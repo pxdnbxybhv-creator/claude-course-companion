@@ -18,7 +18,7 @@ This is a set of Markdown prompts, not an application. There is no code to insta
 
 ## Why I built this
 
-I am a Computer Science and Technology undergraduate at Harbin Engineering University. Many students, including me at times, use AI mainly for quick answers.
+I am a Computer Science and Technology undergraduate at Harbin Engineering University. Many students use AI mainly for quick answers.
 
 I wanted to explore a different approach: using Claude as a long-context learning workspace that helps me understand how concepts connect, reason through difficult material, test my understanding, and review my mistakes systematically. Rather than pasting in a question and copying the answer, I give Claude the course materials and the full context, ask it to build a structure first, and then work through that structure one section at a time.
 
