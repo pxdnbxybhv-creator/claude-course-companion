@@ -207,11 +207,72 @@ def build_front(doc, data):
     para(doc, '', size=10.5, exact=22)
 
 
+def set_cell_borders(cell, **kw):
+    tcPr = cell._element.get_or_add_tcPr()
+    b = tcPr.find(qn('w:tcBorders'))
+    if b is None:
+        b = OxmlElement('w:tcBorders'); tcPr.append(b)
+    for edge in ('top', 'bottom', 'left', 'right'):
+        el = OxmlElement('w:' + edge)
+        if edge in kw:
+            el.set(qn('w:val'), 'single'); el.set(qn('w:sz'), str(kw[edge])); el.set(qn('w:color'), '000000')
+        else:
+            el.set(qn('w:val'), 'nil')
+        b.append(el)
+
+
+def build_table(doc, caption, rows):
+    C = WD_ALIGN_PARAGRAPH.CENTER
+    p = para(doc, '', size=10.5, align=C, exact=22, before=6)
+    p.paragraph_format.keep_with_next = True
+    add_mixed_runs(p, caption, HEI, HEI, 10.5)
+    ncol = max(len(r) for r in rows)
+    tbl = doc.add_table(rows=len(rows), cols=ncol)
+    tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+    tbl.autofit = True
+    total = 8312
+    # first column narrower when many columns
+    widths = [int(total / ncol)] * ncol
+    for i, r in enumerate(rows):
+        for j in range(ncol):
+            cell = tbl.rows[i].cells[j]
+            cell.width = Twips(widths[j])
+            cp = cell.paragraphs[0]
+            cp.alignment = C if (i == 0 or j > 0) else WD_ALIGN_PARAGRAPH.LEFT
+            cp.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+            cp.paragraph_format.line_spacing = Pt(16)
+            cp.paragraph_format.space_before = Pt(0); cp.paragraph_format.space_after = Pt(0)
+            if i < len(rows) - 1:
+                cp.paragraph_format.keep_with_next = True
+            txt = r[j] if j < len(r) else ''
+            run = cp.add_run(txt)
+            set_run_font(run, SONG, TNR, 9)
+            kw = {}
+            if i == 0: kw = dict(top=12, bottom=6)
+            if i == len(rows) - 1: kw['bottom'] = 12
+            set_cell_borders(cell, **kw)
+    para(doc, '', size=6, exact=8)
+
+
 def build_body(doc, data):
-    for line in data['BODY'].split('\n'):
-        line = line.rstrip()
+    lines = data['BODY'].split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i].rstrip()
         if not line.strip():
+            i += 1; continue
+        if line.startswith('!!TABLE '):
+            caption = line[8:].strip()
+            rows = []
+            i += 1
+            while i < len(lines) and lines[i].strip().startswith('|'):
+                cells = [c.strip() for c in lines[i].strip().strip('|').split('|')]
+                if not all(set(c) <= set('-: ') for c in cells):
+                    rows.append(cells)
+                i += 1
+            build_table(doc, caption, rows)
             continue
+        i += 1
         if line.startswith('## '):
             p = para(doc, '', size=12, exact=22, before=3)
             add_mixed_runs(p, line[3:].strip(), HEI, HEI, 12)
@@ -239,7 +300,7 @@ def build_refs(doc, data):
 
 def stats(data):
     body = data['BODY']
-    body_text = '\n'.join(l for l in body.split('\n') if not l.startswith('#'))
+    body_text = '\n'.join(l for l in body.split('\n') if not l.startswith('#') and not l.startswith('|') and not l.startswith('!!TABLE'))
     cjk = len(re.findall(r'[一-鿿]', body_text))
     nonspace = len(re.sub(r'\s', '', body_text))
     abstract = len(re.sub(r'\s', '', data['ABSTRACT']))
