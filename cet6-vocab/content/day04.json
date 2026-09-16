@@ -1,0 +1,1469 @@
+{
+  "day": 4,
+  "part": 1,
+  "kind": "study",
+  "title": "句子里还缺两个词",
+  "estimated_minutes": 55,
+  "story_note": "Part I 第四集，接 Day 3 对收据「社团画稿一箱」的核对与次日找照片的约定。唯一新碎片：1987 年交接照片里，两件装订物的封面都题作《银河骑士》。不认定内页一致，不揭作者、电话竞拍者或撕页者。结尾转查交接清单和箱内实物，衔接 Day 5。近刊内容与主线无涉；未交换词。七个词根假朋友逐卡明示；hardy 不采 ECDICT 错误中文释义。",
+  "dialogue": {
+    "title": "关于「认识了，然后呢」的对话",
+    "turns": [
+      {
+        "who": "student",
+        "text": "教授，中文意思我记住了，写句子还是卡住。"
+      },
+      {
+        "who": "professor",
+        "text": "大意对了，词放进去，通常就能往下写。"
+      },
+      {
+        "who": "student",
+        "text": "那我写：Our visit contingent the weather。取决于天气。"
+      },
+      {
+        "who": "professor",
+        "text": "得补 is 和 on。contingent 在这里是形容词。"
+      },
+      {
+        "who": "student",
+        "text": "中文我一个字没少背，英语欠了两个词。您这办法还有尾款。"
+      },
+      {
+        "who": "professor",
+        "text": "是我说得太省了。认出意思和用对句子，是两件事。"
+      },
+      {
+        "who": "student",
+        "text": "所以不能只在词根底下画线？"
+      },
+      {
+        "who": "professor",
+        "text": "还要看它站什么位置，前后常跟谁。今天把介词也圈上。"
+      },
+      {
+        "who": "student",
+        "text": "圈完能去找照片了吗？周管理员说九点。"
+      },
+      {
+        "who": "professor",
+        "text": "能。路上先做个小检查：拿掉中文，你能把一个完整搭配补回来吗？"
+      }
+    ]
+  },
+  "crux": {
+    "question": "认识词义，怎样才算会把词放进句子？",
+    "answer": "词根帮助认形，词性决定位置，搭配提示前后关系。今天每个词至少带走一小段：形容词连介词，动词连宾语，名词连常用结构。复习时再遮住小词补一遍，别只检查中文释义。"
+  },
+  "hook": "周管理员答应找来 1987 年交接时拍的照片。收据只写了一箱画稿；照片能让你们看清，箱子里当时究竟装了什么吗？",
+  "scenes": [
+    {
+      "key": "roots",
+      "title": "词根家族：认出零件，还得放进句子",
+      "intro": "terr（土地）、close 所属的 claudere（关）、posit（放）能把几组词连起来。其余七个不能按表面字母硬归进这些家族。来源核对完，再看词性和搭配：中文意思相近，不代表句子里的位置相同。",
+      "cards": [
+        {
+          "id": 1142,
+          "head": "terrain",
+          "family": [],
+          "ipa": "/tərˈeɪn/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "地形，地势；地带"
+          ],
+          "example": {
+            "en": "The survey team mapped the uneven terrain behind the old campus buildings.",
+            "zh": "测绘队绘制了校园旧楼后方起伏地形的地图。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "terr 来自拉丁语 terra（土地）。terrain 经法语传入，记地面是什么样：平坦、崎岖，还是多山。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "rough terrain",
+            "mountainous terrain"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1141,
+          "head": "terrace",
+          "family": [],
+          "ipa": "/ˈtɛrəs/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "露台，平台",
+            "梯田；阶地"
+          ],
+          "example": {
+            "en": "We carried the empty boxes onto the terrace outside the reading room.",
+            "zh": "我们把空箱子搬到阅览室外面的露台上。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "也是 terra（土地）这一家，经法语 terrasse 传入。把坡地整出一层平台，就能记住梯田和露台两个意思。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a roof terrace",
+            "rice terraces"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 623,
+          "head": "interrogate",
+          "family": [
+            {
+              "form": "interrogation",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˌɪnˈtɛrəˌɡeɪt/",
+          "pos": [
+            "vt."
+          ],
+          "senses": [
+            "审问，讯问；盘问"
+          ],
+          "example": {
+            "en": "The report describes how investigators interrogate witnesses before checking their accounts.",
+            "zh": "报道介绍了调查人员如何先讯问证人，再核查他们的叙述。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 interrogare：inter- + rogare（问）。不是 terr（地）；不要被中间连续的字母带进土地家族。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "interrogate a suspect",
+            "interrogate sb about sth"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 262,
+          "head": "contingent",
+          "family": [],
+          "ipa": "/kənˈtɪndʒənt/",
+          "pos": [
+            "adj.",
+            "n."
+          ],
+          "senses": [
+            "取决于……的；有条件的",
+            "代表团；分遣队"
+          ],
+          "example": {
+            "en": "Our access to the photographs is contingent on the arrival of the keeper.",
+            "zh": "我们能否查阅照片，取决于管理员是否到场。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 contingere：con- + tangere（接触、碰上）。不是 tain（持）；词源只帮认形，用法另记 be contingent on。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "be contingent on approval",
+            "a contingent of students"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 463,
+          "head": "extinct",
+          "family": [
+            {
+              "form": "extinction",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ɪkˈstɪŋkt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "灭绝的；不复存在的",
+            "（火山）死的，不再活跃的"
+          ],
+          "example": {
+            "en": "The exhibition shows drawings of extinct animals alongside photographs of living species.",
+            "zh": "展览把已灭绝动物的绘画与现存物种的照片放在一起。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 exstinguere（熄灭）的过去分词。不是 tain（持）；记「不再存在」，别拆出一个不存在的持有动作。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "become extinct",
+            "an extinct volcano"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 87,
+          "head": "ascertain",
+          "family": [],
+          "ipa": "/ˌæsərˈteɪn/",
+          "pos": [
+            "vt."
+          ],
+          "senses": [
+            "查明，弄清；确定"
+          ],
+          "example": {
+            "en": "We must ascertain whether the photograph was taken before the boxes were sealed.",
+            "zh": "我们必须查明，这张照片是否拍于箱子封好之前。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "经法语来自 a- 与 certain（确定的）的组合。不是 tain（持）；动作是「查清」，可以接 whether 引导的从句。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "ascertain the facts",
+            "ascertain whether"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 213,
+          "head": "cluster",
+          "family": [],
+          "ipa": "/ˈklʌstər/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "群，簇，串",
+            "聚集；使聚集"
+          ],
+          "example": {
+            "en": "A cluster of students gathered around the only table with a working lamp.",
+            "zh": "一群学生聚在唯一亮着台灯的桌子旁。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自古英语 clyster，与 clot（团块）相关。不是 clud（关）；名词看一团东西，动词看东西聚拢。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a cluster of stars",
+            "cluster around"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 359,
+          "head": "disclose",
+          "family": [
+            {
+              "form": "disclosure",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/dɪsˈkloʊz/",
+          "pos": [
+            "vt."
+          ],
+          "senses": [
+            "透露，披露；揭露"
+          ],
+          "example": {
+            "en": "The keeper would not disclose private addresses printed in the old membership book.",
+            "zh": "管理员不愿透露旧会员名册里印着的私人地址。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "经法语来自拉丁语 dis-（分开）+ claudere（关闭）。close 也属这一家；打开原本关着的消息，就是披露。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "disclose information",
+            "disclose sth to sb"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 422,
+          "head": "enclose",
+          "family": [
+            {
+              "form": "enclosure",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ɪnˈkloʊz/",
+          "pos": [
+            "vt."
+          ],
+          "senses": [
+            "围住，圈起",
+            "随函附上；把……装入"
+          ],
+          "example": {
+            "en": "Please enclose a copy of your request when you return the borrowed photographs.",
+            "zh": "归还借阅的照片时，请附上一份申请书副本。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "经法语溯至拉丁语 includere：in-（里面）+ claudere（关闭）。围墙把花园围在里面，信封把附件装在里面。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "enclose a cheque",
+            "enclose sth in an envelope"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 237,
+          "head": "composite",
+          "family": [],
+          "ipa": "/kəmˈpɑzət/",
+          "pos": [
+            "adj.",
+            "n."
+          ],
+          "senses": [
+            "复合的，合成的",
+            "复合材料；合成物"
+          ],
+          "example": {
+            "en": "The engineer chose a light composite material for the new display panels.",
+            "zh": "工程师为新展板选了一种轻质复合材料。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "com-（一起）+ posit（放），来自 componere 的过去分词。「放在一起」形成一个整体，得到复合的、合成的。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a composite material",
+            "a composite image"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 461,
+          "head": "exposition",
+          "family": [],
+          "ipa": "/ˌɛkspəˈzɪʃən/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "阐述，讲解",
+            "展览会，博览会"
+          ],
+          "example": {
+            "en": "The catalogue opens with a clear exposition of how the collection was formed.",
+            "zh": "目录开头清楚讲述了这批藏品是怎样形成的。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "ex-（出来）+ posit（放）。来自 exponere：把事情摆出来解释；也能指把展品摆出来的展览会。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "an exposition of a theory",
+            "an international exposition"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 370,
+          "head": "disposition",
+          "family": [],
+          "ipa": "/ˌdɪspəˈzɪʃən/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "性情，性格；倾向",
+            "安排，布置；处置"
+          ],
+          "example": {
+            "en": "Her calm disposition helped the team finish its work despite repeated delays.",
+            "zh": "尽管工作一再拖延，她沉稳的性情仍帮助团队完成了任务。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "dis-（分开）+ posit（放），来自 disponere（安排）。从事物的安排到人的性情，现代意思要分别记。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a cheerful disposition",
+            "a disposition to argue"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1119,
+          "head": "symposium",
+          "family": [],
+          "ipa": "/sɪmˈpoʊziəm/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "专题讨论会，研讨会"
+          ],
+          "example": {
+            "en": "The university will host a symposium on preserving student publications next month.",
+            "zh": "学校下个月将举办保存学生出版物的专题研讨会。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自希腊语 symposion，相关动词 sympinein 意为「一起饮酒」。不是 pos（放）；如今记会议，不凭酒席猜用法。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a symposium on education",
+            "attend a symposium"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 589,
+          "head": "imminent",
+          "family": [],
+          "ipa": "/ˈɪmənənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "即将发生的，迫近的"
+          ],
+          "example": {
+            "en": "The dark clouds suggested that heavy rain was imminent over the campus.",
+            "zh": "乌云表明，校园很快就会下大雨。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 imminere（悬在上方；迫近）。不是 min（小）；只说事情快发生了，不说明它小，也不说明已经发生。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "imminent danger",
+            "an imminent arrival"
+          ],
+          "card_style": "full"
+        }
+      ],
+      "boxes": [
+        {
+          "type": "aside",
+          "title": "同一个词，两种位置",
+          "after_card_id": 262,
+          "text": "contingent 作形容词，常见 be contingent on/upon，表示取决于某个条件；作名词，a contingent 指代表团或队伍。所以查词时别只抄第一条中文：把词性与紧跟的介词一起带走。",
+          "source": "https://www.merriam-webster.com/dictionary/contingent"
+        },
+        {
+          "type": "tip",
+          "title": "把遮挡挪一格",
+          "text": "把 adjacent to、be contingent on、a breach of 抄成三行。第一遍遮住中文，说意思；第二遍保留关键词，遮住 to、be/on、a/of，补回句子需要的部分。能认词而补不出来，就只重练这一行。"
+        }
+      ]
+    },
+    {
+      "key": "theme",
+      "title": "情景剧：阅览室后面的照片",
+      "intro": "早上九点，周管理员带你们去阅览室后面的储藏间。昨天收据上「社团画稿一箱」几个字还没解释清。他记得交接时拍过照，说照片跟社团年册收在一起。",
+      "cards": [
+        {
+          "id": 530,
+          "head": "grid",
+          "family": [],
+          "ipa": "/ɡrɪd/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "网格，格栅",
+            "电网"
+          ],
+          "example": {
+            "en": "The storage plan uses a grid to show the position of every shelf.",
+            "zh": "储藏室平面图用网格标出每个架子的位置。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "先在方格图上找行、再找列。a power grid 换了场景：纵横连接的是输电线路。"
+          },
+          "collocations": [
+            "a grid reference",
+            "the national grid"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1106,
+          "head": "suite",
+          "family": [],
+          "ipa": "/swit/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "一套房间，套房",
+            "一套（设备或软件）；组曲"
+          ],
+          "example": {
+            "en": "The archive occupies a suite of small rooms beside the main reading room.",
+            "zh": "档案室占用了主阅览室旁边一套相连的小房间。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "读 /swit/，与 sweet 同音。看作一套相连的东西：房间、软件或乐曲；别读成 suit。"
+          },
+          "collocations": [
+            "a hotel suite",
+            "a software suite"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 13,
+          "head": "adjacent",
+          "family": [],
+          "ipa": "/əˈdʒeɪsənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "相邻的，毗邻的"
+          ],
+          "example": {
+            "en": "The storage room is adjacent to the office where visitors sign their names.",
+            "zh": "储藏室紧挨着访客签到的办公室。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "表示「与……相邻」时，记 adjacent to；后面接具体位置。修饰名词时则可以直接说 adjacent buildings。"
+          },
+          "collocations": [
+            "adjacent to the library",
+            "adjacent buildings"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1209,
+          "head": "valve",
+          "family": [],
+          "ipa": "/vælv/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "阀，阀门",
+            "（心脏等的）瓣膜"
+          ],
+          "example": {
+            "en": "The keeper closed the valve on the dripping pipe beside the entrance.",
+            "zh": "管理员关上了入口旁那根滴水水管的阀门。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记水管上控制流量的阀门。a heart valve 是心脏瓣膜；两个语境都抓住控制流动这个作用。"
+          },
+          "collocations": [
+            "close a valve",
+            "a heart valve"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 770,
+          "head": "oak",
+          "family": [],
+          "ipa": "/oʊk/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "橡树；橡木"
+          ],
+          "example": {
+            "en": "We lifted the heavy oak table together to clear the cupboard door.",
+            "zh": "我们一起抬起那张沉重的橡木桌，给柜门让出位置。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "树是 an oak，木材是 oak。看见 an oak table，把 oak 读成桌子的材料，别找桌上的树。"
+          },
+          "collocations": [
+            "an oak tree",
+            "solid oak"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 212,
+          "head": "closet",
+          "family": [],
+          "ipa": "/ˈklɑzət/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "壁橱，储藏间"
+          ],
+          "example": {
+            "en": "The keeper opened the closet and checked the dates on the photograph boxes.",
+            "zh": "管理员打开壁橱，查看照片盒上的年份。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记开门后露出的一排隔板。美式英语里 clothes closet 放衣服，storage closet 放杂物。"
+          },
+          "collocations": [
+            "a storage closet",
+            "a clothes closet"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1113,
+          "head": "surveillance",
+          "family": [],
+          "ipa": "/sərˈveɪləns/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "监视，监控"
+          ],
+          "example": {
+            "en": "The notice states that the reading room entrance is under video surveillance.",
+            "zh": "告示写明，阅览室入口设有视频监控。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记 under surveillance 这个整体：某处或某人正受到监视。不把它当成一次普通的看望。"
+          },
+          "collocations": [
+            "under surveillance",
+            "video surveillance"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 822,
+          "head": "patrol",
+          "family": [],
+          "ipa": "/pəˈtroʊl/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "巡逻，巡视",
+            "巡逻队，巡逻人员"
+          ],
+          "example": {
+            "en": "Security staff patrol the building each evening and check that visitors have left.",
+            "zh": "保安每天傍晚巡视大楼，检查访客是否已经离开。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "动词直接接巡视的地方：patrol the area；名词常在 on patrol 里。记那条每天走过的路线。"
+          },
+          "collocations": [
+            "on patrol",
+            "patrol the streets"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 864,
+          "head": "portfolio",
+          "family": [],
+          "ipa": "/pɔrtˈfoʊliˌoʊ/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "作品集；公事包",
+            "投资组合"
+          ],
+          "example": {
+            "en": "The club kept a portfolio of drawings submitted for its annual exhibition.",
+            "zh": "社团留存了一套用于年度展览的绘画作品集。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "美术生打开它展示作品；谈投资时，它展示持有的各项资产。认清后面的内容，再选义项。"
+          },
+          "collocations": [
+            "a portfolio of drawings",
+            "an investment portfolio"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 515,
+          "head": "genre",
+          "family": [],
+          "ipa": "/ˈʒɑnrə/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "（文学、艺术等的）类型，体裁"
+          ],
+          "example": {
+            "en": "The catalogue lists each genre separately, with poetry placed next to short fiction.",
+            "zh": "目录按体裁分列，把诗歌放在短篇小说旁边。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "问「属于哪一类」：小说、诗歌、纪录片。评价作品好不好另有词，genre 只先说明类型。"
+          },
+          "collocations": [
+            "a literary genre",
+            "the science fiction genre"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1220,
+          "head": "verse",
+          "family": [],
+          "ipa": "/vɜrs/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "诗，韵文",
+            "诗节；（歌曲的）段落"
+          ],
+          "example": {
+            "en": "The student magazine printed one page of verse between two longer essays.",
+            "zh": "学生杂志在两篇较长的文章之间刊登了一页诗。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "verse 可以泛指诗体；a verse 可以是一节诗或一段歌词。先看冠词，再看它在数什么。"
+          },
+          "collocations": [
+            "write in verse",
+            "the first verse"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1228,
+          "head": "vocal",
+          "family": [],
+          "ipa": "/ˈvoʊkəl/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "直言不讳的；公开表达意见的",
+            "嗓音的，发声的；歌唱的"
+          ],
+          "example": {
+            "en": "The editor was vocal about the need to preserve ordinary student writing.",
+            "zh": "那位编辑公开强调，普通学生的文字也需要保存。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "a vocal critic 是公开表达反对意见的人，不是擅长唱歌的评论家。搭配能替你选义项。"
+          },
+          "collocations": [
+            "be vocal about sth",
+            "vocal music"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 664,
+          "head": "lesbian",
+          "family": [],
+          "ipa": "/ˈlɛzbiən/",
+          "pos": [
+            "n.",
+            "adj."
+          ],
+          "senses": [
+            "女同性恋者",
+            "女同性恋的"
+          ],
+          "example": {
+            "en": "The campus magazine interviewed a lesbian poet about her latest collection of poems.",
+            "zh": "校园杂志采访了一位女同性恋诗人，谈论她最新的诗集。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "作名词指女同性恋者；作形容词说明性倾向。a lesbian poet 中修饰 poet，照通常的词性关系理解。"
+          },
+          "collocations": [
+            "a lesbian writer",
+            "lesbian and gay students"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1171,
+          "head": "trauma",
+          "family": [
+            {
+              "form": "traumatic",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/ˈtrɔmə/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "精神创伤",
+            "外伤，身体创伤"
+          ],
+          "example": {
+            "en": "The article examines how journalists interview people who have experienced psychological trauma.",
+            "zh": "这篇文章探讨记者如何采访经历过心理创伤的人。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "看搭配区分心理和身体语境：psychological trauma 是心理创伤，head trauma 是头部外伤。"
+          },
+          "collocations": [
+            "psychological trauma",
+            "head trauma"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1145,
+          "head": "testimony",
+          "family": [],
+          "ipa": "/ˈtɛstəˌmoʊni/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "证词，证言",
+            "证明，证据"
+          ],
+          "example": {
+            "en": "The article explains why a court examines witness testimony alongside other evidence.",
+            "zh": "这篇文章解释了法庭为何要把证人证言与其他证据一同审查。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记 witness testimony：证人所作的陈述。读到陈述，要分清「有人这么说」与「已获证实」。"
+          },
+          "collocations": [
+            "witness testimony",
+            "give testimony"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 644,
+          "head": "judicial",
+          "family": [],
+          "ipa": "/dʒuˈdɪʃəl/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "司法的；法庭的；法官的"
+          ],
+          "example": {
+            "en": "The law society published an introduction to judicial review in its student magazine.",
+            "zh": "法律社团在学生杂志上刊登了一篇司法审查入门文章。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "抓法院和审判这个场景。judicial independence 说司法独立，不是一般意义上的独立判断。"
+          },
+          "collocations": [
+            "judicial review",
+            "judicial independence"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1183,
+          "head": "trophy",
+          "family": [],
+          "ipa": "/ˈtroʊfi/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "奖杯，奖品",
+            "战利品"
+          ],
+          "example": {
+            "en": "A small trophy stood beside the club albums on the lowest shelf.",
+            "zh": "一座小奖杯放在最底层架子上，紧挨着社团相册。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记比赛结束后被举起来的奖杯。家里展示的狩猎战利品也能叫 trophy，具体看来源。"
+          },
+          "collocations": [
+            "win a trophy",
+            "a championship trophy"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 178,
+          "head": "casino",
+          "family": [],
+          "ipa": "/kəˈsinoʊ/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "赌场"
+          ],
+          "example": {
+            "en": "The theatre programme shows a painted casino used as the play’s main setting.",
+            "zh": "戏剧节目册上有一幅绘制的赌场布景，它是这出戏的主要场景。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记正式释义「赌场」。本例是舞台布景上的场所；不要把表演地点和故事发生地混在一起。"
+          },
+          "collocations": [
+            "a casino owner",
+            "a casino table"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 158,
+          "head": "buffalo",
+          "family": [],
+          "ipa": "/ˈbʌfəˌloʊ/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "水牛",
+            "（通称）美洲野牛"
+          ],
+          "example": {
+            "en": "A drawing of a water buffalo lay among the club’s landscape sketches.",
+            "zh": "一张水牛画放在社团的一批风景速写中。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "先记 water buffalo 水牛。北美语境中的 buffalo 也常指美洲野牛，画面换了，别硬套水田。"
+          },
+          "collocations": [
+            "a water buffalo",
+            "a herd of buffalo"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 540,
+          "head": "haven",
+          "family": [],
+          "ipa": "/ˈheɪvən/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "避风港；庇护所，安宁之处"
+          ],
+          "example": {
+            "en": "The quiet reading room became a haven for students during the noisy festival.",
+            "zh": "热闹的节庆期间，安静的阅览室成了学生们的清静去处。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记有人躲进安静屋子的画面。a haven for 后接得到庇护的人或事物，不一定真有港口。"
+          },
+          "collocations": [
+            "a safe haven",
+            "a haven for wildlife"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 192,
+          "head": "chancellor",
+          "family": [],
+          "ipa": "/ˈtʃænsələr/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "（某些国家的）总理，大臣",
+            "（某些大学的）校长，名誉校长"
+          ],
+          "example": {
+            "en": "The club’s annual album begins with a printed greeting from the university chancellor.",
+            "zh": "社团的年度相册开头印着大学校长的致辞。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "先看国家与机构：大学里的职务和政府里的职务不能互换。大学头衔的具体含义也因制度而异。"
+          },
+          "collocations": [
+            "the university chancellor",
+            "the German chancellor"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 281,
+          "head": "courtesy",
+          "family": [],
+          "ipa": "/ˈkɜrtəsi/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "礼貌，谦恭",
+            "好意；恩惠"
+          ],
+          "example": {
+            "en": "The caption says that the photograph appears courtesy of the former student club.",
+            "zh": "图片说明写道，这张照片由原学生社团惠允提供。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "看图注里的 courtesy of：承蒙某方提供或许可。普通句子 show courtesy to sb 则是以礼待人。"
+          },
+          "collocations": [
+            "courtesy of",
+            "show courtesy to sb"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 580,
+          "head": "icon",
+          "family": [],
+          "ipa": "/ˈaɪkɑn/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "图标",
+            "偶像，代表性人物或事物"
+          ],
+          "example": {
+            "en": "Click the small icon beside the filename to enlarge the scanned photograph.",
+            "zh": "点击文件名旁边的小图标，就能放大扫描的照片。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "屏幕上的小图是 icon；被视为某个时代代表的人也可以是 an icon。看见 mouse 别先想到偶像。"
+          },
+          "collocations": [
+            "click an icon",
+            "a cultural icon"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 149,
+          "head": "breach",
+          "family": [],
+          "ipa": "/britʃ/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "违反，违背；违背（规定等）",
+            "缺口；攻破"
+          ],
+          "example": {
+            "en": "Removing a photograph without recording the loan would breach the archive’s rules.",
+            "zh": "未登记借阅就把照片带走，会违反档案室的规定。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "动词 breach a rule；名词 a breach of the rules。表达同一件事，名词多了冠词和 of。"
+          },
+          "collocations": [
+            "a breach of contract",
+            "breach the rules"
+          ],
+          "card_style": "full"
+        }
+      ],
+      "beats": [
+        {
+          "after": null,
+          "text": "你按墙上 grid 找房间，才发现阅览室旁边是一整套 suite。储藏间与办公室 adjacent，入口却在走廊另一头。周管理员停在水管前，把还在滴水的 valve 拧紧。「先干这个。」他说。"
+        },
+        {
+          "after": 1209,
+          "text": "oak 桌挡着半扇 closet 门。教授试着推，桌子没动，脚下的垫子走了。你们换到另一侧抬。门口贴着 surveillance 告示，背面是保安 patrol 的登记表；周管理员签完记录，取下装着社团年册的资料盒。"
+        },
+        {
+          "after": 822,
+          "text": "盒里最上面是一本 portfolio。教授提议按 genre 分摞，verse 一摞，散文一摞，手也跟着伸过去。周管理员按住盒沿：「先别换顺序。年份在书脊上。」教授是按体裁归档的 vocal 支持者，这回还是把书放了回去。"
+        },
+        {
+          "after": 1228,
+          "text": "你拿起上层刊物，先翻目录核对日期。上面列着 lesbian 诗人的访谈、关于 trauma 的采访说明，还有 testimony 与 judicial 程序专题。出版日期是今年。你把近刊归回上层，沿书脊往下找，抽出了写着 1987 的年册。"
+        },
+        {
+          "after": 644,
+          "text": "架子旁有一座 trophy 和旧演出的节目册，casino 布景折在中缝，一张 buffalo 速写夹在后面。窗外有人排练，你关好窗，阅览室又成了 haven。周管理员接过年册，翻到末尾的交接照片，把书转向你们。"
+        },
+        {
+          "after": 540,
+          "text": "年册扉页印着 chancellor 的致辞，交接照下注着 courtesy of 社团。你扫好照片，点开放大 icon：桌上并排放着两件装订物，封面都写着《银河骑士》。教授要把年册借走，周管理员递过借阅簿：「不登记就拿，会 breach 这里的规定。」"
+        }
+      ],
+      "boxes": [
+        {
+          "type": "aside",
+          "title": "suite 先听，再辨义",
+          "after_card_id": 1106,
+          "text": "本日的「套房、软件套件、组曲」都读 /swit/，与 sweet 同音；suit 常读 /sut/，可指西服或诉讼。拼写只差一个字母，不适合只靠默读来区别。听见读音后，再看后面的搭配确认意思。",
+          "source": "Merriam-Webster：suite、suit、sweet 词条（读音与名词义项）"
+        }
+      ]
+    },
+    {
+      "key": "freebies",
+      "title": "闪电轮：短卡，也要核对关系",
+      "intro": "四张短卡，按字母顺序读。hardy 和 outrage 的字形都容易诱导过度拆分，先看钩里的说明，再把搭配读完整。",
+      "cards": [
+        {
+          "id": 539,
+          "head": "hardy",
+          "family": [],
+          "ipa": "/ˈhɑrdi/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "耐寒的；耐劳的，强健的"
+          ],
+          "example": {
+            "en": "The gardener chose hardy plants that could survive the exposed campus terrace.",
+            "zh": "园丁选了耐寒植物，让它们能在无遮挡的校园露台上存活。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "与 hard 同源，经法语传入；并非英语 hard + y。记能扛住恶劣条件。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "hardy plants",
+            "a hardy traveller"
+          ],
+          "card_style": "lite"
+        },
+        {
+          "id": 598,
+          "head": "incorporate",
+          "family": [
+            {
+              "form": "incorporation",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˌɪnˈkɔrpərˌeɪt/",
+          "pos": [
+            "vt.",
+            "vi."
+          ],
+          "senses": [
+            "把……纳入；合并",
+            "组成公司，使成立公司"
+          ],
+          "example": {
+            "en": "The new catalogue will incorporate the corrections written in the keeper’s notebook.",
+            "zh": "新目录会纳入管理员记在笔记本里的更正。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "in-（入）+ corpor（身体）：纳入同一整体。和 corporate 同属 corpus 一家。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "incorporate A into B",
+            "incorporate changes"
+          ],
+          "card_style": "lite"
+        },
+        {
+          "id": 791,
+          "head": "outrage",
+          "family": [
+            {
+              "form": "outrageous",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/ˈaʊˌtreɪdʒ/",
+          "pos": [
+            "n.",
+            "vt."
+          ],
+          "senses": [
+            "愤慨，义愤",
+            "暴行；使震怒"
+          ],
+          "example": {
+            "en": "The unfair admission rule caused outrage among students applying to join the club.",
+            "zh": "那条不公平的入会规定引起了申请加入社团的学生的愤慨。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自法语 outre（越出）加 -age。不是 out + rage；先整词记「愤慨」。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "public outrage",
+            "cause outrage"
+          ],
+          "card_style": "lite"
+        },
+        {
+          "id": 926,
+          "head": "referee",
+          "family": [],
+          "ipa": "/ˌrɛfərˈi/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "裁判员；担任裁判",
+            "审稿人；审阅（论文）"
+          ],
+          "example": {
+            "en": "The referee stopped the match when a player reported damage to the goal.",
+            "zh": "一名球员报告球门损坏后，裁判暂停了比赛。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "refer（提交处理）+ -ee：问题交给其裁断的人。球赛里是裁判，论文里是审稿人。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a football referee",
+            "referee a paper"
+          ],
+          "card_style": "lite"
+        }
+      ]
+    },
+    {
+      "key": "orphans",
+      "title": "孤儿院：今天没有同组伙伴的五个词",
+      "intro": "有的能拆，有的适合连着搭配记。它们只是不在今天的家族里，不表示没有来源。读完一张，把最顺手的搭配留下。",
+      "cards": [
+        {
+          "id": 444,
+          "head": "errand",
+          "family": [],
+          "ipa": "/ˈɛrənd/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "差使，跑腿的事"
+          ],
+          "example": {
+            "en": "My simple errand to fetch one photograph had already taken the entire morning.",
+            "zh": "我本来只是跑腿取张照片，却已经花掉了整个上午。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记「取个东西就回来」。教授说只耽误五分钟时，先问是他的五分钟，还是钟上的。",
+            "joke": true
+          },
+          "collocations": [
+            "run an errand",
+            "send sb on an errand"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 264,
+          "head": "convene",
+          "family": [],
+          "ipa": "/kənˈvin/",
+          "pos": [
+            "vt.",
+            "vi."
+          ],
+          "senses": [
+            "召集（会议）；集合，开会"
+          ],
+          "example": {
+            "en": "The committee will convene next week to discuss access to the student collection.",
+            "zh": "委员会下周将开会，讨论学生藏品的查阅事宜。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "con-（一起）+ venire（来），来自拉丁语 convenire。人聚在一起开会；既可说委员会开会，也可说召集会议。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "convene a meeting",
+            "the committee convenes"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 857,
+          "head": "poise",
+          "family": [
+            {
+              "form": "poised",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/pɔɪz/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "镇定，沉着；平衡",
+            "使保持平衡；使悬着"
+          ],
+          "example": {
+            "en": "The student answered the difficult questions with poise, although her notes were missing.",
+            "zh": "尽管讲稿不见了，那位学生仍沉着回答了难题。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记站稳后从容作答的状态。家族里的 be poised to do sth 另记「准备好做某事」。"
+          },
+          "collocations": [
+            "with poise",
+            "be poised to act"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 11,
+          "head": "acupuncture",
+          "family": [],
+          "ipa": "/ˈækjuˌpʌŋktʃər/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "针刺疗法"
+          ],
+          "example": {
+            "en": "The university library added a history of acupuncture to its medical collection.",
+            "zh": "大学图书馆的医学藏书新增了一本针刺疗法史。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "拉丁语 acu-（针）+ puncture（刺）。针和刺两个要素放在一起，记住完整词义「针刺疗法」。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "acupuncture treatment",
+            "an acupuncture needle"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1086,
+          "head": "strangle",
+          "family": [],
+          "ipa": "/ˈstræŋɡəl/",
+          "pos": [
+            "vt."
+          ],
+          "senses": [
+            "勒死，扼死",
+            "抑制；扼杀"
+          ],
+          "example": {
+            "en": "The editorial argues that excessive restrictions can strangle creativity in student publications.",
+            "zh": "这篇社论认为，过多限制会扼杀学生出版物的创造力。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "此处是比喻义：让某种活动或能力无法发展。strangle creativity 说创造力受到严重压制。"
+          },
+          "collocations": [
+            "strangle creativity",
+            "strangle economic growth"
+          ],
+          "card_style": "full"
+        }
+      ]
+    }
+  ],
+  "homework": {
+    "exercises": [
+      {
+        "type": "cloze",
+        "title": "故事完形：备选词各用一次，按顺序填空",
+        "passage": "Word bank (use each once): icon, oak, courtesy, adjacent, ascertain, portfolio. The keeper led us to a storage room ____ to his office. A heavy ____ table blocked the cupboard door, so we moved it together. While he looked for the album, I put a student’s ____ of drawings safely on the desk. The handover photograph appeared ____ of the old club. I clicked an ____ to enlarge the image. Two bound objects lay on the table, and both covers carried the same title. We still had to ____ what was inside them. The professor reached for the album, but the keeper passed him the loan book first.",
+        "items": [
+          {
+            "answer": "adjacent"
+          },
+          {
+            "answer": "oak"
+          },
+          {
+            "answer": "portfolio"
+          },
+          {
+            "answer": "courtesy"
+          },
+          {
+            "answer": "icon"
+          },
+          {
+            "answer": "ascertain"
+          }
+        ]
+      },
+      {
+        "type": "cloze",
+        "title": "补齐小词：每空填完整缺项",
+        "items": [
+          {
+            "prompt": "Access ____ contingent ____ permission.",
+            "answer": "is；on（或 upon）",
+            "hint": "第一空用 be 的一般现在时；第二空补介词"
+          },
+          {
+            "prompt": "That is ____ breach ____ the rules.",
+            "answer": "a；of"
+          },
+          {
+            "prompt": "Please incorporate the corrections ____ the catalogue.",
+            "answer": "into"
+          }
+        ]
+      }
+    ]
+  },
+  "summary": [
+    "记词时同时留下词性和搭配：adjacent to，be contingent on。",
+    "词根提供认形线索，不能替你决定句子结构。",
+    "同一意思可以换词性，句子结构也要跟着调整。",
+    "照片只能证实两件装订物同题，内页是否相同还不知道。",
+    "明天：核对交接清单，再看那一箱究竟装过什么。"
+  ],
+  "cliffhanger": "你在扫描图上把两本书圈出来。周管理员看了一会儿：「都叫这个名字。里面是不是同一份，得查交接清单。」他把清单所在的卷册号写进你的本子，约好次日一起核对箱内记录。"
+}

@@ -1,0 +1,1522 @@
+{
+  "day": 3,
+  "part": 1,
+  "kind": "study",
+  "title": "认出了零件，还要读完句子",
+  "estimated_minutes": 58,
+  "dialogue": {
+    "title": "关于一个人是几次方的对话",
+    "turns": [
+      {
+        "who": "student",
+        "text": "教授，我把 exponent 拆成「放出来」，还是读不懂句子。"
+      },
+      {
+        "who": "professor",
+        "text": "先译成「指数」试试。"
+      },
+      {
+        "who": "student",
+        "text": "He is an exponent of modern art。这个人是几次方？"
+      },
+      {
+        "who": "professor",
+        "text": "这里是倡导者。你说得对，我还没看见句子就选了意思。"
+      },
+      {
+        "who": "student",
+        "text": "那我把计算器收起来。差一点要算他的艺术成就了。"
+      },
+      {
+        "who": "professor",
+        "text": "收起来吧。词源没有错，我选错了义项。"
+      },
+      {
+        "who": "student",
+        "text": "拆对也不够，那零件到底帮了什么忙？"
+      },
+      {
+        "who": "professor",
+        "text": "帮你记住这个词。到了句子里，还要看词性、搭配和话题。"
+      },
+      {
+        "who": "student",
+        "text": "所以我既要认得词，也要找出这句话为什么用这个意思。"
+      },
+      {
+        "who": "professor",
+        "text": "对。今天每读一张卡，就圈出帮助你选义的邻词。我们拿收据试试。"
+      }
+    ]
+  },
+  "crux": {
+    "question": "词根已经认对，怎样选出句子里的那个意思？",
+    "answer": "先用零件认词，再用搭配选义。读到 exponent，别停在「放出来」：先找它说的是人还是数，再看 of 后接什么。每张卡圈出一处语境证据，合上释义重译一遍；翻译要放回整句检验。"
+  },
+  "scenes": [
+    {
+      "key": "roots",
+      "title": "词根家族：五张标签，不能代替句子",
+      "intro": "昨天预告了五张标签：cur（跑）、frag（碎）、min（小）、pos/pon（放）、spect（看）。先修正一处：reminiscent 和 eminent 都不能按 min（小）拆，fragrant 也不属 frag（碎）。纠正之后，还得继续问：真正的零件能否决定一句话里的意思？",
+      "cards": [
+        {
+          "id": 361,
+          "head": "discourse",
+          "family": [],
+          "ipa": "/ˈdɪskɔrs/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "（正式的）论述，谈话；话语",
+            "论述，谈论"
+          ],
+          "example": {
+            "en": "Public discourse about the comic changed after students questioned the university’s proposed sale.",
+            "zh": "学生质疑校方拟议的出售计划之后，围绕这本漫画的公共讨论发生了变化。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 discurrere：dis-（分散）+ currere（跑）。这里指言语展开；不能把现代释义直接译成「跑来跑去」。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "public discourse",
+            "discourse on a subject"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 620,
+          "head": "intercourse",
+          "family": [],
+          "ipa": "/ˈɪntərˌkɔrs/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "（正式）交往，交流",
+            "性交"
+          ],
+          "example": {
+            "en": "The history chapter examines social intercourse between the two trading communities.",
+            "zh": "这一历史章节考察了两个商贸群体之间的社会交往。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "inter-（之间）+ 拉丁语 currere（跑）→ 往来。历史文献中的 social intercourse 指社会交往；其他语境须辨明义项。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "social intercourse",
+            "sexual intercourse"
+          ],
+          "card_style": "full",
+          "sense_note": "「交往」义较正式、旧式；现代语境中常指性交。"
+        },
+        {
+          "id": 243,
+          "head": "concurrent",
+          "family": [],
+          "ipa": "/kənˈkɜrənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "同时发生的，并存的"
+          ],
+          "example": {
+            "en": "Two concurrent exhibitions left the small museum with only one available room.",
+            "zh": "两场同时举办的展览使这座小博物馆只剩下一间可用的房间。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "con-（一起）+ currere（跑）→ 一起进行。时间有重叠就可以是 concurrent，不要求开始和结束都相同。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "concurrent events",
+            "concurrent use"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1052,
+          "head": "spectrum",
+          "family": [],
+          "ipa": "/ˈspɛktrəm/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "光谱；频谱",
+            "范围，系列"
+          ],
+          "example": {
+            "en": "The discussion revealed a broad spectrum of opinions about selling the comic.",
+            "zh": "这场讨论呈现出人们对出售漫画的各种不同意见。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "拉丁语 spectrum（显现之物）与 specere（看）有关。a spectrum of opinions 是一系列意见；of 后面没有颜色。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "the visible spectrum",
+            "a broad spectrum of opinions"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1050,
+          "head": "spectacle",
+          "family": [
+            {
+              "form": "spectacular",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/ˈspɛktəkəl/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "壮观景象；引人注目的场面",
+            "（复数）眼镜"
+          ],
+          "example": {
+            "en": "The evening performance turned the empty courtyard into a spectacle of light.",
+            "zh": "晚间演出让空荡荡的庭院变成了一片壮观的灯光景象。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 spectaculum（可观看之物），与 spectare（观看）相连。单数看场面，复数 spectacles 还可能是眼镜。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a magnificent spectacle",
+            "a pair of spectacles"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1051,
+          "head": "spectator",
+          "family": [],
+          "ipa": "/ˈspɛkteɪtər/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "观众，旁观者"
+          ],
+          "example": {
+            "en": "One spectator stayed behind to ask how the moving lights were controlled.",
+            "zh": "一位观众留下来询问那些移动的灯光是怎样控制的。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "spectare（观看）+ 表人的 -or：观看的人。参加比赛的人和看比赛的人，英语不会都叫 spectator。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a crowd of spectators",
+            "spectator sports"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 633,
+          "head": "irrespective",
+          "family": [],
+          "ipa": "/ˌɪrəˈspɛktɪv/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "（irrespective of）不考虑，不论"
+          ],
+          "example": {
+            "en": "All students may enter the exhibition irrespective of their subject or year.",
+            "zh": "所有学生都可以参观展览，不论专业和年级。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "ir-（否定）+ respective（顾及的），远处连着 spect（看）。阅读时抓整块 irrespective of，不逐字拼成中文。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "irrespective of age",
+            "irrespective of the outcome"
+          ],
+          "card_style": "full",
+          "sense_note": "通常用于 irrespective of；整组短语相当于 regardless of。"
+        },
+        {
+          "id": 957,
+          "head": "retrospect",
+          "family": [
+            {
+              "form": "retrospective",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/ˈrɛtrəˌspɛkt/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "回顾，回想"
+          ],
+          "example": {
+            "en": "In retrospect, we should have checked the receipt before arranging the auction.",
+            "zh": "回想起来，我们本该先核对收据，再安排拍卖。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "retro-（向后）+ spect（看）→ 回头看。in retrospect 给整句话加上「事后回想」的时间视角。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "in retrospect",
+            "a retrospective exhibition"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 460,
+          "head": "exponent",
+          "family": [],
+          "ipa": "/ˈɛkˌspoʊnənt/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "倡导者，阐述者；代表人物",
+            "（数学）指数"
+          ],
+          "example": {
+            "en": "The young lecturer became a leading exponent of using drawings in history lessons.",
+            "zh": "这位年轻讲师成了在历史课中使用绘画教学的主要倡导者。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "ex-（向外）+ ponere（放）→ 展示、阐明。exponent 可指阐述观点的人，也可指数学指数；pon 不能替你选义。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a leading exponent of",
+            "a negative exponent"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 941,
+          "head": "reminiscent",
+          "family": [
+            {
+              "form": "reminiscence",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˌrɛməˈnɪsənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "使人想起……的；怀旧的"
+          ],
+          "example": {
+            "en": "The narrow reading room was reminiscent of the classroom where he once taught.",
+            "zh": "这间狭窄的阅览室让人想起他曾经教过课的那间教室。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "拉丁语 reminisci（回想）→ 令人想起。不是 min（小）；搭配 reminiscent of 说的是眼前东西唤起了哪段记忆。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "be reminiscent of",
+            "a reminiscent smile"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 418,
+          "head": "eminent",
+          "family": [
+            {
+              "form": "eminence",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈɛmənənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "杰出的，著名的"
+          ],
+          "example": {
+            "en": "An eminent historian offered to examine the records without charging the museum.",
+            "zh": "一位著名历史学家提出免费为博物馆检查这些档案。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "拉丁语 eminere（突出、高出）→ 杰出。不是 min（小）；eminence 是相应名词。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "an eminent scholar",
+            "a person of eminence"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 499,
+          "head": "fragile",
+          "family": [
+            {
+              "form": "fragility",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈfrædʒəl/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "易碎的，易损坏的",
+            "脆弱的"
+          ],
+          "example": {
+            "en": "The fragile receipt lay flat on a clean sheet while we read it.",
+            "zh": "我们读收据时，这张易损的纸平放在一张干净纸上。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "fragilis（易破的）来自 frangere（打破）。脆弱的纸和脆弱的关系都可能是 fragile，例句中的名词决定你读哪一种。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "fragile glass",
+            "a fragile relationship"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 498,
+          "head": "fracture",
+          "family": [],
+          "ipa": "/ˈfræktʃər/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "断裂，裂缝；骨折",
+            "（使）断裂，破裂"
+          ],
+          "example": {
+            "en": "A narrow fracture in the metal frame prevented the drawer from closing properly.",
+            "zh": "金属框上的一道细裂缝使抽屉无法正常关上。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "fract- 是 frangere（打破）的词干变体，与 fragile 同源。记一处已经裂开的地方；骨头的断裂也用它。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a hairline fracture",
+            "fracture a bone"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 500,
+          "head": "fragrant",
+          "family": [
+            {
+              "form": "fragrance",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈfreɪɡrənt/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "芳香的，香的"
+          ],
+          "example": {
+            "en": "Fragrant tea waited on the desk, safely away from the open folders.",
+            "zh": "清香的茶放在桌上，离摊开的文件夹远远的。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "拉丁语 fragrare（散发香气）→ 芳香的。不是 frag（碎）；fragrant 描述气味，fragrance 是香气本身。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "fragrant flowers",
+            "a fragrant aroma"
+          ],
+          "card_style": "full"
+        }
+      ],
+      "boxes": [
+        {
+          "type": "tip",
+          "title": "圈出选义的证据",
+          "text": "在 spectrum 的例句里圈出 opinions；在 exponent 的例句里圈出 lecturer 和 of using drawings。遮住中文，分别重译。随后把 opinions 换成 light，想一想 spectrum 为什么也要跟着换译法。",
+          "after_card_id": 460
+        },
+        {
+          "type": "aside",
+          "title": "min 这一组实际缺席",
+          "text": "reminiscent 来自拉丁语 reminisci（回想），eminent 来自 eminere（突出、高出）。它们都不能按 min（小）来拆。把两个词放在一起，划掉错误的 min 标签，再各写一条真正有用的搭配：reminiscent of、an eminent scholar。",
+          "source": "Merriam-Webster：reminiscent、eminent 的 Word History",
+          "after_card_id": 418
+        }
+      ]
+    },
+    {
+      "key": "theme",
+      "title": "情景剧：收据上究竟写了什么",
+      "cards": [
+        {
+          "id": 789,
+          "head": "outfit",
+          "family": [],
+          "ipa": "/ˈaʊtˌfɪt/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "机构，团体；全套服装",
+            "全套装备；为……装备"
+          ],
+          "example": {
+            "en": "The film outfit sent its lawyer back to collect the unfinished proposal.",
+            "zh": "那家制片机构让律师回来取尚未完成的提案。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "先问这个 outfit 能做什么：能派律师来，是机构；能穿在身上，是一套衣服。别一看到它就先想衣柜。"
+          },
+          "collocations": [
+            "a small publishing outfit",
+            "a complete outfit",
+            "outfit a laboratory"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 988,
+          "head": "scenario",
+          "family": [],
+          "ipa": "/sɪˈnɛrioʊ/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "设想的情况，可能发生的局面",
+            "剧情梗概，剧本提纲"
+          ],
+          "example": {
+            "en": "The lawyer removed a possible film scenario from the papers on the desk.",
+            "zh": "律师从桌上的文件中抽出了一个备选的电影剧情提纲。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "提案里写「如果改成电影，会发生什么」。一份剧情方案是 scenario；讨论现实的几种可能结果时也用它。"
+          },
+          "collocations": [
+            "a possible scenario",
+            "the worst-case scenario"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 73,
+          "head": "arc",
+          "family": [],
+          "ipa": "/ɑrk/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "弧，弧形；电弧"
+          ],
+          "example": {
+            "en": "The drawing showed a searchlight sweeping in an arc across the courtyard.",
+            "zh": "那幅图画着一盏探照灯，沿弧线扫过庭院。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "先看半个圆的弧线，再看提案里的 story arc（故事发展线）。记忆图是弧线，别把所有 arc 都译成情节。"
+          },
+          "collocations": [
+            "an arc of light",
+            "a story arc"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1002,
+          "head": "serial",
+          "family": [],
+          "ipa": "/ˈsɪˌriəl/",
+          "pos": [
+            "adj.",
+            "n."
+          ],
+          "senses": [
+            "连续的；连载的；串行的",
+            "连载作品，连续剧"
+          ],
+          "example": {
+            "en": "The company proposed a television serial instead of the six planned films.",
+            "zh": "公司又提出拍电视连续剧，替代原先计划的六部电影。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "一部作品分期接着播，叫 serial。serial number 是编号；计算机里的 serial processing 则强调依次处理。"
+          },
+          "collocations": [
+            "a television serial",
+            "a serial number",
+            "serial processing"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1195,
+          "head": "ultra",
+          "family": [],
+          "ipa": "/ˈʌltrə/",
+          "pos": [
+            "n.",
+            "adj."
+          ],
+          "senses": [
+            "极端分子，激进派",
+            "极端的，过激的"
+          ],
+          "example": {
+            "en": "The article contrasts the party’s ultras with members willing to negotiate a compromise.",
+            "zh": "这篇文章把该党内的激进派与愿意协商妥协的成员作了对照。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "这里 ultras 是复数名词，指持极端立场的人。句子把他们与愿意协商的 members 作比较，两边说的都是人。"
+          },
+          "collocations": [
+            "the party’s ultras",
+            "ultra conservatism"
+          ],
+          "card_style": "full",
+          "sense_note": "独立词 ultra 与前缀 ultra- 要分开看；ultramodern 中的 ultra- 不是名词。"
+        },
+        {
+          "id": 1216,
+          "head": "venue",
+          "family": [],
+          "ipa": "/ˈvɛnju/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "（活动的）举办地点，场所"
+          ],
+          "example": {
+            "en": "The dean suggested the old courtyard as a venue for the proposed exhibition.",
+            "zh": "系主任建议把旧庭院作为拟议展览的举办地。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "在活动通知上找时间下面那一行：Venue。它告诉你去哪里，不告诉你里面会展什么。"
+          },
+          "collocations": [
+            "an exhibition venue",
+            "choose a venue"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1178,
+          "head": "tribute",
+          "family": [],
+          "ipa": "/ˈtrɪbjut/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "致敬，颂辞；敬意的表示",
+            "贡品，贡金"
+          ],
+          "example": {
+            "en": "The exhibition plan included a tribute to the people who had maintained the chapel.",
+            "zh": "展览计划包含了向历年来维护教堂的人致敬的内容。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "给长期做维护工作的人留一块展板，写清他们做过什么：这就是 a tribute to someone，不一定是一段悼词。"
+          },
+          "collocations": [
+            "pay tribute to",
+            "a tribute to someone"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 154,
+          "head": "bronze",
+          "family": [],
+          "ipa": "/brɑnz/",
+          "pos": [
+            "n.",
+            "adj."
+          ],
+          "senses": [
+            "青铜；青铜制品；铜牌",
+            "青铜制的；青铜色的"
+          ],
+          "example": {
+            "en": "The catalogue included a photograph of a small bronze bell from the chapel.",
+            "zh": "目录里有一张教堂小青铜钟的照片。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "把照片里的材质标签记在钟旁边：bronze。体育报道中常把 bronze medal 简写成 bronze。"
+          },
+          "collocations": [
+            "a bronze statue",
+            "win a bronze medal"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 973,
+          "head": "sacred",
+          "family": [],
+          "ipa": "/ˈseɪkrəd/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "神圣的，宗教的",
+            "不可侵犯的，极受珍视的"
+          ],
+          "example": {
+            "en": "The exhibition notes explain why the chapel remained a sacred place for former students.",
+            "zh": "展览说明解释了为什么这座教堂对昔日学生仍是神圣的场所。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "a sacred place 说这个地方受到宗教上的尊崇。形容承诺或责任时，sacred 也可以表示不可侵犯。"
+          },
+          "collocations": [
+            "a sacred place",
+            "a sacred duty"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 379,
+          "head": "divine",
+          "family": [],
+          "ipa": "/dɪˈvaɪn/",
+          "pos": [
+            "adj.",
+            "v."
+          ],
+          "senses": [
+            "神的，神圣的",
+            "凭直觉猜出，推测"
+          ],
+          "example": {
+            "en": "The old catalogue described the painting as an image of divine protection.",
+            "zh": "旧目录把那幅画描述为表现神佑的图像。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "divine protection 里的词是形容词，说明保护来自神。若后面直接接人的意图等宾语，则可能是动词「猜出」。"
+          },
+          "collocations": [
+            "divine power",
+            "divine someone’s intentions"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 526,
+          "head": "gospel",
+          "family": [],
+          "ipa": "/ˈɡɑspəl/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "福音；福音书",
+            "绝对真理；福音音乐"
+          ],
+          "example": {
+            "en": "The display included a printed Gospel beside the chapel’s original service notices.",
+            "zh": "展柜中一本印刷的福音书旁边，放着教堂原先的礼拜通知。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "书名或福音书常见大写 Gospel。take something as gospel 则是把某种说法当作绝对真理，要看它前面的动词。"
+          },
+          "collocations": [
+            "the Gospel of John",
+            "take something as gospel"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1163,
+          "head": "toxic",
+          "family": [],
+          "ipa": "/ˈtɑksɪk/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "有毒的；有害的"
+          ],
+          "example": {
+            "en": "The leaflet warned that some old paints could release toxic dust during removal.",
+            "zh": "宣传单提醒，清除某些旧油漆时可能会产生有毒粉尘。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "在说明文字里，找出 toxic 后面的名词：是 dust、gas，还是 waste。先弄清什么东西有毒。"
+          },
+          "collocations": [
+            "toxic chemicals",
+            "toxic waste"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1121,
+          "head": "syndrome",
+          "family": [],
+          "ipa": "/ˈsɪnˌdroʊm/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "综合征；一组相关症状"
+          ],
+          "example": {
+            "en": "The article explains why a syndrome can include several symptoms rather than one complaint.",
+            "zh": "这篇文章解释了为什么综合征可以包含多种症状，而非一种不适。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记一份描述：几种症状一起出现，医生讨论它们的组合。不要把 syndrome 自动等同于一个单独的症状。"
+          },
+          "collocations": [
+            "a clinical syndrome",
+            "the symptoms of a syndrome"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 197,
+          "head": "chronic",
+          "family": [
+            {
+              "form": "chronically",
+              "pos": "adv."
+            }
+          ],
+          "ipa": "/ˈkrɑnɪk/",
+          "pos": [
+            "adj."
+          ],
+          "senses": [
+            "慢性的，长期的；积习难改的"
+          ],
+          "example": {
+            "en": "The health leaflet discussed chronic illness and the support available to affected students.",
+            "zh": "健康宣传单谈到慢性疾病，以及患病学生可以得到的支持。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "这里看持续时间：chronic illness 是慢性病。chronic shortage 是长期短缺，词义随名词转到非医学语境。"
+          },
+          "collocations": [
+            "chronic illness",
+            "a chronic shortage"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 307,
+          "head": "custody",
+          "family": [],
+          "ipa": "/ˈkʌstədi/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "保管，监护；监护权",
+            "拘留，羁押"
+          ],
+          "example": {
+            "en": "The comic would remain in the archive’s custody while its records were checked.",
+            "zh": "核查相关记录期间，漫画将继续由档案馆保管。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "档案馆负责保管物品，用 in its custody。不要只因看到了 custody，就把存放漫画的地方理解成拘留所。"
+          },
+          "collocations": [
+            "in police custody",
+            "have custody of a child",
+            "in the custody of the museum"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 662,
+          "head": "legitimate",
+          "family": [
+            {
+              "form": "legitimacy",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ləˈdʒɪtəmət/",
+          "pos": [
+            "adj.",
+            "v."
+          ],
+          "senses": [
+            "合法的，正当的；合理的",
+            "使合法，使正当"
+          ],
+          "example": {
+            "en": "The student raised a legitimate question about what the old receipt actually covered.",
+            "zh": "学生提出了一个合理的问题：这张旧收据究竟涵盖哪些东西。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "legitimate question 是合理的问题；legitimate owner 是合法所有者。形容的名词不同，选用的中文也不同。"
+          },
+          "collocations": [
+            "a legitimate concern",
+            "a legitimate owner"
+          ],
+          "card_style": "full",
+          "sense_note": "形容词读 /ləˈdʒɪtəmət/；动词末尾读 /meɪt/，即 /ləˈdʒɪtəˌmeɪt/。"
+        },
+        {
+          "id": 1237,
+          "head": "warrant",
+          "family": [],
+          "ipa": "/ˈwɔrənt/",
+          "pos": [
+            "v.",
+            "n."
+          ],
+          "senses": [
+            "使有必要，使有正当理由；保证",
+            "令状，授权令；根据"
+          ],
+          "example": {
+            "en": "The available information did not warrant a claim that the comic had been sold.",
+            "zh": "现有信息不足以支持「这本漫画已经售出」的说法。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "读 warrant a claim 时，问证据够不够支持断言；读 a search warrant 时，才是在读一份搜查令。"
+          },
+          "collocations": [
+            "warrant further investigation",
+            "a search warrant"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1103,
+          "head": "sue",
+          "family": [],
+          "ipa": "/su/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "起诉，控告"
+          ],
+          "example": {
+            "en": "The dean asked whether someone might sue over the proposed sale of the comic.",
+            "zh": "系主任问，会不会有人因拟议的漫画出售计划而起诉。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "sue someone for damages：起诉某人索赔。for 后接索赔事项或起诉理由；只知道有人 sue，还不知道判决结果。"
+          },
+          "collocations": [
+            "sue for damages",
+            "sue someone for breach of contract"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1173,
+          "head": "treasury",
+          "family": [
+            {
+              "form": "treasurer",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈtrɛʒəri/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "国库；财政部",
+            "（组织的）资金，金库；宝库"
+          ],
+          "example": {
+            "en": "The failed auction had brought no money into the university’s treasury.",
+            "zh": "这场失败的拍卖没有为学校的资金库带来任何收入。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "想清楚钱归谁：国库归国家，这里的 treasury 指学校的资金。treasurer 是负责管理钱的人。"
+          },
+          "collocations": [
+            "the national treasury",
+            "the Treasury Department",
+            "a club treasurer"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 188,
+          "head": "census",
+          "family": [],
+          "ipa": "/ˈsɛnsəs/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "人口普查；全面调查，普查"
+          ],
+          "example": {
+            "en": "The student moved a folder of census records away from the receipt.",
+            "zh": "学生把一夹人口普查记录从收据旁边挪开。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "普查要登记规定范围里的全部对象。记一张逐户填写的表，区别于只抽一部分人的 sample survey。"
+          },
+          "collocations": [
+            "conduct a census",
+            "census data"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 482,
+          "head": "flip",
+          "family": [],
+          "ipa": "/flɪp/",
+          "pos": [
+            "v.",
+            "n."
+          ],
+          "senses": [
+            "迅速翻动；抛，弹；翻转",
+            "翻转，轻弹"
+          ],
+          "example": {
+            "en": "The professor asked permission to flip the receipt over before checking the reverse.",
+            "zh": "教授想翻过收据查看背面，于是先征求同意。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "翻转硬币或翻到背面，都有一下改变朝向的动作；flip through a book 则是快速翻阅。"
+          },
+          "collocations": [
+            "flip a coin",
+            "flip through the pages"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1032,
+          "head": "snap",
+          "family": [],
+          "ipa": "/snæp/",
+          "pos": [
+            "v.",
+            "n."
+          ],
+          "senses": [
+            "（使）啪地折断；厉声说",
+            "拍快照；快照；咔嚓声"
+          ],
+          "example": {
+            "en": "The student paused to snap a clear photograph of the receipt’s description of the goods.",
+            "zh": "学生停下来，拍了一张能看清收据货品栏的照片。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "snap a photograph 看见 photograph 就选「拍照」。换成 snap a pencil，才是把铅笔啪地折断。"
+          },
+          "collocations": [
+            "snap a photograph",
+            "snap at someone",
+            "snap in half"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 705,
+          "head": "mar",
+          "family": [],
+          "ipa": "/mɑr/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "损伤，损害；破坏……的完美"
+          ],
+          "example": {
+            "en": "We kept our pencils off the receipt so that no marks would mar its surface.",
+            "zh": "我们让铅笔远离收据，免得任何笔迹损坏它的表面。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记一个小污点落在干净纸面上的画面。mar 不一定把整件东西毁掉，也可以是局部损伤使它不再完好。"
+          },
+          "collocations": [
+            "mar the surface",
+            "mar an otherwise successful event"
+          ],
+          "card_style": "full"
+        }
+      ],
+      "intro": "拍卖流拍后的第二天早上。律师来取提案，教授把昨天带来的收据摆在阅览室桌上。周管理员还要整理待归档的材料，只答应留十分钟。你先替他清出一小块桌面。",
+      "beats": [
+        {
+          "after": null,
+          "text": "律师来替制片 outfit 收回提案，里面已经写了 scenario、story arc，甚至备选的电视 serial。「没谈成，写这些不白费吗？」你问。「可以留着下次用。」他把稿纸抽走，下面是旧报纸，文章正在比较党内的 ultras 与愿意协商的成员。"
+        },
+        {
+          "after": 1195,
+          "text": "系主任还惦记旧教堂能否做展览 venue，想安排一处 tribute，致敬过去的维护人员。你把那摞展陈资料递给周管理员：bronze 小钟、sacred 场所的说明、画里的 divine protection，还有一本 Gospel。他逐样点过，才让你把文件夹合上。"
+        },
+        {
+          "after": 526,
+          "text": "教授催着看收据，周管理员却还在找一份旧健康宣传稿。「少一张，待会儿还是我回来找。」你从桌沿抽出那张写着 toxic、syndrome 和 chronic illness 的纸，递回他手里。他把它放进另一只文件夹，拉过一把椅子坐下。"
+        },
+        {
+          "after": 197,
+          "text": "律师说漫画先留在校史馆 custody 之下。教授指着签名想往下说，你问：「这张收据到底收的是什么？」律师说这是个 legitimate 问题；眼前的信息，还不足以 warrant 出售过这本漫画的判断。系主任问会不会有人 sue，律师让他先把收据读完。学校的 treasury 暂时等不到那笔钱。"
+        },
+        {
+          "after": 1173,
+          "text": "你把 census 表挪开，先拍正面；教授征得周同意，才 flip 到背面检查。没有另外的字迹。你再 snap 一张货品栏近照，不让铅笔 mar 原纸。读出来的是「社团画稿一箱」。「一箱里有多少？」教授问。周把收据扶正：「先别凭这个猜。我记得移交时拍过照片。」"
+        }
+      ],
+      "boxes": [
+        {
+          "type": "aside",
+          "title": "同一个词，语境选义",
+          "text": "spectrum 可以是光谱，也可以是一系列相关事物的范围。visible spectrum 谈可见光谱；a spectrum of opinions 谈不同意见。它们的词源相同，在句子里的意思却不同。读到这个词，先看看周围是在谈光，还是在列出不同的看法。",
+          "source": "https://www.merriam-webster.com/dictionary/spectrum"
+        },
+        {
+          "type": "tip",
+          "title": "把推测与所见分开写",
+          "text": "在纸上分两行写收据：第一行只抄看得到的「卖方签名、买方空白、社团画稿一箱」；第二行写还不能确定的事。再回到 warrant 的例句，解释为什么它用了 did not。练习只依据今天的文本。"
+        }
+      ]
+    },
+    {
+      "key": "freebies",
+      "title": "闪电轮：熟悉的字母，也要核对来源",
+      "intro": "五个词按字母序过一遍。借熟词帮助记忆，但别把每个近似拼写都当成派生关系：refund 的 fund 尤其需要停一下。",
+      "cards": [
+        {
+          "id": 231,
+          "head": "compassion",
+          "family": [
+            {
+              "form": "compassionate",
+              "pos": "adj."
+            }
+          ],
+          "ipa": "/kəmˈpæʃən/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "同情，怜悯"
+          ],
+          "example": {
+            "en": "The volunteers showed compassion by listening patiently to people who needed help.",
+            "zh": "志愿者耐心倾听需要帮助的人，以此表达同情与关怀。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "com-（一起）+ pati（受苦）→ 同情；passion 与它同源。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "show compassion",
+            "compassion for others"
+          ],
+          "card_style": "lite"
+        },
+        {
+          "id": 562,
+          "head": "hostage",
+          "family": [],
+          "ipa": "/ˈhɑstɪdʒ/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "人质"
+          ],
+          "example": {
+            "en": "The report confirmed that the last hostage had returned home safely that evening.",
+            "zh": "报道证实，最后一名人质当晚已经平安回家。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "经古法语 hoste（客人）而来，与 host 有词源联系；今义是人质。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "hold someone hostage",
+            "release a hostage"
+          ],
+          "card_style": "lite"
+        },
+        {
+          "id": 929,
+          "head": "refund",
+          "family": [],
+          "ipa": "/ˈriˌfʌnd/",
+          "pos": [
+            "n.",
+            "v."
+          ],
+          "senses": [
+            "退款；退还（款项）"
+          ],
+          "example": {
+            "en": "The student requested a refund after the evening performance was cancelled.",
+            "zh": "晚间演出取消后，这名学生要求退款。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "re-（回）+ fundere（倾倒）→ 退还。不是 fund（资金）的派生。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "request a full refund",
+            "refund the cost"
+          ],
+          "card_style": "lite",
+          "sense_note": "名词通常重读首音节；动词通常重读第二音节。"
+        },
+        {
+          "id": 1049,
+          "head": "specialty/speciality",
+          "family": [],
+          "ipa": "/ˈspɛʃəlti/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "专业，专长",
+            "特色产品，特产；特色菜"
+          ],
+          "example": {
+            "en": "Paper repair is her specialty, though she also restores old wooden frames.",
+            "zh": "纸张修复是她的专长，不过她也修复旧木框。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "与 special（特别的）相连：专门擅长的事，也可以是当地特产。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a medical specialty",
+            "a local speciality"
+          ],
+          "card_style": "lite",
+          "sense_note": "specialty 常用于美式英语；speciality 常用于英式英语。"
+        },
+        {
+          "id": 1146,
+          "head": "texture",
+          "family": [],
+          "ipa": "/ˈtɛkstʃər/",
+          "pos": [
+            "n."
+          ],
+          "senses": [
+            "质地，手感；纹理"
+          ],
+          "example": {
+            "en": "The photograph shows the rough texture of paper along the folded edge.",
+            "zh": "照片显示了折边处纸张粗糙的纹理。"
+          },
+          "hook": {
+            "type": "morph",
+            "text": "来自拉丁语 textura（编织），与 text 同源；不是现代 text 加 -ure。",
+            "true_etymology": true
+          },
+          "collocations": [
+            "a rough texture",
+            "the texture of the paper"
+          ],
+          "card_style": "lite"
+        }
+      ],
+      "boxes": [
+        {
+          "type": "aside",
+          "title": "退款不是再筹一笔钱",
+          "text": "退款义的 refund 来自拉丁语 refundere，其中 fundere 是「倾倒」。英语另有用 re- 加 fund 构成的动词，表示重新提供资金等意思；两条来源不要混为一条。这里要学的是 request a refund 和 refund the cost。读音也要分：名词 /ˈriˌfʌnd/，动词 /rɪˈfʌnd/。",
+          "source": "https://www.merriam-webster.com/dictionary/refund"
+        },
+        {
+          "type": "aside",
+          "title": "专长的两种拼写",
+          "text": "specialty 常用于美式英语，speciality 常用于英式英语；这里词头把两种拼写并列。它既可表示一个人的专长，也可表示地方特产或特色菜，别把每次出现都译成「专业」。",
+          "source": "https://www.collinsdictionary.com/dictionary/english/speciality"
+        }
+      ]
+    },
+    {
+      "key": "orphans",
+      "title": "孤儿院：让五个词各做一件事",
+      "intro": "这五个词没有排进今天的家族。把它们分别接上请求、路线、纸张、振动和理解的动作；先记用法，不再给每一个词寻找亲戚。",
+      "cards": [
+        {
+          "id": 1041,
+          "head": "solicit",
+          "family": [
+            {
+              "form": "solicitor",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/səˈlɪsɪt/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "请求，征求；招揽"
+          ],
+          "example": {
+            "en": "The museum will solicit comments from students before choosing its next exhibition.",
+            "zh": "博物馆将在选定下次展览主题之前征求学生意见。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "记这个画面：意见箱放了一个月没人看见，搬到门口再加一张「请写两句」。solicit 是主动去征求。"
+          },
+          "collocations": [
+            "solicit advice",
+            "solicit donations"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 348,
+          "head": "deviate",
+          "family": [
+            {
+              "form": "deviation",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈdiviˌeɪt/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "偏离，背离"
+          ],
+          "example": {
+            "en": "We should not deviate from the agreed route while carrying these heavy boxes.",
+            "zh": "搬运这些沉重的箱子时，我们不应偏离商定的路线。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "编个记忆画面：你沿地面箭头走，教授绕进了茶水间。偏离路线用 deviate from；目的地是不是茶水间不影响词义。",
+            "joke": true
+          },
+          "collocations": [
+            "deviate from the plan",
+            "a slight deviation"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 485,
+          "head": "flutter",
+          "family": [],
+          "ipa": "/ˈflʌtər/",
+          "pos": [
+            "v.",
+            "n."
+          ],
+          "senses": [
+            "飘动，振翅；轻颤",
+            "飘动，颤动；紧张不安"
+          ],
+          "example": {
+            "en": "Loose notices flutter in the doorway whenever someone opens the courtyard gate.",
+            "zh": "每当有人打开院门，门口松挂着的通知就会飘动。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "看一张纸被风吹得轻轻翻动：不是一次掀起，是连续的小动作。旗、翅膀和纸张都能 flutter。"
+          },
+          "collocations": [
+            "flutter in the breeze",
+            "a flutter of excitement"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 1223,
+          "head": "vibrate",
+          "family": [
+            {
+              "form": "vibration",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/ˈvaɪbreɪt/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "（使）振动，颤动"
+          ],
+          "example": {
+            "en": "The shelves vibrate slightly whenever a delivery truck passes the side entrance.",
+            "zh": "每当送货卡车经过侧门，架子就会轻轻振动。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "手机设成振动，来电时在桌面上连续抖动。记这个动作，再把主语换成窗玻璃或机器。"
+          },
+          "collocations": [
+            "vibrate gently",
+            "reduce vibration"
+          ],
+          "card_style": "full"
+        },
+        {
+          "id": 93,
+          "head": "assimilate",
+          "family": [
+            {
+              "form": "assimilation",
+              "pos": "n."
+            }
+          ],
+          "ipa": "/əˈsɪməˌleɪt/",
+          "pos": [
+            "v."
+          ],
+          "senses": [
+            "吸收，理解（信息等）",
+            "（使）同化，融入"
+          ],
+          "example": {
+            "en": "Students need time to assimilate new ideas before applying them to unfamiliar problems.",
+            "zh": "学生需要时间理解新观念，之后才能将其用于陌生的问题。"
+          },
+          "hook": {
+            "type": "story",
+            "text": "编个学习画面：刚看完的定义还不会用，亲手做过两道题才用得出来。后一个阶段才算开始吸收、理解。"
+          },
+          "collocations": [
+            "assimilate information",
+            "be assimilated into a community"
+          ],
+          "card_style": "full"
+        }
+      ]
+    }
+  ],
+  "homework": {
+    "exercises": [
+      {
+        "type": "match",
+        "title": "别只认出词：写释义，再圈出选义的邻词",
+        "items": [
+          {
+            "prompt": "a broad spectrum of opinions",
+            "answer": "范围，一系列；证据是 opinions"
+          },
+          {
+            "prompt": "a photograph of the visible spectrum",
+            "answer": "光谱；证据是 visible"
+          },
+          {
+            "prompt": "an exponent of modern art",
+            "answer": "倡导者／代表人物；证据是 modern art"
+          },
+          {
+            "prompt": "These facts warrant an inquiry.",
+            "answer": "使有必要；证据是 an inquiry"
+          }
+        ]
+      },
+      {
+        "type": "cloze",
+        "title": "故事完形：选用词库中的词，每词一次",
+        "passage": "Word bank: snap, legitimate, custody, scenario, warrant. The comic remained in the archive’s ____ after the failed auction. The lawyer returned for the company’s film ____, but the professor wanted to discuss the receipt. The student raised a ____ question: did the paper actually describe this particular book? Its wording did not ____ that conclusion. It mentioned one box of club drawings, without listing each item. The student stopped to ____ a photograph of the description. Zhou offered to find an old handover photograph the next morning. They left without naming a buyer or deciding who had drawn the missing page.",
+        "items": [
+          {
+            "answer": "custody"
+          },
+          {
+            "answer": "scenario"
+          },
+          {
+            "answer": "legitimate"
+          },
+          {
+            "answer": "warrant"
+          },
+          {
+            "answer": "snap"
+          }
+        ]
+      }
+    ]
+  },
+  "summary": [
+    "词根帮你认词；词性、搭配和话题帮你选本句中的意思。",
+    "min 的两个候选词都不属「小」；fragrant 也不属 frag（碎）。",
+    "退款义 refund 不能按现代 fund 拆；熟悉的字母也要核实来源。",
+    "收据写的是「社团画稿一箱」；不能据此断定交易的就是这本漫画。",
+    "明天：到阅览室找移交照片，继续核对那一箱到底装过什么。"
+  ],
+  "hook": "教授把那张没人认领的收据摊在桌上。卖方签名没变，买方仍然空着；收据记载的，真是眼前这本漫画吗？",
+  "cliffhanger": "周管理员看了看钟，把收据交还教授。「照片在阅览室后面的储藏区。明早我开门，你们再来。」你在纸上记下：1987 年，社团移交。",
+  "story_note": "Part I 第三集，承接流拍、匿名来电者自称持有末页，以及教授带来的旧收据。唯一新碎片：货品栏是「社团画稿一箱」，不能据此确认交易对象就是眼前漫画。周未被洗清或定罪，买方仍空白，作者未揭。教堂展陈、旧报纸与健康稿仅是整理背景。周约次晨找1987年社团移交照片，照片内容留Day4。47词按v0原分配，无交换；明确纠正min、fragrant及refund等假拆法。"
+}
