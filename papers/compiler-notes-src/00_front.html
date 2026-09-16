@@ -1,0 +1,117 @@
+<!-- ===================== 封面 ===================== -->
+<section class="cover">
+  <div>
+    <div class="kicker">编译原理 · 从零开始的讲义</div>
+    <h1>编译器是怎样炼成的</h1>
+    <div class="sub">第一部：概览与扫描<br>Compiler Construction, Part I: Overview &amp; Scanning</div>
+    <div class="rule"></div>
+    <div class="meta">
+      以 OSTEP 的方式讲述编译器的第 1、2 章<br>
+      对话 · 关键问题 · 提示 · 补充 · 图解 · 作业<br>
+      <b>预备知识 · 编译器概览 · 扫描（正则表达式与有限自动机）</b>
+    </div>
+  </div>
+  <div class="art">
+    <svg viewBox="0 0 400 120" width="100%" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="carr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#e6c27a"/></marker></defs>
+      <g fill="none" stroke="#e6c27a" stroke-width="1.6">
+        <line x1="10" y1="60" x2="48" y2="60" marker-end="url(#carr)"/>
+        <circle cx="70" cy="60" r="20"/>
+        <line x1="92" y1="60" x2="148" y2="60" marker-end="url(#carr)"/>
+        <circle cx="170" cy="60" r="20"/><circle cx="170" cy="60" r="15"/>
+        <path d="M160,42 C150,10 190,10 180,42" marker-end="url(#carr)"/>
+        <path d="M160,78 C150,110 190,110 180,78" marker-end="url(#carr)"/>
+        <line x1="192" y1="60" x2="248" y2="60" marker-end="url(#carr)"/>
+        <circle cx="270" cy="60" r="20"/><circle cx="270" cy="60" r="15"/>
+      </g>
+      <g fill="#fff" font-family="JetBrains Mono, monospace" font-size="12" text-anchor="middle">
+        <text x="70" y="64">1</text><text x="170" y="64">2</text><text x="270" y="64">3</text>
+        <text x="120" y="50">letter</text><text x="170" y="18">letter</text><text x="170" y="112">digit</text><text x="220" y="50">[other]</text>
+        <text x="345" y="64" fill="#e6c27a">return ID</text>
+      </g>
+    </svg>
+  </div>
+  <div class="meta">
+    依据哈尔滨工程大学《编译原理》第 1–2 章课件整理编写<br>
+    参考教材：K. C. Louden, <i>Compiler Construction: Principles and Practice</i><br>
+    为 iPad Pro 11″ 横屏/竖屏阅读排版 · 2026 年 9 月
+  </div>
+</section>
+
+<!-- ===================== 前言 ===================== -->
+<section class="front" id="preface">
+  <h1>致读者：关于这本讲义的对话</h1>
+  <div class="dialogue">
+    <p class="dtitle">一段对话</p>
+    <p><span class="who">教授：</span>欢迎来学编译原理。你知道编译器是什么吗？</p>
+    <p><span class="who s">学生：</span>呃……就是那个把代码变成程序的东西？我按一下"运行"，它就干活了。</p>
+    <p><span class="who">教授：</span>说得不错，但"变成"这两个字里藏着一整门课。想想看：你写下 <code>a[index] = 4 + 2</code>，机器却只认识一串 0 和 1。中间发生了什么？谁把 <code>index</code> 这五个字母看成一个整体？谁决定先算加法再赋值？谁把它翻译成机器指令？谁把"<code>4 + 2</code>"直接算成 6 好让程序快一点？</p>
+    <p><span class="who s">学生：</span>听起来是一大堆事。</p>
+    <p><span class="who">教授：</span>是一大堆，但每一件都不难。这门课的美妙之处在于：它把一个看起来像魔法的过程，拆成一连串<b>清清楚楚的小问题</b>，每个小问题都有优雅的理论和朴素的代码。学完之后，你看任何一门编程语言的眼光都会不一样。</p>
+    <p><span class="who s">学生：</span>可是我数学一般，也没学过什么"自动机"。</p>
+    <p><span class="who">教授：</span>所以这本讲义从<b>零</b>开始。第 0 章会把你需要的所有预备知识——字符串、集合、树、状态机的直觉——用最平实的话讲一遍。你只要会一点点 C 语言，并且愿意动手画图，就够了。</p>
+    <p><span class="who s">学生：</span>那我们从哪里开始？</p>
+    <p><span class="who">教授：</span>从一个问题开始。每一章的核心，都会以一个"<b>关键问题</b>"的形式提出来。带着问题读，比背结论有用一百倍。</p>
+  </div>
+
+  <h2 style="margin-top:4mm">这本讲义怎么用</h2>
+  <p>这本讲义模仿了《Operating Systems: Three Easy Pieces》（OSTEP）的写法：<b>先提问题，再给答案；先讲直觉，再讲定义；先举例子，再谈一般性</b>。你会在正文里反复见到下面几种"盒子"：</p>
+  <div class="box crux"><p class="title">关键问题：这是本节要解决的核心问题</p><p>每一节围绕一个明确的问题展开。读完这一节，你应该能用自己的话回答它。</p></div>
+  <div class="box tip"><p class="title">提示：可以带走的经验</p><p>一条可以反复使用的经验法则、记忆技巧或者常见陷阱。</p></div>
+  <div class="box aside"><p class="title">补充：更宽一点的视野</p><p>历史、轶事、与其他课程的联系，或是课件之外但有助于理解的内容。跳过不影响主线，读了会更有趣。</p></div>
+  <p>此外，每章开头有一段<b>对话</b>，帮你进入情境；章末有<b>小结</b>和<b>作业</b>（课件里布置的原题，附录 B 给出提示与参考思路）。所有的图都是重新绘制的，尽量让每个箭头、每个圆圈都有解释。</p>
+  <p>在 iPad 上阅读时，建议横向或纵向单页显示，用 Apple Pencil 直接在自动机图上"走一遍"输入串——这是学会本课最快的方式。</p>
+
+  <h2>内容一览</h2>
+  <ul>
+    <li><b>第 0 章 预备知识</b>：机器如何理解程序、字符串与语言、集合运算、树、状态机的直觉、读懂课件代码所需的一点 C。</li>
+    <li><b>第 1 章 编译器概览</b>：编译器是什么、它的亲戚们、翻译的六个阶段、主要数据结构、前端与后端、自举与移植、TINY 语言与 TM 机器。</li>
+    <li><b>第 2 章 扫描</b>：记号、正则表达式、DFA 与 NFA、把自动机变成代码的三种方法。</li>
+    <li><b>附录</b>：中英术语对照、作业提示与参考思路、自测清单。</li>
+  </ul>
+</section>
+
+<!-- ===================== 目录 ===================== -->
+<section class="front toc" id="toc" style="break-before:page">
+  <h1>目录</h1>
+  <ol>
+    <li class="lvl1 front-item"><a href="#preface">致读者：关于这本讲义的对话</a><span class="fill"></span><a class="pg" href="#preface"></a></li>
+
+    <li class="lvl1"><a href="#ch0">第 0 章　预备知识：在编译器之前</a><span class="fill"></span><a class="pg" href="#ch0"></a></li>
+    <li class="lvl2"><a href="#s0-1">0.1　机器只认识数字</a><span class="fill"></span><a class="pg" href="#s0-1"></a></li>
+    <li class="lvl2"><a href="#s0-2">0.2　程序、语言与"翻译"</a><span class="fill"></span><a class="pg" href="#s0-2"></a></li>
+    <li class="lvl2"><a href="#s0-3">0.3　字符、字符串与字母表</a><span class="fill"></span><a class="pg" href="#s0-3"></a></li>
+    <li class="lvl2"><a href="#s0-4">0.4　语言就是字符串的集合</a><span class="fill"></span><a class="pg" href="#s0-4"></a></li>
+    <li class="lvl2"><a href="#s0-5">0.5　树：把结构画出来</a><span class="fill"></span><a class="pg" href="#s0-5"></a></li>
+    <li class="lvl2"><a href="#s0-6">0.6　状态机的直觉</a><span class="fill"></span><a class="pg" href="#s0-6"></a></li>
+    <li class="lvl2"><a href="#s0-7">0.7　读懂课件代码所需的一点 C</a><span class="fill"></span><a class="pg" href="#s0-7"></a></li>
+    <li class="lvl2"><a href="#s0-8">0.8　符号速查与小结</a><span class="fill"></span><a class="pg" href="#s0-8"></a></li>
+
+    <li class="lvl1"><a href="#ch1">第 1 章　编译器概览</a><span class="fill"></span><a class="pg" href="#ch1"></a></li>
+    <li class="lvl2"><a href="#s1-1">1.1　为什么需要编译器</a><span class="fill"></span><a class="pg" href="#s1-1"></a></li>
+    <li class="lvl2"><a href="#s1-2">1.2　编译器的亲戚们</a><span class="fill"></span><a class="pg" href="#s1-2"></a></li>
+    <li class="lvl2"><a href="#s1-3">1.3　翻译过程：六个阶段</a><span class="fill"></span><a class="pg" href="#s1-3"></a></li>
+    <li class="lvl2"><a href="#s1-4">1.4　编译器中的主要数据结构</a><span class="fill"></span><a class="pg" href="#s1-4"></a></li>
+    <li class="lvl2"><a href="#s1-5">1.5　编译器结构中的其他问题</a><span class="fill"></span><a class="pg" href="#s1-5"></a></li>
+    <li class="lvl2"><a href="#s1-6">1.6　自举与移植</a><span class="fill"></span><a class="pg" href="#s1-6"></a></li>
+    <li class="lvl2"><a href="#s1-7">1.7　TINY 语言与 TM 机器</a><span class="fill"></span><a class="pg" href="#s1-7"></a></li>
+    <li class="lvl2"><a href="#s1-sum">小结与作业</a><span class="fill"></span><a class="pg" href="#s1-sum"></a></li>
+
+    <li class="lvl1"><a href="#ch2">第 2 章　扫描：从字符到记号</a><span class="fill"></span><a class="pg" href="#ch2"></a></li>
+    <li class="lvl2"><a href="#s2-1">2.1　扫描的任务</a><span class="fill"></span><a class="pg" href="#s2-1"></a></li>
+    <li class="lvl2"><a href="#s2-2">2.2　正则表达式：描述模式</a><span class="fill"></span><a class="pg" href="#s2-2"></a></li>
+    <li class="lvl3"><a href="#s2-2-1">2.2.1　基本定义与三种运算</a><span class="fill"></span><a class="pg" href="#s2-2-1"></a></li>
+    <li class="lvl3"><a href="#s2-2-4">2.2.4　五个例题，一次学会写正则</a><span class="fill"></span><a class="pg" href="#s2-2-4"></a></li>
+    <li class="lvl3"><a href="#s2-2-6">2.2.6　描述真实的记号</a><span class="fill"></span><a class="pg" href="#s2-2-6"></a></li>
+    <li class="lvl2"><a href="#s2-3">2.3　有限自动机：识别模式</a><span class="fill"></span><a class="pg" href="#s2-3"></a></li>
+    <li class="lvl3"><a href="#s2-3-2">2.3.2　确定性有限自动机（DFA）</a><span class="fill"></span><a class="pg" href="#s2-3-2"></a></li>
+    <li class="lvl3"><a href="#s2-3-4">2.3.4　合并多个 DFA</a><span class="fill"></span><a class="pg" href="#s2-3-4"></a></li>
+    <li class="lvl3"><a href="#s2-3-5">2.3.5　ε-转换与非确定性有限自动机（NFA）</a><span class="fill"></span><a class="pg" href="#s2-3-5"></a></li>
+    <li class="lvl2"><a href="#s2-4">2.4　把自动机变成代码</a><span class="fill"></span><a class="pg" href="#s2-4"></a></li>
+    <li class="lvl2"><a href="#s2-sum">小结与作业</a><span class="fill"></span><a class="pg" href="#s2-sum"></a></li>
+
+    <li class="lvl1"><a href="#appA">附录 A　术语中英对照表</a><span class="fill"></span><a class="pg" href="#appA"></a></li>
+    <li class="lvl1"><a href="#appB">附录 B　作业提示与参考思路</a><span class="fill"></span><a class="pg" href="#appB"></a></li>
+    <li class="lvl1"><a href="#appC">附录 C　自测清单</a><span class="fill"></span><a class="pg" href="#appC"></a></li>
+  </ol>
+</section>

@@ -1,0 +1,158 @@
+<!-- ===================== 第 0 章 ===================== -->
+<div class="chap-open" id="ch0"><div class="num">第 0 章</div><h1 class="chapter">预备知识：在编译器之前</h1><div class="en">Prerequisites: Before the Compiler</div></div>
+<p class="chapter-lead">这一章不讲编译器。它讲的是编译器这门课默认你"已经知道"、但很少有人真正教过的东西：机器怎样理解程序，字符串和语言的精确含义，树，以及状态机的直觉。如果你觉得自己基础扎实，可以快速浏览；但请至少读一读 0.3、0.4 和 0.6——第 2 章几乎每一页都建立在它们之上。</p>
+
+<div class="dialogue">
+  <p class="dtitle">对话：为什么要先讲"预备知识"？</p>
+  <p><span class="who s">学生：</span>课件第一页就是"编译器是把一种语言翻译成另一种语言的程序"，我觉得我听得懂啊，为什么还要预备知识？</p>
+  <p><span class="who">教授：</span>你当然听得懂这句话。问题是第二章：突然冒出来 Σ、L(r)、(a|c)*b(a|c)*、T: S×Σ→S……很多同学就是在这里掉队的。</p>
+  <p><span class="who s">学生：</span>确实，那些符号看起来像另一门课。</p>
+  <p><span class="who">教授：</span>它们其实只是在<b>精确地</b>说一些非常朴素的事：什么是"一串字符"、什么是"一类字符串"、什么是"一步一步地读"。这一章我们就把这些朴素的事说清楚。学会之后，第二章的符号就只是速记，而不是障碍。</p>
+</div>
+
+<h2 id="s0-1">0.1　机器只认识数字</h2>
+<p>先从最底层说起。一台计算机的内存，可以想成一排<b>编了号的小格子</b>，每个格子装一个 8 位的二进制数（一个<b>字节</b>，byte）。格子的编号叫<b>地址</b>（address）。CPU 做的事情极其单调：从某个地址取出一个数，把它当成"指令"来解释，执行，再取下一个。</p>
+<figure>
+  <div class="diagram" id="d-memory"></div>
+  <script type="text/diagram" data-kind="flow" data-target="d-memory">
+  {
+    w: 520, h: 120, maxw: 470,
+    boxes: [
+      {x:20,y:30,w:44,h:34,t:'C7',mono:true,fill:'#fff3c4'},{x:64,y:30,w:44,h:34,t:'06',mono:true,fill:'#fff3c4'},
+      {x:108,y:30,w:44,h:34,t:'00',mono:true,fill:'#fff3c4'},{x:152,y:30,w:44,h:34,t:'00',mono:true,fill:'#fff3c4'},
+      {x:196,y:30,w:44,h:34,t:'00',mono:true,fill:'#fff3c4'},{x:240,y:30,w:44,h:34,t:'02',mono:true,fill:'#fff3c4'},
+      {x:284,y:30,w:44,h:34,t:'..',mono:true},{x:328,y:30,w:44,h:34,t:'..',mono:true},{x:372,y:30,w:44,h:34,t:'..',mono:true},{x:416,y:30,w:44,h:34,t:'..',mono:true}
+    ],
+    texts: [
+      {x:42,y:80,t:'100',fs:9,anchor:'middle',color:'#888'},{x:86,y:80,t:'101',fs:9,anchor:'middle',color:'#888'},{x:130,y:80,t:'102',fs:9,anchor:'middle',color:'#888'},
+      {x:174,y:80,t:'103',fs:9,anchor:'middle',color:'#888'},{x:218,y:80,t:'104',fs:9,anchor:'middle',color:'#888'},{x:262,y:80,t:'105',fs:9,anchor:'middle',color:'#888'},
+      {x:20,y:14,t:'内存：编了号的字节格子（地址从左到右递增）',fs:10,color:'#555'},
+      {x:20,y:104,t:'黄色的 6 个字节合起来是一条 8086 指令：把数字 2 存到地址 0000 处',fs:10,color:'#8a4b08'}
+    ]
+  }
+  </script>
+  <figcaption><b>图 0.1</b>　内存是一排编号的字节；指令本身也只是存放在内存里的数字。课件中的例子 <code>C7 06 0000 0002</code> 就是这样一条"把 2 放进地址 0000"的机器指令。</figcaption>
+</figure>
+<p>这就是<b>机器语言</b>（machine language）：程序是一串数字，每个数字代表一个动作。最早的程序员真的就是这样写程序的——查表、手工编码、用开关或纸带输入。这样写程序<b>费时、乏味、容易出错</b>，而且换一种 CPU，所有数字的含义都变了。</p>
+<p>于是人们想：能不能给每个数字起个名字？把 <code>C7 06</code> 叫 <code>MOV</code>，把地址 0000 叫 <code>X</code>，那条指令就成了 <code>MOV X, 2</code>。这就是<b>汇编语言</b>（assembly language）。但是名字和数字之间的对应，总得有人来做——这个"有人"，就是历史上第一批<b>翻译程序</b>：汇编器。</p>
+<div class="box tip"><p class="title">提示：整门课只回答一个问题</p><p>"人喜欢用符号和结构来表达想法，机器只认识数字。谁来做中间的翻译？怎么做？"记住这句话，第 1 章的所有内容（编译器、汇编器、解释器、连接器……）都是这个问题在不同层次上的答案。</p></div>
+
+<h2 id="s0-2">0.2　程序、语言与"翻译"</h2>
+<p>在这门课里，我们会同时谈论好几种"语言"，先把它们分清楚：</p>
+<ul>
+  <li><b>源语言</b>（source language）：你写程序用的语言，如 C、Pascal，或者课程里的小语言 TINY。</li>
+  <li><b>目标语言</b>（target language）：翻译的结果，通常是某台机器的机器语言或汇编语言。</li>
+  <li><b>实现语言</b>（implementation / host language）：编译器<i>本身</i>是用什么语言写的。这一点在 1.6 节讨论"自举"时会变得非常有趣。</li>
+</ul>
+<p>"翻译"这个词很恰当，但有一个重要的差别：把中文翻成英文，允许一点意译；把 C 翻成机器码，<b>意思必须一字不差</b>。编译器输出的目标程序必须与源程序<b>等价</b>（equivalent）——对任何输入，行为都一样。这条要求贯穿全课：无论做多少"优化"，都不能改变程序的意思。</p>
+<p>另一个常见的误解是把"编译"和"运行"混为一谈。编译器只负责<b>翻译</b>；翻译完成后，得到的目标程序才被<b>执行</b>。它们发生在不同的时间，术语上叫<b>编译时</b>（compile time）和<b>运行时</b>（run time）。编译器报告的错误——比如少了个分号、变量没声明——都是编译时错误，程序还一步都没有跑。</p>
+
+<h2 id="s0-3">0.3　字符、字符串与字母表</h2>
+<p>编译器读进来的，是一个文本文件：一长串<b>字符</b>（character）。第 2 章的全部内容，就是"怎样把一串字符切成有意义的单元"。所以我们需要一套精确谈论"字符串"的语言。这一节的每个定义都很简单，但请务必读慢一点，因为第 2 章会假设你对它们熟悉到不假思索。</p>
+<h3>字母表 Σ</h3>
+<p>一个<b>字母表</b>（alphabet）就是一个<b>有限的字符集合</b>，习惯上记作 <span class="sym">Σ</span>（希腊字母 Sigma）。例如 Σ = {a, b, c}，或者 Σ = {0, 1}，或者 Σ = 全部 ASCII 字符。字母表里的成员叫<b>符号</b>（symbol）。</p>
+<h3>字符串</h3>
+<p>一个<b>字符串</b>（string）是从 Σ 中取出的符号排成的<b>有限序列</b>。<code>abc</code>、<code>aab</code>、<code>b</code> 都是 {a, b, c} 上的字符串。字符串的<b>长度</b>就是它包含的符号个数。</p>
+<p>有一个特殊的字符串，长度为 0，什么符号都没有，叫<b>空串</b>（empty string），记作 <span class="sym">ε</span>（希腊字母 epsilon）。它和"空格"不是一回事：空格是一个真实的字符，而 ε 是"没有字符"。很多同学第一次见到 ε 时觉得它多余——但你马上会看到，它是让很多定义变得干净的关键。</p>
+<h3>连接</h3>
+<p>把两个字符串首尾相接，叫<b>连接</b>（concatenation）。<code>ab</code> 连接 <code>c</code> 得到 <code>abc</code>。连接不满足交换律（<code>ab</code> ≠ <code>ba</code>），但 ε 是它的"单位元"：任何字符串连接 ε，还是它自己。就像乘法里的 1。</p>
+<div class="box tip"><p class="title">提示：ε 就像乘法里的 1</p><p>x · 1 = x，s · ε = s。凡是遇到"某个东西可以出现、也可以不出现"的情形，"不出现"这个选项就用 ε 来表示。第 2 章的 <span class="regex">(+|-|ε)</span> 就是这个意思：正号、负号，或者什么都没有。</p></div>
+
+<h2 id="s0-4">0.4　语言就是字符串的集合</h2>
+<div class="box crux"><p class="title">关键问题：如何精确地说出"哪些字符串是合法的"</p><p>"标识符"是什么？"数字常量"长什么样？直觉上你都知道，但计算机需要一个精确的定义。我们需要一种既能描述<b>无穷多</b>个字符串、本身又是<b>有限</b>的说法。</p></div>
+<p>在形式语言理论里，"语言"这个词有一个出乎意料地简单的定义：</p>
+<p class="center"><b>一个语言（language）就是一个字符串的集合。</b></p>
+<p>没有别的了。{a, ab, abb} 是一个语言（只有三个字符串）。"所有 C 语言的合法标识符"是一个语言（无穷多个字符串）。"所有语法正确的 C 程序"也是一个语言（每个程序本身就是一个很长的字符串）。所以说，判断一个字符串是不是合法标识符，就是在问："它属不属于这个集合？"</p>
+<p>集合可以是无穷的，但我们写在纸上的<b>描述</b>必须是有限的。怎么用有限的规则描述无限的集合？这正是第 2 章的主题——<b>正则表达式</b>是这样的一套记法。为了铺路，先看三种基本的"集合运算"，它们正好对应正则表达式的三种运算。设 <i>A</i> 和 <i>B</i> 是两个语言：</p>
+<table class="nowrap12">
+  <tr><th>运算</th><th>记法</th><th>含义</th><th>例子（A = {a, ab}，B = {c, ε}）</th></tr>
+  <tr><td>并</td><td class="c"><i>A</i> ∪ <i>B</i></td><td>属于 A <b>或</b> 属于 B 的字符串</td><td>{a, ab, c, ε}</td></tr>
+  <tr><td>连接</td><td class="c"><i>A B</i></td><td>前半段取自 A、后半段取自 B 的所有拼接</td><td>{ac, a, abc, ab}</td></tr>
+  <tr><td>闭包</td><td class="c"><i>A</i>*</td><td>把 A 中的字符串<b>任意个</b>（含 0 个）首尾相接</td><td>{ε, a, ab, aa, aab, aba, abab, …}</td></tr>
+</table>
+<p>请注意闭包的两个要点：第一，"0 个"也算，所以 ε 总是属于 <i>A</i>*；第二，每次可以取<i>不同</i>的成员，<code>aab</code> = <code>a</code>·<code>ab</code> 就是这样得到的。星号 * 叫做 <b>Kleene 星号</b>，第 2 章会大量使用。</p>
+<div class="box aside"><p class="title">补充：Σ* 是"所有可能的字符串"</p><p>把闭包用在字母表本身上：Σ* 就是 Σ 上<b>所有</b>有限长度的字符串组成的集合（包括 ε）。因此任何一个 Σ 上的语言，都是 Σ* 的一个子集。"语言 ⊆ Σ*"这个式子你会在教材里经常见到，它只是在说"语言是某些字符串"。</p></div>
+
+<h2 id="s0-5">0.5　树：把结构画出来</h2>
+<p>字符串是一维的，一个符号跟着一个符号。但程序有<b>结构</b>：<code>4 + 2 * 3</code> 里，乘法要先算，所以 <code>2 * 3</code> 是一个整体，然后才和 <code>4</code> 相加。一维的字符串没法直接表达"谁包住谁"，我们需要<b>树</b>（tree）。</p>
+<figure>
+  <div class="diagram" id="d-tree0"></div>
+  <script type="text/diagram" data-kind="tree" data-target="d-tree0">
+  { root: { t:'+', k:'t', c:[ { t:'4', k:'t' }, { t:'*', k:'t', c:[ { t:'2', k:'t' }, { t:'3', k:'t' } ] } ] }, opt: { levelH: 40, gap: 26, maxw: 200 } }
+  </script>
+  <figcaption><b>图 0.2</b>　表达式 <code>4 + 2 * 3</code> 的树。树天然地表达了"先算什么、后算什么"：要算根节点 +，先得算出两个孩子；要算 *，先得算出 2 和 3。</figcaption>
+</figure>
+<p>几个术语，都很直观：最上面的节点叫<b>根</b>（root）；一个节点下面挂着的叫它的<b>孩子</b>（children），它则是孩子们的<b>父亲</b>（parent）；没有孩子的节点叫<b>叶子</b>（leaf）；从某个节点出发、连同它下面的一切，叫一棵<b>子树</b>（subtree）。</p>
+<p>树在编译器里无处不在：第 1 章的分析树、语法树、注释树，都是树。它们在内存里的表示也很朴素——每个节点是一个 C 结构体，里面有若干指向孩子的指针（1.4 节会具体讲）。</p>
+<p>树还带来一种思考方式：<b>递归</b>。"计算一棵树的值"可以定义为："如果是叶子，直接返回它的数；否则先计算左右子树的值，再做运算。"这个定义在描述自己的时候用到了自己，但因为树是有限的，它总会在叶子处停下来。编译器里大量的算法都是这个形状。</p>
+
+<h2 id="s0-6">0.6　状态机的直觉</h2>
+<div class="box crux"><p class="title">关键问题：怎样"一步一步"地读一个字符串</p><p>扫描程序每次只看一个字符。看了 <code>i</code>，再看 <code>f</code>，它怎么知道这是关键字 <code>if</code> 还是标识符 <code>ifx</code> 的开头？它必须<b>记住到目前为止看到了什么</b>，但又不能什么都记（那样太慢、太占内存）。</p></div>
+<p>想象一台最简单的自动门禁闸机：它只有两种情况——<b>锁着</b>和<b>开着</b>。投币，它从"锁着"变成"开着"；推一下，它从"开着"变回"锁着"。它不记得你投过几次币、几点来的，它只记得<b>当前处于哪种情况</b>。这种"情况"就叫<b>状态</b>（state），投币和推门叫<b>输入</b>（input），从一种情况到另一种情况叫<b>转换</b>（transition）。</p>
+<figure>
+  <div class="diagram" id="d-turnstile"></div>
+  <script type="text/diagram" data-kind="fa" data-target="d-turnstile">
+  { w: 360, h: 120, maxw: 300, r: 22,
+    states: [ {id:'L', x:80, y:60, label:'锁着', start:true}, {id:'O', x:270, y:60, label:'开着'} ],
+    edges: [ {from:'L', to:'O', label:'投币', curve:-40}, {from:'O', to:'L', label:'推门', curve:-40}, {from:'L', to:'L', label:'推门', loop:'top'}, {from:'O', to:'O', label:'投币', loop:'top'} ] }
+  </script>
+  <figcaption><b>图 0.3</b>　一台闸机的状态机。圆圈是状态，箭头是转换，箭头上写的是触发它的输入。没有来源的箭头指出<b>起始状态</b>。</figcaption>
+</figure>
+<p>这种"只记住当前处于哪个状态、根据输入切换状态"的机器，叫<b>有限状态机</b>（finite-state machine），第 2 章叫它<b>有限自动机</b>（finite automaton）。"有限"是关键：状态的个数是固定的，不随输入变长而增加。这带来两个巨大的好处——<b>速度极快</b>（每读一个字符只做一次查表）、<b>内存极省</b>（只存一个"当前状态"）。这正是扫描程序需要的。</p>
+<p>现在把它用在字符串上。假设我们想识别"以字母开头、后面跟任意多个字母或数字"的标识符。我们需要两个状态：状态 1 是"还没读到任何东西"，状态 2 是"已经读到一个合法的开头，后面可以继续"。读到字母时从 1 到 2；在 2 读到字母或数字时留在 2。当输入结束时，如果停在状态 2，就说这个字符串<b>被接受</b>了。第 2 章会把这个想法完全形式化，你会发现所有的形式化都只是把图 0.3 这样的图用集合和函数写下来而已。</p>
+<div class="box tip"><p class="title">提示：手指走图</p><p>学自动机最有效的方法就是用手指（或 Apple Pencil）在图上走：从起始状态出发，读一个字符，沿着标着这个字符的箭头走到下一个状态；读完后看看停在哪。请对图 0.3 试一下输入序列"投币、推门、推门、投币"。</p></div>
+
+<h2 id="s0-7">0.7　读懂课件代码所需的一点 C</h2>
+<p>课件里的代码不多，但用到几个 C 语言特性，这里做个速览，保证你在第 1、2 章遇到时不会卡住。</p>
+<h3>枚举类型 enum</h3>
+<pre><code><span class="k">typedef enum</span> { IF, THEN, ELSE, PLUS, MINUS, NUM, ID } TokenType;</code></pre>
+<p>枚举就是"给一组整数常量起名字"。<code>IF</code> 其实是 0，<code>THEN</code> 是 1，依此类推。编译器用它来表示"这是哪一类记号"，比用字符串比较快得多，也不容易写错。</p>
+<h3>结构体 struct</h3>
+<pre><code><span class="k">typedef struct</span> {
+    TokenType  tokenval;   <span class="c">/* 记号的类别 */</span>
+    <span class="k">char</span> *     stringval;  <span class="c">/* 原始的字符串，如 "index" */</span>
+    <span class="k">int</span>        numval;     <span class="c">/* 如果是数字，它的数值 */</span>
+} TokenRecord;</code></pre>
+<p>结构体把几个相关的值打包成一个。<code>char *</code> 是"指向字符的指针"，在 C 里就是字符串。第 2 章的"记号记录"就是这样一个结构体。</p>
+<h3>循环里的 switch</h3>
+<pre><code>state = 1;
+<span class="k">while</span> (state == 1 || state == 2) {
+    <span class="k">switch</span> (state) {
+        <span class="k">case</span> 1: <span class="c">/* 根据下一个字符决定去哪里 */</span> <span class="k">break</span>;
+        <span class="k">case</span> 2: <span class="c">/* ... */</span> <span class="k">break</span>;
+    }
+}</code></pre>
+<p><code>switch</code> 根据一个整数的值跳到对应的 <code>case</code>；<code>break</code> 跳出 switch。"外层 while、内层 switch(state)"是把状态机写成代码的经典模样，2.4 节会详细分析。</p>
+<h3>二维数组当作表</h3>
+<pre><code><span class="k">int</span> T[NSTATES][NCHARS];      <span class="c">/* T[state][ch] = 下一个状态 */</span>
+newstate = T[state][ch];</code></pre>
+<p>一张"当前状态 × 输入字符 → 下一状态"的表，就是一个二维数组。整个自动机可以压缩成这张表，代码则退化成"查表、赋值、循环"三句话。</p>
+
+<h2 id="s0-8">0.8　符号速查与小结</h2>
+<table class="glossary">
+  <tr><th>符号</th><th>读法</th><th>意思</th></tr>
+  <tr><td>Σ</td><td>Sigma</td><td>字母表：允许出现的全部字符</td></tr>
+  <tr><td>ε</td><td>epsilon</td><td>空串：长度为 0 的字符串</td></tr>
+  <tr><td>Φ / ∅</td><td>phi / 空集</td><td>什么字符串都没有的语言（注意：{ε} 不是空集，它有一个成员）</td></tr>
+  <tr><td>L(r)</td><td>r 的语言</td><td>正则表达式 r 所描述的那个字符串集合</td></tr>
+  <tr><td>x ∈ A</td><td>x 属于 A</td><td>x 是集合 A 的成员</td></tr>
+  <tr><td>A ⊆ B</td><td>A 包含于 B</td><td>A 的每个成员都在 B 里</td></tr>
+  <tr><td>A ∪ B</td><td>A 并 B</td><td>在 A 里或在 B 里的东西</td></tr>
+  <tr><td>A × B</td><td>A 叉乘 B</td><td>所有的有序对 (a, b)，a 取自 A，b 取自 B</td></tr>
+  <tr><td>f : X → Y</td><td>f 从 X 到 Y</td><td>函数 f，输入是 X 的成员，输出是 Y 的成员</td></tr>
+  <tr><td>𝒫(S)</td><td>S 的幂集</td><td>S 的所有子集组成的集合</td></tr>
+  <tr><td>A*</td><td>A 星</td><td>把 A 的成员连接任意多次（含零次）得到的一切</td></tr>
+</table>
+<div class="box summary"><p class="title">本章小结</p><ul>
+  <li>机器只认识数字；从机器语言到汇编再到高级语言，每上一层，就需要一个新的翻译程序。</li>
+  <li>字母表是有限的字符集合；字符串是有限的符号序列；ε 是空串，是连接运算的单位元。</li>
+  <li><b>语言 = 字符串的集合</b>。并、连接、闭包三种运算可以从小语言造出大语言。</li>
+  <li>树表达嵌套结构；递归是处理树的自然方式。</li>
+  <li>有限状态机：有限个状态、按输入转换、只记住当前状态。它快、省，正是扫描程序所需要的。</li>
+</ul></div>
+<div class="box hw"><p class="title">热身练习（不计分，但强烈建议做）</p><ol>
+  <li>设 Σ = {0, 1}。写出长度 ≤ 2 的全部字符串（提示：别忘了 ε，一共 7 个）。</li>
+  <li>设 A = {a, b}，写出 A A 和 A* 的前 8 个成员。</li>
+  <li>给"电梯门"画一个状态机：状态有"开""关""正在关"；输入有"按开门""按关门""到时"。</li>
+  <li>画出表达式 <code>(1 + 2) * (3 - 4)</code> 的树。括号在树里去哪了？</li>
+</ol></div>

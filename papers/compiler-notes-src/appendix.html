@@ -1,0 +1,169 @@
+<!-- ===================== 附录 A ===================== -->
+<div class="chap-open" id="appA"><div class="num">附录 A</div><h1 class="chapter">术语中英对照表</h1><div class="en">Glossary</div></div>
+<p class="chapter-lead">课件是中英双语的，考试和教材都会用到英文术语。下表按章节整理了本讲义出现的全部术语，中文译名以课件为准。</p>
+<table class="glossary nowrap1">
+  <tr><th>英文</th><th>中文</th><th>一句话解释</th></tr>
+  <tr><td colspan="3" style="background:#eef2f7;color:#1e3a5f;font-weight:700">第 1 章</td></tr>
+  <tr><td>compiler</td><td>编译器</td><td>把源语言程序翻译成等价目标语言程序的程序</td></tr>
+  <tr><td>source / target language</td><td>源语言 / 目标语言</td><td>翻译的输入语言 / 输出语言</td></tr>
+  <tr><td>host / implementation language</td><td>主机语言 / 实现语言</td><td>编译器本身用什么语言写</td></tr>
+  <tr><td>machine language</td><td>机器语言</td><td>用数字编码的指令</td></tr>
+  <tr><td>assembly language</td><td>汇编语言</td><td>机器语言的符号形式；机器依赖</td></tr>
+  <tr><td>Chomsky hierarchy</td><td>乔姆斯基层次</td><td>按文法复杂度对语言的四级分类</td></tr>
+  <tr><td>context-free grammar</td><td>上下文无关文法</td><td>2 型文法，描述程序语法</td></tr>
+  <tr><td>regular grammar</td><td>正则文法</td><td>3 型文法，等价于正则表达式</td></tr>
+  <tr><td>interpreter</td><td>解释器</td><td>边翻译边执行的语言处理程序</td></tr>
+  <tr><td>assembler / linker / loader</td><td>汇编器 / 连接器 / 装入程序</td><td>翻译汇编 / 合并目标文件 / 解析重定位地址</td></tr>
+  <tr><td>preprocessor</td><td>预处理器</td><td>删注释、包含文件、宏替换</td></tr>
+  <tr><td>debugger / profiler</td><td>调试程序 / 描述器</td><td>定位执行错误 / 统计执行时间</td></tr>
+  <tr><td>scanner, lexical analysis</td><td>扫描程序，词法分析</td><td>字符 → 记号</td></tr>
+  <tr><td>parser, syntax analysis</td><td>分析程序，语法分析</td><td>记号 → 语法树</td></tr>
+  <tr><td>parse tree / (abstract) syntax tree</td><td>分析树 / （抽象）语法树</td><td>完整推导记录 / 它的浓缩</td></tr>
+  <tr><td>semantic analyzer, static semantics</td><td>语义分析器，静态语义</td><td>声明、类型检查等执行前可判定的性质</td></tr>
+  <tr><td>attribute, annotated tree</td><td>属性，注释树</td><td>语义分析算出的信息及带信息的树</td></tr>
+  <tr><td>intermediate representation (IR)</td><td>中间表示 / 中间代码</td><td>前端与后端之间的接口</td></tr>
+  <tr><td>constant folding</td><td>常数合并</td><td>编译时预先计算常量表达式</td></tr>
+  <tr><td>code generator</td><td>代码生成器</td><td>中间代码 → 目标代码</td></tr>
+  <tr><td>literal table / symbol table</td><td>常数表 / 符号表</td><td>常量与字符串 / 标识符信息（哈希表）</td></tr>
+  <tr><td>single symbol lookahead</td><td>单符号先行</td><td>一次只需向前看一个记号</td></tr>
+  <tr><td>backpatch</td><td>反填</td><td>先留空后回填跳转地址</td></tr>
+  <tr><td>analysis / synthesis</td><td>分析 / 综合</td><td>计算源程序性质 / 产生目标代码</td></tr>
+  <tr><td>front end / back end</td><td>前端 / 后端</td><td>只依赖源语言 / 只依赖目标语言的部分</td></tr>
+  <tr><td>pass</td><td>遍</td><td>对源程序（或其表示）的一次完整处理</td></tr>
+  <tr><td>portability</td><td>可移植性</td><td>换机器所需改动的多少</td></tr>
+  <tr><td>cross compiler</td><td>交叉编译器</td><td>为另一台机器生成代码的编译器</td></tr>
+  <tr><td>T-diagram</td><td>T 型图</td><td>表示编译器 S→T 用 H 写的图</td></tr>
+  <tr><td>bootstrapping</td><td>自举</td><td>用语言自身写它的编译器的三步法</td></tr>
+  <tr><td>porting</td><td>移植</td><td>改代码生成器 + 两次编译</td></tr>
+  <tr><td colspan="3" style="background:#eef2f7;color:#1e3a5f;font-weight:700">第 2 章</td></tr>
+  <tr><td>token</td><td>记号</td><td>扫描程序输出的逻辑单元</td></tr>
+  <tr><td>lexeme / string value</td><td>词素 / 字符串值</td><td>记号对应的具体字符串</td></tr>
+  <tr><td>attribute, token record</td><td>属性，记号记录</td><td>与记号关联的值及打包它们的结构体</td></tr>
+  <tr><td>reserved word</td><td>保留字</td><td>if、then 等固定拼写的记号</td></tr>
+  <tr><td>literal</td><td>字面量</td><td>字符串、字符常量</td></tr>
+  <tr><td>pattern matching</td><td>模式匹配</td><td>扫描是它的特例</td></tr>
+  <tr><td>regular expression</td><td>正则表达式</td><td>描述模式的记法</td></tr>
+  <tr><td>alphabet Σ</td><td>字母表</td><td>可用字符的有限集合</td></tr>
+  <tr><td>language L(r)</td><td>语言</td><td>r 匹配的字符串集合</td></tr>
+  <tr><td>metacharacter / metasymbol</td><td>元字符 / 元符号</td><td>记法自身的符号：| * ( ) 等</td></tr>
+  <tr><td>choice / concatenation / repetition</td><td>选择 / 连接 / 重复</td><td>三种基本运算</td></tr>
+  <tr><td>(Kleene) closure</td><td>（Kleene）闭包</td><td>星号运算</td></tr>
+  <tr><td>precedence</td><td>优先级</td><td>重复 > 连接 > 选择</td></tr>
+  <tr><td>pumping lemma</td><td>泵引理</td><td>证明某语言不是正则的工具</td></tr>
+  <tr><td>escape character</td><td>转义字符</td><td>关闭元字符特殊含义的引号</td></tr>
+  <tr><td>pseudotoken</td><td>伪记号</td><td>被识别但不返回的记号，如注释</td></tr>
+  <tr><td>delimiter</td><td>定界符</td><td>标志记号结束的字符</td></tr>
+  <tr><td>backing up / looking ahead</td><td>退回 / 先行</td><td>处理定界符的两种方式</td></tr>
+  <tr><td>ambiguity</td><td>二义性</td><td>一个串匹配多个模式</td></tr>
+  <tr><td>principle of longest substring</td><td>最长子串原则</td><td>能匹配多长就匹配多长</td></tr>
+  <tr><td>finite automaton (FA)</td><td>有限自动机</td><td>有限状态、按输入转换的机器</td></tr>
+  <tr><td>state / transition</td><td>状态 / 转换</td><td>圆圈 / 箭头</td></tr>
+  <tr><td>start state / accepting state</td><td>起始状态 / 接受状态</td><td>无源箭头所指 / 双圈</td></tr>
+  <tr><td>DFA</td><td>确定性有限自动机</td><td>T: S×Σ→S</td></tr>
+  <tr><td>transition function</td><td>转换函数</td><td>（状态, 字符）→ 下一状态</td></tr>
+  <tr><td>language accepted L(M)</td><td>接受的语言</td><td>能从起点走到接受状态的所有串</td></tr>
+  <tr><td>error transition / error state</td><td>错误转换 / 错误状态</td><td>默认存在、不画出</td></tr>
+  <tr><td>action</td><td>动作</td><td>转换时累积词素、接受时返回记号</td></tr>
+  <tr><td>backtracking</td><td>回溯</td><td>出错或不确定时退回重试</td></tr>
+  <tr><td>ε-transition</td><td>ε-转换</td><td>不消耗输入的转换</td></tr>
+  <tr><td>NFA</td><td>非确定性有限自动机</td><td>T: S×(Σ∪{ε})→𝒫(S)</td></tr>
+  <tr><td>power set 𝒫(S)</td><td>幂集</td><td>S 的所有子集</td></tr>
+  <tr><td>transition table</td><td>转换表</td><td>状态 × 字符 → 下一状态的二维表</td></tr>
+</table>
+
+<!-- ===================== 附录 B ===================== -->
+<div class="chap-open" id="appB"><div class="num">附录 B</div><h1 class="chapter">作业提示与参考思路</h1><div class="en">Hints and Sketches for the Homework</div></div>
+<p class="chapter-lead">这里给的是<b>思路和检验方法</b>，不是标准答案——正则表达式和 DFA 都不唯一，你的答案和这里不同不代表错了。请务必先自己做，再来对照。</p>
+
+<h2>第 1 章的作业</h2>
+<h3>1.2　<code>a[i+1] = a[i] + 2</code> 的分析树与语法树</h3>
+<p>照抄图 1.3 的模式。分析树的根是 expression → assign-expression，它有三个孩子：左边的 expression（下面是 subscript-expression，包含 identifier a、[、expression（下面是 additive-expression：identifier i、+、number 1）、]），中间的 =，右边的 expression（下面是 additive-expression：左孩子是 expression → subscript-expression（a、[、i、]），中间 +，右孩子 number 2）。语法树把所有单孩子的 expression 层和括号记号删掉：</p>
+<figure>
+  <div class="diagram" id="d-hw12"></div>
+  <script type="text/diagram" data-kind="tree" data-target="d-hw12">
+  { root: { t:'assign-expression', c:[
+      { t:'subscript-expression', c:[ { t:'identifier a', k:'t' }, { t:'additive-expression', c:[ { t:'identifier i', k:'t' }, { t:'number 1', k:'t' } ] } ] },
+      { t:'additive-expression', c:[ { t:'subscript-expression', c:[ { t:'identifier a', k:'t' }, { t:'identifier i', k:'t' } ] }, { t:'number 2', k:'t' } ] } ] },
+    opt: { levelH: 40, gap: 14, fs: 10, maxw: 470 } }
+  </script>
+  <figcaption><b>图 B.1</b>　作业 1.2 的语法树（参考）。检验：树的叶子从左到右读出来应当是 a、i、1、a、i、2——正好是原表达式里的全部标识符和数。</figcaption>
+</figure>
+<h3>1.3　语法错误与语义错误</h3>
+<p>a. 语法错误（C 语言）：<code>int x = 5</code> 缺分号；<code>if x &gt; 0 { }</code> 条件缺括号；<code>for (i = 0; i &lt; n; i++</code> 括号不配对。语义错误：<code>int x = "hello";</code> 类型不匹配；使用未声明的变量 <code>y = 3;</code>；给函数传错参数个数；<code>3 = x;</code>（左边不是左值——结构合法，意思不合法）。</p>
+<p>b. 用 gcc 试试一个同时含两类错误的文件。你会发现：如果语法错误严重到分析程序无法继续，gcc 往往只报语法错误；而在能恢复的情况下，两类错误<b>混杂</b>出现。混杂说明它在同一遍里做语法分析和语义分析（分析程序一边建树一边调用语义检查），而不是先完整地做完一遍语法分析。</p>
+<h3>1.7　用 T 型图造 Pascal 编译器</h3>
+<p>已有：① Pascal → C 的翻译器，用 C 写（T 型图：Pascal / C / C）；② C 编译器，运行在机器 H 上（C / H / H）。</p>
+<ol>
+  <li>用 C 编译器编译翻译器（情形 2）：Pascal/C/C 落在 C/H/H 上，得到 <b>Pascal / C / H</b>——一个能在 H 上运行的 Pascal → C 翻译器。</li>
+  <li>把它和 C 编译器串联（情形 1）：Pascal/C/H 接 C/H/H，得到 <b>Pascal / H / H</b>——一个在 H 上运行、生成 H 代码的 Pascal 编译器。</li>
+</ol>
+<p>检验：每一步都对照 1.6 节的"三条口诀"，尤其是第 1 步落下去的字母（C）必须等于下方横杠左端的字母（C）。</p>
+
+<h2>第 2 章的作业</h2>
+<h3>2.1　写正则表达式</h3>
+<p>设 letter = [a-z]，digit = [0-9]。</p>
+<ol type="a">
+  <li>以 a 开头且以 a 结尾：别忘了长度为 1 的串 <code>a</code> 本身！<span class="regex">a | a letter* a</span>。</li>
+  <li>以 a 开头或以 a 结尾：<span class="regex">a letter* | letter* a</span>。两部分重叠（既以 a 开头又以 a 结尾的串被两边都匹配）没有关系——选择是并集。</li>
+  <li>不含前导零的数字串：单独的 0 是合法的，其他串必须以 1–9 开头：<span class="regex">0 | [1-9] digit*</span>。</li>
+  <li>偶数：最后一位是偶数字：<span class="regex">digit* [02468]</span>。（如果也要求无前导零，就和 (c) 合并：<span class="regex">0 | [1-9] digit* [02468] | [2468]</span>。）</li>
+</ol>
+<h3>2.2　用文字描述语言</h3>
+<ol type="a">
+  <li><span class="regex">(a|b)* a (a|b|ε)</span>：{a, b} 上<b>倒数第一位或倒数第二位是 a</b> 的所有串。检验：<code>ab</code>（倒数第二位 a）✓，<code>ba</code> ✓，<code>bb</code> ✗，<code>abb</code> ✗。</li>
+  <li><span class="regex">(A|B|…|Z)(a|b|…|z)*</span>：一个大写字母后跟任意多个小写字母——<b>首字母大写的单词</b>，如 <code>Hello</code>、<code>X</code>。</li>
+</ol>
+<h3>2.4　为什么不规定结合性</h3>
+<p>因为选择和连接都满足<b>结合律</b>：L((a|b)|c) = ({a}∪{b})∪{c} = {a}∪({b}∪{c}) = L(a|(b|c))；L((ab)c) = L(a(bc)) = {abc}。既然无论怎样加括号得到的语言都一样，就不需要规定。（对比减法：(8−3)−2 ≠ 8−(3−2)，所以算术必须规定减法左结合。）</p>
+<h3>2.5　证明 L(r**) = L(r*)</h3>
+<p>两个方向的包含。⊇：L(r*) ⊆ L((r*)*) 显然——任何集合 X 都满足 X ⊆ X*（取"重复一次"）。⊆：L(r**) 的成员是若干个 L(r*) 成员的连接；每个 L(r*) 成员本身是若干个 L(r) 成员的连接；连接起来仍然是若干个 L(r) 成员的连接，因此属于 L(r*)。直觉：“任意多次地做‘任意多次重复’”还是“任意多次重复”。</p>
+<h3>2.8　为 2.1 画 DFA</h3>
+<p>用 2.3.2 节"给状态起含义"的方法：</p>
+<ol type="a">
+  <li>状态：<i>起始</i>、<i>已读 a 开头且当前以 a 结尾</i>（接受）、<i>已读 a 开头但当前以非 a 结尾</i>。起始读 a 到接受态；接受态读 a 留在原地、读其他字母到第三态；第三态读 a 回接受态、读其他留在原地。</li>
+  <li>状态：<i>起始</i>、<i>以 a 开头</i>（接受，之后读什么都留在这里）、<i>不以 a 开头且当前以 a 结尾</i>（接受）、<i>不以 a 开头且当前不以 a 结尾</i>。四个状态。</li>
+  <li>状态：<i>起始</i>、<i>读到单独的 0</i>（接受，再读任何数字都出错）、<i>读到 1–9 开头</i>（接受，读任意数字留在原地）。</li>
+  <li>状态：<i>起始</i>、<i>当前末位是偶数</i>（接受）、<i>当前末位是奇数</i>。每读一个数字，按它的奇偶决定去哪个状态。</li>
+</ol>
+<p>四个都存在 DFA——正如 2.3.5 节的补充所说，凡是能用正则表达式写出来的，就一定有 DFA。</p>
+
+<!-- ===================== 附录 C ===================== -->
+<div class="chap-open" id="appC"><div class="num">附录 C</div><h1 class="chapter">自测清单</h1><div class="en">Self-Check</div></div>
+<p class="chapter-lead">合上讲义，对照下面的清单逐条自问。能用自己的话回答（而不是背出课件原句）才算掌握。打不上勾的条目，回到对应小节再读一遍。</p>
+<h3>第 0 章</h3>
+<ul class="checklist">
+  <li>我能解释 ε 和空格的区别，以及 {ε} 和 { } 的区别。</li>
+  <li>给定两个小语言 A、B，我能写出 A ∪ B、AB、A* 的成员。</li>
+  <li>我能画出一个日常设备（闸机、电梯门）的状态机，并说明"有限"指的是什么。</li>
+</ul>
+<h3>第 1 章</h3>
+<ul class="checklist">
+  <li>我能说出编译器的定义，并解释"等价"为什么是硬性要求。</li>
+  <li>我能画出机器语言 → 汇编 → 高级语言的阶梯，并说出每一层的优缺点。</li>
+  <li>我能列出乔姆斯基四型文法，并说出编译器用哪两型、分别用来干什么。</li>
+  <li>我能区分编译器和解释器、汇编器、连接器、装入程序、预处理器的职责。</li>
+  <li>给定一条赋值语句，我能画出它经过六个阶段时的每一种中间表示（记号、分析树、语法树、注释树、优化后的树、目标代码）。</li>
+  <li>我能解释常数合并、以及"目标机器的性质"是如何影响代码生成的（乘 2 那条指令）。</li>
+  <li>我能说出符号表和常数表的区别，以及为什么符号表用哈希表。</li>
+  <li>我能解释前端/后端划分为什么带来 M + N 而不是 M × N。</li>
+  <li>我能画出 T 型图的两种拼接，并完成作业 1.7。</li>
+  <li>我能用自己的话讲清楚自举的三步，以及为什么最后一步是必要的。</li>
+  <li>我能读懂 TINY 的阶乘程序，并解释 TM 的"寄存器 + 偏移量"寻址。</li>
+</ul>
+<h3>第 2 章</h3>
+<ul class="checklist">
+  <li>我能区分记号、词素、属性，并写出记号记录的结构体。</li>
+  <li>我能说出正则表达式的三种基本表达式、三种运算及其优先级，并用集合运算解释每一种。</li>
+  <li>给定一个用文字描述的字符串集合，我能写出正则表达式，并用反例检验它。</li>
+  <li>我能解释为什么 a<sup>n</sup>ba<sup>n</sup> 不能用正则表达式描述。</li>
+  <li>我能写出 number、identifier 和两种注释的正则表达式，并解释引号转义。</li>
+  <li>我能说出"最长子串原则"和"关键字优先"各解决什么二义性。</li>
+  <li>我能写出 DFA 的五元组定义，并用文字解释 L(M)。</li>
+  <li>给定正则表达式，我能画出 DFA；给定 DFA，我能说出它接受的语言。</li>
+  <li>我能解释 [other] 的含义，以及为什么定界符不能被消耗。</li>
+  <li>我能说明首字符相同/不同时如何合并 DFA，以及 ε-转换如何让合并机械化。</li>
+  <li>我能写出 NFA 的定义，指出它与 DFA 定义的两处不同，并解释"NFA 不是算法"。</li>
+  <li>我能用三种方法把一个 DFA 写成代码，并说出各自的优缺点。</li>
+</ul>
+<hr>
+<p class="small center" style="margin-top:8mm">— 第一部完 —<br>下一部：从有限自动机到扫描程序生成器（子集构造、DFA 最小化、Lex），以及上下文无关文法与分析。</p>
