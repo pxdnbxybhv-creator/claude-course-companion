@@ -41,7 +41,7 @@
         {% endfor %}
         <tr><td>作业</td><td>{{ total_words }}</td><td>自测 + 间隔复习</td><td>约 15 分钟</td></tr>
       </table>
-      <p class="note" style="margin-top:8px">作业里的复习表会自动把今天这些词排进后面几天，你不需要自己决定复习什么。</p>
+      <div class="hookline"><span class="lab">今天的悬念</span>{{ d.hook }}</div>
     </div>
   </div>
   <footer class="run"><span>Day {{ day }} · 第 1 页</span><div class="progress"><i style="width:{{ progress }}%"></i></div><span>Day {{ day }} / 30</span></footer>
@@ -51,6 +51,7 @@
 {% for s in d.scenes %}
   <h2 class="scene span2" data-short="{{ scene_tag[s.key] }} {{ s.title.split('：')[0] }}"><span class="tag">{{ scene_tag[s.key] }}</span>{{ s.title }}</h2>
   {% if s.intro %}<p class="intro span2">{{ s.intro }}</p>{% endif %}
+  {% for b in s.beats | default([]) if b.after is none %}<div class="beat"><span class="lab">剧情</span>{{ b.text }}</div>{% endfor %}
   {% for c in s.cards %}
     {% if c.card_style == 'lite' %}
     <div class="card lite">
@@ -69,6 +70,7 @@
       <div class="row col"><span class="lab col">搭</span><div class="txt">{{ c.collocations | join('　·　') }}</div></div>
     </div>
     {% endif %}
+    {% for b in s.beats | default([]) if b.after == c.id %}<div class="beat"><span class="lab">剧情</span>{{ b.text }}</div>{% endfor %}
   {% endfor %}
   {% for b in s.boxes | default([]) %}
   <div class="box span2 {{ 'tip' if b.type == 'tip' else '' }}">
@@ -110,11 +112,15 @@
 
 {% for ex in d.homework.exercises %}
   <h2 class="hwt" data-short="作业 · 练习"><span class="tag">作业 {{ day }}.{{ reviews | length + loop.index + 1 }}</span>{{ ex.title }}</h2>
+  {% if ex.passage %}
+  <p class="passage">{% set parts = ex.passage.split('____') %}{% for part in parts %}{{ part }}{% if not loop.last %}<span class="blank">({{ loop.index }})________</span>{% endif %}{% endfor %}</p>
+  {% else %}
   <ol class="parts">
     {% for it in ex['items'] %}
     <li>{{ it.prompt }}{% if it.hint %}<span class="zh">　（{{ it.hint }}）</span>{% endif %}</li>
     {% endfor %}
   </ol>
+  {% endif %}
 {% endfor %}
 
   <h2 class="hwt" data-short="复习日程"><span class="tag">复习日程</span>今天这 {{ total_words }} 个词会在哪些天回来找你</h2>
@@ -128,6 +134,7 @@
     <div class="t">SUMMARY<span>小结</span></div>
     <ul>{% for s in d.summary %}<li>{{ s }}</li>{% endfor %}</ul>
   </div>
+  <div class="cliff span2"><span class="lab">下集预告</span>{{ d.cliffhanger }}</div>
 
   <h2 class="hwt" data-short="答案"><span class="tag">答案</span>作业 {{ day }}.1 今日自测</h2>
   {% for ch in answers %}
@@ -138,7 +145,7 @@
 {% for ex in d.homework.exercises %}
   <h2 class="hwt" data-short="答案"><span class="tag">答案</span>{{ ex.title }}</h2>
   <ol class="parts ans">
-    {% for it in ex['items'] %}<li>{{ it.prompt }}　<b>{{ it.answer }}</b></li>{% endfor %}
+    {% for it in ex['items'] %}<li>{% if it.prompt %}{{ it.prompt }}　{% endif %}<b>{{ it.answer }}</b></li>{% endfor %}
   </ol>
 {% endfor %}
 </div>

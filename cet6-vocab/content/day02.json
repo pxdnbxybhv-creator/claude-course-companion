@@ -4,7 +4,7 @@
  "kind": "study",
  "title": "拆词术的第一个陷阱",
  "estimated_minutes": 55,
- "story_note": "Part I 第二集，直接承接 Day 1 结尾发现的手绘漫画《银河骑士》：1987 年学生社团的作品，如今有制片公司要在拍卖会上买下版权。词根场景刻意分成「四个真家族 + 六个假朋友」，因为 v0 分配表按正则给出的 medi/sacr/metr/term 四组里，medication、metropolitan、cemetery、massacre、aftermath、intermittent 六个是词源假朋友——与其回避，不如把它做成今天的 CRUX。",
+ "story_note": "Part I 第二集，承接 Day 1 结尾的收据。碎片：制片公司想买版权；电话竞拍者拒绝留名；此人知道最后一页的下落，并称管理员为「小周」——说明是 1987 年的熟人。词根场景刻意分成「四个真家族 + 六个假朋友」（见 DESIGN 4.6）。审计后按 5.6 补了 hook / 5 个 beats / cliffhanger / 故事完形，并修正 bass、cape、legacy、shield 四张卡的说法与对话里一句没有依据的「命中率八成」。",
  "dialogue": {
   "title": "关于「零件会不会骗人」的对话",
   "turns": [
@@ -26,35 +26,35 @@
    },
    {
     "who": "student",
-    "text": "那我昨天学的拆词术……"
+    "text": "所以您昨天教的方法，第二天就翻车了。"
    },
    {
     "who": "professor",
-    "text": "照用。它是启发式，不是保证。就像缓存：命中的时候快得不讲道理，没命中的时候你得回去查主存。"
+    "text": "方法没翻车，翻的是我。昨天我该先说这句：零件是启发式，不是保证。"
    },
    {
     "who": "student",
-    "text": "主存是什么？"
+    "text": "启发式。就是「通常对，出错不负责」。"
    },
    {
     "who": "professor",
-    "text": "词典。"
+    "text": "说得比我准。它像缓存：命中的时候快得不讲道理，没命中的时候你得回去查主存。"
    },
    {
     "who": "student",
-    "text": "那我怎么知道哪一次没命中？"
+    "text": "主存是词典。那我怎么知道哪一次没命中？"
    },
    {
     "who": "professor",
-    "text": "把今天这六个记住就行。假朋友不多，但个个常考——出题的人也读词源。"
+    "text": "记住今天这六个。假朋友不多，但个个常考——出题的人也读词源。"
    },
    {
     "who": "student",
-    "text": "六个假的，八个真的。听起来这个缓存的命中率不算高。"
+    "text": "六个假的，八个真的。您是不是专挑最坏的一天来教这个？"
    },
    {
     "who": "professor",
-    "text": "今天这一组是我特意挑出来的最坏情况。真实命中率在八成以上，否则我不会教你这个办法。"
+    "text": "是。另外，拍卖会是今天下午。周管理员昨天走得太快，收据都忘了拿。"
    }
   ]
  },
@@ -487,7 +487,7 @@
   {
    "key": "theme",
    "title": "情景剧：《银河骑士》的拍卖会",
-   "intro": "第三个抽屉里那本漫画有了名字：《银河骑士》，1987 年一个学生社团画的，四百页，没有署名。今天下午它要被拍卖，而阅览室里只坐了十一个人。",
+   "intro": "第三个抽屉里那本漫画有了名字：《银河骑士》，1987 年一个学生社团画的，四百页，没有署名，最后一页被撕掉了。今天下午它要被拍卖，阅览室里只坐了十一个人。",
    "cards": [
     {
      "id": 435,
@@ -567,7 +567,7 @@
      },
      "hook": {
       "type": "story",
-      "text": "四级里你见过它的名词义。六级更常考动词：shield sb from sth，把人从某个东西后面挡住。"
+      "text": "名词义「盾」你多半见过。六级更常考动词：shield sb from sth，把人挡在某个东西后面。"
      },
      "collocations": [
       "a heat shield",
@@ -594,7 +594,7 @@
      },
      "hook": {
       "type": "morph",
-      "text": "两个义项同源：拉丁语 caput（头）→ 披在头上的是斗篷，伸进海里的「头」是海角。capital（首都）也是这一家。",
+      "text": "海角来自拉丁语 caput（头，同 capital 首都）；斗篷来自晚期拉丁语 cappa（带帽斗篷），cappa 是否也出自 caput，词源学界尚无定论。",
       "true_etymology": true
      },
      "collocations": [
@@ -832,7 +832,7 @@
      },
      "hook": {
       "type": "story",
-      "text": "拼写陷阱：读 /beɪs/ 时是「低音」，读 /bæs/ 时是一种鱼（鲈鱼）。同形不同音，词表里也是分开列的。",
+      "text": "拼写陷阱：读 /beɪs/ 是「低音」，读 /bæs/ 是鲈鱼——同一个拼写，两个不相干的词。六级只考前者。",
       "joke": true
      },
      "collocations": [
@@ -918,7 +918,7 @@
      },
      "hook": {
       "type": "morph",
-      "text": "leg（法律，同 legal）→ 通过法律留给别人的东西。程序员说的 legacy code（祖传代码）也是「前人留下的」。",
+      "text": "lex / legare（法律；依法委托，同 legal、delegate）→ 依法留给别人的东西。程序员说的 legacy code（祖传代码）也是「前人留下的」。",
       "true_etymology": true,
       "joke": true
      },
@@ -1158,6 +1158,28 @@
      "title": "franchise 的两张面孔",
      "source": "词源；franc（自由）",
      "text": "同一个词，在商科阅读里是「特许经营权」（麦当劳的加盟店），在影评里是「系列版权」（漫威宇宙），在政治学文章里是「选举权」。三个意思都来自同一个本义：被授予的自由。看到 franchise 先别急着选「加盟店」，看清楚它在谈生意、谈电影，还是谈投票。"
+    }
+   ],
+   "beats": [
+    {
+     "after": null,
+     "text": "系主任看了漫画十分钟，说了一句「这是个 epic」，然后打了一个电话。第二天早上，一家制片公司的律师坐在阅览室里，手里拿着一份出价单，桌上摊开的正是那位丢了马和名字的 knight。"
+    },
+    {
+     "after": 169,
+     "text": "律师翻到第三十页停住了：这一页画的是一座 arena，看台上写着本校校训。「所以 galaxy 是校园，alien 是新生，那只 spider 是——」「教务处。」你替他说完。律师没有笑。"
+    },
+    {
+     "after": 77,
+     "text": "第二卷是 knight 的 quest：去找一页被撕掉的纸。1987 年的作者好像早就知道会有人撕。整本书里当 butt of the joke 的那个跟班，在第 200 页忽然说：「去问阅览室的人。」你抬头，阅览室里只有律师和你。"
+    },
+    {
+     "after": 683,
+     "text": "下午两点，拍卖会。到场十一人：律师、系主任、两个社团前成员、六个来蹭空调的学生，和你。教授没来。制片公司要的不是这本书，是 franchise——六部电影，从一本没署名的漫画开始。"
+    },
+    {
+     "after": 476,
+     "text": "起拍价一千英镑。律师举牌，一个前成员举牌，然后电话响了。电话那头出两万，条件是不问买方姓名。系主任说这不 eligible，学生们当场起草 petition。教授这时候才推门进来，手里拿着昨天那张收据。"
     }
    ]
   },
@@ -1536,27 +1558,26 @@
    },
    {
     "type": "cloze",
-    "title": "填空：用今天的词填，注意词形",
+    "title": "故事完形：用今天的词填空，注意词形",
+    "passage": "The lawyer called the comic an ____ and offered to buy the ____ for six films. Only former club members were ____ to bid, and two of them came. The ____ opened at a thousand pounds. Then the telephone rang: twenty thousand, on one condition — no name. The dean refused, and the students drafted a ____ on the spot. The archive, the professor said afterwards, exists to ____ curiosity, not to sell it. But the voice on the telephone knew about the missing page.",
     "items": [
      {
-      "prompt": "The council voted to impose economic ______ on the company.",
-      "answer": "sanctions"
+      "answer": "epic"
      },
      {
-      "prompt": "Only former members were ______ to bid at the auction.",
+      "answer": "franchise"
+     },
+     {
       "answer": "eligible"
      },
      {
-      "prompt": "The archive exists to ______ curiosity, not just to keep paper dry.",
-      "answer": "foster"
+      "answer": "auction"
      },
      {
-      "prompt": "The heating is ______ , which is worse than no heating at all.",
-      "answer": "intermittent"
-     },
-     {
-      "prompt": "Students signed a ______ asking the university to keep the comic.",
       "answer": "petition"
+     },
+     {
+      "answer": "foster"
      }
     ]
    }
@@ -1568,5 +1589,7 @@
   "sanction 同时是「批准」和「制裁」——考试最爱这种词。",
   "同根不同尾要成对记：clearing（空地）和 clearance（清除、间隙、许可）。",
   "明天：五个新零件（cur、frag、min、pos、spect），以及一张没人认领的收据。"
- ]
+ ],
+ "hook": "1987 年那张收据上，卖方是周管理员，买方是空的。今天下午的拍卖会，来了十一个人和一部电话。",
+ "cliffhanger": "拍卖流拍，因为系主任坚持要买方的姓名。挂电话之前，那个声音说了一句：「告诉小周，最后一页在我这儿。」"
 }

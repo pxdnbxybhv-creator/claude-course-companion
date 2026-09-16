@@ -96,6 +96,28 @@ for f in files:
     turns = d.get('dialogue', {}).get('turns', [])
     if turns and turns[0]['who'] != 'student': warn(name, 'dialogue usually opens with the student')
     if sum(len(t['text']) for t in turns) > 450: warn(name, 'dialogue > 450 chars')
+    # ---- story layer
+    theme = next((sc for sc in d.get('scenes', []) if sc['key'] == 'theme'), None)
+    if theme is not None and len(theme.get('beats', [])) < 3: err(name, 'theme scene needs >= 3 story beats')
+    for sc in d.get('scenes', []):
+        ids = {c['id'] for c in sc['cards']}
+        for b in sc.get('beats', []):
+            if b.get('after') is not None and b['after'] not in ids: err(name, f"beat after={b['after']} is not a card of scene {sc['key']}")
+    if not d.get('hook'): err(name, 'missing hook (今天的悬念)')
+    if not d.get('cliffhanger'): err(name, 'missing cliffhanger (下集预告)')
+    if any(k in d.get('cliffhanger', '') for k in ('明天继续', '待续')): warn(name, 'cliffhanger should name a concrete event')
+    for t in turns:
+        if t['who'] == 'professor' and len(t['text']) > 80: warn(name, f"professor turn of {len(t['text'])} chars reads like a lecture (limit 80)")
+    if turns and turns[-1]['who'] != 'professor': warn(name, 'dialogue usually ends on the professor')
+    for ex in d.get('homework', {}).get('exercises', []):
+        if ex.get('passage'):
+            blanks = ex['passage'].count('____'); n_ans = len(ex['items'])
+            if blanks != n_ans: err(name, f"story cloze: {blanks} blanks but {n_ans} answers")
+            nw = len(ex['passage'].split())
+            if not (60 <= nw <= 160): warn(name, f'story cloze passage has {nw} words (target 80–120)')
+        else:
+            for it in ex['items']:
+                if not it.get('prompt'): err(name, f"exercise 「{ex['title']}」: item without prompt needs a passage")
     day_ids = {c['id'] for _, c in cards}
     for g in inter:
         hit = [h for h in g if by_head.get(h) in day_ids]

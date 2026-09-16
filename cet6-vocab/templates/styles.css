@@ -146,3 +146,12 @@ table.q.ans td.n { width: 30px; }
 
 h2.scene, h2.hwt, p.intro { break-after: avoid; page-break-after: avoid; }
 h2.hwt { break-inside: avoid; }
+
+/* ---- story layer ---- */
+.beat { font-family: var(--hand), var(--serif-zh); font-size: 15px; line-height: 1.62; color: var(--ink); border-left: 3px solid var(--amber); padding: 3px 0 4px 12px; margin: 2px 0 10px; break-inside: avoid; page-break-inside: avoid; }
+.beat .lab, .hookline .lab, .cliff .lab { display: inline-block; font-family: var(--sans-zh); font-size: 11px; font-weight: 700; color: #fff; background: var(--amber); border-radius: 3px; padding: 1px 6px; margin-right: 8px; vertical-align: 2px; }
+.hookline { font-family: var(--hand), var(--serif-zh); font-size: 16px; line-height: 1.6; margin-top: 12px; border-left: 3px solid var(--amber); padding-left: 12px; }
+.cliff { font-family: var(--hand), var(--serif-zh); font-size: 16px; line-height: 1.6; border-left: 3px solid var(--amber); padding: 4px 0 4px 12px; margin: 10px 0 8px; break-inside: avoid; }
+.passage { font-family: var(--latin); font-size: 14.5px; line-height: 1.7; margin: 2px 0 10px; break-inside: avoid; }
+.passage .blank { font-family: var(--sans-zh); color: var(--accent); font-size: 12.5px; letter-spacing: .05em; }
+table.q.ans td.n { width: 34px; } table.q.ans td.w { width: auto; }

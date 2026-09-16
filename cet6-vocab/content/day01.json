@@ -4,7 +4,7 @@
  "kind": "study",
  "title": "教授，这个词为什么这么长？",
  "estimated_minutes": 55,
- "story_note": "Part I 校园悬疑线第一集。学生在校史馆勤工俭学，撬开 1987 年起没开过的铁柜，翻出 1930 年代校报，最后在第三个抽屉里发现一本没有署名的手绘漫画——直接接到 Day 2 的拍卖会。情景剧的杂乱是有意的：档案馆本来就什么都装，这也替 v0 分配表里高频杂词同天出现做了掩护。",
+ "story_note": "Part I 校园悬疑线第一集。Part I 的总问题：谁画的《银河骑士》，为什么第三个抽屉被锁了 36 年。本集提出问题：登记簿与撕口的时间对不上，收据上卖方是管理员本人。情景剧的杂乱是有意的：档案馆本来就什么都装，这也替 v0 分配表里高频杂词同天出现做了掩护。审计后按 DESIGN 5.6 补了 hook / 5 个 beats / cliffhanger / 故事完形。",
  "dialogue": {
   "title": "关于「三十天」的对话",
   "turns": [
@@ -18,43 +18,43 @@
    },
    {
     "who": "student",
-    "text": "档案馆。这个我知道，电脑上就有。"
+    "text": "档案馆。顺便说，您这个开场我在网上见过——先问一个我会的词，再告诉我它和另一个词是亲戚。"
    },
    {
     "who": "professor",
-    "text": "那 monarchy 呢？"
+    "text": "……那你说说，archive 和 monarchy 是什么亲戚。"
    },
    {
     "who": "student",
-    "text": "君主制。……这两个词有关系？"
+    "text": "都有 arch，希腊语的「统治」。archive 是官府存文件的屋子，monarchy 是一个人统治。"
    },
    {
     "who": "professor",
-    "text": "都有 arch，希腊语的「统治」。archive 是官府存文件的地方，monarchy 是一个人统治。今天第三个词 hierarchy，等级制度，是神职人员的统治。三个词，一个零件。"
+    "text": "对。我准备了三分钟的讲解，你用了十秒。剩下的时间我们聊点别的。"
    },
    {
     "who": "student",
-    "text": "那这样的零件，够背完 1263 个词吗？"
+    "text": "比如？"
    },
    {
     "who": "professor",
-    "text": "不够。所以还有三种办法：把词放进一个场景、认出你其实已经认识的老朋友、给剩下的词编个荒唐故事。每天四组，对应四种办法。"
+    "text": "比如 1263 个词里，有零件可拆的不到一半。剩下的怎么办？"
    },
    {
     "who": "student",
-    "text": "听起来像是在给一堆杂物分类。"
+    "text": "放进一个场景、认出老朋友、给最难的编故事。这也在网上。"
    },
    {
     "who": "professor",
-    "text": "今天下午你就要去校史馆给一堆杂物分类。顺便说，那正是 archive 这个词的本义。"
+    "text": "网上没有的是：今天下午你去校史馆上班。地下室那排铁柜，从 1987 年起没人打开过。"
    },
    {
     "who": "student",
-    "text": "那我怎么保证明天还记得？"
+    "text": "好。那我怎么保证明天还记得这些词？"
    },
    {
     "who": "professor",
-    "text": "这才是今天真正的问题。"
+    "text": "这才是今天真正的问题。至于铁柜里有什么——我也不知道，所以才让你去。"
    }
   ]
  },
@@ -473,7 +473,7 @@
   {
    "key": "theme",
    "title": "情景剧：校史馆地下室，第三个抽屉",
-   "intro": "勤工俭学第一天。管理员给了你一把钥匙、一副手套，和一句话：「下面那排铁柜从 1987 年起就没打开过。」",
+   "intro": "勤工俭学第一天。管理员姓周，六十岁上下，给了你一把钥匙、一副手套，和一句话：「下面那排铁柜从 1987 年起就没打开过。」",
    "cards": [
     {
      "id": 637,
@@ -494,9 +494,10 @@
       "zh": "他用千斤顶把柜子抬起一点点，刚好够把门推开。"
      },
      "hook": {
-      "type": "story",
+      "type": "morph",
       "text": "jack 本来是「男仆」的通名，后来凡是替人干活的小东西都叫 jack：千斤顶、耳机插孔、扑克里的 J。",
-      "joke": true
+      "joke": true,
+      "true_etymology": true
      },
      "collocations": [
       "a car jack",
@@ -772,9 +773,10 @@
       "zh": "1935 年的社论把吸烟、赌博和懒散列为学生生活的三大恶习。"
      },
      "hook": {
-      "type": "story",
+      "type": "morph",
       "text": "副校长 vice-chancellor 里的 vice 是另一个词（拉丁语「代替」），和「恶习」只是长得一样。学校当然不希望你搞混。",
-      "joke": true
+      "joke": true,
+      "true_etymology": true
      },
      "collocations": [
       "vice and virtue",
@@ -1068,8 +1070,9 @@
       "zh": "乐团在教堂屋顶还没完工时就在那里首演了。"
      },
      "hook": {
-      "type": "story",
-      "text": "法语词，所以 t 不发音：/deɪˈbju/。记住它永远指「第一次」——首演、首秀、新专辑首发。"
+      "type": "morph",
+      "text": "法语词，所以 t 不发音：/deɪˈbju/。记住它永远指「第一次」——首演、首秀、新专辑首发。",
+      "true_etymology": true
      },
      "collocations": [
       "make one's debut",
@@ -1151,6 +1154,28 @@
      "title": "词表不挑词",
      "source": "常识",
      "text": "今天有三个词属于社会新闻版：assault、rape、suicide。词表不会因为一个词沉重就把它拿掉，考试也不会。本书对这类词的处理是：给准确的释义、给新闻或法律语境的例句，不编任何联想、不开任何玩笑。记住意思，然后翻页。"
+    }
+   ],
+   "beats": [
+    {
+     "after": null,
+     "text": "周管理员把钥匙放在你手心的时候没有松手。「铁柜卡死了，用 jack 顶开。第三个抽屉别碰。」他说完就上楼了，没解释为什么，也没说地下室那间小 chamber 的灯为什么一直亮着。"
+    },
+    {
+     "after": 909,
+     "text": "第一个抽屉是 1904 年的地契。这块地在成为校园之前是一座 fort，驻过一位 colonel、他的 lieutenant 和一个 squad。校报说他们最后一次 assault 演习是 1938 年——打在自己的北墙上。"
+    },
+    {
+     "after": 91,
+     "text": "第二个抽屉是教堂档案。1912 年 bishop 来祝圣；1935 年社论骂学生的三大 vice；1936 年头版：建楼款被 appropriated，承建商被控 fraud。教堂始终没有屋顶。再往后是社会版，字很小，没有姓名。"
+    },
+    {
+     "after": 1105,
+     "text": "社会版翻过去就是体育版。1936 年的 cricket 和 hockey tournament，周六的 hop，一个女生的小提琴 solo debut，到场十一人。这些人现在都不在了，可在报纸上他们还在赢。"
+    },
+    {
+     "after": 314,
+     "text": "然后是第三个抽屉。它没有锁。里面是一本手绘的 comic，四百页，主角是个 village idiot，封面烫金：《银河骑士》。最后一页被撕掉了，撕口很新——新到不像 1987 年。"
     }
    ]
   },
@@ -1519,27 +1544,26 @@
    },
    {
     "type": "cloze",
-    "title": "填空：用今天的词填，注意词形",
+    "title": "故事完形：用今天的词填空，注意词形",
+    "passage": "The keeper gave me a key and a ____ to lift the cabinet. The first drawer held a deed: before it was a campus, this land was a ____ , and a ____ had signed the order that closed it in 1904. The second drawer was the chapel file. A ____ had blessed the building in 1912; four years later the building fund was ____ by the builder, who was then charged with ____ . The third drawer had no lock. Inside was a hand-drawn comic, four hundred pages long, and the last page was gone.",
     "items": [
      {
-      "prompt": "The jury took six hours to reach a ______ .",
-      "answer": "verdict"
+      "answer": "jack"
      },
      {
-      "prompt": "The campus police have no ______ over the street outside the gate.",
-      "answer": "jurisdiction"
+      "answer": "fort"
      },
      {
-      "prompt": "Someone had ______ the building fund, and the chapel was never finished.",
+      "answer": "colonel"
+     },
+     {
+      "answer": "bishop"
+     },
+     {
       "answer": "appropriated"
      },
      {
-      "prompt": "Three small parties formed a ______ to block the budget.",
-      "answer": "coalition"
-     },
-     {
-      "prompt": "The project was ______ by delays from the very first week.",
-      "answer": "beset"
+      "answer": "fraud"
      }
     ]
    }
@@ -1551,5 +1575,7 @@
   "同一个拼写可能是两个词：appropriate 的形容词是四级，动词才带星。",
   "档案馆里的东西本来就是 random 的——所以情景剧不怕杂。",
   "明天：第三个抽屉里那本漫画，以及一个会骗人的零件。"
- ]
+ ],
+ "hook": "登记簿上写着第三个抽屉最后一次打开是 1987 年 6 月。签名的人，正是今天早上把钥匙交给你的那位管理员。",
+ "cliffhanger": "你把漫画放回去的时候，发现抽屉底板下压着一张 1987 年的拍卖行收据。买方一栏是空的；卖方一栏，是周管理员的签名。"
 }

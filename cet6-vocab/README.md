@@ -2,7 +2,7 @@
 
 给 iPad Pro 11 英寸横屏用的六级英语单词背诵讲义，30 天，OSTEP 风格。
 
-**当前状态：框架已定稿，十个设计问题已裁决；Day 1 与 Day 2 全稿已完成、已渲染，等待验收审计。**
+**当前状态：Day 1 与 Day 2 已通过审计（修改后通过，报告见 [`audit/part1-sample.md`](audit/part1-sample.md)）。审计新增了「剧情层」规范（悬念、节拍、下集预告、故事完形），已进 Schema 与校验器。下一步：Part I 剩余词的标注 pass 与 Day 3–9。**
 
 | 你想看 | 打开 |
 |---|---|
@@ -12,6 +12,7 @@
 | 1263 个六级词 | [`data/cet6_star_words.txt`](data/cet6_star_words.txt) |
 | 30 天分配草案 | [`schedule/day_plan.md`](schedule/day_plan.md) |
 | 写手 / 标注 / 审计 提示词 | [`prompts/`](prompts/) |
+| 审计报告 | [`audit/`](audit/) |
 | 每日内容格式 | [`schema/day.schema.json`](schema/day.schema.json)、[`schema/day01.example.json`](schema/day01.example.json) |
 
 ## 复现

@@ -1,109 +1,391 @@
 {
-  "day": 1, "part": 1, "kind": "study",
-  "title": "教授，这个词为什么这么长？",
-  "estimated_minutes": 55,
-  "story_note": "样例：只含样张里的 8 个词。情景剧「地方法院」是校园悬疑线的第一集：学生在法院旁听席撞见教授。",
-  "dialogue": {
-    "title": "关于「三十天」的对话",
-    "turns": [
-      {"who": "student", "text": "教授，我数了，六级词表里带星号的词有 1263 个。三十天。这不叫背单词，这叫绝食。"},
-      {"who": "professor", "text": "先别急着饿。abnormal 什么意思？"},
-      {"who": "student", "text": "不正常的。"},
-      {"who": "professor", "text": "恭喜，第一个词背完了。你早就认识 normal，ab- 只是给它贴了一张「离开」的标签。这本讲义的第一条承诺：绝不让你从零开始记一个你其实已经认识一半的词。"},
-      {"who": "student", "text": "那剩下的 1262 个呢？"},
-      {"who": "professor", "text": "三十个简单小片，一天一片。每天 46 或 47 个词，分成四组：词根家族、情景剧、闪电轮、孤儿院。每组有自己的记法。"},
-      {"who": "student", "text": "……孤儿院？"},
-      {"who": "professor", "text": "有些词没有零件、没有亲戚、也不合群，比如 bewilder。它们需要单独安置，外加一点同情。"}
-    ]
-  },
-  "crux": {
-    "question": "如何在一天里记住 47 个词，而且第二天还记得？",
-    "answer": "短答案：不是「记住」，是「认出」。记忆不是往硬盘里写数据，而是给已经有的东西挂标签——零件、场景、老朋友。挂不上标签的进孤儿院，编一个荒唐到忘不掉的故事。第二天还记得，靠的是作业里的间隔复习表，不靠意志力。"
-  },
-  "scenes": [
-    {
-      "key": "roots", "title": "词根家族：trans- 一家人今天只来了一个",
-      "intro": "拆词术的第一课：一个长词通常是三块零件——前缀说方向，词根说动作，后缀说词性。transition 就是教科书级的样本。",
-      "cards": [
-        {"id": 1170, "head": "transition", "family": [{"form": "transitional", "pos": "adj."}], "ipa": "/trænˈzɪʃn/", "pos": ["n."],
-         "senses": ["过渡，转变", "（乐曲、文章的）过渡段"],
-         "example": {"en": "The country is in transition from a planned economy to a market economy.", "zh": "该国正处于从计划经济向市场经济的过渡期。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "trans-（跨过）+ it（走：exit, circuit）+ -ion（名词）= 走过去 = 过渡。trans- 家族的其他成员会在 Day 3 集体登场，今天先记住带头大哥。"},
-         "collocations": ["in transition", "a smooth transition", "transition to / from"], "card_style": "full"}
-      ]
-    },
-    {
-      "key": "theme", "title": "情景剧：地方法院，周一早上",
-      "intro": "被告涉嫌 fraud，还顺手 appropriated 了一笔公款；法庭外有人 assaulted 记者。陪审团的 verdict 马上就来。",
-      "cards": [
-        {"id": 1217, "head": "verdict", "family": [], "ipa": "/ˈvɜːrdɪkt/", "pos": ["n."],
-         "senses": ["（陪审团的）裁决", "（经过考虑的）意见，定论"],
-         "example": {"en": "The jury returned a verdict of not guilty.", "zh": "陪审团作出了无罪裁决。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "ver（真：verify, very）+ dict（说：dictionary, predict）= 说出真相 = 裁决。这是真词源，不是编的。"},
-         "collocations": ["return / reach a verdict", "a guilty verdict", "the verdict on ..."], "card_style": "full"},
-        {"id": 503, "head": "fraud", "family": [{"form": "fraudulent", "pos": "adj."}], "ipa": "/frɔːd/", "pos": ["n."],
-         "senses": ["欺诈（罪）", "骗子；冒牌货"],
-         "example": {"en": "He was jailed for tax fraud after the auditors traced the missing money.", "zh": "审计员追查到失踪的钱款后，他因税务欺诈入狱。"},
-         "hook": {"type": "story", "joke": true, "text": "与心理学家 Freud 只差一个字母、读音不同（/frɔːd/ 对 /frɔɪd/）。考场上别把弗洛伊德送进监狱。"},
-         "collocations": ["commit fraud", "credit-card fraud", "He's a fraud.（他是个骗子）"], "card_style": "full"},
-        {"id": 91, "head": "assault", "family": [], "ipa": "/əˈsɔːlt/", "pos": ["n.", "v."],
-         "senses": ["袭击；人身攻击（罪）", "（军事）突击", "（言语上的）抨击"],
-         "example": {"en": "He was charged with assault after the scuffle outside the courthouse.", "zh": "法院外的推搡之后，他被控袭击罪。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "as-（= ad-，朝向）+ sault（跳：somersault 翻跟头）= 朝人跳过去 = 袭击。"},
-         "collocations": ["an assault on / against", "sexual assault", "assault rifle"], "card_style": "full"},
-        {"id": 69, "head": "appropriate²", "family": [{"form": "appropriation", "pos": "n."}], "ipa": "/əˈproʊprieɪt/", "pos": ["v."],
-         "senses": ["挪用，盗用", "拨出（款项）"],
-         "sense_note": "形容词 appropriate¹「恰当的」是四级词，读 /-ət/；六级考的是动词，尾音 /-eɪt/。",
-         "example": {"en": "The minister was accused of appropriating public funds for his own campaign.", "zh": "这位部长被指控挪用公款给自己竞选。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "ap-（朝向）+ propri（自己的：property）+ -ate = 据为己有。形容词的「恰当」也是从「属于这个场合」来的。"},
-         "collocations": ["appropriate funds for ...", "appropriation bill（拨款法案）"], "card_style": "full"}
-      ]
-    },
-    {
-      "key": "freebies", "title": "闪电轮：你其实已经认识它们",
-      "intro": "规则：每个词只给一行。看到零件，读出意思，翻页。不许停留超过十秒。",
-      "cards": [
-        {"id": 3, "head": "abnormal", "family": [], "ipa": "/æbˈnɔːrml/", "pos": ["adj."], "senses": ["反常的，异常的"],
-         "example": {"en": "Doctors noticed an abnormal rise in the patient's heart rate overnight.", "zh": "医生注意到病人的心率在夜间异常升高。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "ab-（离开）+ normal → 反常的"},
-         "collocations": ["abnormal behavior", "abnormal weather"], "card_style": "lite"},
-        {"id": 12, "head": "adhere", "family": [{"form": "adherence", "pos": "n."}], "ipa": "/ədˈhɪr/", "pos": ["v."], "senses": ["粘附", "(adhere to) 遵守，坚持"],
-         "example": {"en": "All members must adhere to the safety rules posted in the lab.", "zh": "所有成员都必须遵守实验室张贴的安全规定。"},
-         "hook": {"type": "morph", "true_etymology": true, "text": "ad-（到）+ here（粘：adhesive 胶带）→ 粘到……上"},
-         "collocations": ["adhere to the rules", "strict adherence to"], "card_style": "lite"}
-      ],
-      "boxes": [
-        {"type": "tip", "title": "先认零件，再认整词", "text": "读到 verdict 时，眼睛里应该是 ver + dict 两块，而不是 v-e-r-d-i-c-t 七个字母。前者是两个你已经认识的东西，后者是七个陌生人。这个习惯一旦养成，Part I 后面几天会越来越轻松——这不是鸡汤，是压缩算法。", "joke": true}
-      ]
-    },
-    {
-      "key": "orphans", "title": "孤儿院：今天只收一个",
-      "cards": [
-        {"id": 127, "head": "bewilder", "family": [{"form": "bewilderment", "pos": "n."}], "ipa": "/bɪˈwɪldər/", "pos": ["v."], "senses": ["使迷惑，使不知所措"],
-         "example": {"en": "The new tax rules bewildered even the accountants.", "zh": "新的税收规定连会计师都给弄糊涂了。"},
-         "hook": {"type": "morph", "true_etymology": true, "joke": true, "text": "be-（使）+ wilder（荒野：wilderness）= 把人带进荒野 = 让人迷路、迷惑。想象一个人拿着六级词表在荒野里转圈，就是你昨天的样子。"},
-         "collocations": ["be bewildered by ...", "a bewildering array of choices"], "card_style": "full"}
-      ],
-      "boxes": [
-        {"type": "aside", "title": "星号的秘密", "source": "2016 版大纲词表说明页", "text": "2016 版大纲词表共 5418 个词目，只有 1263 个带 ★。★ 的意思不是「更难」，而是「四级不考、六级考」。appropriate 就是个好例子：形容词是四级词，动词才带星。所以这本讲义只管这 1263 个；你的四级词汇不在这里重修——除非它换了一副面孔。"},
-        {"type": "aside", "title": "为什么是 47", "source": "常识", "text": "1263 个词分给 27 个学习日，每天 46 或 47 个。这个数字不是教育学算出来的，是除法算出来的。教育学负责的部分是：每个词至少回访六次。"}
-      ]
-    }
-  ],
-  "homework": {
-    "exercises": [
-      {"type": "parts", "title": "拆词练习（词不在今天的表里，零件在）",
-       "items": [
-         {"prompt": "transatlantic = trans + atlantic → ？", "answer": "横跨大西洋的"},
-         {"prompt": "contradict = contra（反）+ dict → ？", "answer": "反驳；与……矛盾"},
-         {"prompt": "adhesive = ad + hes（粘）+ ive → ？", "answer": "有粘性的；胶粘剂"}
-       ]}
-    ]
-  },
-  "summary": [
-    "长词 = 前缀 + 词根 + 后缀。看见 verdict 要看见 ver + dict。",
-    "同一个拼写可以是两个词：appropriate 的形容词是四级，动词才是六级。",
-    "四组词四种记法：零件、场景、老朋友、编故事。唯独不许硬背。",
-    "明天：trans- 家族没来的成员、一场发布会（debut）、一个叫 random 的老熟人。"
+ "day": 1,
+ "part": 1,
+ "kind": "study",
+ "title": "教授，这个词为什么这么长？",
+ "estimated_minutes": 55,
+ "story_note": "样例：只含样张里的 8 个词。情景剧「地方法院」是校园悬疑线的第一集：学生在法院旁听席撞见教授。",
+ "dialogue": {
+  "title": "关于「三十天」的对话",
+  "turns": [
+   {
+    "who": "student",
+    "text": "教授，我数了，六级词表里带星号的词有 1263 个。三十天。这不叫背单词，这叫绝食。"
+   },
+   {
+    "who": "professor",
+    "text": "先别急着饿。abnormal 什么意思？"
+   },
+   {
+    "who": "student",
+    "text": "不正常的。"
+   },
+   {
+    "who": "professor",
+    "text": "恭喜，第一个词背完了。你早就认识 normal，ab- 只是给它贴了一张「离开」的标签。这本讲义的第一条承诺：绝不让你从零开始记一个你其实已经认识一半的词。"
+   },
+   {
+    "who": "student",
+    "text": "那剩下的 1262 个呢？"
+   },
+   {
+    "who": "professor",
+    "text": "三十个简单小片，一天一片。每天 46 或 47 个词，分成四组：词根家族、情景剧、闪电轮、孤儿院。每组有自己的记法。"
+   },
+   {
+    "who": "student",
+    "text": "……孤儿院？"
+   },
+   {
+    "who": "professor",
+    "text": "有些词没有零件、没有亲戚、也不合群，比如 bewilder。它们需要单独安置，外加一点同情。"
+   }
   ]
+ },
+ "crux": {
+  "question": "如何在一天里记住 47 个词，而且第二天还记得？",
+  "answer": "短答案：不是「记住」，是「认出」。记忆不是往硬盘里写数据，而是给已经有的东西挂标签——零件、场景、老朋友。挂不上标签的进孤儿院，编一个荒唐到忘不掉的故事。第二天还记得，靠的是作业里的间隔复习表，不靠意志力。"
+ },
+ "scenes": [
+  {
+   "key": "roots",
+   "title": "词根家族：trans- 一家人今天只来了一个",
+   "intro": "拆词术的第一课：一个长词通常是三块零件——前缀说方向，词根说动作，后缀说词性。transition 就是教科书级的样本。",
+   "cards": [
+    {
+     "id": 1170,
+     "head": "transition",
+     "family": [
+      {
+       "form": "transitional",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/trænˈzɪʃn/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "过渡，转变",
+      "（乐曲、文章的）过渡段"
+     ],
+     "example": {
+      "en": "The country is in transition from a planned economy to a market economy.",
+      "zh": "该国正处于从计划经济向市场经济的过渡期。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "trans-（跨过）+ it（走：exit, circuit）+ -ion（名词）= 走过去 = 过渡。trans- 家族的其他成员会在 Day 3 集体登场，今天先记住带头大哥。"
+     },
+     "collocations": [
+      "in transition",
+      "a smooth transition",
+      "transition to / from"
+     ],
+     "card_style": "full"
+    }
+   ]
+  },
+  {
+   "key": "theme",
+   "title": "情景剧：地方法院，周一早上",
+   "intro": "被告涉嫌 fraud，还顺手 appropriated 了一笔公款；法庭外有人 assaulted 记者。陪审团的 verdict 马上就来。",
+   "cards": [
+    {
+     "id": 1217,
+     "head": "verdict",
+     "family": [],
+     "ipa": "/ˈvɜːrdɪkt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（陪审团的）裁决",
+      "（经过考虑的）意见，定论"
+     ],
+     "example": {
+      "en": "The jury returned a verdict of not guilty.",
+      "zh": "陪审团作出了无罪裁决。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "ver（真：verify, very）+ dict（说：dictionary, predict）= 说出真相 = 裁决。这是真词源，不是编的。"
+     },
+     "collocations": [
+      "return / reach a verdict",
+      "a guilty verdict",
+      "the verdict on ..."
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 503,
+     "head": "fraud",
+     "family": [
+      {
+       "form": "fraudulent",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/frɔːd/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "欺诈（罪）",
+      "骗子；冒牌货"
+     ],
+     "example": {
+      "en": "He was jailed for tax fraud after the auditors traced the missing money.",
+      "zh": "审计员追查到失踪的钱款后，他因税务欺诈入狱。"
+     },
+     "hook": {
+      "type": "story",
+      "joke": true,
+      "text": "与心理学家 Freud 只差一个字母、读音不同（/frɔːd/ 对 /frɔɪd/）。考场上别把弗洛伊德送进监狱。"
+     },
+     "collocations": [
+      "commit fraud",
+      "credit-card fraud",
+      "He's a fraud.（他是个骗子）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 91,
+     "head": "assault",
+     "family": [],
+     "ipa": "/əˈsɔːlt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "袭击；人身攻击（罪）",
+      "（军事）突击",
+      "（言语上的）抨击"
+     ],
+     "example": {
+      "en": "He was charged with assault after the scuffle outside the courthouse.",
+      "zh": "法院外的推搡之后，他被控袭击罪。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "as-（= ad-，朝向）+ sault（跳：somersault 翻跟头）= 朝人跳过去 = 袭击。"
+     },
+     "collocations": [
+      "an assault on / against",
+      "sexual assault",
+      "assault rifle"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 69,
+     "head": "appropriate²",
+     "family": [
+      {
+       "form": "appropriation",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/əˈproʊprieɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "挪用，盗用",
+      "拨出（款项）"
+     ],
+     "sense_note": "形容词 appropriate¹「恰当的」是四级词，读 /-ət/；六级考的是动词，尾音 /-eɪt/。",
+     "example": {
+      "en": "The minister was accused of appropriating public funds for his own campaign.",
+      "zh": "这位部长被指控挪用公款给自己竞选。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "ap-（朝向）+ propri（自己的：property）+ -ate = 据为己有。形容词的「恰当」也是从「属于这个场合」来的。"
+     },
+     "collocations": [
+      "appropriate funds for ...",
+      "appropriation bill（拨款法案）"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "beats": [
+    {
+     "after": null,
+     "text": "周一早上八点，地方法院。你本来只是来旁听的，但第三排坐着一个熟人：教授，手里拿着一本 1937 年的校报，正在做笔记。"
+    },
+    {
+     "after": 503,
+     "text": "被告席上那位承建商，正是校报头版被指控 fraud 的那家公司的孙子。教授说：「有些案子会遗传。」"
+    },
+    {
+     "after": 69,
+     "text": "休庭。教授把校报递给你，指着一行小字：建楼款被 appropriated 的那一年，校史馆的第三个抽屉换了锁。"
+    }
+   ]
+  },
+  {
+   "key": "freebies",
+   "title": "闪电轮：你其实已经认识它们",
+   "intro": "规则：每个词只给一行。看到零件，读出意思，翻页。不许停留超过十秒。",
+   "cards": [
+    {
+     "id": 3,
+     "head": "abnormal",
+     "family": [],
+     "ipa": "/æbˈnɔːrml/",
+     "pos": [
+      "adj."
+     ],
+     "senses": [
+      "反常的，异常的"
+     ],
+     "example": {
+      "en": "Doctors noticed an abnormal rise in the patient's heart rate overnight.",
+      "zh": "医生注意到病人的心率在夜间异常升高。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "ab-（离开）+ normal → 反常的"
+     },
+     "collocations": [
+      "abnormal behavior",
+      "abnormal weather"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 12,
+     "head": "adhere",
+     "family": [
+      {
+       "form": "adherence",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ədˈhɪr/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "粘附",
+      "(adhere to) 遵守，坚持"
+     ],
+     "example": {
+      "en": "All members must adhere to the safety rules posted in the lab.",
+      "zh": "所有成员都必须遵守实验室张贴的安全规定。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "text": "ad-（到）+ here（粘：adhesive 胶带）→ 粘到……上"
+     },
+     "collocations": [
+      "adhere to the rules",
+      "strict adherence to"
+     ],
+     "card_style": "lite"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "tip",
+     "title": "先认零件，再认整词",
+     "text": "读到 verdict 时，眼睛里应该是 ver + dict 两块，而不是 v-e-r-d-i-c-t 七个字母。前者是两个你已经认识的东西，后者是七个陌生人。这个习惯一旦养成，Part I 后面几天会越来越轻松——这不是鸡汤，是压缩算法。",
+     "joke": true
+    }
+   ]
+  },
+  {
+   "key": "orphans",
+   "title": "孤儿院：今天只收一个",
+   "cards": [
+    {
+     "id": 127,
+     "head": "bewilder",
+     "family": [
+      {
+       "form": "bewilderment",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/bɪˈwɪldər/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "使迷惑，使不知所措"
+     ],
+     "example": {
+      "en": "The new tax rules bewildered even the accountants.",
+      "zh": "新的税收规定连会计师都给弄糊涂了。"
+     },
+     "hook": {
+      "type": "morph",
+      "true_etymology": true,
+      "joke": true,
+      "text": "be-（使）+ wilder（荒野：wilderness）= 把人带进荒野 = 让人迷路、迷惑。想象一个人拿着六级词表在荒野里转圈，就是你昨天的样子。"
+     },
+     "collocations": [
+      "be bewildered by ...",
+      "a bewildering array of choices"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "aside",
+     "title": "星号的秘密",
+     "source": "2016 版大纲词表说明页",
+     "text": "2016 版大纲词表共 5418 个词目，只有 1263 个带 ★。★ 的意思不是「更难」，而是「四级不考、六级考」。appropriate 就是个好例子：形容词是四级词，动词才带星。所以这本讲义只管这 1263 个；你的四级词汇不在这里重修——除非它换了一副面孔。"
+    },
+    {
+     "type": "aside",
+     "title": "为什么是 47",
+     "source": "常识",
+     "text": "1263 个词分给 27 个学习日，每天 46 或 47 个。这个数字不是教育学算出来的，是除法算出来的。教育学负责的部分是：每个词至少回访六次。"
+    }
+   ]
+  }
+ ],
+ "homework": {
+  "exercises": [
+   {
+    "type": "parts",
+    "title": "拆词练习（词不在今天的表里，零件在）",
+    "items": [
+     {
+      "prompt": "transatlantic = trans + atlantic → ？",
+      "answer": "横跨大西洋的"
+     },
+     {
+      "prompt": "contradict = contra（反）+ dict → ？",
+      "answer": "反驳；与……矛盾"
+     },
+     {
+      "prompt": "adhesive = ad + hes（粘）+ ive → ？",
+      "answer": "有粘性的；胶粘剂"
+     }
+    ]
+   }
+  ]
+ },
+ "summary": [
+  "长词 = 前缀 + 词根 + 后缀。看见 verdict 要看见 ver + dict。",
+  "同一个拼写可以是两个词：appropriate 的形容词是四级，动词才是六级。",
+  "四组词四种记法：零件、场景、老朋友、编故事。唯独不许硬背。",
+  "明天：trans- 家族没来的成员、一场发布会（debut）、一个叫 random 的老熟人。"
+ ],
+ "hook": "第三个抽屉的锁是 1987 年换的，可登记簿上写着它 2003 年被打开过——用什么打开的？",
+ "cliffhanger": "管理员看了一眼那本漫画的封面，说了一句「别拿给系里看」，然后把地下室的灯关了。"
 }
