@@ -1,0 +1,1572 @@
+{
+ "day": 2,
+ "part": 1,
+ "kind": "study",
+ "title": "拆词术的第一个陷阱",
+ "estimated_minutes": 55,
+ "story_note": "Part I 第二集，直接承接 Day 1 结尾发现的手绘漫画《银河骑士》：1987 年学生社团的作品，如今有制片公司要在拍卖会上买下版权。词根场景刻意分成「四个真家族 + 六个假朋友」，因为 v0 分配表按正则给出的 medi/sacr/metr/term 四组里，medication、metropolitan、cemetery、massacre、aftermath、intermittent 六个是词源假朋友——与其回避，不如把它做成今天的 CRUX。",
+ "dialogue": {
+  "title": "关于「零件会不会骗人」的对话",
+  "turns": [
+   {
+    "who": "student",
+    "text": "教授，我按您的办法拆了一个词。cemetery = 量东西的地方？"
+   },
+   {
+    "who": "professor",
+    "text": "你量到了什么？"
+   },
+   {
+    "who": "student",
+    "text": "墓地。……不太对。"
+   },
+   {
+    "who": "professor",
+    "text": "不是不太对，是完全不对。cemetery 来自希腊语的「睡觉的地方」，和 metr（测量）一点关系都没有。"
+   },
+   {
+    "who": "student",
+    "text": "那我昨天学的拆词术……"
+   },
+   {
+    "who": "professor",
+    "text": "照用。它是启发式，不是保证。就像缓存：命中的时候快得不讲道理，没命中的时候你得回去查主存。"
+   },
+   {
+    "who": "student",
+    "text": "主存是什么？"
+   },
+   {
+    "who": "professor",
+    "text": "词典。"
+   },
+   {
+    "who": "student",
+    "text": "那我怎么知道哪一次没命中？"
+   },
+   {
+    "who": "professor",
+    "text": "把今天这六个记住就行。假朋友不多，但个个常考——出题的人也读词源。"
+   },
+   {
+    "who": "student",
+    "text": "六个假的，八个真的。听起来这个缓存的命中率不算高。"
+   },
+   {
+    "who": "professor",
+    "text": "今天这一组是我特意挑出来的最坏情况。真实命中率在八成以上，否则我不会教你这个办法。"
+   }
+  ]
+ },
+ "crux": {
+  "question": "零件拼出来的意思，什么时候会骗你？",
+  "answer": "零件是启发式，不是保证。拆出来的意思和词典对不上时，相信词典。今天十四个词里有六个是假朋友：它们长得像某个家族，其实不是——而这六个恰好都常考。"
+ },
+ "scenes": [
+  {
+   "key": "roots",
+   "title": "词根家族：四个真家族，六个假朋友",
+   "intro": "先认四个真家族：medi（中间）、sanct（神圣）、metr（测量）、termin（界限）。然后是六个长得像家族成员、其实不是的词——它们是拆词术的第一个陷阱。",
+   "cards": [
+    {
+     "id": 715,
+     "head": "medieval",
+     "family": [],
+     "ipa": "/mɪˈdivəl/",
+     "pos": [
+      "adj."
+     ],
+     "senses": [
+      "中世纪的，中古的"
+     ],
+     "example": {
+      "en": "The chapel keeps a medieval door that is three centuries older than the building.",
+      "zh": "小教堂留着一扇中世纪的门，比整栋楼还老三百年。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "medi（中间）+ ev（时代，拉丁语 aevum）= 中间的那个时代。欧洲人把古典和文艺复兴之间的一千年叫「中间」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "medieval history",
+      "the medieval period"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 713,
+     "head": "mediate",
+     "family": [
+      {
+       "form": "mediation",
+       "pos": "n."
+      },
+      {
+       "form": "mediator",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈmidiˌeɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "调停，斡旋",
+      "居间促成"
+     ],
+     "example": {
+      "en": "The dean was asked to mediate between the two clubs before the vote.",
+      "zh": "有人请院长在投票前给两个社团调停。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "medi（中间）+ -ate = 站到两边中间去。medium、media、middle 都是这一家。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "mediate a dispute",
+      "mediate between A and B",
+      "act as mediator"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 982,
+     "head": "sanctuary",
+     "family": [],
+     "ipa": "/ˈsæŋktʃuˌɛri/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "避难所，庇护所",
+      "圣所；禁猎区"
+     ],
+     "example": {
+      "en": "The old chapel became a sanctuary for anyone who had missed the last bus home.",
+      "zh": "那座旧教堂成了所有错过末班车的人的避难所。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "sanct（神圣，同 saint 圣人）+ -uary（场所）= 圣地。教堂里不许抓人，于是「圣地」变成了「避难所」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "seek sanctuary",
+      "a wildlife sanctuary"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 981,
+     "head": "sanction",
+     "family": [],
+     "ipa": "/ˈsæŋkʃən/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "制裁（常用复数）",
+      "批准，认可"
+     ],
+     "example": {
+      "en": "The council may sanction the plan, or impose sanctions on the club that broke the rule.",
+      "zh": "理事会可以批准这项计划，也可以对违规社团实施制裁。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "同一个 sanct（神圣）：让某事神圣不可侵犯 = 批准；以神圣的名义惩罚 = 制裁。一个词同时是准许和惩罚，考试最爱考。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "economic sanctions",
+      "impose sanctions on",
+      "officially sanction"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 809,
+     "head": "parameter",
+     "family": [],
+     "ipa": "/pərˈæmətər/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "参数，参量",
+      "（复数）范围，界限"
+     ],
+     "example": {
+      "en": "Change one parameter and the whole simulation gives a different answer.",
+      "zh": "改一个参数，整个模拟就给出不同的结果。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "para（旁边）+ metr（测量）= 在旁边量出来的量。别和 perimeter（周长）搞混。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "set the parameters",
+      "within the parameters of",
+      "a key parameter"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1117,
+     "head": "symmetry",
+     "family": [
+      {
+       "form": "symmetric(al)",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈsɪmətri/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "对称；匀称"
+     ],
+     "example": {
+      "en": "The building's symmetry is broken by one window that was added later.",
+      "zh": "这栋楼的对称，被后来加的一扇窗户破坏了。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "sym（共同，同 sympathy 同情）+ metr（测量）= 两边量起来一样 = 对称。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "perfect symmetry",
+      "a symmetrical pattern"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 113,
+     "head": "barometer",
+     "family": [],
+     "ipa": "/bərˈɑmɪtər/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "气压计",
+      "（比喻）晴雨表，指标"
+     ],
+     "example": {
+      "en": "Student attendance is a barometer of how badly a course is going.",
+      "zh": "学生出勤率是一门课上得有多糟的晴雨表。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "baro（重量、压力）+ metr（测量）= 量压力。比喻义「晴雨表」在阅读里比本义更常出现。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a barometer of public opinion",
+      "the barometer is falling"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1140,
+     "head": "terminate",
+     "family": [
+      {
+       "form": "termination",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈtɜrməˌneɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "终止，结束",
+      "（线路）终止于"
+     ],
+     "example": {
+      "en": "The university may terminate the contract if the work stops for sixty days.",
+      "zh": "如果工程停工六十天，校方可以终止合同。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "termin（界限，同 terminal 终点站、term 学期）+ -ate = 走到界限 = 终止。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "terminate a contract",
+      "terminate employment",
+      "termination of a lease"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 714,
+     "head": "medication",
+     "family": [],
+     "ipa": "/ˌmɛdəˈkeɪʃən/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "药物；药物治疗"
+     ],
+     "example": {
+      "en": "He takes three kinds of medication and still cannot fall asleep before two.",
+      "zh": "他吃三种药，还是两点之前睡不着。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "假朋友第一个：不是 medi（中间），而是 medeor（治疗）。它的亲戚是 medical、remedy，不是 medium。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "be on medication",
+      "prescribe medication"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 725,
+     "head": "metropolitan",
+     "family": [],
+     "ipa": "/ˌmɛtrəˈpɑlətən/",
+     "pos": [
+      "adj.",
+      "n."
+     ],
+     "senses": [
+      "大都市的",
+      "大都市居民"
+     ],
+     "example": {
+      "en": "The metropolitan area now reaches twenty miles past the old city wall.",
+      "zh": "大都市区如今已延伸到旧城墙外二十英里。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "不是 metr（测量）。是 mētēr（母亲，同 maternal）+ polis（城，同 politics）= 母城。地铁 metro 就是从这个词剪下来的。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a metropolitan area",
+      "the metropolitan police"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 186,
+     "head": "cemetery",
+     "family": [],
+     "ipa": "/ˈsɛməˌtɛri/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "墓地，公墓"
+     ],
+     "example": {
+      "en": "The cemetery behind the chapel holds nine graves and one empty plot.",
+      "zh": "教堂后面的墓地有九座坟，和一块空地。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "和「量」毫无关系。希腊语 koimētērion 的意思是「睡觉的地方」。跟它同源的是「安眠」，不是 meter。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "a military cemetery",
+      "be buried in a cemetery"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 710,
+     "head": "massacre",
+     "family": [],
+     "ipa": "/ˈmæsəkər/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "大屠杀；屠杀"
+     ],
+     "example": {
+      "en": "The report of the 1938 massacre filled the front page for a week.",
+      "zh": "1938 年那场屠杀的报道占了头版整整一周。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "看着有 sacr（神圣），其实没有：它来自古法语 macacre（屠宰场），再往上词源学界至今没有定论。零件在这里帮不上忙。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a massacre of civilians",
+      "commemorate the massacre"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 24,
+     "head": "aftermath",
+     "family": [],
+     "ipa": "/ˈæftərˌmæθ/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（灾难等的）后果，余波"
+     ],
+     "example": {
+      "en": "In the aftermath of the fire, the archive moved everything down to the basement.",
+      "zh": "火灾之后，档案馆把所有东西搬到了地下室。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "math 既不是数学，也不是 term。after（之后）+ math（割草）= 割完草之后又长出来的那一茬。灾难之后的那一茬，就是余波。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "in the aftermath of",
+      "the aftermath of the storm"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 622,
+     "head": "intermittent",
+     "family": [],
+     "ipa": "/ˌɪntərˈmɪtənt/",
+     "pos": [
+      "adj."
+     ],
+     "senses": [
+      "间歇的，断断续续的"
+     ],
+     "example": {
+      "en": "The heating in the basement is intermittent, which is worse than no heating.",
+      "zh": "地下室的暖气断断续续，比没有还难受。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "不是 term。inter（之间）+ mit（送，同 transmit 传送、submit 提交）= 送一阵，停一阵。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "intermittent rain",
+      "intermittent fasting",
+      "intermittent faults"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "tip",
+     "title": "对不上的时候，信词典",
+     "text": "拆词是为了省力，不是为了证明自己聪明。判断标准只有一个：拆出来的意思和词典给的意思能不能对上。对得上，这个零件帮你记住了一个词；对不上，立刻停手，按整词硬记，然后把这个词标记成「假朋友」。今天的六个假朋友建议单独抄在一张纸上——它们会在 Day 10 的检查站再见到你。"
+    },
+    {
+     "type": "aside",
+     "title": "昨天那个 syndicate",
+     "source": "词源；参见 OED 对 syndic 的词条",
+     "text": "昨天讲 dict（说）家族时留了个尾巴：syndicate 看着像 dict，其实来自希腊语 dikē（公正），syndikos 是「陪你上法庭的人」。它和 dict 在更古老的印欧词根上确实是远亲，但对背单词来说，「远亲」和「无关」的实用价值一样——都不能拿来推意思。"
+    }
+   ]
+  },
+  {
+   "key": "theme",
+   "title": "情景剧：《银河骑士》的拍卖会",
+   "intro": "第三个抽屉里那本漫画有了名字：《银河骑士》，1987 年一个学生社团画的，四百页，没有署名。今天下午它要被拍卖，而阅览室里只坐了十一个人。",
+   "cards": [
+    {
+     "id": 435,
+     "head": "epic",
+     "family": [],
+     "ipa": "/ˈɛpɪk/",
+     "pos": [
+      "n.",
+      "adj."
+     ],
+     "senses": [
+      "史诗；史诗般的作品",
+      "宏大的，漫长艰苦的"
+     ],
+     "example": {
+      "en": "The comic runs to four hundred pages, which makes it an epic by any standard.",
+      "zh": "这本漫画有四百页，按任何标准都算史诗。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "希腊语 epos（话语、故事）→ epic。荷马史诗是「讲出来的故事」，不是写出来的。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "an epic poem",
+      "an epic journey",
+      "epic in scale"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 651,
+     "head": "knight",
+     "family": [],
+     "ipa": "/naɪt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "骑士",
+      "（英国）爵士；授予爵位",
+      "（国际象棋）马"
+     ],
+     "example": {
+      "en": "The hero of the comic is a knight who has lost both his horse and his name.",
+      "zh": "漫画的主角是一位骑士，马和名字都丢了。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "古英语 cniht 本义是「少年、仆人」，k 当年是要发音的。它爬到「骑士」用了五百年。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a medieval knight",
+      "be knighted by the Queen",
+      "move the knight"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1008,
+     "head": "shield",
+     "family": [],
+     "ipa": "/ʃild/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "盾；防护物",
+      "保护，庇护；屏蔽"
+     ],
+     "example": {
+      "en": "She raised the folder like a shield when the superintendent walked in.",
+      "zh": "主管走进来时，她把文件夹像盾一样举了起来。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "四级里你见过它的名词义。六级更常考动词：shield sb from sth，把人从某个东西后面挡住。"
+     },
+     "collocations": [
+      "a heat shield",
+      "shield sb from criticism",
+      "use sth as a shield"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 169,
+     "head": "cape",
+     "family": [],
+     "ipa": "/keɪp/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "海角，岬",
+      "披肩，斗篷"
+     ],
+     "example": {
+      "en": "The knight wears a cape that the artist clearly traced from a film poster.",
+      "zh": "骑士披着一件斗篷，画的人显然是照着电影海报描的。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "两个义项同源：拉丁语 caput（头）→ 披在头上的是斗篷，伸进海里的「头」是海角。capital（首都）也是这一家。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the Cape of Good Hope",
+      "a black cape"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 511,
+     "head": "galaxy",
+     "family": [],
+     "ipa": "/ˈɡæləksi/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "星系；银河",
+      "（比喻）一群（名人）"
+     ],
+     "example": {
+      "en": "The title of the comic is The Knight of the Galaxy, printed in gold on the cover.",
+      "zh": "这本漫画叫《银河骑士》，封面上是烫金的。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "希腊语 gala（奶）→ 银河在西方是「奶做的路」（the Milky Way）。galaxy 的本义就是「奶」。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "a distant galaxy",
+      "a galaxy of stars（明星云集）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 34,
+     "head": "alien",
+     "family": [
+      {
+       "form": "alienate",
+       "pos": "v."
+      },
+      {
+       "form": "alienation",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈeɪliən/",
+     "pos": [
+      "n.",
+      "adj."
+     ],
+     "senses": [
+      "外星人；外国人，外侨",
+      "外国的；陌生的，格格不入的"
+     ],
+     "example": {
+      "en": "The villains are aliens who speak perfect English and complain about the weather.",
+      "zh": "反派是一群外星人，英语说得完美，还抱怨天气。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "alius（别的，同 alter 改变、else）→ alien 是「别处来的」。alienate 是把人推到「别处」去 = 使疏远。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "an alien species",
+      "feel alien",
+      "alienate your readers"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1054,
+     "head": "spider",
+     "family": [],
+     "ipa": "/ˈspaɪdər/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "蜘蛛"
+     ],
+     "example": {
+      "en": "The chief villain is a spider the size of a bus, drawn with far too many legs.",
+      "zh": "大反派是一只公交车那么大的蜘蛛，腿画得太多了。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "和 spin（纺、织）同源：蜘蛛就是「那个纺线的」。网络爬虫叫 spider 也是这个道理。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a spider web",
+      "a spider bite"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 77,
+     "head": "arena",
+     "family": [],
+     "ipa": "/ərˈinə/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "竞技场，比赛场地",
+      "（活动的）舞台，领域"
+     ],
+     "example": {
+      "en": "The final fight takes place in an arena built inside a hollow moon.",
+      "zh": "最后的决战发生在一座建在空心月亮里的竞技场。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "拉丁语 harena（沙）：古罗马斗兽场地上铺沙，为了吸血。现在「政治舞台」也叫 the political arena。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a sports arena",
+      "enter the political arena"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 904,
+     "head": "quest",
+     "family": [],
+     "ipa": "/kwɛst/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "探索，追求；寻找"
+     ],
+     "example": {
+      "en": "His quest for the missing page lasted three volumes and ended in a library.",
+      "zh": "他寻找那一页失踪书页的旅程持续了三卷，结束在一座图书馆里。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "quaerere（寻找）一家：question 问题、request 请求、inquiry 调查、conquer 征服。quest 是其中最短的一个。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a quest for truth",
+      "in quest of sth",
+      "go on a quest"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1227,
+     "head": "virgin",
+     "family": [
+      {
+       "form": "virginity",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈvɜrdʒɪn/",
+     "pos": [
+      "n.",
+      "adj."
+     ],
+     "senses": [
+      "处女，童贞者",
+      "未开发的，原始的；初次的"
+     ],
+     "example": {
+      "en": "The story opens on a virgin planet where nobody has ever set foot.",
+      "zh": "故事开始于一颗从未有人踏足的原始星球。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "阅读里最常见的是形容词义「未开发的」：virgin forest 原始森林、virgin territory 处女地、a virgin flight 首航。"
+     },
+     "collocations": [
+      "virgin forest",
+      "virgin territory",
+      "virgin snow"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 163,
+     "head": "butt",
+     "family": [],
+     "ipa": "/bʌt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "（笑柄的）对象；靶子",
+      "烟蒂；粗大的一端",
+      "用头顶撞"
+     ],
+     "example": {
+      "en": "The sidekick is the butt of every joke in all four hundred pages.",
+      "zh": "那个跟班在整整四百页里都是所有笑话的笑柄。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "记住 the butt of the joke（被笑的那个人）这个搭配，六级里它比「烟蒂」常见得多。"
+     },
+     "collocations": [
+      "the butt of the joke",
+      "a cigarette butt",
+      "butt in（插嘴）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 116,
+     "head": "bass",
+     "family": [],
+     "ipa": "/beɪs/",
+     "pos": [
+      "n.",
+      "adj."
+     ],
+     "senses": [
+      "低音；男低音；贝斯",
+      "低音的"
+     ],
+     "example": {
+      "en": "The club even recorded a soundtrack, with a bass line borrowed from a film.",
+      "zh": "社团甚至录了配乐，贝斯线是从一部电影里借来的。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "拼写陷阱：读 /beɪs/ 时是「低音」，读 /bæs/ 时是一种鱼（鲈鱼）。同形不同音，词表里也是分开列的。",
+      "joke": true
+     },
+     "collocations": [
+      "a bass guitar",
+      "a deep bass voice",
+      "turn up the bass"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 683,
+     "head": "loop",
+     "family": [],
+     "ipa": "/lup/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "环，圈；（程序）循环",
+      "使成环；循环播放"
+     ],
+     "example": {
+      "en": "The story runs in a loop: the last page sends you back to the first.",
+      "zh": "故事是个循环：最后一页把你送回第一页。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "计算机专业的你已经认识 loop。六级要多记一个搭配：keep sb in the loop，意思是「让某人一直知情」。"
+     },
+     "collocations": [
+      "an infinite loop",
+      "keep sb in the loop",
+      "loop back"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 185,
+     "head": "celebrity",
+     "family": [],
+     "ipa": "/səˈlɛbrɪti/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "名人",
+      "名声，知名度"
+     ],
+     "example": {
+      "en": "One of the artists later became a celebrity, and never mentioned the comic again.",
+      "zh": "其中一位画手后来成了名人，再没提过这本漫画。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "celebrate（庆祝）的亲戚：拉丁语 celeber（人多的、著名的）。名人就是「被很多人庆祝的人」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a TV celebrity",
+      "celebrity culture",
+      "achieve celebrity"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 661,
+     "head": "legacy",
+     "family": [],
+     "ipa": "/ˈlɛɡəsi/",
+     "pos": [
+      "n.",
+      "adj."
+     ],
+     "senses": [
+      "遗产（尤指遗赠物）",
+      "（前人留下的）影响",
+      "（技术）遗留的，老旧的"
+     ],
+     "example": {
+      "en": "The club left no money, only a legacy of forty boxes nobody could throw away.",
+      "zh": "社团没留下钱，只留下四十箱谁也扔不掉的遗产。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "leg（法律，同 legal）→ 通过法律留给别人的东西。程序员说的 legacy code（祖传代码）也是「前人留下的」。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "leave a legacy",
+      "a lasting legacy",
+      "legacy systems"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 501,
+     "head": "franchise",
+     "family": [],
+     "ipa": "/ˈfrænˌtʃaɪz/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "特许经营权；加盟店",
+      "（电影、游戏的）系列版权",
+      "选举权"
+     ],
+     "example": {
+      "en": "A studio offered to buy the franchise and turn the comic into six films.",
+      "zh": "一家制片公司提出买下版权，把这本漫画拍成六部电影。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "法语 franc（自由）→ franchise 本义是「被授予的自由」。所以它同时是「特许经营权」和「选举权」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a fast-food franchise",
+      "the film franchise",
+      "extend the franchise"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 100,
+     "head": "auction",
+     "family": [
+      {
+       "form": "auctioneer",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈɔkʃən/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "拍卖",
+      "拍卖（掉）"
+     ],
+     "example": {
+      "en": "The auction was held in the reading room, with eleven people and one telephone bidder.",
+      "zh": "拍卖在阅览室举行，到场十一人，还有一位电话竞拍者。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "拉丁语 augere（增加，同 augment 增加）= 价格一路往上加。所以拍卖只有加价，没有减价。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "put sth up for auction",
+      "an online auction",
+      "be auctioned off"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 476,
+     "head": "fiscal",
+     "family": [],
+     "ipa": "/ˈfɪskəl/",
+     "pos": [
+      "adj."
+     ],
+     "senses": [
+      "财政的，国库的"
+     ],
+     "example": {
+      "en": "The sale had to close before the end of the fiscal year, which explained the hurry.",
+      "zh": "这笔交易必须在财政年度结束前完成，这解释了为什么这么急。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "拉丁语 fiscus 本义是「装钱的篮子」，后来指国库。fiscal year 财政年度是阅读里的高频搭配。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "fiscal policy",
+      "the fiscal year",
+      "fiscal deficit"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 384,
+     "head": "domain",
+     "family": [],
+     "ipa": "/doʊˈmeɪn/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "领域，范围",
+      "领地；（互联网）域名"
+     ],
+     "example": {
+      "en": "Who owned the comic was outside the domain of the archive and inside that of the lawyers.",
+      "zh": "漫画归谁所有，已经不在档案馆的管辖范围，而在律师的范围里了。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "dominus（主人，同 dominate 支配）→ 主人管得着的地盘。域名 domain name 也是你在网上的那块地盘。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the public domain",
+      "a domain name",
+      "outside my domain"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 409,
+     "head": "eligible",
+     "family": [
+      {
+       "form": "eligibility",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈɛlɪdʒəbəl/",
+     "pos": [
+      "adj."
+     ],
+     "senses": [
+      "有资格的，符合条件的",
+      "合适的（婚配对象）"
+     ],
+     "example": {
+      "en": "Only former club members were eligible to bid, and just two of them showed up.",
+      "zh": "只有社团前成员有资格竞拍，而他们只来了两个。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "e（出来）+ lig（选，同 select 选择、elect 选举）+ -ible = 可以被挑出来的 = 有资格的。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "be eligible for sth",
+      "be eligible to do sth",
+      "eligibility criteria"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 843,
+     "head": "petition",
+     "family": [
+      {
+       "form": "petitioner",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/pəˈtɪʃən/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "请愿（书）；申请",
+      "（向……）请愿，请求"
+     ],
+     "example": {
+      "en": "Students signed a petition asking the university to keep the comic on campus.",
+      "zh": "学生们签了一份请愿书，要求学校把漫画留在校内。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "petere（要求、追求）一家：compete 竞争、appetite 食欲、repeat 重复。请愿就是集体「要求」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "sign a petition",
+      "petition the government",
+      "a petition against sth"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 496,
+     "head": "foster",
+     "family": [],
+     "ipa": "/ˈfɑstər/",
+     "pos": [
+      "v.",
+      "adj."
+     ],
+     "senses": [
+      "培养，促进",
+      "收养，抚育（非亲生）",
+      "寄养的"
+     ],
+     "example": {
+      "en": "The archive exists to foster curiosity, not merely to keep paper dry.",
+      "zh": "档案馆存在的意义是培养好奇心，而不只是让纸张保持干燥。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "古英语 fōstor（食物、养育）：喂养一个不是自己生的孩子 = 寄养；喂养一个想法 = 培养。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "foster growth",
+      "a foster family",
+      "foster care"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "aside",
+     "title": "为什么今天的词像超级英雄片",
+     "source": "常识",
+     "text": "knight、shield、cape、galaxy、alien、arena、quest——这一串词看着像漫威的选角表，其实是六级词表里本来就挨着的高频词。原因不神秘：这些词在英语新闻、影评和科普里出现得太频繁了，而四六级的命题语料正是从这些地方选的。换句话说，出题人和漫画作者读的是同一批杂志。"
+    },
+    {
+     "type": "aside",
+     "title": "franchise 的两张面孔",
+     "source": "词源；franc（自由）",
+     "text": "同一个词，在商科阅读里是「特许经营权」（麦当劳的加盟店），在影评里是「系列版权」（漫威宇宙），在政治学文章里是「选举权」。三个意思都来自同一个本义：被授予的自由。看到 franchise 先别急着选「加盟店」，看清楚它在谈生意、谈电影，还是谈投票。"
+    }
+   ]
+  },
+  {
+   "key": "freebies",
+   "title": "闪电轮：老朋友换了个后缀",
+   "intro": "今天这五个词，词根你在四级就认识。变的只是前缀和后缀——以及它们带来的、你可能没想到的意思。",
+   "cards": [
+    {
+     "id": 397,
+     "head": "Easter",
+     "family": [],
+     "ipa": "/ˈistər/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "复活节"
+     ],
+     "example": {
+      "en": "The auction was postponed until the week after Easter.",
+      "zh": "拍卖推迟到了复活节后的那一周。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "和 east（东方）同源：都来自「黎明」。太阳从东边升起，复活节讲的也是重新升起。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "Easter Sunday",
+      "the Easter holidays"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 254,
+     "head": "console",
+     "family": [
+      {
+       "form": "consolation",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/kənˈsoʊl/",
+     "pos": [
+      "v.",
+      "n."
+     ],
+     "senses": [
+      "安慰，慰藉",
+      "控制台，操纵台"
+     ],
+     "example": {
+      "en": "Nobody could console the student who had bid one pound too little.",
+      "zh": "没人安慰得了那个少出了一英镑的学生。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "con（一起）+ sol（安慰，拉丁语 solari）= 陪着你 = 安慰。别拆成 con + sole（唯一），那是巧合。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "console sb for sth",
+      "a consolation prize",
+      "a games console"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 206,
+     "head": "clearing",
+     "family": [],
+     "ipa": "/ˈklɪrɪŋ/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（林中）空地",
+      "（票据）清算"
+     ],
+     "example": {
+      "en": "They found the cabin in a clearing about a mile behind the sports field.",
+      "zh": "他们在运动场后面约一英里处的一片林中空地上找到了那间小屋。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "clear（清出来）+ -ing = 树被清掉之后留下的那块地。银行的「清算」也是把账「清干净」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a clearing in the forest",
+      "a clearing bank"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 205,
+     "head": "clearance",
+     "family": [],
+     "ipa": "/ˈklɪrəns/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "清除；清仓",
+      "（空间的）间隙",
+      "许可，批准"
+     ],
+     "example": {
+      "en": "You need security clearance and about two inches of clearance to move that shelf.",
+      "zh": "要挪动那个书架，你既需要安全许可，也需要大约两英寸的间隙。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "同一个 clear，三个方向：清掉东西（清仓）、清出空间（间隙）、清掉障碍（许可）。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a clearance sale",
+      "security clearance",
+      "enough clearance"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 1109,
+     "head": "superintendent",
+     "family": [],
+     "ipa": "/ˌsupərɪnˈtɛndənt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "主管，负责人",
+      "（英）警司；（美）学区总监"
+     ],
+     "example": {
+      "en": "The superintendent of buildings arrived with a key that did not fit.",
+      "zh": "物业主管带着一把对不上的钥匙来了。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "super（在上）+ intend（关注，同 intend 打算）+ -ent（人）= 在上面盯着的人。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the superintendent of schools",
+      "a police superintendent"
+     ],
+     "card_style": "lite"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "tip",
+     "title": "成对记：-ing 和 -ance",
+     "text": "同一个词根、两个后缀、两条完全不同的意思线：-ing 给出「清出来的那块地」（林中空地），-ance 给出「清除这个动作和它的结果」（清仓、间隙、许可）。六级喜欢考这种同根不同尾的一对。遇到一对，就把它们写在同一行，中间画一条竖线——分开记是两个词，一起记是一个词加一条规则。"
+    }
+   ]
+  },
+  {
+   "key": "orphans",
+   "title": "孤儿院：今天收留五个",
+   "intro": "五个不属于今天任何家族的词。其中四个有真词源可讲，一个没有——我会诚实地告诉你是哪一个。",
+   "cards": [
+    {
+     "id": 570,
+     "head": "humiliate",
+     "family": [
+      {
+       "form": "humiliation",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/hjuˈmɪliˌeɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "使蒙羞，羞辱"
+     ],
+     "example": {
+      "en": "He was humiliated in front of the whole room by a single question.",
+      "zh": "一个问题就让他在满屋子人面前颜面扫地。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "humus（土地）一家：humble 谦卑、human 人（土里来的）。humiliate 就是把人的脸按到土上。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "feel humiliated",
+      "a humiliating defeat",
+      "public humiliation"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 634,
+     "head": "irritate",
+     "family": [
+      {
+       "form": "irritation",
+       "pos": "n."
+      },
+      {
+       "form": "irritating",
+       "pos": "adj."
+      },
+      {
+       "form": "irritable",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈɪrɪˌteɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "激怒，使恼火",
+      "使发炎，刺激"
+     ],
+     "example": {
+      "en": "The dripping tap irritated him far more than the missing money did.",
+      "zh": "滴水的水龙头比丢了钱更让他恼火。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "拉丁语 irritare 再往上就说不清了，所以只能编：它同时能形容「惹毛一个人」和「刺激一块皮肤」——两种都是让人坐不住。",
+      "true_etymology": false,
+      "joke": true
+     },
+     "collocations": [
+      "be irritated by sth",
+      "an irritating habit",
+      "skin irritation"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1126,
+     "head": "tact",
+     "family": [
+      {
+       "form": "tactful",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/tækt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "机智，圆通；分寸感"
+     ],
+     "example": {
+      "en": "It takes tact to tell someone that their life’s work is worth eleven pounds.",
+      "zh": "要告诉一个人他毕生的作品只值十一英镑，是需要分寸感的。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "tangere（触碰）一家：contact 接触、tangible 摸得着的。有 tact 的人知道话该怎么「碰」人才不疼。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "show tact",
+      "handle sth with tact",
+      "a tactful reply"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1199,
+     "head": "unify",
+     "family": [
+      {
+       "form": "unification",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈjunəˌfaɪ/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "统一，使成一体"
+     ],
+     "example": {
+      "en": "One editor was brought in to unify four different drawing styles.",
+      "zh": "请了一位编辑来统一四种不同的画风。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "uni（一）+ -fy（使）= 使成为一个。零件全认识，只是这个词在表里没有兄弟姐妹。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "unify a country",
+      "a unified theory",
+      "national unification"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1258,
+     "head": "yawn",
+     "family": [],
+     "ipa": "/jɔn/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "哈欠；打哈欠",
+      "（裂口）张开"
+     ],
+     "example": {
+      "en": "The auctioneer yawned twice before the first bid was made.",
+      "zh": "第一次出价之前，拍卖师打了两个哈欠。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "和 gap（缺口）、gape（张大嘴）同源：打哈欠就是把嘴变成一个缺口。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "stifle a yawn",
+      "yawn widely",
+      "a yawning gap"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "aside",
+     "title": "哪些记法是编的",
+     "source": "本书体例",
+     "text": "本书的规矩：凡是「拆」这一行给出的零件说明，要么是真词源，要么会明说是编的。今天 irritate 那一条就是编的——拉丁语 irritare 再往上，词源学界并没有可靠的说法，所以我给你的是一个好用的画面，不是一段历史。你可以放心用它记住这个词，但不要在论文里引用它。"
+    }
+   ]
+  }
+ ],
+ "homework": {
+  "exercises": [
+   {
+    "type": "match",
+    "title": "真假鉴定：下面每个词的零件说明，对还是错？",
+    "items": [
+     {
+      "prompt": "cemetery = ceme + metry（测量）",
+      "answer": "错。来自希腊语 koimētērion「睡觉的地方」",
+      "hint": "今天的六个之一"
+     },
+     {
+      "prompt": "symmetry = sym（共同）+ metr（测量）",
+      "answer": "对。两边量起来一样"
+     },
+     {
+      "prompt": "aftermath = after + math（数学）",
+      "answer": "错。math 在这里是「割草」，指割后再生的那茬草"
+     },
+     {
+      "prompt": "terminate = termin（界限）+ ate",
+      "answer": "对。走到界限"
+     },
+     {
+      "prompt": "metropolitan = metro（测量）+ politan",
+      "answer": "错。是 mētēr（母亲）+ polis（城）= 母城"
+     },
+     {
+      "prompt": "medieval = medi（中间）+ ev（时代）",
+      "answer": "对。中间的那个时代"
+     }
+    ]
+   },
+   {
+    "type": "cloze",
+    "title": "填空：用今天的词填，注意词形",
+    "items": [
+     {
+      "prompt": "The council voted to impose economic ______ on the company.",
+      "answer": "sanctions"
+     },
+     {
+      "prompt": "Only former members were ______ to bid at the auction.",
+      "answer": "eligible"
+     },
+     {
+      "prompt": "The archive exists to ______ curiosity, not just to keep paper dry.",
+      "answer": "foster"
+     },
+     {
+      "prompt": "The heating is ______ , which is worse than no heating at all.",
+      "answer": "intermittent"
+     },
+     {
+      "prompt": "Students signed a ______ asking the university to keep the comic.",
+      "answer": "petition"
+     }
+    ]
+   }
+  ]
+ },
+ "summary": [
+  "零件是启发式，不是保证：拆出来的和词典对不上，信词典。",
+  "cemetery 不量东西，aftermath 不是数学，metro 是「母城」。",
+  "sanction 同时是「批准」和「制裁」——考试最爱这种词。",
+  "同根不同尾要成对记：clearing（空地）和 clearance（清除、间隙、许可）。",
+  "明天：五个新零件（cur、frag、min、pos、spect），以及一张没人认领的收据。"
+ ]
+}

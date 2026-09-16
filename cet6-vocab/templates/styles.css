@@ -52,30 +52,30 @@ h2.scene .tag { display: inline-block; font-family: var(--latin); font-size: 11p
 .intro { font-family: var(--serif-zh); font-size: 14px; color: var(--ink); margin: 0 0 10px; }
 .intro .w { font-family: var(--latin); font-weight: 700; color: var(--accent); }
 .cards { column-count: 2; column-gap: 30px; column-fill: auto; }
-.card { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid var(--accent); padding: 8px 0 10px; margin-bottom: 12px; }
+.card { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid var(--accent); padding: 6px 0 7px; margin-bottom: 9px; }
 .card .hd { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
-.card .hw { font-family: var(--latin); font-weight: 700; font-size: 24px; color: var(--accent); line-height: 1.1; }
+.card .hw { font-family: var(--latin); font-weight: 700; font-size: 22px; color: var(--accent); line-height: 1.1; }
 .card .hw sup { font-size: 12px; margin-left: 1px; }
 .card .ipa { font-family: var(--latin); font-size: 14px; color: var(--muted); }
 .card .pos { font-family: var(--latin); font-style: italic; font-size: 12.5px; color: #fff; background: var(--accent); opacity: .85; padding: 0 6px; border-radius: 3px; }
 .card .fam { font-family: var(--latin); font-size: 12.5px; color: var(--muted); margin-left: auto; }
 .card .fam b { font-weight: 700; color: var(--ink); }
-.card .gloss { font-family: var(--serif-zh); font-size: 15px; margin: 3px 0 2px; }
+.card .gloss { font-family: var(--serif-zh); font-size: 14.5px; margin: 2px 0 1px; line-height: 1.45; }
 .card .gloss em { font-style: normal; color: var(--muted); font-size: 12.5px; margin-right: 4px; }
-.card .row { display: flex; gap: 8px; margin-top: 3px; font-size: 13.5px; }
+.card .row { display: flex; gap: 7px; margin-top: 2px; font-size: 13.2px; line-height: 1.5; }
 .card .lab { flex: none; font-family: var(--sans-zh); font-size: 11px; font-weight: 700; color: #fff; background: #8A8F98; border-radius: 3px; padding: 1px 5px; height: 16px; line-height: 16px; margin-top: 3px; }
 .card .lab.ex { background: #5E7D9A; } .card .lab.hook { background: var(--amber); } .card .lab.col { background: #6B8F71; }
-.card .ex .en { font-family: var(--latin); font-style: italic; font-size: 14px; }
+.card .ex .en { font-family: var(--latin); font-style: italic; font-size: 13.5px; }
 .card .ex .zh { font-family: var(--serif-zh); font-size: 13px; color: var(--muted); display: block; }
-.card .hook .txt, .card .col .txt { font-family: var(--serif-zh); font-size: 13.5px; }
+.card .hook .txt, .card .col .txt { font-family: var(--serif-zh); font-size: 13.2px; }
 .card .txt .w { font-family: var(--latin); font-weight: 700; }
-.card.lite { border-top: 1px solid var(--rule); padding: 6px 0 8px; margin-bottom: 8px; }
+.card.lite { border-top: 1px solid var(--rule); padding: 5px 0 6px; margin-bottom: 7px; }
 .card.lite .hw { font-size: 20px; }
 .card.lite .eq { font-family: var(--serif-zh); font-size: 14px; margin-top: 2px; }
 .card.lite .eq .w { font-family: var(--latin); font-weight: 700; }
 
 /* boxes (OSTEP-style gray boxes) */
-.box { background: var(--box); border-left: 4px solid var(--accent); padding: 9px 14px 10px; margin: 8px 0 12px; break-inside: avoid; }
+.box { background: var(--box); border-left: 4px solid var(--accent); padding: 8px 13px 9px; margin: 6px 0 10px; break-inside: avoid; }
 .box.tip { border-left-color: var(--amber); }
 .box .t { font-family: var(--latin); font-weight: 700; font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
 .box.tip .t { color: var(--amber); }
@@ -107,3 +107,42 @@ ol.parts .zh { font-family: var(--serif-zh); color: var(--muted); font-size: 13p
 .summary ul { margin: 4px 0 0 18px; padding: 0; font-family: var(--serif-zh); font-size: 13.8px; }
 .summary li { margin-bottom: 3px; }
 .summary .w { font-family: var(--latin); font-weight: 700; }
+
+/* ---- paginated layout (templates/paginate.js) ---- */
+.page { display: flex; flex-direction: column; }
+.page.opener { display: block; }
+.page .content { flex: 1 1 auto; min-height: 0; column-count: 2; column-gap: 30px; column-fill: balance; overflow: hidden; }
+.page > footer.run { position: static; margin-top: 10px; padding-top: 6px; border-top: 1px solid var(--rule); }
+.page.opener > footer.run { position: absolute; border-top: none; padding-top: 0; }
+.page .content > h2.scene:first-child, .page .content > h2.hwt:first-child { margin-top: 0; }
+h2.scene, h2.hwt { margin-top: 6px; }
+.card .lab.warn { background: var(--amber); }
+.card .note-row .txt { font-family: var(--serif-zh); font-size: 13.2px; color: var(--muted); }
+.card .made { color: var(--amber); font-family: var(--sans-zh); font-size: 12px; }
+.card.lite .eq .colloc { font-family: var(--latin); color: var(--muted); font-size: 12.5px; }
+.box .src { font-family: var(--sans-zh); font-size: 11.5px; color: var(--muted); margin-top: 5px; }
+table.q { margin-bottom: 10px; break-inside: avoid; page-break-inside: avoid; }
+table.q.rev td.w, table.q.ans td.w { font-family: var(--latin); font-size: 14px; }
+table.q.rev td.blank, table.q.ans td.blank { width: 52%; }
+table.q.ans td { border-bottom: 1px dotted var(--rule); padding: 3px 6px; }
+.sched { break-inside: avoid; margin-bottom: 8px; }
+ol.parts { break-inside: avoid; }
+ol.parts.ans b { font-family: var(--serif-zh); color: var(--accent); }
+.summary { break-inside: avoid; }
+.note.span2 { margin: 2px 0 10px; }
+
+.sched.budget { margin-top: 12px; }
+.sched.budget td:nth-child(2), .sched.budget td:nth-child(4) { font-family: var(--latin); }
+.map td .w { line-height: 1.45; }
+
+table.q { table-layout: fixed; }
+table.q td, table.q th { word-break: normal; overflow-wrap: anywhere; }
+table.q td.n, table.q th.n { width: 24px; }
+table.q td:nth-child(2) { width: 40%; }
+table.q td.blank { width: 32%; }
+table.q td.note { width: 26%; font-family: var(--latin); font-size: 12.5px; line-height: 1.35; }
+table.q.rev td.w, table.q.rev td:first-child { width: 46%; }
+table.q.ans td.n { width: 30px; }
+
+h2.scene, h2.hwt, p.intro { break-after: avoid; page-break-after: avoid; }
+h2.hwt { break-inside: avoid; }

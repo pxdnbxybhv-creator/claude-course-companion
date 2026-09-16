@@ -2,8 +2,8 @@
 
 > 六级词汇背诵讲义 · iPad Pro 11 英寸横屏 · 30 天 · OSTEP 风格
 >
-> 状态：**设计稿，等待用户裁决（见第 10 节）**。本阶段不生产正文内容。
-> 本文档由 Fable 5.1 负责撰写与后续验收审计；正文写作可由其他会话/模型按本文档执行。
+> 状态：**框架已定稿，第 10 节十个问题已裁决；Day 1、Day 2 全稿已完成并渲染**（见 `content/`、`samples/`）。
+> 框架设计与最终验收审计由 Fable 5.1 负责；正文写作由 Opus 5 按本文档执行。
 
 ---
 
@@ -12,10 +12,10 @@
 - **对象**：2016 版《全国大学英语四、六级考试大纲》词表中带 ★ 的六级词，共 **1263 个词目**（另含 432 个派生形式）。四级词（4114 个不带 ★ 的词目）不在正文范围内。
 - **节奏**：30 天 = 3 个 Part × (9 个学习日 + 1 个检查站日)。学习日每天 46–47 个新词，检查站日不学新词，只做本 Part 的综合复习与测试。
 - **每天的形状**（对应 OSTEP 章节结构）：开场对话 → THE CRUX（今日症结）→ 四个场景（词根家族 / 情景剧 / 闪电轮 / 孤儿院）→ ASIDE / TIP 灰框穿插 → 作业（今日自测 + 间隔复习）→ 小结。
-- **排序策略**：两阶段。v0（已跑通，见 `schedule/day_plan.md`）按「频率前置 + 词根家族聚合 + 易混词隔离 + 每日四组配额」机械分配；v1 在第二阶段的标注 pass（主题 / 真词根 / 易混词）之后重排，让每天的情景剧真正成为一集故事。
-- **版式**：1194 × 834 逻辑点（iPad Pro 11 横屏原生比例），双栏卡片流 + 通栏灰框，Noto Serif SC + Charis SIL + LXGW WenKai（全部开源字体）。样张见 `samples/day01-sample.pdf`。
+- **排序策略**：两阶段。v0（已跑通，见 `schedule/day_plan.md`）按「频率前置 + 词根家族聚合 + 易混词隔离 + 每日四组配额」机械分配；v1 在第二阶段的标注 pass（主题 / 真词根 / 易混词）之后重排，让每天的情景剧真正成为一集故事。写 Day 2 时发现 v0 的正则词根判定会造出**词源假朋友**（cemetery 不属于 metr、massacre 不属于 sacr、aftermath 与 intermittent 不属于 term、medication 不属于 medi、metropolitan 不属于 metr），这正是 v1 标注 pass 要修的问题；Day 2 的处理方式是把它变成当天的 CRUX，见 4.6。
+- **版式**：1194 × 834 逻辑点（iPad Pro 11 横屏原生比例），双栏卡片流 + 通栏灰框，Noto Serif SC + Charis SIL + LXGW WenKai（全部开源字体）。实际成品见 `samples/CET6-Day1-2-preview.pdf`（Day 1 + Day 2，32 页，带书签）。
 - **流水线**：词表 JSON → 标注 → 分配 → 写手按 Schema 产出每日 JSON → `validate.py` 机器校验 → Jinja2 模板渲染 HTML → Chromium 打印 PDF → PyMuPDF 加书签/页标签 → Fable 审计。
-- **待用户决定**：范围、故事世界、人物称呼、每日词量、谐音梗尺度、IPA 口音、生产分工（第 10 节）。
+- **已定**：范围含四级自查表附录、校园悬疑故事世界、30 天 47 词先做、写手按 Part 分三批（第 10 节）。
 
 ---
 
@@ -113,15 +113,17 @@
 
 ### 3.5 每日时间预算（用于写手控制篇幅）
 
-| 部分 | 目标用时 | 页数（横屏） |
+| 部分 | 目标用时 | 页数（横屏，实测） |
 |---|---|---|
-| 开场对话 + CRUX + 今日地图 | 5 分钟 | 1 |
-| Scene 1–4（含灰框） | 35–40 分钟 | 7–8 |
-| 作业（自测 + 复习 + 练习） | 15 分钟 | 2（题 1 页、答案 1 页） |
-| 小结 | 2 分钟 | 与作业同页 |
-| **合计** | **约 60 分钟** | **10–11 页** |
+| 开场对话 + CRUX + 今日地图 + 时间预算 | 5 分钟 | 1 |
+| Scene 1–4（含灰框） | 35–40 分钟 | 8–10 |
+| 作业（自测 + 间隔复习 + 练习 + 复习日程） | 15 分钟 | 3–4 |
+| 小结 + 答案 | 2 分钟 | 2 |
+| **合计** | **约 60 分钟** | **15–17 页** |
 
-全书约 27 × 11 + 3 × 8 + 前言/目录/索引 20 ≈ **340 页**。嵌入字体子集后文件预计 5 MB 以内。
+实测：Day 1 = 15 页，Day 2 = 17 页（Day 2 多一组 Day 1 的复习）。全书约 27 × 16 + 3 × 8 + 前言/目录/附录 35 ≈ **490 页**，比初稿估计的 340 页多，原因是每张词卡给了完整的例句 + 中译 + 拆解 + 搭配四行，而不是词典式的一行。两天合订本实测 32 页 2.6 MB（字体只嵌一次），全书预计 6 MB 以内。
+
+页面利用率的已知代价：场景标题与灰框是通栏元素，通栏元素必须排在它上方所有分栏内容之下，因此每个场景边界会浪费半页到一页的下半部分。作业区的小标题已改为不通栏以回收空间（省下约 2 页／天）。
 
 ---
 
@@ -145,7 +147,7 @@
 2. **隔离**：`data/interference.json` 中同组的词不得同天首次出现；两者都学过之后，在 Part III 的辨析题里正面相遇。
 3. **频率前置**：Part I 平均 Zipf 最高，Part III 最低（v0 结果：Day 1 = 4.14，Day 29 = 2.91，单调下降）。Part 内允许为了故事做交换，Part 之间原则上不交换。
 4. **家族聚合**：同词根组（≥ 3 词）整组进入同一天的 Scene 1；不足时用同前缀切片补足到 8 个（「今日零件：dis-」）。
-5. **四组配额**：每天 Scene 3 闪电轮 4–9 词（对四级学习者透明的同源词），Scene 4 孤儿院 5 词（本 Part 内频率最低、无零件无亲戚），其余进 Scene 2。
+5. **四组配额**：每天 Scene 3 闪电轮 4–9 词（对四级学习者透明的同源词），Scene 4 孤儿院 5 词，其余进 Scene 2。孤儿院的准确定义是**不属于任何词根家族、也不是透明同源词、且在剩下的词里频率最低的那一批**——它们仍可能有可拆的零件（如 certify = cert + fy），只是在这张表里没有兄弟姐妹。每天的场景标题应如实反映这一点，不要谎称「没有零件」。
 6. **场景可写**：Scene 2 的 20–30 个词交给写手时，允许写手在**同一 Part 内**与相邻天交换至多 6 个词，以换取一个连贯的场景。交换后必须重跑 `validate.py`。
 
 ### 4.3 两阶段算法
@@ -200,6 +202,22 @@ v0 的局限（写在这里，免得被当成最终答案）：词根标签是�
 
 ---
 
+### 4.6 假朋友（写 Day 2 时新增的规则）
+
+v0 的词根标签由正则粗判，会把**看起来像**某个家族的词放进那个家族。已确认的假朋友：
+
+| 词 | v0 误判为 | 真词源 |
+|---|---|---|
+| medication | medi（中间） | medeor 治疗（同 medical、remedy） |
+| metropolitan | metr（测量） | mētēr 母亲 + polis 城 = 母城 |
+| cemetery | metr（测量） | koimētērion 睡觉的地方 |
+| massacre | sacr（神圣） | 古法语 macacre 屠宰场，再往上无定论 |
+| aftermath | term（界限） | after + math 割草，指割后再生的草 |
+| intermittent | term（界限） | inter + mit 送 |
+| syndicate | dict（说） | 希腊语 dikē 公正（与 dict 只是远亲） |
+
+处理原则：**不回避，改成教学内容**。写手看到这种词时，卡片必须写出真词源并明确否定错误的拆法（「不是 metr」），而不是悄悄换个说法。Day 2 把这六个词编成一节「四个真家族，六个假朋友」，并让它成为当天的 CRUX（「零件什么时候会骗你」）——这条经验建议保留到 v1 之后：每个 Part 安排一天专门讲假朋友。
+
 ## 5. 风格指南（OSTEP → 词汇讲义）
 
 ### 5.1 元素映射
@@ -253,11 +271,11 @@ v0 的局限（写在这里，免得被当成最终答案）：词根标签是�
 | `id` | ✓ | 来自 `cet6_star_words.json`，不可改 |
 | `head` | ✓ | 与词表一致，含上标（`appropriate²`） |
 | `family` | ✓ | 与词表一致；卡片上每个家族成员标词性 |
-| `ipa` | ✓ | 美音，斜杠包围，Unicode IPA；来源：写手给出，审计抽查 |
+| `ipa` | ✓ | 美音，斜杠包围，Unicode IPA。体例 = CMUdict 转写（无长度符号，保留次重音），可用 `scripts/ipa.py --check` 机器校验；与 CMUdict 不同的条目必须是有意为之，并在交稿时列出 |
 | `pos` | ✓ | 只列六级考的词性 |
 | `senses` | ✓ | 1–3 条中文释义，考试义项在第一条 |
 | `example.en` / `example.zh` | ✓ | 见 5.5 |
-| `hook` | ✓ | 类型 ∈ {`morph` 拆, `story` 钩, `pun` 谐音}；`morph` 必须带 `true_etymology: true/false` |
+| `hook` | ✓ | 类型 ∈ {`morph` 拆, `story` 钩, `pun` 谐音}；`morph` 必须带 `true_etymology: true/false`。**判定标准**：只要这一行对词的来源作出任何事实断言（拆零件、指出同源词、否定某个词根），就用 `morph`；纯记忆画面用 `story`；谐音用 `pun`。这样 `true_etymology` 才能覆盖住全部事实性断言 |
 | `collocations` | ✓ | 2–3 个 |
 | `scene` | ✓ | ∈ {roots, theme, freebies, orphans}，与分配表一致 |
 | `card_style` | ✓ | `full` 或 `lite`（闪电轮一律 `lite`） |
@@ -266,7 +284,13 @@ v0 的局限（写在这里，免得被当成最终答案）：词根标签是�
 
 长度预算（validate 会检查）：`full` 卡片中文正文 ≤ 160 字，`lite` 卡片一行 ≤ 60 字；对话 ≤ 450 字；CRUX 回答 ≤ 120 字。
 
-释义的事实来源：写手可以用任何词典知识，但审计会用 ECDICT（开源英汉词典，含音标、释义、柯林斯星级、词频）逐条比对释义与音标。生产阶段先下载 ECDICT（约 300 MB 的 CSV/SQLite），放在 `data/` 但不提交仓库。
+释义的事实来源：写手可以用任何词典知识，但写稿与审计都应当用 ECDICT（开源英汉词典，含音标、释义、柯林斯星级、考试标签、词频）逐条比对。取用方式：
+
+```bash
+curl -sSL -o data/ecdict.csv https://raw.githubusercontent.com/skywind3000/ECDICT/master/ecdict.csv   # 66 MB，不入库
+python3 scripts/lookup.py verdict archive        # 查词
+python3 scripts/lookup.py --check content/day01.json   # 逐卡比对音标与释义
+```
 
 ---
 
@@ -305,9 +329,17 @@ v0 的局限（写在这里，免得被当成最终答案）：词根标签是�
 - 内链：今日地图中的每个词 → 卡片；作业答案 → 卡片；页脚「今日目录」→ 当天首页。Chromium 导出会保留 `<a href="#id">` 为链接注释，已在样张中验证。
 - 页标签：`I-1`、`I-2`……（PyMuPDF `set_page_labels`），阅读器里输入 `II-3` 直接跳。
 
-### 7.5 样张
+### 7.5 分页与样张
 
-`samples/day01-sample.pdf`（4 页）与 `samples/day01-p1..4.png`：开场页、卡片页、闪电轮 + 孤儿院 + 灰框页、作业页。内容是 8 个真实六级词的示范写法，语气与本指南一致。这四页就是「验收时对照的视觉基线」。
+分页不交给浏览器的自动分页，而是由 `templates/paginate.js` 在 Chromium 里做「量一块、放一块」：每页是一个固定高度的双栏盒子，逐块塞入并实时测量，放不下就翻页。这样保证：
+
+- 词卡既不跨页、也不跨栏（`break-inside: avoid` 在通栏元素旁边并不可靠，所以脚本额外检测「某个非通栏块的宽度超过一栏」这种被拆开的情况）；
+- 场景标题不会孤零零留在页脚（标题连同它的导语一起被带到下一页）；
+- 必须等 `document.fonts.ready` 之后再分页，否则会按后备字体测量，成品必然溢出。
+
+`scripts/render.cjs` 在导出 PDF 前会复核每一页是否溢出，并把每页的小标题写进 `build/dayNN.pages.json`，供 `scripts/build_book.py` 生成书签。
+
+样张：`samples/CET6-Day1-2-preview.pdf`（Day 1 + Day 2 合订，32 页，含三级书签与 `I-1` 式页标签），以及 `samples/day01-p01-opener.png` 等五张代表页。这就是验收时对照的视觉基线。
 
 ---
 
@@ -322,16 +354,29 @@ PDF 词表 ──extract_wordlist.py──▶ data/cet6_star_words.json
              tagger pass (LLM, 阶段2) ───┘  → data/tags.json → allocate.py --tags → day_plan.json (v1)
                                                                                │
 写手会话（每次 1 天）◀── prompts/writer_day.md + day_plan.json[day] + schema ◀───┘
-        │
-        ▼
-content/dayNN.json ──validate.py──▶ 通过 ──render.py (Jinja2 → HTML)──▶ build/dayNN.html
+   ├─ 查词：scripts/lookup.py（ECDICT）、scripts/ipa.py（CMUdict）
+   ▼
+content/dayNN.json ──validate.py──▶ 通过 ──render.py (Jinja2 + 自动生成作业)──▶ build/dayNN.html
                                                   │
-                          render.cjs (Playwright Chromium, 1194×834) ──▶ build/dayNN.pdf
+              render.cjs (Playwright Chromium, 1194×834, paginate.js) ──▶ build/dayNN.pdf + .pages.json
                                                   │
                      build_book.py (PyMuPDF: 合并、书签、页标签、内链检查) ──▶ dist/CET6-Thirty-Easy-Pieces.pdf
                                                   │
-                     audit（Fable：自动检查 + 抽样人工 + 版式栅格化检查） ──▶ 验收报告
+                     audit（Fable：ipa.py/lookup.py 机检 + 抽样人工 + 版式栅格化检查） ──▶ 验收报告
 ```
+
+一天的完整命令：
+
+```bash
+python3 scripts/validate.py content/day03.json          # 必须 0 error
+python3 scripts/ipa.py --check content/day03.json       # 音标与 CMUdict 对表
+python3 scripts/lookup.py --check content/day03.json    # 释义与 ECDICT 对表
+python3 scripts/render.py content/day03.json
+node scripts/render.cjs build/day03.html build/day03.pdf
+python3 scripts/build_book.py build/day*.pdf            # 合订、书签、页标签
+```
+
+**写手只写四样东西**：开场对话、CRUX、46–47 张卡片（含灰框），以及 1–3 个小练习和小结。今日自测、间隔复习队列、复习日程表、答案页、今日地图、时间预算表全部由 `render.py` 生成——写手不要手写这些，也不要手排复习日期。
 
 工具依赖（容器内已验证可用）：Python 3.11 + PyMuPDF 1.28 + wordfreq + Jinja2；Node 22 + Playwright 1.56（自带 Chromium）；字体四套。ECDICT 待生产阶段下载。
 
@@ -387,24 +432,36 @@ content/dayNN.json ──validate.py──▶ 通过 ──render.py (Jinja2 →
 
 ---
 
-## 10. 待用户决定的问题
+## 10. 已定的决策
 
-| # | 问题 | 选项 | 推荐 |
+十个问题已于设计评审后裁决（用户采纳全部推荐项）。
+
+| # | 问题 | 决定 | 落实情况 |
 |---|---|---|---|
-| 1 | 范围 | A. 只做 1263 个 ★ 词；B. A + 附录「四级词自查表」（4114 词紧凑字母表，只供勾选不认识的词） | **B**（附录只占 10 页，成本极低） |
-| 2 | 故事世界 | A. 校园悬疑：教授和学生调查校园里一连串怪事，每天一个地点（法庭、实验室、媒体中心、医院……）；B. 一家创业公司的三十天；C. 环球旅行 | **A**（与对话框架同源，地点可随主题标签任意换） |
-| 3 | 人物称呼 | 「教授 / 学生」；或起名 | 不起名（OSTEP 同款） |
-| 4 | 每日词量 | 47 词 / 30 天；或 36 天（35 词 / 天）；或「轻量模式」 | 30 天先做，Part I 试读后再调 |
-| 5 | 谐音梗尺度 | 无 / 每天 ≤ 4 张（标注）/ 放开 | 每天 ≤ 4 张 |
-| 6 | IPA 口音 | 美音 / 英音 / 双标 | 美音（与大纲美式拼写一致） |
-| 7 | 释义详略 | 只写考试义项 1–3 条 / 全义项 | 1–3 条 |
-| 8 | 生产分工 | 写手用哪个模型、几个会话并行；Fable 只审计 | 写手按 Part 分三批；每批先交 2 天样稿给 Fable 看 |
-| 9 | 检查站测试形式 | 完形故事 + 配对 + 辨析 + 默写；或只做默写 | 四合一 |
-| 10 | 阅读器 | Books / GoodNotes / PDF Expert（影响是否要留手写空白） | 若用 GoodNotes 手写，作业页横线加高到 22 pt |
+| 1 | 范围 | 1263 个 ★ 词 **+ 附录「四级词自查表」**（4114 词紧凑字母表，只供勾选不认识的词，约 10 页） | 正文已开工；附录待排（`scripts/` 需新增一个附录生成脚本） |
+| 2 | 故事世界 | **校园悬疑**：学生在校史馆勤工俭学，一天一个地点 | Day 1 = 校史馆地下室第三个抽屉；Day 2 = 那本漫画的拍卖会 |
+| 3 | 人物称呼 | 不起名，「教授 / 学生」 | 已用 |
+| 4 | 每日词量 | 先按 47 词 / 30 天做，Part I 试读后再调 | Day 1–2 各 46 词，实测 15–17 页、约 55 分钟 |
+| 5 | 谐音梗尺度 | 每天 ≤ 4 张卡片，且标注 | 校验器已强制；Day 1–2 实际用了 0 张（真词源够用，没必要硬凑） |
+| 6 | IPA 口音 | 美音 | 体例见 6 节，机器可校验 |
+| 7 | 释义详略 | 只写考试义项 1–3 条 | 已用 |
+| 8 | 生产分工 | 写手按 Part 分三批，每批先交 2 天样稿给 Fable 审 | Day 1–2 即 Part I 的样稿，等待审计 |
+| 9 | 检查站测试形式 | 完形故事 + 配对 + 辨析 + 默写四合一 | Day 10 未写 |
+| 10 | 阅读器 | Books / GoodNotes / PDF Expert 均可 | 作业页横线高度待实机确认（若用 GoodNotes 手写，需加高到 22 pt） |
 
-裁决完成后的第一步是：跑标注 pass（Part I 的 423 词）→ 重排 → 写 Day 1、Day 2 全稿 → 渲染 → 审计 → 再决定是否放量。
+### 10.1 当前状态
 
----
+- 已完成：词表抽取与核对、v0 分配、Schema、校验器、查词与音标工具、渲染与合订流水线、**Day 1 与 Day 2 全稿**（92 张卡片，均通过 `validate.py` 零错误零警告）。
+- 音标：90 个词与 CMUdict 完全一致；两个有意的差异是 `Catholic /ˈkæθəlɪk/`（用三音节的常见读法，CMUdict 首选 `/ˈkæθlɪk/`）和 `idiot /ˈɪdiət/`（去掉 CMUdict 的次重音）。
+- 未做：Day 3–29、三个检查站、四级词自查表附录、前言与索引、v1 标注 pass。
+
+### 10.2 下一步（建议顺序）
+
+1. Fable 审计 Day 1–2（清单见 9 节与 `prompts/auditor.md`），特别是词源诚实性与幽默密度。
+2. 审计通过后跑 Part I 剩余 423 词的标注 pass（`prompts/tagger_pass.md`），用 `allocate.py --tags` 重排 Day 3–9。
+3. 写 Day 3–9，每两天渲染一次看版式。
+4. 写 Day 10 检查站（第一个，形式要定型，后两个照抄结构）。
+5. 再决定是否调整每日词量。
 
 ## 附录 A · 目录说明
 
@@ -412,7 +469,10 @@ content/dayNN.json ──validate.py──▶ 通过 ──render.py (Jinja2 →
 cet6-vocab/
 ├── DESIGN.md                 本文档
 ├── README.md                 入口与状态
-├── data/                     词表与特征（纯词形，无释义）
+├── content/                  正文（写手产出，一天一个文件）
+│   ├── day01.json            Day 1 全稿（46 词）
+│   └── day02.json            Day 2 全稿（46 词）
+├── data/                     词表与特征（纯词形，无释义；ecdict.csv 不入库）
 │   ├── cet6_star_words.json / .txt
 │   ├── syllabus_words_all.json
 │   ├── features.json         Zipf、同源、词缀、词根（v0 粗判）
@@ -422,31 +482,47 @@ cet6-vocab/
 │   └── day_plan.md           概览表
 ├── schema/
 │   ├── day.schema.json       每日内容 Schema
-│   └── day01.example.json    与样张一致的示例
+│   └── day01.example.json    最小示例（8 词，供新写手起步）
 ├── scripts/
 │   ├── extract_wordlist.py   PDF → 词表
-│   ├── features.py / allocate.py / validate.py
-│   ├── render.cjs            HTML → PDF（Playwright）
+│   ├── features.py / allocate.py
+│   ├── validate.py           Schema + 项目规则校验（交稿闸门）
+│   ├── ipa.py                CMUdict → 美音 IPA；--check 对表
+│   ├── lookup.py             ECDICT 查词；--check 对表
+│   ├── render.py             JSON → HTML（含自动生成的作业）
+│   ├── render.cjs            HTML → PDF（Playwright + paginate.js）
+│   ├── build_book.py         合并、书签、页标签、内链检查
 │   └── get_fonts.sh          下载四套开源字体
 ├── templates/
-│   ├── styles.css            版式（与样张一致）
-│   └── day01.html            样张源文件（生产阶段改为 Jinja2 模板）
+│   ├── styles.css            版式
+│   ├── day.html.j2           每日模板
+│   └── paginate.js           量一块放一块的分页器
 ├── samples/
-│   ├── day01-sample.pdf
-│   └── day01-p1.png … p4.png
+│   ├── CET6-Day1-2-preview.pdf   Day 1 + Day 2 合订（32 页，带书签）
+│   └── day01-p01-opener.png 等   五张代表页
+├── build/ · dist/            渲染中间产物与成书（不入库）
 └── prompts/
     ├── tagger_pass.md        阶段 2：标注 pass
     ├── writer_day.md         写手：一天的内容
     └── auditor.md            审计：验收清单
 ```
 
-## 附录 B · v0 分配概览
+## 附录 B · v0 分配概览与 Day 1–2 的落地
 
-见 `schedule/day_plan.md`。Day 1 的样子（节选）：
+见 `schedule/day_plan.md`。这份表的正确读法是「谁在哪一天」，不是「以什么顺序读」——顺序由写手在场景里决定。
 
-- 词根家族（13）：sentiment, sensation, dissent, archive, hierarchy, monarchy, demographic, bibliography …
-- 情景剧（23）：jack, vice, appropriate², squad, suicide, solo, random, tournament …
-- 闪电轮（5）：profile, equity, default, coalition, dressing
-- 孤儿院（5）：beset, certify, distort, henceforth, huddle
+Day 1（46 词，全部按 v0 分配，未做任何交换）：
 
-这份表的正确读法是「谁在哪一天」，不是「以什么顺序读」——顺序由写手在阶段 v1 的场景里决定。
+- 词根家族（13）：四个零件 arch（统治）／graph（写）／dict（说）／sens（感），覆盖 archive、hierarchy、monarchy、demographic、bibliography、autobiography、jurisdiction、verdict、dedicate、syndicate、sentiment、sensation、dissent。
+- 情景剧（23）：校史馆地下室。一把千斤顶撬开 1987 年起没开过的铁柜，翻出 1930 年代校报：要塞、上校、中尉、小队、主教、板球与曲棍球锦标赛、周六舞会、一桩挪用建楼款的欺诈案，最后是第三个抽屉里一本没有署名的手绘漫画。
+- 闪电轮（5）：profile、equity、default、coalition、dressing。
+- 孤儿院（5）：beset、certify、distort、henceforth、huddle。
+
+Day 2（46 词）：
+
+- 词根家族（14）：拆成「四个真家族（medi／sanct／metr／termin，8 词）+ 六个假朋友」，见 4.6。
+- 情景剧（22）：那本漫画《银河骑士》的拍卖会——骑士、盾、披风、银河、外星人、蜘蛛、竞技场、远征，接上特许经营权、拍卖、财政年度、请愿与资格。
+- 闪电轮（5）：Easter、console、clearing、clearance、superintendent。
+- 孤儿院（5）：humiliate、irritate、tact、unify、yawn。
+
+两天都没有动用「同 Part 内交换 ≤ 6 词」的额度。

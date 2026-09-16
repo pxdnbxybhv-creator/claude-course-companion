@@ -6,3 +6,5 @@ cet6-vocab/dist/
 cet6-vocab/data/ecdict*
 cet6-vocab/node_modules/
 *.pdf.zip
+__pycache__/
+*.pyc

@@ -1,0 +1,1555 @@
+{
+ "day": 1,
+ "part": 1,
+ "kind": "study",
+ "title": "教授，这个词为什么这么长？",
+ "estimated_minutes": 55,
+ "story_note": "Part I 校园悬疑线第一集。学生在校史馆勤工俭学，撬开 1987 年起没开过的铁柜，翻出 1930 年代校报，最后在第三个抽屉里发现一本没有署名的手绘漫画——直接接到 Day 2 的拍卖会。情景剧的杂乱是有意的：档案馆本来就什么都装，这也替 v0 分配表里高频杂词同天出现做了掩护。",
+ "dialogue": {
+  "title": "关于「三十天」的对话",
+  "turns": [
+   {
+    "who": "student",
+    "text": "教授，我数了，六级词表里带星号的词有 1263 个。三十天。这不叫背单词，这叫绝食。"
+   },
+   {
+    "who": "professor",
+    "text": "先别急着饿。archive 什么意思？"
+   },
+   {
+    "who": "student",
+    "text": "档案馆。这个我知道，电脑上就有。"
+   },
+   {
+    "who": "professor",
+    "text": "那 monarchy 呢？"
+   },
+   {
+    "who": "student",
+    "text": "君主制。……这两个词有关系？"
+   },
+   {
+    "who": "professor",
+    "text": "都有 arch，希腊语的「统治」。archive 是官府存文件的地方，monarchy 是一个人统治。今天第三个词 hierarchy，等级制度，是神职人员的统治。三个词，一个零件。"
+   },
+   {
+    "who": "student",
+    "text": "那这样的零件，够背完 1263 个词吗？"
+   },
+   {
+    "who": "professor",
+    "text": "不够。所以还有三种办法：把词放进一个场景、认出你其实已经认识的老朋友、给剩下的词编个荒唐故事。每天四组，对应四种办法。"
+   },
+   {
+    "who": "student",
+    "text": "听起来像是在给一堆杂物分类。"
+   },
+   {
+    "who": "professor",
+    "text": "今天下午你就要去校史馆给一堆杂物分类。顺便说，那正是 archive 这个词的本义。"
+   },
+   {
+    "who": "student",
+    "text": "那我怎么保证明天还记得？"
+   },
+   {
+    "who": "professor",
+    "text": "这才是今天真正的问题。"
+   }
+  ]
+ },
+ "crux": {
+  "question": "如何在一天里记住四十多个词，而且第二天还记得？",
+  "answer": "短答案：不是「记住」，是「认出」。给词挂标签——零件、场景、老朋友、荒唐故事；挂不上标签的才硬记。至于第二天还记得，靠的是作业里的间隔复习表，不是意志力。"
+ },
+ "scenes": [
+  {
+   "key": "roots",
+   "title": "词根家族：四个零件，十三个词",
+   "intro": "拆词术第一课：长词通常是三块零件——前缀说方向，词根说动作，后缀说词性。今天这十三个词只用四个零件：arch（统治）、graph（写画）、dict（说）、sens（感觉）。",
+   "cards": [
+    {
+     "id": 75,
+     "head": "archive",
+     "family": [],
+     "ipa": "/ˈɑrˌkaɪv/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "档案馆；档案，案卷",
+      "把……存档"
+     ],
+     "example": {
+      "en": "The university archive holds every student newspaper printed since 1921.",
+      "zh": "校档案馆保存着 1921 年以来的每一份学生报纸。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "希腊语 arkhē（统治、政府）→ arkheion，官府存放文件的屋子。档案馆的本义是「官府的房间」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the national archive",
+      "archive a file",
+      "archive footage（资料影像）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 552,
+     "head": "hierarchy",
+     "family": [
+      {
+       "form": "hierarchical",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈhaɪərˌɑrki/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "等级制度；层级结构"
+     ],
+     "example": {
+      "en": "In a strict hierarchy, a good idea has to climb three floors before anyone hears it.",
+      "zh": "在严格的层级制度里，一个好点子要爬上三层楼才有人听见。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "hieros（神圣）+ arkhē（统治）= 神职人员的统治，后来泛指任何一层压一层的结构。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a rigid hierarchy",
+      "social hierarchy",
+      "a hierarchical structure"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 741,
+     "head": "monarchy",
+     "family": [
+      {
+       "form": "monarch",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈmɑnɑrki/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "君主制，君主政体",
+      "君主国"
+     ],
+     "example": {
+      "en": "Britain remains a monarchy, but the real power moved to Parliament centuries ago.",
+      "zh": "英国仍是君主制国家，但实权几百年前就转移到了议会。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "mono（一）+ arkhē（统治）= 一个人统治。monarch 是那个人，monarchy 是那套制度。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "absolute monarchy",
+      "constitutional monarchy",
+      "abolish the monarchy"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 326,
+     "head": "demographic",
+     "family": [],
+     "ipa": "/ˌdɛməˈɡræfɪk/",
+     "pos": [
+      "adj.",
+      "n."
+     ],
+     "senses": [
+      "人口统计的",
+      "（营销中的）目标人群"
+     ],
+     "example": {
+      "en": "Demographic data show that the city has aged rapidly since 2005.",
+      "zh": "人口统计数据显示，这座城市自 2005 年起迅速老龄化。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "dēmos（人民，同 democracy）+ graph（写）= 把人民写下来 = 人口统计。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "demographic change",
+      "demographic data",
+      "the 18–24 demographic"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 128,
+     "head": "bibliography",
+     "family": [],
+     "ipa": "/ˌbɪbliˈɑɡrəfi/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "参考书目；文献目录"
+     ],
+     "example": {
+      "en": "Every term paper must end with a bibliography listing the sources you actually read.",
+      "zh": "每篇学期论文最后都要附参考书目，列出你真正读过的文献。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "biblion（书，同 Bible 圣经）+ graph（写）= 把书写下来 = 书目。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a select bibliography",
+      "compile a bibliography"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 103,
+     "head": "autobiography",
+     "family": [
+      {
+       "form": "autobiographic(al)",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˌɔtəbaɪˈɑɡrəfi/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "自传"
+     ],
+     "example": {
+      "en": "His autobiography devotes forty pages to one summer he spent working in the archive.",
+      "zh": "他的自传用四十页写他在档案馆打工的那一个夏天。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "auto（自己）+ bio（生命）+ graph（写）= 自己写自己的一生。三个零件你全都认识。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "publish an autobiography",
+      "a ghostwritten autobiography"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 647,
+     "head": "jurisdiction",
+     "family": [],
+     "ipa": "/ˌdʒʊrəsˈdɪkʃən/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "司法权，管辖权",
+      "管辖区域"
+     ],
+     "example": {
+      "en": "The campus police have no jurisdiction over the street outside the main gate.",
+      "zh": "校警对校门外那条街没有管辖权。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "juris（法律，同 jury 陪审团）+ dict（说）= 有权对法律说话 = 管辖权。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "have jurisdiction over",
+      "outside our jurisdiction",
+      "federal jurisdiction"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1217,
+     "head": "verdict",
+     "family": [],
+     "ipa": "/ˈvɜrdɪkt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（陪审团的）裁决",
+      "（经过考虑的）定论，评价"
+     ],
+     "example": {
+      "en": "The jury returned a verdict of not guilty after deliberating for six hours.",
+      "zh": "陪审团商议六小时后作出了无罪裁决。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "ver（真，同 verify 核实）+ dict（说）= 说出真相 = 裁决。这是真词源，不是编的。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "return / reach a verdict",
+      "a guilty verdict",
+      "the verdict on sth"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 317,
+     "head": "dedicate",
+     "family": [
+      {
+       "form": "dedication",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈdɛdəˌkeɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "把（时间、精力）献给",
+      "为……题献；为……揭幕"
+     ],
+     "example": {
+      "en": "She dedicated three years to cataloguing the boxes nobody else wanted to open.",
+      "zh": "她用三年时间整理那些没人愿意打开的箱子。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "de（郑重地）+ dic（说）= 郑重宣告某物属于谁。书前面那页「谨以此书献给……」就是 dedication。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "dedicate oneself to",
+      "be dedicated to doing sth",
+      "dedication to duty"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1120,
+     "head": "syndicate",
+     "family": [],
+     "ipa": "/ˈsɪndɪkət/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "财团，企业联合组织",
+      "（把稿件）同时售予多家媒体"
+     ],
+     "example": {
+      "en": "The comic strip was syndicated to more than two hundred newspapers in its first year.",
+      "zh": "这部连环漫画第一年就被同时卖给两百多家报纸。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "看着像 dict 家族，其实来自希腊语 dikē（公正）：syndikos 是「陪你上法庭的人」。远房亲戚，不是亲兄弟——明天专讲这件事。",
+      "true_etymology": true,
+      "joke": true
+     },
+     "collocations": [
+      "a crime syndicate",
+      "a syndicated column"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1000,
+     "head": "sentiment",
+     "family": [
+      {
+       "form": "sentimental",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈsɛntəmənt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（群体的）情绪，看法",
+      "伤感，多愁善感"
+     ],
+     "example": {
+      "en": "Public sentiment turned against the plan as soon as the cost became known.",
+      "zh": "造价一公开，公众情绪就转而反对这项计划。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "sent（感觉，同 sense）+ -ment（名词后缀）= 感觉出来的东西 = 情绪、看法。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "public sentiment",
+      "anti-war sentiment",
+      "sentimental value（纪念价值）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 999,
+     "head": "sensation",
+     "family": [
+      {
+       "form": "sensational",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/sɛnˈseɪʃən/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "感觉，知觉",
+      "轰动；轰动一时的人或事"
+     ],
+     "example": {
+      "en": "The band's first record was a sensation, and their second one sank without trace.",
+      "zh": "这支乐队的首张唱片轰动一时，第二张则销声匿迹。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "sens（感）+ -ation = 让人有感觉：一是身体上的感觉，二是让所有人都有感觉，也就是轰动。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a burning sensation",
+      "cause a sensation",
+      "an overnight sensation"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 372,
+     "head": "dissent",
+     "family": [],
+     "ipa": "/dɪˈsɛnt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "异议；持异议，不同意"
+     ],
+     "example": {
+      "en": "Two judges dissented, and the opinion they wrote later became the law.",
+      "zh": "两名法官持异议，他们写下的意见后来成了法律。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "dis（分开）+ sent（感觉）= 感觉跟大家分开 = 不同意。注意别和 descent（下降）、decent（体面的）混。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "voice dissent",
+      "political dissent",
+      "dissent from the majority"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "tip",
+     "title": "先认零件，再认整词",
+     "text": "读到 verdict 时，眼睛里应该是 ver + dict 两块，而不是 v-e-r-d-i-c-t 七个字母。前者是两个你已经认识的东西，后者是七个陌生人。这个习惯一旦养成，Part I 后面几天会越来越轻松——这不是鸡汤，是压缩算法。",
+     "joke": true
+    }
+   ]
+  },
+  {
+   "key": "theme",
+   "title": "情景剧：校史馆地下室，第三个抽屉",
+   "intro": "勤工俭学第一天。管理员给了你一把钥匙、一副手套，和一句话：「下面那排铁柜从 1987 年起就没打开过。」",
+   "cards": [
+    {
+     "id": 637,
+     "head": "jack",
+     "family": [],
+     "ipa": "/dʒæk/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "千斤顶",
+      "插孔，插座",
+      "（jack up）抬起；抬高"
+     ],
+     "example": {
+      "en": "He used a jack to lift the cabinet just enough to slide the door open.",
+      "zh": "他用千斤顶把柜子抬起一点点，刚好够把门推开。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "jack 本来是「男仆」的通名，后来凡是替人干活的小东西都叫 jack：千斤顶、耳机插孔、扑克里的 J。",
+      "joke": true
+     },
+     "collocations": [
+      "a car jack",
+      "jack up the price",
+      "a headphone jack"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 191,
+     "head": "chamber",
+     "family": [],
+     "ipa": "/ˈtʃeɪmbər/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（特定用途的）室，房间",
+      "（议会的）议院",
+      "枪膛；（心脏的）腔"
+     ],
+     "example": {
+      "en": "Behind the shelves was a small chamber with no window and one very cold lamp.",
+      "zh": "书架后面是一间没有窗户的小屋，只有一盏很冷的灯。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "拉丁语 camera（拱顶房间）→ 法语 chambre → chamber。照相机 camera 的本义就是「暗室」，两个词同源。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a burial chamber",
+      "the upper chamber",
+      "chamber music（室内乐）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 909,
+     "head": "random",
+     "family": [],
+     "ipa": "/ˈrændəm/",
+     "pos": [
+      "adj.",
+      "n."
+     ],
+     "senses": [
+      "随机的，任意的",
+      "（口）没来由的，莫名其妙的"
+     ],
+     "example": {
+      "en": "The boxes were stacked in random order, with 1931 sitting on top of 1974.",
+      "zh": "箱子堆放的顺序完全随机，1931 年的压在 1974 年的上面。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "今天这一组词彼此没有关系，就像档案馆里的东西——因为 archive 的本义就是「什么都往里放的屋子」。",
+      "joke": true
+     },
+     "collocations": [
+      "at random",
+      "a random sample",
+      "random access memory"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 493,
+     "head": "fort",
+     "family": [],
+     "ipa": "/fɔrt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "堡垒，要塞"
+     ],
+     "example": {
+      "en": "The oldest building on campus was a fort long before it was a library.",
+      "zh": "校园里最老的那栋楼，在成为图书馆之前很久是一座要塞。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "fortis（强壮）一家：fort 要塞、force 力量、comfort 让人重新强壮起来 = 安慰。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "hold the fort（守住摊子）",
+      "an abandoned fort"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 224,
+     "head": "colonel",
+     "family": [],
+     "ipa": "/ˈkɜrnəl/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（陆军）上校"
+     ],
+     "example": {
+      "en": "A colonel signed the order that turned the fort into a teaching college in 1904.",
+      "zh": "1904 年，一位上校签字把这座要塞改成了师范学校。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "拼写里有 l，读音却是 /ˈkɜrnəl/，和 kernel（果仁、内核）完全同音。英语拼写史上最有名的事故之一。",
+      "joke": true
+     },
+     "collocations": [
+      "Colonel Smith",
+      "be promoted to colonel"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 667,
+     "head": "lieutenant",
+     "family": [],
+     "ipa": "/luˈtɛnənt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "中尉；上尉",
+      "副职官员，助手"
+     ],
+     "example": {
+      "en": "The colonel sent his lieutenant to count the rifles stored in the basement.",
+      "zh": "上校派他的中尉去清点存放在地下室的步枪。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "法语 lieu（位置，同 in lieu of 代替）+ tenant（持有，同 tenant 房客）= 替上级在位的人。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a first lieutenant",
+      "the mayor's chief lieutenant"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1061,
+     "head": "squad",
+     "family": [],
+     "ipa": "/skwɑd/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "（军队的）班，小队",
+      "（警察的）组；（运动的）队"
+     ],
+     "example": {
+      "en": "A squad of six students was assigned to carry the boxes upstairs.",
+      "zh": "一个六人小队被派去把箱子搬上楼。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "和 square（方）同源：士兵排成方阵，一个方块就是一个 squad。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a bomb squad",
+      "a squad car（警车）",
+      "the national squad"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 91,
+     "head": "assault",
+     "family": [],
+     "ipa": "/əˈsɔlt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "袭击；人身攻击（罪）",
+      "（军事）突击",
+      "（言语上的）抨击"
+     ],
+     "example": {
+      "en": "The 1938 drill simulated an assault on the north wall of the old fort.",
+      "zh": "1938 年的演习模拟了对旧要塞北墙的一次突击。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "as-（= ad-，朝向）+ sault（跳，同 somersault 翻跟头）= 朝人跳过去。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "an assault on / against",
+      "assault rifle",
+      "come under assault"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 182,
+     "head": "Catholic",
+     "family": [],
+     "ipa": "/ˈkæθəlɪk/",
+     "pos": [
+      "adj.",
+      "n."
+     ],
+     "senses": [
+      "天主教的；天主教徒",
+      "（小写）广泛的，兼容并包的"
+     ],
+     "example": {
+      "en": "The chapel was built for Catholic students who could not walk to the town church.",
+      "zh": "这座小教堂是为走不到镇上教堂的天主教学生建的。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "kata（遍及）+ holos（整体，同 whole、holistic）= 普世的。小写的 catholic 还保留着「广泛的」这个本义。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the Catholic Church",
+      "a catholic taste in music"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 131,
+     "head": "bishop",
+     "family": [],
+     "ipa": "/ˈbɪʃəp/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "主教",
+      "（国际象棋）象"
+     ],
+     "example": {
+      "en": "A bishop came from the capital in 1912 to bless the new chapel.",
+      "zh": "1912 年，一位主教从首都赶来为新教堂祝圣。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "episkopos = epi（在上）+ skopos（看，同 scope、telescope）= 在上面看着的人。象棋里的「象」也斜着盯住全场。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "the Bishop of Durham",
+      "move the bishop"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1224,
+     "head": "vice",
+     "family": [],
+     "ipa": "/vaɪs/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "恶习，堕落；缺点",
+      "老虎钳"
+     ],
+     "example": {
+      "en": "The 1935 editorial listed smoking, gambling and idleness as the three vices of student life.",
+      "zh": "1935 年的社论把吸烟、赌博和懒散列为学生生活的三大恶习。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "副校长 vice-chancellor 里的 vice 是另一个词（拉丁语「代替」），和「恶习」只是长得一样。学校当然不希望你搞混。",
+      "joke": true
+     },
+     "collocations": [
+      "vice and virtue",
+      "vice-president",
+      "hold sth in a vice"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 503,
+     "head": "fraud",
+     "family": [
+      {
+       "form": "fraudulent",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/frɔd/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "欺诈（罪）",
+      "骗子；冒牌货"
+     ],
+     "example": {
+      "en": "The paper's front page accused the builder of fraud and demanded an audit.",
+      "zh": "报纸头版指控承建商欺诈，并要求审计。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "和心理学家 Freud 只差一个字母，读音却不同：/frɔd/ 对 /frɔɪd/。考场上别把弗洛伊德送进监狱。",
+      "joke": true
+     },
+     "collocations": [
+      "commit fraud",
+      "credit-card fraud",
+      "He's a fraud.（他是个骗子）"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 69,
+     "head": "appropriate²",
+     "family": [
+      {
+       "form": "appropriation",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/əˈproʊpriˌeɪt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "挪用，盗用",
+      "拨出（款项）"
+     ],
+     "example": {
+      "en": "Someone had appropriated the building fund, and the chapel was never finished.",
+      "zh": "有人挪用了建楼款，那座教堂始终没有完工。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "ap-（朝向）+ propri（自己的，同 property）+ -ate = 据为己有。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "appropriate funds for sth",
+      "an appropriation bill（拨款法案）"
+     ],
+     "card_style": "full",
+     "sense_note": "形容词 appropriate¹「恰当的」是四级词，读 /əˈproʊpriət/；六级考的是动词，尾音读成「eight」。"
+    },
+    {
+     "id": 911,
+     "head": "rape",
+     "family": [],
+     "ipa": "/reɪp/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "强奸（罪）",
+      "（书面）掠夺，蹂躏"
+     ],
+     "example": {
+      "en": "Newspapers of that period reported cases of rape in a single line, without names.",
+      "zh": "那个时期的报纸用一行字报道强奸案，不提姓名。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "拉丁语 rapere（猛地夺走）→ 还有 rapid（迅速）、rapture（狂喜）。书面语里的 the rape of the land 指对土地的掠夺。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a rape case",
+      "the rape of the countryside"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1105,
+     "head": "suicide",
+     "family": [
+      {
+       "form": "suicidal",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈsuəˌsaɪd/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "自杀",
+      "（比喻）自取灭亡的做法"
+     ],
+     "example": {
+      "en": "Cutting the research budget would be political suicide for any university president.",
+      "zh": "削减科研预算，对任何一位校长来说都是政治上的自取灭亡。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "sui（自己）+ cid（杀，同 homicide 凶杀、pesticide 杀虫剂）= 杀自己。比喻义在阅读里更常见。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "commit suicide",
+      "a suicide mission",
+      "political suicide"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1161,
+     "head": "tournament",
+     "family": [],
+     "ipa": "/ˈtʊrnəmənt/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "锦标赛，联赛"
+     ],
+     "example": {
+      "en": "The 1936 tournament ran for three weeks and filled four pages of the paper.",
+      "zh": "1936 年的锦标赛办了三周，占了报纸四个版面。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "法语 tourner（转）：中世纪骑士比武要绕着圈冲刺。turn、tour、tournament 是一家。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a chess tournament",
+      "be knocked out of the tournament"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 290,
+     "head": "cricket",
+     "family": [],
+     "ipa": "/ˈkrɪkət/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "板球（运动）",
+      "蟋蟀"
+     ],
+     "example": {
+      "en": "The cricket team lost every match that season but still got a photograph.",
+      "zh": "板球队那个赛季一场没赢，照片还是照登。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "一个词两样东西：一项要打好几天的运动，和一只叫个不停的虫子。英国人觉得这没什么问题。",
+      "joke": true
+     },
+     "collocations": [
+      "play cricket",
+      "a cricket match",
+      "the sound of crickets"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 557,
+     "head": "hockey",
+     "family": [],
+     "ipa": "/ˈhɑki/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "曲棍球；（美）冰球"
+     ],
+     "example": {
+      "en": "In Canada hockey means ice hockey; in India it means the version played on grass.",
+      "zh": "在加拿大，hockey 指冰球；在印度，它指草地上的曲棍球。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "可能来自古法语 hoquet（牧羊人的弯钩）。词源学界并无定论，但「弯钩」这个画面是准的——球杆就是弯的。",
+      "true_etymology": false
+     },
+     "collocations": [
+      "ice hockey",
+      "field hockey",
+      "a hockey stick"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 560,
+     "head": "hop",
+     "family": [],
+     "ipa": "/hɑp/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "单脚跳；跳跃",
+      "（旧）舞会",
+      "短途飞行"
+     ],
+     "example": {
+      "en": "The Saturday hop in the gym was the only event the paper never criticised.",
+      "zh": "体育馆里的周六舞会，是报纸唯一从不批评的活动。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "hop 的「舞会」义如今基本只活在老报纸里——那种一边蹦一边跳的舞会。考试里更常见的是「单脚跳」和「短途飞行」。"
+     },
+     "collocations": [
+      "hop on a plane",
+      "a short hop",
+      "hop over the fence"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 1044,
+     "head": "solo",
+     "family": [],
+     "ipa": "/ˈsoʊˌloʊ/",
+     "pos": [
+      "n.",
+      "adj.",
+      "adv."
+     ],
+     "senses": [
+      "独奏，独唱；单独表演",
+      "单独的；单独地"
+     ],
+     "example": {
+      "en": "She played a violin solo at a concert that only eleven people attended.",
+      "zh": "她在一场只有十一个人到场的音乐会上拉了小提琴独奏。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "意大利语 solo（单独），和 sole（唯一的）、solitary（孤独的）同源。飞行员第一次单飞也叫 solo。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a guitar solo",
+      "go solo",
+      "a solo flight"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 314,
+     "head": "debut",
+     "family": [],
+     "ipa": "/deɪˈbju/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "首次登台，首次亮相",
+      "首次推出"
+     ],
+     "example": {
+      "en": "The orchestra made its debut in the chapel before the roof was finished.",
+      "zh": "乐团在教堂屋顶还没完工时就在那里首演了。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "法语词，所以 t 不发音：/deɪˈbju/。记住它永远指「第一次」——首演、首秀、新专辑首发。"
+     },
+     "collocations": [
+      "make one's debut",
+      "a debut album",
+      "debut as a director"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 226,
+     "head": "comic",
+     "family": [],
+     "ipa": "/ˈkɑmɪk/",
+     "pos": [
+      "adj.",
+      "n."
+     ],
+     "senses": [
+      "滑稽的，喜剧的",
+      "连环漫画；喜剧演员"
+     ],
+     "example": {
+      "en": "The third drawer held a comic drawn by hand, with no name anywhere on it.",
+      "zh": "第三个抽屉里是一本手绘的连环漫画，上面哪儿都没有署名。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "希腊语 kōmos（狂欢）→ comedy → comic。comic 是类型（喜剧的），comical 是评价（可笑的），语感不同。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a comic novel",
+      "comic books",
+      "a stand-up comic"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 582,
+     "head": "idiot",
+     "family": [
+      {
+       "form": "idiotic",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈɪdiət/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "傻瓜，白痴"
+     ],
+     "example": {
+      "en": "The comic's hero was a village idiot who turned out to be the only honest man.",
+      "zh": "漫画的主角是个乡下傻瓜，结果却是全镇唯一诚实的人。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "希腊语 idiōtēs 本义是「只管自己私事的人」，和 idiom（习语）、idiosyncrasy（癖性）同含 idio（自己的）。骂人是后来才有的意思。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "Don't be an idiot.",
+      "an idiotic mistake"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "aside",
+     "title": "英国人读 leftenant",
+     "source": "词源；OED 记录 lieu 的古法语变体 luef",
+     "text": "同一个词，美国人读 /luˈtɛnənt/，英国人读 /lɛfˈtɛnənt/——凭空多出一个 f。一种解释是古法语里 lieu 有个写作 luef 的变体，英国人照着念了下去。四六级听力用美音，你只需要记美式读法，但读到英式材料时别被这个 f 吓到。"
+    },
+    {
+     "type": "aside",
+     "title": "词表不挑词",
+     "source": "常识",
+     "text": "今天有三个词属于社会新闻版：assault、rape、suicide。词表不会因为一个词沉重就把它拿掉，考试也不会。本书对这类词的处理是：给准确的释义、给新闻或法律语境的例句，不编任何联想、不开任何玩笑。记住意思，然后翻页。"
+    }
+   ]
+  },
+  {
+   "key": "freebies",
+   "title": "闪电轮：你其实已经认识它们",
+   "intro": "规则：每个词只给一行。看到零件，读出意思，翻页。不许在一个词上停留超过十秒。",
+   "cards": [
+    {
+     "id": 885,
+     "head": "profile",
+     "family": [],
+     "ipa": "/ˈproʊˌfaɪl/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "侧面像；轮廓",
+      "人物特写，简介"
+     ],
+     "example": {
+      "en": "The magazine ran a two-page profile of the retiring archivist.",
+      "zh": "杂志刊登了一篇两页的人物特写，写的是即将退休的档案管理员。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "pro（向前）+ file（线，拉丁语 filum）= 沿轮廓画一条线。和「文件」file 同源——文件本来是串在线上的。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "keep a low profile",
+      "a high-profile case",
+      "a profile picture"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 440,
+     "head": "equity",
+     "family": [
+      {
+       "form": "equitable",
+       "pos": "adj."
+      }
+     ],
+     "ipa": "/ˈɛkwəti/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "公平，公正",
+      "（金融）股本，权益"
+     ],
+     "example": {
+      "en": "The new rules were written in the name of equity, not efficiency.",
+      "zh": "新规定是以公平而非效率的名义写成的。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "equ（相等，同 equal、equator 赤道）+ -ity = 公平。金融里的「权益」就是「属于你的那份」。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "gender equity",
+      "private equity",
+      "an equitable solution"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 320,
+     "head": "default",
+     "family": [],
+     "ipa": "/dɪˈfɔlt/",
+     "pos": [
+      "n.",
+      "v."
+     ],
+     "senses": [
+      "违约，拖欠；不到场",
+      "默认（设置）"
+     ],
+     "example": {
+      "en": "If you change nothing, the system keeps the default setting.",
+      "zh": "如果你什么都不改，系统就保持默认设置。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "de（缺少）+ fault（过失、缺失）= 该做的没做 → 违约；该选的没选 → 默认值。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "by default",
+      "default on a loan",
+      "the default option"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 215,
+     "head": "coalition",
+     "family": [],
+     "ipa": "/ˌkoʊəˈlɪʃən/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "联合，联盟；联合政府"
+     ],
+     "example": {
+      "en": "Three small parties formed a coalition to block the budget.",
+      "zh": "三个小党结成联盟以阻止预算通过。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "co（共同）+ alesc（生长，同 adolescent 正在长大的人）= 长到一起。和「煤」coal 没有关系。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "a coalition government",
+      "form a coalition",
+      "a broad coalition"
+     ],
+     "card_style": "lite"
+    },
+    {
+     "id": 391,
+     "head": "dressing",
+     "family": [],
+     "ipa": "/ˈdrɛsɪŋ/",
+     "pos": [
+      "n."
+     ],
+     "senses": [
+      "调味汁，酱料",
+      "（伤口的）敷料",
+      "穿衣；打扮"
+     ],
+     "example": {
+      "en": "He put too much dressing on the salad and no one else would eat it.",
+      "zh": "他往沙拉里倒了太多酱，别人都不肯吃了。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "你认识 dress。dressing 是两样你可能没想到的东西：沙拉酱，和包扎伤口的纱布。共同点是「给它穿一层」。",
+      "joke": true
+     },
+     "collocations": [
+      "salad dressing",
+      "change the dressing",
+      "a dressing room"
+     ],
+     "card_style": "lite"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "tip",
+     "title": "闪电轮不许查词典",
+     "text": "这一组的五个词，每个都由你已经认识的零件组成。如果某个词你读完一行还是不确定，不要停下来查，做个记号继续走——它会在今晚的自测里再来找你一次。在这里停留是最浪费时间的做法：你花三分钟查到的东西，正是这一行已经告诉你的东西。"
+    }
+   ]
+  },
+  {
+   "key": "orphans",
+   "title": "孤儿院：今天收留五个不合群的",
+   "intro": "它们不属于今天任何一个词根家族，也不是你认识的四级词换了马甲。有的其实有零件，只是在这张表里没有兄弟姐妹。",
+   "cards": [
+    {
+     "id": 124,
+     "head": "beset",
+     "family": [],
+     "ipa": "/bɪˈsɛt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "困扰，使苦恼（多用被动）",
+      "包围"
+     ],
+     "example": {
+      "en": "The project was beset by delays from the very first week.",
+      "zh": "这个项目从第一周起就被延期困扰。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "古英语 be（周围）+ set（放）= 四周都放上东西 = 围住 → 困扰。set 你早就认识。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "be beset by problems",
+      "beset with difficulties"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 190,
+     "head": "certify",
+     "family": [
+      {
+       "form": "certification",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/ˈsɜrtəˌfaɪ/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "证明，证实",
+      "颁发证书；认证"
+     ],
+     "example": {
+      "en": "A doctor must certify that the student is fit to return to class.",
+      "zh": "必须由医生证明这名学生可以回课堂上课。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "cert（确定，同 certain）+ -fy（使）= 使某件事确定下来。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "certify a document",
+      "a certified copy",
+      "a certification body"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 376,
+     "head": "distort",
+     "family": [
+      {
+       "form": "distortion",
+       "pos": "n."
+      }
+     ],
+     "ipa": "/dɪˈstɔrt/",
+     "pos": [
+      "v."
+     ],
+     "senses": [
+      "扭曲，使变形",
+      "歪曲（事实）"
+     ],
+     "example": {
+      "en": "The report distorted the numbers by quoting only the best three months.",
+      "zh": "那份报告只引用最好的三个月，歪曲了数据。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "dis（分开）+ tort（扭，同 torture 拷打）= 扭到变形。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "distort the facts",
+      "a distorted image",
+      "signal distortion"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 547,
+     "head": "henceforth",
+     "family": [],
+     "ipa": "/ˌhɛnsˈfɔrθ/",
+     "pos": [
+      "adv."
+     ],
+     "senses": [
+      "此后，从今以后"
+     ],
+     "example": {
+      "en": "Henceforth the basement will be locked at six o’clock every evening.",
+      "zh": "此后地下室每晚六点上锁。"
+     },
+     "hook": {
+      "type": "morph",
+      "text": "hence（从此）+ forth（向前）= 从此向前。只在公文和通知里用，口语说 from now on。",
+      "true_etymology": true
+     },
+     "collocations": [
+      "henceforth known as",
+      "shall henceforth apply"
+     ],
+     "card_style": "full"
+    },
+    {
+     "id": 566,
+     "head": "huddle",
+     "family": [],
+     "ipa": "/ˈhʌdəl/",
+     "pos": [
+      "v.",
+      "n."
+     ],
+     "senses": [
+      "挤作一团；蜷缩",
+      "（橄榄球）围圈商量；密谈"
+     ],
+     "example": {
+      "en": "The students huddled around one small heater and refused to move.",
+      "zh": "学生们挤在一台小取暖器旁，谁也不肯挪。"
+     },
+     "hook": {
+      "type": "story",
+      "text": "记住这个画面：橄榄球队员低头围成一圈说悄悄话——那个圈就叫 huddle。人冷的时候也这么站。",
+      "joke": true
+     },
+     "collocations": [
+      "huddle together",
+      "huddle around sth",
+      "go into a huddle"
+     ],
+     "card_style": "full"
+    }
+   ],
+   "boxes": [
+    {
+     "type": "aside",
+     "title": "星号的秘密",
+     "source": "《2016 年修订版》大纲词表说明页",
+     "text": "词表共收录 5418 个词目，带 ★ 的只有 1263 个。★ 不是「更难」的意思，而是「四级不考、六级考」。appropriate 就是个好例子：形容词是四级词，动词才带星。所以这本讲义只管这 1263 个；你的四级词汇不在这里重修——除非它换了一副面孔，比如今天的 dressing。"
+    }
+   ]
+  }
+ ],
+ "homework": {
+  "exercises": [
+   {
+    "type": "parts",
+    "title": "拆词练习：零件不在今天的表里，今天的零件在",
+    "items": [
+     {
+      "prompt": "predict = pre（预先）+ dict（说）→ ？",
+      "answer": "预测，预言",
+      "hint": "和 verdict 同一个零件"
+     },
+     {
+      "prompt": "biography = bio（生命）+ graph（写）→ ？",
+      "answer": "传记",
+      "hint": "去掉 auto 的自传"
+     },
+     {
+      "prompt": "consent = con（共同）+ sent（感）→ ？",
+      "answer": "同意，准许",
+      "hint": "dissent 的反义"
+     },
+     {
+      "prompt": "anarchy = an（无）+ arch（统治）→ ？",
+      "answer": "无政府状态，混乱",
+      "hint": "monarchy 的反面"
+     },
+     {
+      "prompt": "photograph = photo（光）+ graph（写）→ ？",
+      "answer": "照片（用光写下来的东西）",
+      "hint": "字面义比你想的准确"
+     },
+     {
+      "prompt": "archaeology = arch? + logy（学）→ ？",
+      "answer": "考古学。注意：这里的 arch 来自 arkhaios（古老的），不是 arkhē（统治）——明天专讲这种情况",
+      "hint": "小心，这是个陷阱"
+     }
+    ]
+   },
+   {
+    "type": "cloze",
+    "title": "填空：用今天的词填，注意词形",
+    "items": [
+     {
+      "prompt": "The jury took six hours to reach a ______ .",
+      "answer": "verdict"
+     },
+     {
+      "prompt": "The campus police have no ______ over the street outside the gate.",
+      "answer": "jurisdiction"
+     },
+     {
+      "prompt": "Someone had ______ the building fund, and the chapel was never finished.",
+      "answer": "appropriated"
+     },
+     {
+      "prompt": "Three small parties formed a ______ to block the budget.",
+      "answer": "coalition"
+     },
+     {
+      "prompt": "The project was ______ by delays from the very first week.",
+      "answer": "beset"
+     }
+    ]
+   }
+  ]
+ },
+ "summary": [
+  "长词 = 前缀 + 词根 + 后缀。看见 verdict 要看见 ver + dict。",
+  "arch（统治）、graph（写）、dict（说）、sens（感）：今天十三个词共用四个零件。",
+  "同一个拼写可能是两个词：appropriate 的形容词是四级，动词才带星。",
+  "档案馆里的东西本来就是 random 的——所以情景剧不怕杂。",
+  "明天：第三个抽屉里那本漫画，以及一个会骗人的零件。"
+ ]
+}

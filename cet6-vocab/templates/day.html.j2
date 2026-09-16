@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CET-6: Thirty Easy Pieces — Day {{ day }}</title>
+<link rel="stylesheet" href="../templates/styles.css">
+</head>
+<body data-day="{{ day }}" data-part="{{ d.part }}" data-title="{{ d.title }}" data-progress="{{ progress }}">
+
+<section class="page opener" id="day{{ '%02d' % day }}">
+  <header class="run"><span><b>CET-6 · Thirty Easy Pieces</b>　六级词汇：三十个简单小片</span><span>Day {{ day }} / 30　·　Part {{ 'I' * d.part }}　·　开场</span></header>
+  <div class="kicker">Day {{ day }} · Part {{ 'I' * d.part }} · {{ ['拆词术','语境术','钉牢术'][d.part-1] }}</div>
+  <h1>{{ d.title }}</h1>
+  <div class="sub">{{ total_words }} 个词　·　4 个场景　·　预计 {{ d.estimated_minutes }} 分钟　·　今晚作业约 15 分钟</div>
+  <div class="two">
+    <div>
+      <h3 class="dlg-title">{{ d.dialogue.title }}</h3>
+      <div class="dialogue">
+        {% for t in d.dialogue.turns %}
+        <p><span class="who{{ ' s' if t.who == 'student' }}">{{ '学生' if t.who == 'student' else '教授' }}</span>{{ t.text }}</p>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <div class="crux">
+        <div class="t"><small>THE CRUX</small>{{ d.crux.question }}</div>
+        <p>{{ d.crux.answer }}</p>
+      </div>
+      <table class="map">
+        <tr>{% for r in map_rows %}<th>{{ r.tag }} · {{ r.title }}</th>{% endfor %}</tr>
+        <tr>
+        {% for r in map_rows %}
+          <td><span class="w">{{ r.heads | join(' · ') }}{% if r.n > 3 %} …{% endif %}</span><br><span class="n">{{ r.n }} 个词</span></td>
+        {% endfor %}
+        </tr>
+      </table>
+      <table class="sched budget">
+        <tr><th>今天的路线</th><th>词数</th><th>记法</th><th>预计</th></tr>
+        {% for b in budget %}
+        <tr><td>{{ b.tag }} · {{ b.title }}</td><td>{{ b.n }}</td><td>{{ ['拆零件','放进场景','认老朋友','编个故事'][loop.index0] }}</td><td>{{ b.min }} 分钟</td></tr>
+        {% endfor %}
+        <tr><td>作业</td><td>{{ total_words }}</td><td>自测 + 间隔复习</td><td>约 15 分钟</td></tr>
+      </table>
+      <p class="note" style="margin-top:8px">作业里的复习表会自动把今天这些词排进后面几天，你不需要自己决定复习什么。</p>
+    </div>
+  </div>
+  <footer class="run"><span>Day {{ day }} · 第 1 页</span><div class="progress"><i style="width:{{ progress }}%"></i></div><span>Day {{ day }} / 30</span></footer>
+</section>
+
+<div id="flow">
+{% for s in d.scenes %}
+  <h2 class="scene span2" data-short="{{ scene_tag[s.key] }} {{ s.title.split('：')[0] }}"><span class="tag">{{ scene_tag[s.key] }}</span>{{ s.title }}</h2>
+  {% if s.intro %}<p class="intro span2">{{ s.intro }}</p>{% endif %}
+  {% for c in s.cards %}
+    {% if c.card_style == 'lite' %}
+    <div class="card lite">
+      <div class="hd"><span class="hw">{{ c.head }}</span><span class="ipa">{{ c.ipa }}</span><span class="pos">{{ c.pos | join(' / ') }}</span>{% if c.family %}<span class="fam">家族 {% for f in c.family %}<b>{{ f.form }}</b> {{ f.pos }}{% if not loop.last %}、{% endif %}{% endfor %}</span>{% endif %}</div>
+      <div class="eq">{{ c.senses | join('；') }}　·　{{ c.hook.text }}</div>
+      <div class="eq"><span class="colloc">{{ c.collocations | join('　·　') }}</span></div>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="hd"><span class="hw">{{ c.head }}</span><span class="ipa">{{ c.ipa }}</span><span class="pos">{{ c.pos | join(' / ') }}</span>{% if c.family %}<span class="fam">家族 {% for f in c.family %}<b>{{ f.form }}</b> {{ f.pos }}{% if not loop.last %}、{% endif %}{% endfor %}</span>{% endif %}</div>
+      <div class="gloss">{% for g in c.senses %}<em>{{ ['①','②','③'][loop.index0] }}</em>{{ g }}{% if not loop.last %}　{% endif %}{% endfor %}</div>
+      <div class="row ex"><span class="lab ex">例</span><div><span class="en">{{ c.example.en }}</span><span class="zh">{{ c.example.zh }}</span></div></div>
+      <div class="row hook"><span class="lab hook">{{ {'morph':'拆','story':'钩','pun':'音'}[c.hook.type] }}</span><div class="txt">{{ c.hook.text }}{% if c.hook.type == 'morph' and c.hook.true_etymology == false %}<span class="made">（这条是编的，好用但不是真词源）</span>{% endif %}</div></div>
+      {% if c.sense_note %}<div class="row note-row"><span class="lab warn">辨</span><div class="txt">{{ c.sense_note }}</div></div>{% endif %}
+      {% if c.confusable_with %}{% for cf in c.confusable_with %}<div class="row note-row"><span class="lab warn">辨</span><div class="txt"><span class="w">{{ cf.head }}</span>：{{ cf.note }}</div></div>{% endfor %}{% endif %}
+      <div class="row col"><span class="lab col">搭</span><div class="txt">{{ c.collocations | join('　·　') }}</div></div>
+    </div>
+    {% endif %}
+  {% endfor %}
+  {% for b in s.boxes | default([]) %}
+  <div class="box span2 {{ 'tip' if b.type == 'tip' else '' }}">
+    <div class="t">{{ 'Tip' if b.type == 'tip' else 'Aside' }}<span>{{ b.title }}</span></div>
+    <p>{{ b.text }}</p>
+    {% if b.source %}<p class="src">出处：{{ b.source }}</p>{% endif %}
+  </div>
+  {% endfor %}
+{% endfor %}
+
+  <h2 class="hwt" data-short="作业 · 今日自测"><span class="tag">作业 {{ day }}.1</span>今日自测：中 → 英，写在横线上（答案在最后一页）</h2>
+  {% for ch in selftest %}
+  <table class="q">
+    {% if loop.first %}<tr><th class="n">#</th><th>释义</th><th>写出单词</th><th>提示</th></tr>{% endif %}
+    {% for r in ch %}
+    <tr><td class="n">{{ r.i }}</td><td>{{ r.zh }}</td><td class="blank"><span></span></td><td class="note">{{ r.hint }}</td></tr>
+    {% endfor %}
+  </table>
+  {% endfor %}
+
+{% for rev in reviews %}
+  <h2 class="hwt" data-short="作业 · 复习 Day {{ rev.src }}"><span class="tag">作业 {{ day }}.{{ loop.index + 1 }}</span>复习 · Day {{ rev.src }} 的 {{ rev.n }} 个词 · {{ rev.label }}（约 {{ rev.minutes }} 分钟）</h2>
+  {% if rev.words %}
+    {% if rev.form == 'en2zh' %}
+      {% for ch in rev.chunks %}
+      <table class="q rev">
+        {% for r in ch %}<tr><td class="w">{{ r.w }}</td><td class="blank"><span></span></td></tr>{% endfor %}
+      </table>
+      {% endfor %}
+    {% else %}
+      {% for ch in rev.chunks %}
+      <table class="q rev">
+        {% for r in ch %}<tr><td>{{ r.zh }}</td><td class="blank"><span></span></td></tr>{% endfor %}
+      </table>
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+{% for ex in d.homework.exercises %}
+  <h2 class="hwt" data-short="作业 · 练习"><span class="tag">作业 {{ day }}.{{ reviews | length + loop.index + 1 }}</span>{{ ex.title }}</h2>
+  <ol class="parts">
+    {% for it in ex['items'] %}
+    <li>{{ it.prompt }}{% if it.hint %}<span class="zh">　（{{ it.hint }}）</span>{% endif %}</li>
+    {% endfor %}
+  </ol>
+{% endfor %}
+
+  <h2 class="hwt" data-short="复习日程"><span class="tag">复习日程</span>今天这 {{ total_words }} 个词会在哪些天回来找你</h2>
+  <table class="sched">
+    <tr><th>复习</th><th>在哪一天</th><th>形式</th><th>用时</th></tr>
+    {% for r in schedule %}<tr><td>{{ r.n }}</td><td>{{ r.when }}</td><td>{{ r.how }}</td><td>{{ r.time }}</td></tr>{% endfor %}
+  </table>
+  <p class="note">间隔 1 / 3 / 7 / 14 天来自艾宾浩斯式的经验曲线，不是精确科学。它真正的作用是让你不用自己决定「今天复习什么」。</p>
+
+  <div class="summary span2">
+    <div class="t">SUMMARY<span>小结</span></div>
+    <ul>{% for s in d.summary %}<li>{{ s }}</li>{% endfor %}</ul>
+  </div>
+
+  <h2 class="hwt" data-short="答案"><span class="tag">答案</span>作业 {{ day }}.1 今日自测</h2>
+  {% for ch in answers %}
+  <table class="q ans">
+    {% for r in ch %}<tr><td class="n">{{ r.i }}</td><td class="w">{{ r.a }}</td></tr>{% endfor %}
+  </table>
+  {% endfor %}
+{% for ex in d.homework.exercises %}
+  <h2 class="hwt" data-short="答案"><span class="tag">答案</span>{{ ex.title }}</h2>
+  <ol class="parts ans">
+    {% for it in ex['items'] %}<li>{{ it.prompt }}　<b>{{ it.answer }}</b></li>{% endfor %}
+  </ol>
+{% endfor %}
+</div>
+<script src="../templates/paginate.js"></script>
+</body>
+</html>
