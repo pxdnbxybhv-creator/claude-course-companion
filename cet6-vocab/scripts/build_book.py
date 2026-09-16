@@ -23,6 +23,13 @@ for pdf in sorted(args.pdfs):
     pages = json.load(open(pdf.replace('.pdf', '.pages.json')))
     src = fitz.open(pdf)
     book.insert_pdf(src)
+    # Chromium writes in-document links as named destinations, which insert_pdf
+    # drops; re-create them as plain GoTo links shifted by this day's page offset.
+    for i, spg in enumerate(src):
+        for l in spg.get_links():
+            if l['kind'] in (fitz.LINK_GOTO, fitz.LINK_NAMED) and l.get('page') is not None and l['page'] >= 0:
+                book[cursor + i].insert_link({'kind': fitz.LINK_GOTO, 'from': l['from'],
+                                              'page': cursor + l['page'], 'to': l.get('to', fitz.Point(0, 0))})
     part = day['part']
     if part not in seen_parts:
         seen_parts.add(part)
@@ -46,7 +53,8 @@ except Exception as e:
     print('page labels skipped:', e)
 os.makedirs(os.path.dirname(args.out), exist_ok=True)
 book.save(args.out, garbage=4, deflate=True, clean=True)
-bad = sum(1 for pg in book for l in pg.get_links() if l['kind'] == fitz.LINK_GOTO and not (0 <= l['page'] < book.page_count))
+links = [l for pg in book for l in pg.get_links() if l['kind'] == fitz.LINK_GOTO]
+bad = sum(1 for l in links if not (0 <= l['page'] < book.page_count))
 print(f"{book.page_count} pages, {len([t for t in toc if t[0]==3])} section bookmarks, "
-      f"{bad} broken internal link(s) -> {os.path.relpath(args.out, ROOT)} "
+      f"{len(links)} internal link(s), {bad} broken -> {os.path.relpath(args.out, ROOT)} "
       f"({round(os.path.getsize(args.out)/1e6, 2)} MB)")

@@ -72,6 +72,11 @@ def budget(day):
     return [{'tag': SCENE_TAG[s['key']], 'title': s['title'].split('：')[0],
              'n': len(s['cards']), 'min': m} for s, m in zip(day['scenes'], mins)]
 
+def short(text, n):
+    if len(text) <= n: return text
+    cut = text[:n].rsplit(' ', 1)[0]
+    return (cut if len(cut) >= 8 else text[:n]) + '…'
+
 def chunk(seq, n):
     return [seq[i:i + n] for i in range(0, len(seq), n)]
 
@@ -97,7 +102,7 @@ def build(path, all_days, env):
     cards = cards_of(day)
     scene_of = {c['id']: s['key'] for s in day['scenes'] for c in s['cards']}
     selftest = chunk([{'i': i + 1, 'zh': '；'.join(c['senses'])[:22], 'answer': c['head'],
-                       'hint': hint_for(c)[:26]} for i, c in enumerate(cards)], 8)
+                       'hint': short(hint_for(c), 26)} for i, c in enumerate(cards)], 8)
     revs = reviews_for(n, all_days)
     for r in revs:
         if r['words'] is not None:
@@ -107,12 +112,12 @@ def build(path, all_days, env):
         'd': day, 'day': n, 'total_words': len(cards),
         'scene_tag': SCENE_TAG,
         'map_rows': [{'tag': SCENE_TAG[s['key']], 'title': s['title'].split('：')[0],
-                      'heads': [c['head'] for c in s['cards'][:3]], 'n': len(s['cards'])}
+                      'heads': [{'id': c['id'], 'head': c['head']} for c in s['cards'][:3]], 'n': len(s['cards'])}
                      for s in day['scenes']],
         'budget': budget(day),
         'selftest': selftest, 'reviews': revs, 'schedule': future_schedule(n),
         'progress': round(n / 30 * 100, 1),
-        'answers': chunk([{'i': i + 1, 'a': c['head']} for i, c in enumerate(cards)], 12),
+        'answers': chunk([{'i': i + 1, 'a': c['head'], 'id': c['id']} for i, c in enumerate(cards)], 12),
         'scene_of': scene_of,
     }
     out = os.path.join(ROOT, 'build', f'day{n:02d}.html')

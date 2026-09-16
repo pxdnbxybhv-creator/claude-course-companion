@@ -155,3 +155,7 @@ h2.hwt { break-inside: avoid; }
 .passage { font-family: var(--latin); font-size: 14.5px; line-height: 1.7; margin: 2px 0 10px; break-inside: avoid; }
 .passage .blank { font-family: var(--sans-zh); color: var(--accent); font-size: 12.5px; letter-spacing: .05em; }
 table.q.ans td.n { width: 34px; } table.q.ans td.w { width: auto; }
+
+/* labels that carry CJK text must never depend on a system fallback font */
+.card .fam, .card .pos, h2 .tag, .box .t, .crux .t small, .summary .t, .map td .w, footer.run a { font-family: var(--latin), var(--sans-zh), sans-serif; }
+.map td .w a, table.q.ans td.w a { color: var(--accent); text-decoration: none; }

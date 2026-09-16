@@ -117,12 +117,12 @@ git add content/day03.json && git commit -m "Write Day 3" && git push
 
 | 批次 | 内容 | 交给 Fable 审计的东西 |
 |---|---|---|
-| A | Day 3、Day 4 | `content/day03.json`、`day04.json`；三道闸门的输出（贴 validate / ipa --check 结果）；每天的 `story_note` 里写清本集放了哪块碎片、换了哪些词（若有） |
+| A | Day 3、Day 4 | **已交、已审计**（`audit/part1-batchA.md`：修改后通过，M1–M4 须在 Day 5 前返工） |
 | B | Day 5–9 | 同上 |
 | C | Day 10 检查站 | **先交一页设计稿**（见第 8 节），Fable 批准后再写 |
 | D | Part II、III | 见第 8 节的「标注 pass」 |
 
-审计报告会写在 `audit/`，退回级问题要改完再进下一批。
+审计报告会写在 `audit/`，退回级问题要改完再进下一批。**写手自己的核查材料与自检报告放 `audit/writer/`**，`audit/` 根目录只放 Fable 的报告。
 
 ## 8. 尚未完成、需要你知道的事
 
@@ -132,6 +132,7 @@ git add content/day03.json && git commit -m "Write Day 3" && git push
 4. **每天 15–17 页**是实测值，不是 bug；每页放不下的卡片会整张挪到下一页，场景边界处会留白。
 5. v0 的词根分组是正则粗判，**会有假朋友**（已知名单在 DESIGN 4.6）。遇到拆不通的词，明写「不是 X」，可以像 Day 2 那样做成教学点。
 6. `features.json` 里的 `cognate` 字段也可能是错的（equity→quit、coalition→coal 都是假的）。以真词源为准。
+7. 批次 A 审计后新增的规则（已进 DESIGN 5.6 与写手规范）：每天 ≥ 5 个标记笑点；节拍必须是事件，词只需写进 2–3 个；周管理员每天至少一处「有事没说」；例句开头去重。页内链接（今日地图→卡片、答案→卡片、页脚→当天首页）现已真正输出。
 
 ## 9. 已踩过的坑
 

@@ -91,6 +91,7 @@ for f in files:
         if b['type'] == 'aside' and not b.get('source'): warn(name, f'ASIDE 「{b["title"]}」 has no source')
         if b.get('joke'): jokes += 1
     if jokes > 2 * max(1, n // 5): warn(name, f'{jokes} jokes for {n} cards — density likely > 2 per page')
+    if n >= 40 and jokes < 5: warn(name, f'only {jokes} marked joke(s) — 趣味性不足 (DESIGN 5.6: >= 5 per day across cards and boxes, plus >= 2 in the dialogue)')
     ans = d.get('crux', {}).get('answer', '')
     if len(ans) > 120: err(name, f'crux answer {len(ans)} chars > 120')
     turns = d.get('dialogue', {}).get('turns', [])

@@ -25,7 +25,7 @@
       '<div class="content"></div>' +
       '<footer class="run"><span>Day ' + day + ' · 第 ' + pageNo + ' 页</span>' +
       '<div class="progress"><i style="width:' + progress + '%"></i></div>' +
-      '<span>Day ' + day + ' / 30</span></footer>';
+      '<span><a class="toc" href="#day' + String(day).padStart(2, '0') + '">今日目录</a>　·　Day ' + day + ' / 30</span></footer>';
     body.appendChild(sec);
     pages.push(sec);
     return sec.querySelector('.content');
