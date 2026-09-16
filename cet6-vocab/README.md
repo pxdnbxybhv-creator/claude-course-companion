@@ -13,6 +13,7 @@
 | 30 天分配草案 | [`schedule/day_plan.md`](schedule/day_plan.md) |
 | 写手 / 标注 / 审计 提示词 | [`prompts/`](prompts/) |
 | 审计报告 | [`audit/`](audit/) |
+| 接手写作请读 | [`HANDOFF.md`](HANDOFF.md) |
 | 每日内容格式 | [`schema/day.schema.json`](schema/day.schema.json)、[`schema/day01.example.json`](schema/day01.example.json) |
 
 ## 复现
