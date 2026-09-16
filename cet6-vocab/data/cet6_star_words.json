@@ -1,0 +1,10914 @@
+[
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abbreviation",
+  "family": [],
+  "id": 1
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abide",
+  "family": [],
+  "id": 2
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abnormal",
+  "family": [],
+  "id": 3
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abort",
+  "family": [
+   "abortion"
+  ],
+  "id": 4
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abreast",
+  "family": [],
+  "id": 5
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "abrupt",
+  "family": [],
+  "id": 6
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "absurd",
+  "family": [
+   "absurdity"
+  ],
+  "id": 7
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "accessory",
+  "family": [],
+  "id": 8
+ },
+ {
+  "page": 21,
+  "book_page": 16,
+  "star": true,
+  "head": "acclaim",
+  "family": [],
+  "id": 9
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "activate",
+  "family": [],
+  "id": 10
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "acupuncture",
+  "family": [],
+  "id": 11
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adhere",
+  "family": [
+   "adherence"
+  ],
+  "id": 12
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adjacent",
+  "family": [],
+  "id": 13
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adolescent",
+  "family": [
+   "adolescence"
+  ],
+  "id": 14
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adore",
+  "family": [
+   "adorable"
+  ],
+  "id": 15
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "advent",
+  "family": [],
+  "id": 16
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adversary",
+  "family": [],
+  "id": 17
+ },
+ {
+  "page": 22,
+  "book_page": 17,
+  "star": true,
+  "head": "adverse",
+  "family": [
+   "adversity"
+  ],
+  "id": 18
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "aesthetic",
+  "family": [
+   "aesthetics"
+  ],
+  "id": 19
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "affiliate",
+  "family": [
+   "affiliation"
+  ],
+  "id": 20
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "affirm",
+  "family": [
+   "affirmation",
+   "affirmative"
+  ],
+  "id": 21
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "affix",
+  "family": [
+   "affixation"
+  ],
+  "id": 22
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "afloat",
+  "family": [],
+  "id": 23
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "aftermath",
+  "family": [],
+  "id": 24
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "aggravate",
+  "family": [
+   "aggravation"
+  ],
+  "id": 25
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "aggregate",
+  "family": [],
+  "id": 26
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "agitate",
+  "family": [
+   "agitation"
+  ],
+  "id": 27
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "agony",
+  "family": [],
+  "id": 28
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "aide",
+  "family": [],
+  "id": 29
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "ail",
+  "family": [
+   "ailment"
+  ],
+  "id": 30
+ },
+ {
+  "page": 23,
+  "book_page": 18,
+  "star": true,
+  "head": "airborne",
+  "family": [],
+  "id": 31
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "akin",
+  "family": [],
+  "id": 32
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "ale",
+  "family": [],
+  "id": 33
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "alien",
+  "family": [
+   "alienate",
+   "alienation"
+  ],
+  "id": 34
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "align",
+  "family": [
+   "alignment"
+  ],
+  "id": 35
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "allergic",
+  "family": [
+   "allergy"
+  ],
+  "id": 36
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "alleviate",
+  "family": [
+   "alleviation"
+  ],
+  "id": 37
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "allocate",
+  "family": [
+   "allocation"
+  ],
+  "id": 38
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "allot",
+  "family": [
+   "allotment"
+  ],
+  "id": 39
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "alloy",
+  "family": [],
+  "id": 40
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "allude",
+  "family": [
+   "allusion"
+  ],
+  "id": 41
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "allure",
+  "family": [
+   "allurement"
+  ],
+  "id": 42
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "almighty",
+  "family": [],
+  "id": 43
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "aloft",
+  "family": [],
+  "id": 44
+ },
+ {
+  "page": 24,
+  "book_page": 19,
+  "star": true,
+  "head": "alternate",
+  "family": [
+   "alternation",
+   "alternately"
+  ],
+  "id": 45
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "amass",
+  "family": [],
+  "id": 46
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "ambiguous",
+  "family": [
+   "ambiguity"
+  ],
+  "id": 47
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "amend",
+  "family": [
+   "amendment"
+  ],
+  "id": 48
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "amiable",
+  "family": [],
+  "id": 49
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "ammunition",
+  "family": [],
+  "id": 50
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "amplify",
+  "family": [
+   "amplification"
+  ],
+  "id": 51
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "analogue",
+  "family": [
+   "analogous"
+  ],
+  "id": 52
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "analogy",
+  "family": [],
+  "id": 53
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "anecdote",
+  "family": [
+   "anecdotal"
+  ],
+  "id": 54
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "anguish",
+  "family": [],
+  "id": 55
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "animate",
+  "family": [
+   "animated",
+   "animation"
+  ],
+  "id": 56
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "annex",
+  "family": [
+   "annexation"
+  ],
+  "id": 57
+ },
+ {
+  "page": 25,
+  "book_page": 20,
+  "star": true,
+  "head": "anonymous",
+  "family": [
+   "anonymity"
+  ],
+  "id": 58
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "antagonism",
+  "family": [
+   "antagonist",
+   "antagonistic",
+   "antagonistically"
+  ],
+  "id": 59
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "antenna",
+  "family": [],
+  "id": 60
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "antibiotic",
+  "family": [],
+  "id": 61
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "antonym",
+  "family": [],
+  "id": 62
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "ape",
+  "family": [],
+  "id": 63
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "appal(l)",
+  "family": [
+   "appalling"
+  ],
+  "id": 64
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "appease",
+  "family": [
+   "appeasement"
+  ],
+  "id": 65
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "appendix",
+  "family": [],
+  "id": 66
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "appraise",
+  "family": [
+   "appraisal"
+  ],
+  "id": 67
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "apprentice",
+  "family": [],
+  "id": 68
+ },
+ {
+  "page": 26,
+  "book_page": 21,
+  "star": true,
+  "head": "appropriate²",
+  "family": [
+   "appropriation"
+  ],
+  "id": 69
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "apron",
+  "family": [],
+  "id": 70
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "apt",
+  "family": [
+   "aptly"
+  ],
+  "id": 71
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "arbitrate",
+  "family": [
+   "arbitration"
+  ],
+  "id": 72
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "arc",
+  "family": [],
+  "id": 73
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "arch",
+  "family": [],
+  "id": 74
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "archive",
+  "family": [],
+  "id": 75
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "ardent",
+  "family": [],
+  "id": 76
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "arena",
+  "family": [],
+  "id": 77
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "aristocrat",
+  "family": [
+   "aristocratic",
+   "aristocracy"
+  ],
+  "id": 78
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "armo(u)r",
+  "family": [],
+  "id": 79
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "array",
+  "family": [],
+  "id": 80
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "arrogant",
+  "family": [
+   "arrogance"
+  ],
+  "id": 81
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "artery",
+  "family": [],
+  "id": 82
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "articulate",
+  "family": [
+   "articulation"
+  ],
+  "id": 83
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "artifact",
+  "family": [],
+  "id": 84
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "artillery",
+  "family": [],
+  "id": 85
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "ascend",
+  "family": [
+   "ascendance"
+  ],
+  "id": 86
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "ascertain",
+  "family": [],
+  "id": 87
+ },
+ {
+  "page": 27,
+  "book_page": 22,
+  "star": true,
+  "head": "ascribe",
+  "family": [],
+  "id": 88
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "aspire",
+  "family": [
+   "aspiration"
+  ],
+  "id": 89
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assassinate",
+  "family": [
+   "assassination",
+   "assassin"
+  ],
+  "id": 90
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assault",
+  "family": [],
+  "id": 91
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assert",
+  "family": [
+   "assertion",
+   "assertive"
+  ],
+  "id": 92
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assimilate",
+  "family": [
+   "assimilation"
+  ],
+  "id": 93
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assorted",
+  "family": [],
+  "id": 94
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "assortment",
+  "family": [],
+  "id": 95
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "astray",
+  "family": [],
+  "id": 96
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "asylum",
+  "family": [],
+  "id": 97
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "atlas",
+  "family": [],
+  "id": 98
+ },
+ {
+  "page": 28,
+  "book_page": 23,
+  "star": true,
+  "head": "atrocity",
+  "family": [
+   "atrocious"
+  ],
+  "id": 99
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "auction",
+  "family": [
+   "auctioneer"
+  ],
+  "id": 100
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "audit",
+  "family": [
+   "auditing",
+   "auditor"
+  ],
+  "id": 101
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "augment",
+  "family": [
+   "augmentation"
+  ],
+  "id": 102
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "autobiography",
+  "family": [
+   "autobiographic(al)"
+  ],
+  "id": 103
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "autonomous",
+  "family": [
+   "autonomy"
+  ],
+  "id": 104
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "auxiliary",
+  "family": [],
+  "id": 105
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "avail",
+  "family": [],
+  "id": 106
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "avenge",
+  "family": [],
+  "id": 107
+ },
+ {
+  "page": 29,
+  "book_page": 24,
+  "star": true,
+  "head": "avert",
+  "family": [
+   "aversion"
+  ],
+  "id": 108
+ },
+ {
+  "page": 30,
+  "book_page": 25,
+  "star": true,
+  "head": "baffle",
+  "family": [],
+  "id": 109
+ },
+ {
+  "page": 30,
+  "book_page": 25,
+  "star": true,
+  "head": "bald",
+  "family": [],
+  "id": 110
+ },
+ {
+  "page": 30,
+  "book_page": 25,
+  "star": true,
+  "head": "barge",
+  "family": [],
+  "id": 111
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "barn",
+  "family": [],
+  "id": 112
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "barometer",
+  "family": [],
+  "id": 113
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "barracks",
+  "family": [],
+  "id": 114
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "barren",
+  "family": [],
+  "id": 115
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "bass",
+  "family": [],
+  "id": 116
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "batter",
+  "family": [],
+  "id": 117
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "bead",
+  "family": [],
+  "id": 118
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "beak",
+  "family": [],
+  "id": 119
+ },
+ {
+  "page": 31,
+  "book_page": 26,
+  "star": true,
+  "head": "beckon",
+  "family": [],
+  "id": 120
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "beetle",
+  "family": [],
+  "id": 121
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "benevolent",
+  "family": [
+   "benevolence"
+  ],
+  "id": 122
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "benign",
+  "family": [],
+  "id": 123
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "beset",
+  "family": [],
+  "id": 124
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "besiege",
+  "family": [],
+  "id": 125
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "beware",
+  "family": [],
+  "id": 126
+ },
+ {
+  "page": 32,
+  "book_page": 27,
+  "star": true,
+  "head": "bewilder",
+  "family": [
+   "bewilderment"
+  ],
+  "id": 127
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bibliography",
+  "family": [],
+  "id": 128
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bilateral",
+  "family": [],
+  "id": 129
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "binoculars",
+  "family": [],
+  "id": 130
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bishop",
+  "family": [],
+  "id": 131
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bizarre",
+  "family": [],
+  "id": 132
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "blackmail",
+  "family": [],
+  "id": 133
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "blaze",
+  "family": [],
+  "id": 134
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bleach",
+  "family": [],
+  "id": 135
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bleak",
+  "family": [],
+  "id": 136
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "blink",
+  "family": [],
+  "id": 137
+ },
+ {
+  "page": 33,
+  "book_page": 28,
+  "star": true,
+  "head": "bloc",
+  "family": [],
+  "id": 138
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "bluff",
+  "family": [],
+  "id": 139
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "blunder",
+  "family": [],
+  "id": 140
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "blunt",
+  "family": [],
+  "id": 141
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "blush",
+  "family": [],
+  "id": 142
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "bolster",
+  "family": [],
+  "id": 143
+ },
+ {
+  "page": 34,
+  "book_page": 29,
+  "star": true,
+  "head": "botany",
+  "family": [
+   "botanical"
+  ],
+  "id": 144
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "bouquet",
+  "family": [],
+  "id": 145
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "bout",
+  "family": [],
+  "id": 146
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "boycott",
+  "family": [],
+  "id": 147
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "brace",
+  "family": [],
+  "id": 148
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "breach",
+  "family": [],
+  "id": 149
+ },
+ {
+  "page": 35,
+  "book_page": 30,
+  "star": true,
+  "head": "brew",
+  "family": [
+   "brewery"
+  ],
+  "id": 150
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "brigade",
+  "family": [],
+  "id": 151
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "brink",
+  "family": [],
+  "id": 152
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "brisk",
+  "family": [],
+  "id": 153
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "bronze",
+  "family": [],
+  "id": 154
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "brood",
+  "family": [],
+  "id": 155
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "bruise",
+  "family": [],
+  "id": 156
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "Buddhism",
+  "family": [
+   "Buddhist"
+  ],
+  "id": 157
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "buffalo",
+  "family": [],
+  "id": 158
+ },
+ {
+  "page": 36,
+  "book_page": 31,
+  "star": true,
+  "head": "buffer",
+  "family": [],
+  "id": 159
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "bureaucrat",
+  "family": [
+   "bureaucratic",
+   "bureaucracy"
+  ],
+  "id": 160
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "burglar",
+  "family": [
+   "burglary"
+  ],
+  "id": 161
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "bust",
+  "family": [],
+  "id": 162
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "butt",
+  "family": [],
+  "id": 163
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "buzz",
+  "family": [],
+  "id": 164
+ },
+ {
+  "page": 37,
+  "book_page": 32,
+  "star": true,
+  "head": "calcium",
+  "family": [],
+  "id": 165
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "cannon",
+  "family": [],
+  "id": 166
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "canoe",
+  "family": [],
+  "id": 167
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "canvas",
+  "family": [],
+  "id": 168
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "cape",
+  "family": [],
+  "id": 169
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "capsule",
+  "family": [],
+  "id": 170
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "caption",
+  "family": [],
+  "id": 171
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "captive",
+  "family": [],
+  "id": 172
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "caravan",
+  "family": [],
+  "id": 173
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "carbohydrate",
+  "family": [],
+  "id": 174
+ },
+ {
+  "page": 38,
+  "book_page": 33,
+  "star": true,
+  "head": "cardinal",
+  "family": [],
+  "id": 175
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "carton",
+  "family": [],
+  "id": 176
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "carve",
+  "family": [
+   "carving"
+  ],
+  "id": 177
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "casino",
+  "family": [],
+  "id": 178
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "casualty",
+  "family": [],
+  "id": 179
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "catastrophe",
+  "family": [
+   "catastrophic"
+  ],
+  "id": 180
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "cathedral",
+  "family": [],
+  "id": 181
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "Catholic",
+  "family": [],
+  "id": 182
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "cauliflower",
+  "family": [],
+  "id": 183
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "cavity",
+  "family": [],
+  "id": 184
+ },
+ {
+  "page": 39,
+  "book_page": 34,
+  "star": true,
+  "head": "celebrity",
+  "family": [],
+  "id": 185
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "cemetery",
+  "family": [],
+  "id": 186
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "censor",
+  "family": [
+   "censorship"
+  ],
+  "id": 187
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "census",
+  "family": [],
+  "id": 188
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "ceramic",
+  "family": [],
+  "id": 189
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "certify",
+  "family": [
+   "certification"
+  ],
+  "id": 190
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "chamber",
+  "family": [],
+  "id": 191
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "chancellor",
+  "family": [],
+  "id": 192
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "chant",
+  "family": [],
+  "id": 193
+ },
+ {
+  "page": 40,
+  "book_page": 35,
+  "star": true,
+  "head": "chapel",
+  "family": [],
+  "id": 194
+ },
+ {
+  "page": 41,
+  "book_page": 36,
+  "star": true,
+  "head": "choir",
+  "family": [],
+  "id": 195
+ },
+ {
+  "page": 41,
+  "book_page": 36,
+  "star": true,
+  "head": "chord",
+  "family": [],
+  "id": 196
+ },
+ {
+  "page": 41,
+  "book_page": 36,
+  "star": true,
+  "head": "chronic",
+  "family": [
+   "chronically"
+  ],
+  "id": 197
+ },
+ {
+  "page": 41,
+  "book_page": 36,
+  "star": true,
+  "head": "chronicle",
+  "family": [],
+  "id": 198
+ },
+ {
+  "page": 41,
+  "book_page": 36,
+  "star": true,
+  "head": "chunk",
+  "family": [],
+  "id": 199
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "civic",
+  "family": [],
+  "id": 200
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clamp",
+  "family": [],
+  "id": 201
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clan",
+  "family": [],
+  "id": 202
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clasp",
+  "family": [],
+  "id": 203
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "cleanse",
+  "family": [],
+  "id": 204
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clearance",
+  "family": [],
+  "id": 205
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clearing",
+  "family": [],
+  "id": 206
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clench",
+  "family": [],
+  "id": 207
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "clergy",
+  "family": [],
+  "id": 208
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "cliché",
+  "family": [],
+  "id": 209
+ },
+ {
+  "page": 42,
+  "book_page": 37,
+  "star": true,
+  "head": "cloak",
+  "family": [],
+  "id": 210
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "clog",
+  "family": [],
+  "id": 211
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "closet",
+  "family": [],
+  "id": 212
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "cluster",
+  "family": [],
+  "id": 213
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "clutch",
+  "family": [],
+  "id": 214
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "coalition",
+  "family": [],
+  "id": 215
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "cocaine",
+  "family": [],
+  "id": 216
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "cockpit",
+  "family": [],
+  "id": 217
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "cocktail",
+  "family": [],
+  "id": 218
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "coconut",
+  "family": [],
+  "id": 219
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "coexist",
+  "family": [
+   "coexistence"
+  ],
+  "id": 220
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "cognitive",
+  "family": [
+   "cognition"
+  ],
+  "id": 221
+ },
+ {
+  "page": 43,
+  "book_page": 38,
+  "star": true,
+  "head": "coincide",
+  "family": [
+   "coincidence"
+  ],
+  "id": 222
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "collide",
+  "family": [
+   "collision"
+  ],
+  "id": 223
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "colonel",
+  "family": [],
+  "id": 224
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "comet",
+  "family": [],
+  "id": 225
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "comic",
+  "family": [],
+  "id": 226
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "commemorate",
+  "family": [
+   "commemoration"
+  ],
+  "id": 227
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "commend",
+  "family": [
+   "commendation"
+  ],
+  "id": 228
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "commonwealth",
+  "family": [],
+  "id": 229
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "compartment",
+  "family": [],
+  "id": 230
+ },
+ {
+  "page": 44,
+  "book_page": 39,
+  "star": true,
+  "head": "compassion",
+  "family": [
+   "compassionate"
+  ],
+  "id": 231
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "compile",
+  "family": [
+   "compilation"
+  ],
+  "id": 232
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "complacent",
+  "family": [
+   "complacency"
+  ],
+  "id": 233
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "complement",
+  "family": [
+   "complementary"
+  ],
+  "id": 234
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "complexion",
+  "family": [],
+  "id": 235
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "compliment",
+  "family": [
+   "complimentary"
+  ],
+  "id": 236
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "composite",
+  "family": [],
+  "id": 237
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "compress",
+  "family": [
+   "compression"
+  ],
+  "id": 238
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "concede",
+  "family": [
+   "concession"
+  ],
+  "id": 239
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "conceit",
+  "family": [
+   "conceited"
+  ],
+  "id": 240
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "conceive",
+  "family": [
+   "conception"
+  ],
+  "id": 241
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "concise",
+  "family": [],
+  "id": 242
+ },
+ {
+  "page": 45,
+  "book_page": 40,
+  "star": true,
+  "head": "concurrent",
+  "family": [],
+  "id": 243
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "condolence",
+  "family": [],
+  "id": 244
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "conducive",
+  "family": [],
+  "id": 245
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "confederation",
+  "family": [
+   "confederate"
+  ],
+  "id": 246
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "confer",
+  "family": [],
+  "id": 247
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "confide",
+  "family": [],
+  "id": 248
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "configuration",
+  "family": [],
+  "id": 249
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "congregate",
+  "family": [
+   "congregation"
+  ],
+  "id": 250
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "connotation",
+  "family": [],
+  "id": 251
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "consecutive",
+  "family": [],
+  "id": 252
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "conserve",
+  "family": [
+   "conservation"
+  ],
+  "id": 253
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "console",
+  "family": [
+   "consolation"
+  ],
+  "id": 254
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "conspicuous",
+  "family": [],
+  "id": 255
+ },
+ {
+  "page": 46,
+  "book_page": 41,
+  "star": true,
+  "head": "conspire",
+  "family": [
+   "conspiracy"
+  ],
+  "id": 256
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "constituent",
+  "family": [
+   "constituency"
+  ],
+  "id": 257
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "constrain",
+  "family": [
+   "constraint"
+  ],
+  "id": 258
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "consulate",
+  "family": [
+   "consul"
+  ],
+  "id": 259
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "contagious",
+  "family": [],
+  "id": 260
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "contemplate",
+  "family": [
+   "contemplation",
+   "contemplative"
+  ],
+  "id": 261
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "contingent",
+  "family": [],
+  "id": 262
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "contrive",
+  "family": [],
+  "id": 263
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "convene",
+  "family": [],
+  "id": 264
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "converge",
+  "family": [
+   "convergence"
+  ],
+  "id": 265
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "converse²",
+  "family": [],
+  "id": 266
+ },
+ {
+  "page": 47,
+  "book_page": 42,
+  "star": true,
+  "head": "convict",
+  "family": [
+   "conviction"
+  ],
+  "id": 267
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "convoy",
+  "family": [],
+  "id": 268
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "coral",
+  "family": [],
+  "id": 269
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "cordial",
+  "family": [
+   "cordiality"
+  ],
+  "id": 270
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "cork",
+  "family": [],
+  "id": 271
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "corporal",
+  "family": [],
+  "id": 272
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "corpse",
+  "family": [],
+  "id": 273
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "correlate",
+  "family": [
+   "correlation",
+   "correlative"
+  ],
+  "id": 274
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "corrode",
+  "family": [
+   "corrosion"
+  ],
+  "id": 275
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "cosmetic",
+  "family": [],
+  "id": 276
+ },
+ {
+  "page": 48,
+  "book_page": 43,
+  "star": true,
+  "head": "cosmopolitan",
+  "family": [],
+  "id": 277
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "counteract",
+  "family": [
+   "counteraction"
+  ],
+  "id": 278
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "counterfeit",
+  "family": [],
+  "id": 279
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "coup(d'état)",
+  "family": [],
+  "id": 280
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "courtesy",
+  "family": [],
+  "id": 281
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "cozy/-sy",
+  "family": [],
+  "id": 282
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "crackdown",
+  "family": [],
+  "id": 283
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "cradle",
+  "family": [],
+  "id": 284
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "cram",
+  "family": [],
+  "id": 285
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "crate",
+  "family": [],
+  "id": 286
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "crave",
+  "family": [],
+  "id": 287
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "credential",
+  "family": [],
+  "id": 288
+ },
+ {
+  "page": 49,
+  "book_page": 44,
+  "star": true,
+  "head": "credible",
+  "family": [
+   "credibility"
+  ],
+  "id": 289
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cricket",
+  "family": [],
+  "id": 290
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cripple",
+  "family": [],
+  "id": 291
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crisp",
+  "family": [],
+  "id": 292
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crouch",
+  "family": [],
+  "id": 293
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crow",
+  "family": [],
+  "id": 294
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crude",
+  "family": [],
+  "id": 295
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crumble",
+  "family": [],
+  "id": 296
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crunch",
+  "family": [],
+  "id": 297
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "crust",
+  "family": [],
+  "id": 298
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cub",
+  "family": [],
+  "id": 299
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cuisine",
+  "family": [],
+  "id": 300
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "culminate",
+  "family": [
+   "culmination"
+  ],
+  "id": 301
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cult",
+  "family": [],
+  "id": 302
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cumulative",
+  "family": [],
+  "id": 303
+ },
+ {
+  "page": 50,
+  "book_page": 45,
+  "star": true,
+  "head": "cunning",
+  "family": [],
+  "id": 304
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "curfew",
+  "family": [],
+  "id": 305
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "curtail",
+  "family": [],
+  "id": 306
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "custody",
+  "family": [],
+  "id": 307
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "cylinder",
+  "family": [],
+  "id": 308
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "cynical",
+  "family": [
+   "cynicism"
+  ],
+  "id": 309
+ },
+ {
+  "page": 51,
+  "book_page": 46,
+  "star": true,
+  "head": "dart",
+  "family": [],
+  "id": 310
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "dazzle",
+  "family": [],
+  "id": 311
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "deadlock",
+  "family": [],
+  "id": 312
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "debris",
+  "family": [],
+  "id": 313
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "debut",
+  "family": [],
+  "id": 314
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "decimal",
+  "family": [],
+  "id": 315
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "decree",
+  "family": [],
+  "id": 316
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "dedicate",
+  "family": [
+   "dedication"
+  ],
+  "id": 317
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "deduce",
+  "family": [
+   "deducible"
+  ],
+  "id": 318
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "deduct",
+  "family": [
+   "deduction",
+   "deductive",
+   "deductible"
+  ],
+  "id": 319
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "default",
+  "family": [],
+  "id": 320
+ },
+ {
+  "page": 52,
+  "book_page": 47,
+  "star": true,
+  "head": "defer",
+  "family": [],
+  "id": 321
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "degenerate",
+  "family": [
+   "degeneration"
+  ],
+  "id": 322
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "degrade",
+  "family": [
+   "degradation"
+  ],
+  "id": 323
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "delicacy",
+  "family": [],
+  "id": 324
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "delude",
+  "family": [
+   "delusion"
+  ],
+  "id": 325
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "demographic",
+  "family": [],
+  "id": 326
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "denote",
+  "family": [
+   "denotation"
+  ],
+  "id": 327
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "denounce",
+  "family": [
+   "denunciation"
+  ],
+  "id": 328
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "depict",
+  "family": [
+   "depiction"
+  ],
+  "id": 329
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "deplete",
+  "family": [
+   "depletion"
+  ],
+  "id": 330
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "deplore",
+  "family": [],
+  "id": 331
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "deploy",
+  "family": [
+   "deployment"
+  ],
+  "id": 332
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "deport",
+  "family": [
+   "deportation"
+  ],
+  "id": 333
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "depot",
+  "family": [],
+  "id": 334
+ },
+ {
+  "page": 53,
+  "book_page": 48,
+  "star": true,
+  "head": "depreciate",
+  "family": [
+   "depreciation"
+  ],
+  "id": 335
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "derail",
+  "family": [
+   "derailment"
+  ],
+  "id": 336
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "deregulate",
+  "family": [
+   "deregulation"
+  ],
+  "id": 337
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "designate",
+  "family": [
+   "designation"
+  ],
+  "id": 338
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "desolate",
+  "family": [],
+  "id": 339
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "despise",
+  "family": [],
+  "id": 340
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "destiny",
+  "family": [
+   "destined"
+  ],
+  "id": 341
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "detach",
+  "family": [
+   "detached",
+   "detachment"
+  ],
+  "id": 342
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "detain",
+  "family": [
+   "detention"
+  ],
+  "id": 343
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "deter",
+  "family": [
+   "deterrent"
+  ],
+  "id": 344
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "detergent",
+  "family": [],
+  "id": 345
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "detriment",
+  "family": [
+   "detrimental"
+  ],
+  "id": 346
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "devastate",
+  "family": [
+   "devastating",
+   "devastation"
+  ],
+  "id": 347
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "deviate",
+  "family": [
+   "deviation"
+  ],
+  "id": 348
+ },
+ {
+  "page": 54,
+  "book_page": 49,
+  "star": true,
+  "head": "devour",
+  "family": [],
+  "id": 349
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "diesel",
+  "family": [],
+  "id": 350
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "differentiate",
+  "family": [
+   "differentiation"
+  ],
+  "id": 351
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "diffuse",
+  "family": [
+   "diffusion"
+  ],
+  "id": 352
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "dilute",
+  "family": [
+   "dilution"
+  ],
+  "id": 353
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "diminish",
+  "family": [],
+  "id": 354
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "dinosaur",
+  "family": [],
+  "id": 355
+ },
+ {
+  "page": 55,
+  "book_page": 50,
+  "star": true,
+  "head": "directory",
+  "family": [],
+  "id": 356
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "disarm",
+  "family": [
+   "disarmament"
+  ],
+  "id": 357
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "discern",
+  "family": [],
+  "id": 358
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "disclose",
+  "family": [
+   "disclosure"
+  ],
+  "id": 359
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "discord",
+  "family": [],
+  "id": 360
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "discourse",
+  "family": [],
+  "id": 361
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "discreet",
+  "family": [],
+  "id": 362
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "discrepancy",
+  "family": [],
+  "id": 363
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dismantle",
+  "family": [],
+  "id": 364
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dismay",
+  "family": [],
+  "id": 365
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dispatch/despatch",
+  "family": [],
+  "id": 366
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dispense",
+  "family": [],
+  "id": 367
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "disperse",
+  "family": [],
+  "id": 368
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "displace",
+  "family": [
+   "displacement"
+  ],
+  "id": 369
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "disposition",
+  "family": [],
+  "id": 370
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "disregard",
+  "family": [],
+  "id": 371
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dissent",
+  "family": [],
+  "id": 372
+ },
+ {
+  "page": 56,
+  "book_page": 51,
+  "star": true,
+  "head": "dissertation",
+  "family": [],
+  "id": 373
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dissident",
+  "family": [],
+  "id": 374
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "distil(l)",
+  "family": [],
+  "id": 375
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "distort",
+  "family": [
+   "distortion"
+  ],
+  "id": 376
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "divert",
+  "family": [
+   "diversion"
+  ],
+  "id": 377
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dividend",
+  "family": [],
+  "id": 378
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "divine",
+  "family": [],
+  "id": 379
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "doctrine",
+  "family": [],
+  "id": 380
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dodge",
+  "family": [],
+  "id": 381
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dogma",
+  "family": [],
+  "id": 382
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dole",
+  "family": [],
+  "id": 383
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "domain",
+  "family": [],
+  "id": 384
+ },
+ {
+  "page": 57,
+  "book_page": 52,
+  "star": true,
+  "head": "dome",
+  "family": [],
+  "id": 385
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "dough",
+  "family": [],
+  "id": 386
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "downgrade",
+  "family": [],
+  "id": 387
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "doze",
+  "family": [],
+  "id": 388
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "drawback",
+  "family": [],
+  "id": 389
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "dread",
+  "family": [
+   "dreadful"
+  ],
+  "id": 390
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "dressing",
+  "family": [],
+  "id": 391
+ },
+ {
+  "page": 58,
+  "book_page": 53,
+  "star": true,
+  "head": "dub",
+  "family": [],
+  "id": 392
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "dubious",
+  "family": [],
+  "id": 393
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "duplicate",
+  "family": [
+   "duplication"
+  ],
+  "id": 394
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "dwarf",
+  "family": [],
+  "id": 395
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "dwell",
+  "family": [
+   "dweller",
+   "dwelling"
+  ],
+  "id": 396
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "Easter",
+  "family": [],
+  "id": 397
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "eccentric",
+  "family": [],
+  "id": 398
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "eclipse",
+  "family": [],
+  "id": 399
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "ecosystem",
+  "family": [],
+  "id": 400
+ },
+ {
+  "page": 59,
+  "book_page": 54,
+  "star": true,
+  "head": "edible",
+  "family": [],
+  "id": 401
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "ego",
+  "family": [
+   "egoism",
+   "egoist"
+  ],
+  "id": 402
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "eject",
+  "family": [
+   "ejection"
+  ],
+  "id": 403
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "elaborate",
+  "family": [
+   "elaboration"
+  ],
+  "id": 404
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "elapse",
+  "family": [],
+  "id": 405
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "elastic",
+  "family": [
+   "elasticity"
+  ],
+  "id": 406
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "electoral",
+  "family": [
+   "electorate"
+  ],
+  "id": 407
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "elicit",
+  "family": [],
+  "id": 408
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "eligible",
+  "family": [
+   "eligibility"
+  ],
+  "id": 409
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "eloquent",
+  "family": [
+   "eloquence"
+  ],
+  "id": 410
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "emancipate",
+  "family": [
+   "emancipation"
+  ],
+  "id": 411
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "embargo",
+  "family": [],
+  "id": 412
+ },
+ {
+  "page": 60,
+  "book_page": 55,
+  "star": true,
+  "head": "embark",
+  "family": [],
+  "id": 413
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "embed",
+  "family": [],
+  "id": 414
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "embody",
+  "family": [
+   "embodiment"
+  ],
+  "id": 415
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "embroidery",
+  "family": [],
+  "id": 416
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "emigrate",
+  "family": [
+   "emigration",
+   "emigrant"
+  ],
+  "id": 417
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "eminent",
+  "family": [
+   "eminence"
+  ],
+  "id": 418
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "empirical",
+  "family": [],
+  "id": 419
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "emulate",
+  "family": [
+   "emulation"
+  ],
+  "id": 420
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "enact",
+  "family": [
+   "enactment"
+  ],
+  "id": 421
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "enclose",
+  "family": [
+   "enclosure"
+  ],
+  "id": 422
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "encyclop(a)edia",
+  "family": [],
+  "id": 423
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "endeavo(u)r",
+  "family": [],
+  "id": 424
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "endorse",
+  "family": [
+   "endorsement"
+  ],
+  "id": 425
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "endow",
+  "family": [
+   "endowment"
+  ],
+  "id": 426
+ },
+ {
+  "page": 61,
+  "book_page": 56,
+  "star": true,
+  "head": "enlist",
+  "family": [],
+  "id": 427
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "ensue",
+  "family": [],
+  "id": 428
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "entail",
+  "family": [],
+  "id": 429
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "entity",
+  "family": [],
+  "id": 430
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "entrust",
+  "family": [],
+  "id": 431
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "envelop",
+  "family": [],
+  "id": 432
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "envisage",
+  "family": [],
+  "id": 433
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "envoy",
+  "family": [],
+  "id": 434
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "epic",
+  "family": [],
+  "id": 435
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "epidemic",
+  "family": [],
+  "id": 436
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "epoch",
+  "family": [],
+  "id": 437
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "equate",
+  "family": [
+   "equation"
+  ],
+  "id": 438
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "equator",
+  "family": [],
+  "id": 439
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "equity",
+  "family": [
+   "equitable"
+  ],
+  "id": 440
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "eradicate",
+  "family": [
+   "eradication"
+  ],
+  "id": 441
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "erect",
+  "family": [
+   "erection"
+  ],
+  "id": 442
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "erode",
+  "family": [
+   "erosion",
+   "erosive"
+  ],
+  "id": 443
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "errand",
+  "family": [],
+  "id": 444
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "erupt",
+  "family": [
+   "eruption"
+  ],
+  "id": 445
+ },
+ {
+  "page": 62,
+  "book_page": 57,
+  "star": true,
+  "head": "escalate",
+  "family": [
+   "escalation",
+   "escalator"
+  ],
+  "id": 446
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "escort",
+  "family": [],
+  "id": 447
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "esteem",
+  "family": [],
+  "id": 448
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "esthetic/aesthetic",
+  "family": [
+   "esthetics/aesthetics"
+  ],
+  "id": 449
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "etiquette",
+  "family": [],
+  "id": 450
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "evacuate",
+  "family": [
+   "evacuation"
+  ],
+  "id": 451
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "evade",
+  "family": [
+   "evasive",
+   "evasion"
+  ],
+  "id": 452
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "evaporate",
+  "family": [
+   "evaporation"
+  ],
+  "id": 453
+ },
+ {
+  "page": 63,
+  "book_page": 58,
+  "star": true,
+  "head": "evoke",
+  "family": [],
+  "id": 454
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "excerpt",
+  "family": [],
+  "id": 455
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "exempt",
+  "family": [
+   "exemption"
+  ],
+  "id": 456
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "exotic",
+  "family": [],
+  "id": 457
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "expedition",
+  "family": [],
+  "id": 458
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "expire",
+  "family": [
+   "expiration"
+  ],
+  "id": 459
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "exponent",
+  "family": [],
+  "id": 460
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "exposition",
+  "family": [],
+  "id": 461
+ },
+ {
+  "page": 64,
+  "book_page": 59,
+  "star": true,
+  "head": "exquisite",
+  "family": [],
+  "id": 462
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "extinct",
+  "family": [
+   "extinction"
+  ],
+  "id": 463
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "extract",
+  "family": [
+   "extraction"
+  ],
+  "id": 464
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "extravagant",
+  "family": [
+   "extravagance"
+  ],
+  "id": 465
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "fabricate",
+  "family": [
+   "fabrication"
+  ],
+  "id": 466
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "fabulous",
+  "family": [],
+  "id": 467
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "facet",
+  "family": [],
+  "id": 468
+ },
+ {
+  "page": 65,
+  "book_page": 60,
+  "star": true,
+  "head": "faction",
+  "family": [],
+  "id": 469
+ },
+ {
+  "page": 66,
+  "book_page": 61,
+  "star": true,
+  "head": "fascist",
+  "family": [
+   "fascism"
+  ],
+  "id": 470
+ },
+ {
+  "page": 66,
+  "book_page": 61,
+  "star": true,
+  "head": "feast",
+  "family": [],
+  "id": 471
+ },
+ {
+  "page": 66,
+  "book_page": 61,
+  "star": true,
+  "head": "feat",
+  "family": [],
+  "id": 472
+ },
+ {
+  "page": 66,
+  "book_page": 61,
+  "star": true,
+  "head": "feeble",
+  "family": [],
+  "id": 473
+ },
+ {
+  "page": 66,
+  "book_page": 61,
+  "star": true,
+  "head": "feminine",
+  "family": [
+   "feminism",
+   "feminist"
+  ],
+  "id": 474
+ },
+ {
+  "page": 67,
+  "book_page": 62,
+  "star": true,
+  "head": "finite",
+  "family": [],
+  "id": 475
+ },
+ {
+  "page": 67,
+  "book_page": 62,
+  "star": true,
+  "head": "fiscal",
+  "family": [],
+  "id": 476
+ },
+ {
+  "page": 67,
+  "book_page": 62,
+  "star": true,
+  "head": "flank",
+  "family": [],
+  "id": 477
+ },
+ {
+  "page": 67,
+  "book_page": 62,
+  "star": true,
+  "head": "flap",
+  "family": [],
+  "id": 478
+ },
+ {
+  "page": 67,
+  "book_page": 62,
+  "star": true,
+  "head": "flare",
+  "family": [],
+  "id": 479
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "flatter",
+  "family": [
+   "flattery"
+  ],
+  "id": 480
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "fling",
+  "family": [],
+  "id": 481
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "flip",
+  "family": [],
+  "id": 482
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "flirt",
+  "family": [
+   "flirtation"
+  ],
+  "id": 483
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "flush",
+  "family": [],
+  "id": 484
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "flutter",
+  "family": [],
+  "id": 485
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "foam",
+  "family": [],
+  "id": 486
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "foe",
+  "family": [],
+  "id": 487
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "foil",
+  "family": [],
+  "id": 488
+ },
+ {
+  "page": 68,
+  "book_page": 63,
+  "star": true,
+  "head": "folklore",
+  "family": [],
+  "id": 489
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "foretell",
+  "family": [],
+  "id": 490
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "forfeit",
+  "family": [],
+  "id": 491
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "formidable",
+  "family": [],
+  "id": 492
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "fort",
+  "family": [],
+  "id": 493
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "fortify",
+  "family": [
+   "fortification"
+  ],
+  "id": 494
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "fortnight",
+  "family": [],
+  "id": 495
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "foster",
+  "family": [],
+  "id": 496
+ },
+ {
+  "page": 69,
+  "book_page": 64,
+  "star": true,
+  "head": "foul",
+  "family": [],
+  "id": 497
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "fracture",
+  "family": [],
+  "id": 498
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "fragile",
+  "family": [
+   "fragility"
+  ],
+  "id": 499
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "fragrant",
+  "family": [
+   "fragrance"
+  ],
+  "id": 500
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "franchise",
+  "family": [],
+  "id": 501
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "frantic",
+  "family": [
+   "frantically"
+  ],
+  "id": 502
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "fraud",
+  "family": [
+   "fraudulent"
+  ],
+  "id": 503
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "friction",
+  "family": [],
+  "id": 504
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "fringe",
+  "family": [],
+  "id": 505
+ },
+ {
+  "page": 70,
+  "book_page": 65,
+  "star": true,
+  "head": "frown",
+  "family": [],
+  "id": 506
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "fury",
+  "family": [
+   "furious"
+  ],
+  "id": 507
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "fuse",
+  "family": [],
+  "id": 508
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "fusion",
+  "family": [],
+  "id": 509
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "futile",
+  "family": [
+   "futility"
+  ],
+  "id": 510
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "galaxy",
+  "family": [],
+  "id": 511
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "garlic",
+  "family": [],
+  "id": 512
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "gasp",
+  "family": [],
+  "id": 513
+ },
+ {
+  "page": 71,
+  "book_page": 66,
+  "star": true,
+  "head": "gauge",
+  "family": [],
+  "id": 514
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "genre",
+  "family": [],
+  "id": 515
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "giggle",
+  "family": [],
+  "id": 516
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glacier",
+  "family": [],
+  "id": 517
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glamo(u)r",
+  "family": [
+   "glamo(u)rous"
+  ],
+  "id": 518
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "gland",
+  "family": [],
+  "id": 519
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glare",
+  "family": [],
+  "id": 520
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "gleam",
+  "family": [],
+  "id": 521
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glide",
+  "family": [
+   "glider"
+  ],
+  "id": 522
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glitter",
+  "family": [],
+  "id": 523
+ },
+ {
+  "page": 72,
+  "book_page": 67,
+  "star": true,
+  "head": "glossary",
+  "family": [],
+  "id": 524
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "gorge",
+  "family": [],
+  "id": 525
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "gospel",
+  "family": [],
+  "id": 526
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "graze",
+  "family": [],
+  "id": 527
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "grease",
+  "family": [
+   "greasy"
+  ],
+  "id": 528
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "greed",
+  "family": [
+   "greedy"
+  ],
+  "id": 529
+ },
+ {
+  "page": 73,
+  "book_page": 68,
+  "star": true,
+  "head": "grid",
+  "family": [],
+  "id": 530
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "grill",
+  "family": [],
+  "id": 531
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "grim",
+  "family": [],
+  "id": 532
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "groan",
+  "family": [],
+  "id": 533
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "groove",
+  "family": [],
+  "id": 534
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "grope",
+  "family": [],
+  "id": 535
+ },
+ {
+  "page": 74,
+  "book_page": 69,
+  "star": true,
+  "head": "hamper",
+  "family": [],
+  "id": 536
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "handicraft",
+  "family": [],
+  "id": 537
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "harass",
+  "family": [
+   "harassment"
+  ],
+  "id": 538
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "hardy",
+  "family": [],
+  "id": 539
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "haven",
+  "family": [],
+  "id": 540
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "havoc",
+  "family": [],
+  "id": 541
+ },
+ {
+  "page": 75,
+  "book_page": 70,
+  "star": true,
+  "head": "hawk",
+  "family": [],
+  "id": 542
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "heave",
+  "family": [],
+  "id": 543
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "hectic",
+  "family": [],
+  "id": 544
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "helmet",
+  "family": [],
+  "id": 545
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "hemisphere",
+  "family": [],
+  "id": 546
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "henceforth",
+  "family": [],
+  "id": 547
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "herald",
+  "family": [],
+  "id": 548
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "herb",
+  "family": [
+   "herbal"
+  ],
+  "id": 549
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "heroin",
+  "family": [],
+  "id": 550
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "hibernate",
+  "family": [
+   "hibernation"
+  ],
+  "id": 551
+ },
+ {
+  "page": 76,
+  "book_page": 71,
+  "star": true,
+  "head": "hierarchy",
+  "family": [
+   "hierarchical"
+  ],
+  "id": 552
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hike",
+  "family": [],
+  "id": 553
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hinge",
+  "family": [],
+  "id": 554
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hitherto",
+  "family": [],
+  "id": 555
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hive",
+  "family": [],
+  "id": 556
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hockey",
+  "family": [],
+  "id": 557
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hoist",
+  "family": [],
+  "id": 558
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "homogeneous",
+  "family": [],
+  "id": 559
+ },
+ {
+  "page": 77,
+  "book_page": 72,
+  "star": true,
+  "head": "hop",
+  "family": [],
+  "id": 560
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hose",
+  "family": [],
+  "id": 561
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hostage",
+  "family": [],
+  "id": 562
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hound",
+  "family": [],
+  "id": 563
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hover",
+  "family": [],
+  "id": 564
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "howl",
+  "family": [],
+  "id": 565
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "huddle",
+  "family": [],
+  "id": 566
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hum",
+  "family": [],
+  "id": 567
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "humane",
+  "family": [
+   "humanism",
+   "humanist",
+   "humanitarian"
+  ],
+  "id": 568
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "humid",
+  "family": [
+   "humidity"
+  ],
+  "id": 569
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "humiliate",
+  "family": [
+   "humiliation"
+  ],
+  "id": 570
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hurdle",
+  "family": [],
+  "id": 571
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hurl",
+  "family": [],
+  "id": 572
+ },
+ {
+  "page": 78,
+  "book_page": 73,
+  "star": true,
+  "head": "hurricane",
+  "family": [],
+  "id": 573
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "hybrid",
+  "family": [],
+  "id": 574
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "hygiene",
+  "family": [
+   "hygienic"
+  ],
+  "id": 575
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "hypocrisy",
+  "family": [
+   "hypocritical",
+   "hypocrite"
+  ],
+  "id": 576
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "hypothesis",
+  "family": [
+   "hypothetical"
+  ],
+  "id": 577
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "hysterical",
+  "family": [
+   "hysteria"
+  ],
+  "id": 578
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "iceberg",
+  "family": [],
+  "id": 579
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "icon",
+  "family": [],
+  "id": 580
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "ideology",
+  "family": [
+   "ideological"
+  ],
+  "id": 581
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "idiot",
+  "family": [
+   "idiotic"
+  ],
+  "id": 582
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "idol",
+  "family": [],
+  "id": 583
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "ignite",
+  "family": [
+   "ignition"
+  ],
+  "id": 584
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "illicit",
+  "family": [],
+  "id": 585
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "illiterate",
+  "family": [
+   "illiteracy"
+  ],
+  "id": 586
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "illuminate",
+  "family": [
+   "illumination"
+  ],
+  "id": 587
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "immerse",
+  "family": [
+   "immersion"
+  ],
+  "id": 588
+ },
+ {
+  "page": 79,
+  "book_page": 74,
+  "star": true,
+  "head": "imminent",
+  "family": [],
+  "id": 589
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "impair",
+  "family": [],
+  "id": 590
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "impart",
+  "family": [],
+  "id": 591
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "imperative",
+  "family": [],
+  "id": 592
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "impetus",
+  "family": [],
+  "id": 593
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "imprison",
+  "family": [
+   "imprisonment"
+  ],
+  "id": 594
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "impromptu",
+  "family": [],
+  "id": 595
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "inaugurate",
+  "family": [
+   "inauguration"
+  ],
+  "id": 596
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "inborn",
+  "family": [],
+  "id": 597
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "incorporate",
+  "family": [
+   "incorporation"
+  ],
+  "id": 598
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "incumbent",
+  "family": [],
+  "id": 599
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "incur",
+  "family": [],
+  "id": 600
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "indebted",
+  "family": [],
+  "id": 601
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "indefinite",
+  "family": [],
+  "id": 602
+ },
+ {
+  "page": 80,
+  "book_page": 75,
+  "star": true,
+  "head": "indict",
+  "family": [
+   "indictment"
+  ],
+  "id": 603
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "indigenous",
+  "family": [],
+  "id": 604
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "indignant",
+  "family": [
+   "indignation"
+  ],
+  "id": 605
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "indulge",
+  "family": [
+   "indulgence",
+   "indulgent"
+  ],
+  "id": 606
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inertia",
+  "family": [],
+  "id": 607
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inflict",
+  "family": [
+   "infliction"
+  ],
+  "id": 608
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "infringe",
+  "family": [
+   "infringement"
+  ],
+  "id": 609
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "ingenious",
+  "family": [
+   "ingenuity"
+  ],
+  "id": 610
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inherent",
+  "family": [],
+  "id": 611
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inhibit",
+  "family": [
+   "inhibition"
+  ],
+  "id": 612
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inject",
+  "family": [
+   "injection"
+  ],
+  "id": 613
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "inmate",
+  "family": [],
+  "id": 614
+ },
+ {
+  "page": 81,
+  "book_page": 76,
+  "star": true,
+  "head": "innumerable",
+  "family": [],
+  "id": 615
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "insulate",
+  "family": [
+   "insulation",
+   "insulator"
+  ],
+  "id": 616
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "integral",
+  "family": [],
+  "id": 617
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "intellect",
+  "family": [],
+  "id": 618
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "intelligible",
+  "family": [],
+  "id": 619
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "intercourse",
+  "family": [],
+  "id": 620
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "interim",
+  "family": [],
+  "id": 621
+ },
+ {
+  "page": 82,
+  "book_page": 77,
+  "star": true,
+  "head": "intermittent",
+  "family": [],
+  "id": 622
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "interrogate",
+  "family": [
+   "interrogation"
+  ],
+  "id": 623
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intervene",
+  "family": [
+   "intervention"
+  ],
+  "id": 624
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intimidate",
+  "family": [
+   "intimidation"
+  ],
+  "id": 625
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intricate",
+  "family": [
+   "intricacy"
+  ],
+  "id": 626
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intrigue",
+  "family": [],
+  "id": 627
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intrinsic",
+  "family": [
+   "intrinsically"
+  ],
+  "id": 628
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "intuition",
+  "family": [
+   "intuitive"
+  ],
+  "id": 629
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "invalid¹",
+  "family": [],
+  "id": 630
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "inventory",
+  "family": [],
+  "id": 631
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "invert",
+  "family": [
+   "inversion"
+  ],
+  "id": 632
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "irrespective",
+  "family": [],
+  "id": 633
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "irritate",
+  "family": [
+   "irritation",
+   "irritating",
+   "irritable"
+  ],
+  "id": 634
+ },
+ {
+  "page": 83,
+  "book_page": 78,
+  "star": true,
+  "head": "isle",
+  "family": [],
+  "id": 635
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "ivory",
+  "family": [],
+  "id": 636
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jack",
+  "family": [],
+  "id": 637
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jargon",
+  "family": [],
+  "id": 638
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jelly",
+  "family": [],
+  "id": 639
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jeopardize/-ise",
+  "family": [
+   "jeopardy"
+  ],
+  "id": 640
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jerk",
+  "family": [],
+  "id": 641
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jockey",
+  "family": [],
+  "id": 642
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "jolly",
+  "family": [],
+  "id": 643
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "judicial",
+  "family": [],
+  "id": 644
+ },
+ {
+  "page": 84,
+  "book_page": 79,
+  "star": true,
+  "head": "judiciary",
+  "family": [],
+  "id": 645
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "junction",
+  "family": [],
+  "id": 646
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "jurisdiction",
+  "family": [],
+  "id": 647
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "juvenile",
+  "family": [],
+  "id": 648
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "kidnap",
+  "family": [],
+  "id": 649
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "kidney",
+  "family": [],
+  "id": 650
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "knight",
+  "family": [],
+  "id": 651
+ },
+ {
+  "page": 85,
+  "book_page": 80,
+  "star": true,
+  "head": "knob",
+  "family": [],
+  "id": 652
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "lad",
+  "family": [],
+  "id": 653
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "landmark",
+  "family": [],
+  "id": 654
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "lash",
+  "family": [],
+  "id": 655
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "latitude",
+  "family": [],
+  "id": 656
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "lavish",
+  "family": [],
+  "id": 657
+ },
+ {
+  "page": 86,
+  "book_page": 81,
+  "star": true,
+  "head": "lawsuit",
+  "family": [],
+  "id": 658
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "layman",
+  "family": [],
+  "id": 659
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "leaflet",
+  "family": [],
+  "id": 660
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "legacy",
+  "family": [],
+  "id": 661
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "legitimate",
+  "family": [
+   "legitimacy"
+  ],
+  "id": 662
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "lenient",
+  "family": [
+   "leniency"
+  ],
+  "id": 663
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "lesbian",
+  "family": [],
+  "id": 664
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "lever",
+  "family": [
+   "leverage"
+  ],
+  "id": 665
+ },
+ {
+  "page": 87,
+  "book_page": 82,
+  "star": true,
+  "head": "levy",
+  "family": [],
+  "id": 666
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "lieutenant",
+  "family": [],
+  "id": 667
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "lime",
+  "family": [],
+  "id": 668
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "limelight",
+  "family": [],
+  "id": 669
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "limp",
+  "family": [],
+  "id": 670
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "linen",
+  "family": [],
+  "id": 671
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "liner",
+  "family": [],
+  "id": 672
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "linger",
+  "family": [],
+  "id": 673
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "linguistic",
+  "family": [
+   "linguistics"
+  ],
+  "id": 674
+ },
+ {
+  "page": 88,
+  "book_page": 83,
+  "star": true,
+  "head": "lipstick",
+  "family": [],
+  "id": 675
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "livestock",
+  "family": [],
+  "id": 676
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "locomotive",
+  "family": [],
+  "id": 677
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "lofty",
+  "family": [],
+  "id": 678
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "logistics",
+  "family": [
+   "logistic(al)"
+  ],
+  "id": 679
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "longevity",
+  "family": [],
+  "id": 680
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "longitude",
+  "family": [
+   "longitudinal"
+  ],
+  "id": 681
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "loom",
+  "family": [],
+  "id": 682
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "loop",
+  "family": [],
+  "id": 683
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "loot",
+  "family": [],
+  "id": 684
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "lotion",
+  "family": [],
+  "id": 685
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "lottery",
+  "family": [],
+  "id": 686
+ },
+ {
+  "page": 89,
+  "book_page": 84,
+  "star": true,
+  "head": "lounge",
+  "family": [],
+  "id": 687
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "lubricate",
+  "family": [
+   "lubrication"
+  ],
+  "id": 688
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "lucrative",
+  "family": [],
+  "id": 689
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "luminous",
+  "family": [],
+  "id": 690
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "lure",
+  "family": [],
+  "id": 691
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "lyric",
+  "family": [
+   "lyrical"
+  ],
+  "id": 692
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "magistrate",
+  "family": [],
+  "id": 693
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "magnify",
+  "family": [],
+  "id": 694
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "magnitude",
+  "family": [],
+  "id": 695
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "majesty",
+  "family": [
+   "majestic"
+  ],
+  "id": 696
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "malice",
+  "family": [
+   "malicious"
+  ],
+  "id": 697
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "malignant",
+  "family": [],
+  "id": 698
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "malpractice",
+  "family": [],
+  "id": 699
+ },
+ {
+  "page": 90,
+  "book_page": 85,
+  "star": true,
+  "head": "mandate",
+  "family": [
+   "mandatory"
+  ],
+  "id": 700
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "maneuver/manoeuvre",
+  "family": [],
+  "id": 701
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "manifest",
+  "family": [
+   "manifestation"
+  ],
+  "id": 702
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "mansion",
+  "family": [],
+  "id": 703
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "manuscript",
+  "family": [],
+  "id": 704
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "mar",
+  "family": [],
+  "id": 705
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "marble",
+  "family": [],
+  "id": 706
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "maritime",
+  "family": [],
+  "id": 707
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "martyr",
+  "family": [
+   "martyrdom"
+  ],
+  "id": 708
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "masculine",
+  "family": [
+   "masculinity"
+  ],
+  "id": 709
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "massacre",
+  "family": [],
+  "id": 710
+ },
+ {
+  "page": 91,
+  "book_page": 86,
+  "star": true,
+  "head": "maternal",
+  "family": [
+   "maternity"
+  ],
+  "id": 711
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "meadow",
+  "family": [],
+  "id": 712
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "mediate",
+  "family": [
+   "mediation",
+   "mediator"
+  ],
+  "id": 713
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "medication",
+  "family": [],
+  "id": 714
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "medieval",
+  "family": [],
+  "id": 715
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "melody",
+  "family": [
+   "melodious"
+  ],
+  "id": 716
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "menace",
+  "family": [],
+  "id": 717
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "mentor",
+  "family": [],
+  "id": 718
+ },
+ {
+  "page": 92,
+  "book_page": 87,
+  "star": true,
+  "head": "merchandise",
+  "family": [],
+  "id": 719
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "mercury",
+  "family": [],
+  "id": 720
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "merge",
+  "family": [
+   "merger"
+  ],
+  "id": 721
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "metabolism",
+  "family": [
+   "metabolic"
+  ],
+  "id": 722
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "metaphor",
+  "family": [
+   "metaphorical"
+  ],
+  "id": 723
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "meticulous",
+  "family": [],
+  "id": 724
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "metropolitan",
+  "family": [],
+  "id": 725
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "midst",
+  "family": [],
+  "id": 726
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "midwife",
+  "family": [],
+  "id": 727
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "milestone",
+  "family": [],
+  "id": 728
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "militant",
+  "family": [
+   "militancy"
+  ],
+  "id": 729
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "militia",
+  "family": [],
+  "id": 730
+ },
+ {
+  "page": 93,
+  "book_page": 88,
+  "star": true,
+  "head": "mindset",
+  "family": [],
+  "id": 731
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "mingle",
+  "family": [],
+  "id": 732
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "miniature",
+  "family": [],
+  "id": 733
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "mint",
+  "family": [],
+  "id": 734
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "missionary",
+  "family": [],
+  "id": 735
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "moan",
+  "family": [],
+  "id": 736
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "mobilize/-ise",
+  "family": [],
+  "id": 737
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "mock",
+  "family": [],
+  "id": 738
+ },
+ {
+  "page": 94,
+  "book_page": 89,
+  "star": true,
+  "head": "molecule",
+  "family": [
+   "molecular"
+  ],
+  "id": 739
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "momentum",
+  "family": [
+   "momentous"
+  ],
+  "id": 740
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "monarchy",
+  "family": [
+   "monarch"
+  ],
+  "id": 741
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "monopoly",
+  "family": [
+   "monopolize/-ise"
+  ],
+  "id": 742
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "monotony",
+  "family": [
+   "monotonous"
+  ],
+  "id": 743
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "morale",
+  "family": [],
+  "id": 744
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "mortal",
+  "family": [
+   "mortality"
+  ],
+  "id": 745
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "mosquito",
+  "family": [],
+  "id": 746
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "mourn",
+  "family": [
+   "mourning"
+  ],
+  "id": 747
+ },
+ {
+  "page": 95,
+  "book_page": 90,
+  "star": true,
+  "head": "mow",
+  "family": [],
+  "id": 748
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "multilateral",
+  "family": [],
+  "id": 749
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "multitude",
+  "family": [],
+  "id": 750
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "murmur",
+  "family": [],
+  "id": 751
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "mute",
+  "family": [],
+  "id": 752
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "mutter",
+  "family": [],
+  "id": 753
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "naive",
+  "family": [
+   "naivety"
+  ],
+  "id": 754
+ },
+ {
+  "page": 96,
+  "book_page": 91,
+  "star": true,
+  "head": "navigate",
+  "family": [
+   "navigation"
+  ],
+  "id": 755
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "negligent",
+  "family": [
+   "negligence"
+  ],
+  "id": 756
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "negligible",
+  "family": [],
+  "id": 757
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "nickname",
+  "family": [],
+  "id": 758
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "nil",
+  "family": [],
+  "id": 759
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "nitrogen",
+  "family": [],
+  "id": 760
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "nominal",
+  "family": [],
+  "id": 761
+ },
+ {
+  "page": 97,
+  "book_page": 92,
+  "star": true,
+  "head": "nominate",
+  "family": [
+   "nomination",
+   "nominee"
+  ],
+  "id": 762
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "nonetheless",
+  "family": [],
+  "id": 763
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "noteworthy",
+  "family": [],
+  "id": 764
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "notorious",
+  "family": [
+   "notoriety"
+  ],
+  "id": 765
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "notwithstanding",
+  "family": [],
+  "id": 766
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "numb",
+  "family": [],
+  "id": 767
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "numerical",
+  "family": [],
+  "id": 768
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "nurture",
+  "family": [],
+  "id": 769
+ },
+ {
+  "page": 98,
+  "book_page": 93,
+  "star": true,
+  "head": "oak",
+  "family": [],
+  "id": 770
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "oar",
+  "family": [],
+  "id": 771
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "oath",
+  "family": [],
+  "id": 772
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "obscene",
+  "family": [
+   "obscenity"
+  ],
+  "id": 773
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "obscure",
+  "family": [
+   "obscurity"
+  ],
+  "id": 774
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "observatory",
+  "family": [],
+  "id": 775
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "obsess",
+  "family": [
+   "obsession",
+   "obsessive"
+  ],
+  "id": 776
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "obstruct",
+  "family": [
+   "obstruction"
+  ],
+  "id": 777
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "offset",
+  "family": [],
+  "id": 778
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "offspring",
+  "family": [],
+  "id": 779
+ },
+ {
+  "page": 99,
+  "book_page": 94,
+  "star": true,
+  "head": "olive",
+  "family": [],
+  "id": 780
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "onset",
+  "family": [],
+  "id": 781
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "opaque",
+  "family": [],
+  "id": 782
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "operative",
+  "family": [],
+  "id": 783
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "oppress",
+  "family": [
+   "oppression",
+   "oppressive"
+  ],
+  "id": 784
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "optic",
+  "family": [
+   "optical"
+  ],
+  "id": 785
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "optimum",
+  "family": [
+   "optimal"
+  ],
+  "id": 786
+ },
+ {
+  "page": 100,
+  "book_page": 95,
+  "star": true,
+  "head": "ordeal",
+  "family": [],
+  "id": 787
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "orthodox",
+  "family": [],
+  "id": 788
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "outfit",
+  "family": [],
+  "id": 789
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "outlaw",
+  "family": [],
+  "id": 790
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "outrage",
+  "family": [
+   "outrageous"
+  ],
+  "id": 791
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "overflow",
+  "family": [],
+  "id": 792
+ },
+ {
+  "page": 101,
+  "book_page": 96,
+  "star": true,
+  "head": "overhaul",
+  "family": [],
+  "id": 793
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "overlap",
+  "family": [],
+  "id": 794
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "override",
+  "family": [],
+  "id": 795
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "overstate",
+  "family": [],
+  "id": 796
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "overt",
+  "family": [],
+  "id": 797
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "overturn",
+  "family": [],
+  "id": 798
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "owl",
+  "family": [],
+  "id": 799
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "oxide",
+  "family": [],
+  "id": 800
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "pact",
+  "family": [],
+  "id": 801
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "pamphlet",
+  "family": [],
+  "id": 802
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "panorama",
+  "family": [
+   "panoramic"
+  ],
+  "id": 803
+ },
+ {
+  "page": 102,
+  "book_page": 97,
+  "star": true,
+  "head": "pant",
+  "family": [],
+  "id": 804
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parachute",
+  "family": [],
+  "id": 805
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "paradigm",
+  "family": [],
+  "id": 806
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "paradise",
+  "family": [],
+  "id": 807
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "paralyze/-yse",
+  "family": [
+   "paralysis"
+  ],
+  "id": 808
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parameter",
+  "family": [],
+  "id": 809
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parasite",
+  "family": [],
+  "id": 810
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parish",
+  "family": [],
+  "id": 811
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parole",
+  "family": [],
+  "id": 812
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "parrot",
+  "family": [],
+  "id": 813
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "partisan",
+  "family": [],
+  "id": 814
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "partition",
+  "family": [],
+  "id": 815
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "passerby",
+  "family": [],
+  "id": 816
+ },
+ {
+  "page": 103,
+  "book_page": 98,
+  "star": true,
+  "head": "pasta",
+  "family": [],
+  "id": 817
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pastry",
+  "family": [],
+  "id": 818
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pasture",
+  "family": [],
+  "id": 819
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pathetic",
+  "family": [],
+  "id": 820
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "patriot",
+  "family": [
+   "patriotic",
+   "patriotism"
+  ],
+  "id": 821
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "patrol",
+  "family": [],
+  "id": 822
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "patron",
+  "family": [
+   "patronize/-ise",
+   "patronage"
+  ],
+  "id": 823
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "peck",
+  "family": [],
+  "id": 824
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pedal",
+  "family": [],
+  "id": 825
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "peddle",
+  "family": [],
+  "id": 826
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "peel",
+  "family": [],
+  "id": 827
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "peep",
+  "family": [],
+  "id": 828
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "peg",
+  "family": [],
+  "id": 829
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pending",
+  "family": [],
+  "id": 830
+ },
+ {
+  "page": 104,
+  "book_page": 99,
+  "star": true,
+  "head": "pendulum",
+  "family": [],
+  "id": 831
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "penguin",
+  "family": [],
+  "id": 832
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "peninsula",
+  "family": [],
+  "id": 833
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "perch",
+  "family": [],
+  "id": 834
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "perfume",
+  "family": [],
+  "id": 835
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "perish",
+  "family": [],
+  "id": 836
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "permeate",
+  "family": [
+   "permeation"
+  ],
+  "id": 837
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "perpetual",
+  "family": [
+   "perpetuate"
+  ],
+  "id": 838
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "perplex",
+  "family": [
+   "perplexity"
+  ],
+  "id": 839
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "persecute",
+  "family": [
+   "persecution"
+  ],
+  "id": 840
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "pest",
+  "family": [],
+  "id": 841
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "pesticide",
+  "family": [],
+  "id": 842
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "petition",
+  "family": [
+   "petitioner"
+  ],
+  "id": 843
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "petrochemical",
+  "family": [],
+  "id": 844
+ },
+ {
+  "page": 105,
+  "book_page": 100,
+  "star": true,
+  "head": "pharmacy",
+  "family": [
+   "pharmaceutical"
+  ],
+  "id": 845
+ },
+ {
+  "page": 106,
+  "book_page": 101,
+  "star": true,
+  "head": "physiological",
+  "family": [],
+  "id": 846
+ },
+ {
+  "page": 106,
+  "book_page": 101,
+  "star": true,
+  "head": "pilgrim",
+  "family": [
+   "pilgrimage"
+  ],
+  "id": 847
+ },
+ {
+  "page": 106,
+  "book_page": 101,
+  "star": true,
+  "head": "plaintiff",
+  "family": [],
+  "id": 848
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plateau",
+  "family": [],
+  "id": 849
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plausible",
+  "family": [],
+  "id": 850
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plaza",
+  "family": [],
+  "id": 851
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plea",
+  "family": [],
+  "id": 852
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plead",
+  "family": [],
+  "id": 853
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plight",
+  "family": [],
+  "id": 854
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plumber",
+  "family": [],
+  "id": 855
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "plumbing",
+  "family": [],
+  "id": 856
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "poise",
+  "family": [
+   "poised"
+  ],
+  "id": 857
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "poke",
+  "family": [],
+  "id": 858
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "polytechnic",
+  "family": [],
+  "id": 859
+ },
+ {
+  "page": 107,
+  "book_page": 102,
+  "star": true,
+  "head": "ponder",
+  "family": [],
+  "id": 860
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "porcelain",
+  "family": [],
+  "id": 861
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "porch",
+  "family": [],
+  "id": 862
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "porridge",
+  "family": [],
+  "id": 863
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "portfolio",
+  "family": [],
+  "id": 864
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "portray",
+  "family": [
+   "portrayal",
+   "portrait"
+  ],
+  "id": 865
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "potent",
+  "family": [],
+  "id": 866
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "pottery",
+  "family": [],
+  "id": 867
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "poultry",
+  "family": [],
+  "id": 868
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "practitioner",
+  "family": [],
+  "id": 869
+ },
+ {
+  "page": 108,
+  "book_page": 103,
+  "star": true,
+  "head": "precede",
+  "family": [
+   "preceding",
+   "precedent"
+  ],
+  "id": 870
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "predator",
+  "family": [
+   "predatory"
+  ],
+  "id": 871
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "predecessor",
+  "family": [],
+  "id": 872
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "predominate",
+  "family": [
+   "predominance",
+   "predominant"
+  ],
+  "id": 873
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "premature",
+  "family": [],
+  "id": 874
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "premise",
+  "family": [],
+  "id": 875
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "premium",
+  "family": [],
+  "id": 876
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "preoccupy",
+  "family": [
+   "preoccupied"
+  ],
+  "id": 877
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "prerequisite",
+  "family": [],
+  "id": 878
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "preside",
+  "family": [],
+  "id": 879
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "prestige",
+  "family": [
+   "prestigious"
+  ],
+  "id": 880
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "presume",
+  "family": [
+   "presumption",
+   "presumably"
+  ],
+  "id": 881
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "pretext",
+  "family": [],
+  "id": 882
+ },
+ {
+  "page": 109,
+  "book_page": 104,
+  "star": true,
+  "head": "prey",
+  "family": [],
+  "id": 883
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "probe",
+  "family": [],
+  "id": 884
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "profile",
+  "family": [],
+  "id": 885
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "prolong",
+  "family": [],
+  "id": 886
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "prone",
+  "family": [],
+  "id": 887
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "proofread",
+  "family": [],
+  "id": 888
+ },
+ {
+  "page": 110,
+  "book_page": 105,
+  "star": true,
+  "head": "prop",
+  "family": [],
+  "id": 889
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "propaganda",
+  "family": [],
+  "id": 890
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "propagate",
+  "family": [
+   "propagation"
+  ],
+  "id": 891
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "propel",
+  "family": [
+   "propeller"
+  ],
+  "id": 892
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "prosecute",
+  "family": [
+   "prosecution"
+  ],
+  "id": 893
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "prosper",
+  "family": [
+   "prosperity",
+   "prosperous"
+  ],
+  "id": 894
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "protocol",
+  "family": [],
+  "id": 895
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "prototype",
+  "family": [],
+  "id": 896
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "proximate",
+  "family": [
+   "proximity"
+  ],
+  "id": 897
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "psychiatry",
+  "family": [
+   "psychiatric",
+   "psychiatrist"
+  ],
+  "id": 898
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "pudding",
+  "family": [],
+  "id": 899
+ },
+ {
+  "page": 111,
+  "book_page": 106,
+  "star": true,
+  "head": "pumpkin",
+  "family": [],
+  "id": 900
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "pyramid",
+  "family": [],
+  "id": 901
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "quart",
+  "family": [],
+  "id": 902
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "query",
+  "family": [],
+  "id": 903
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "quest",
+  "family": [],
+  "id": 904
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "quiver",
+  "family": [],
+  "id": 905
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "radiate",
+  "family": [
+   "radiation",
+   "radiator",
+   "radiant"
+  ],
+  "id": 906
+ },
+ {
+  "page": 112,
+  "book_page": 107,
+  "star": true,
+  "head": "radioactive",
+  "family": [
+   "radioactivity"
+  ],
+  "id": 907
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "ranch",
+  "family": [],
+  "id": 908
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "random",
+  "family": [],
+  "id": 909
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "rap",
+  "family": [],
+  "id": 910
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "rape",
+  "family": [],
+  "id": 911
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "rash",
+  "family": [],
+  "id": 912
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "ratify",
+  "family": [
+   "ratification"
+  ],
+  "id": 913
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "ration",
+  "family": [],
+  "id": 914
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "rattle",
+  "family": [],
+  "id": 915
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "reassure",
+  "family": [
+   "reassurance"
+  ],
+  "id": 916
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "recede",
+  "family": [],
+  "id": 917
+ },
+ {
+  "page": 113,
+  "book_page": 108,
+  "star": true,
+  "head": "recipe",
+  "family": [],
+  "id": 918
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "reciprocal",
+  "family": [],
+  "id": 919
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "reckless",
+  "family": [],
+  "id": 920
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "reconcile",
+  "family": [
+   "reconciliation",
+   "reconciliatory"
+  ],
+  "id": 921
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "rectify",
+  "family": [
+   "rectification"
+  ],
+  "id": 922
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "recur",
+  "family": [
+   "recurrence"
+  ],
+  "id": 923
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "redundant",
+  "family": [
+   "redundancy"
+  ],
+  "id": 924
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "reel",
+  "family": [],
+  "id": 925
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "referee",
+  "family": [],
+  "id": 926
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "referendum",
+  "family": [],
+  "id": 927
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "refuge",
+  "family": [
+   "refugee"
+  ],
+  "id": 928
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "refund",
+  "family": [],
+  "id": 929
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "refute",
+  "family": [
+   "refutation"
+  ],
+  "id": 930
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "regime",
+  "family": [],
+  "id": 931
+ },
+ {
+  "page": 114,
+  "book_page": 109,
+  "star": true,
+  "head": "regiment",
+  "family": [
+   "regimental"
+  ],
+  "id": 932
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "rehabilitate",
+  "family": [
+   "rehabilitation"
+  ],
+  "id": 933
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "rehearse",
+  "family": [
+   "rehearsal"
+  ],
+  "id": 934
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "reign",
+  "family": [],
+  "id": 935
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "rein",
+  "family": [],
+  "id": 936
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "rejoice",
+  "family": [
+   "rejoicing"
+  ],
+  "id": 937
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "relentless",
+  "family": [],
+  "id": 938
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "relic",
+  "family": [],
+  "id": 939
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "relish",
+  "family": [],
+  "id": 940
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "reminiscent",
+  "family": [
+   "reminiscence"
+  ],
+  "id": 941
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "remnant",
+  "family": [],
+  "id": 942
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "renaissance",
+  "family": [],
+  "id": 943
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "renown",
+  "family": [
+   "renowned"
+  ],
+  "id": 944
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "repel",
+  "family": [],
+  "id": 945
+ },
+ {
+  "page": 115,
+  "book_page": 110,
+  "star": true,
+  "head": "repertoire",
+  "family": [],
+  "id": 946
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "repress",
+  "family": [
+   "repression",
+   "repressive"
+  ],
+  "id": 947
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "reproach",
+  "family": [],
+  "id": 948
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "repute",
+  "family": [
+   "reputable"
+  ],
+  "id": 949
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "reservoir",
+  "family": [],
+  "id": 950
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "reshuffle",
+  "family": [],
+  "id": 951
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "restless",
+  "family": [],
+  "id": 952
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "retaliate",
+  "family": [
+   "retaliation"
+  ],
+  "id": 953
+ },
+ {
+  "page": 116,
+  "book_page": 111,
+  "star": true,
+  "head": "retarded",
+  "family": [],
+  "id": 954
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "retort",
+  "family": [],
+  "id": 955
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "retrieve",
+  "family": [
+   "retrieval"
+  ],
+  "id": 956
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "retrospect",
+  "family": [
+   "retrospective"
+  ],
+  "id": 957
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "revenge",
+  "family": [
+   "revengeful"
+  ],
+  "id": 958
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "revive",
+  "family": [
+   "revival"
+  ],
+  "id": 959
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "revolt",
+  "family": [],
+  "id": 960
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "rhetoric",
+  "family": [
+   "rhetorical"
+  ],
+  "id": 961
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "ridge",
+  "family": [],
+  "id": 962
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "rig",
+  "family": [],
+  "id": 963
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "rigid",
+  "family": [
+   "rigidity"
+  ],
+  "id": 964
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "rigo(u)r",
+  "family": [
+   "rigorous"
+  ],
+  "id": 965
+ },
+ {
+  "page": 117,
+  "book_page": 112,
+  "star": true,
+  "head": "rim",
+  "family": [],
+  "id": 966
+ },
+ {
+  "page": 118,
+  "book_page": 113,
+  "star": true,
+  "head": "ritual",
+  "family": [],
+  "id": 967
+ },
+ {
+  "page": 118,
+  "book_page": 113,
+  "star": true,
+  "head": "robust",
+  "family": [],
+  "id": 968
+ },
+ {
+  "page": 118,
+  "book_page": 113,
+  "star": true,
+  "head": "rot",
+  "family": [
+   "rotten"
+  ],
+  "id": 969
+ },
+ {
+  "page": 118,
+  "book_page": 113,
+  "star": true,
+  "head": "rotate",
+  "family": [
+   "rotation"
+  ],
+  "id": 970
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "rust",
+  "family": [
+   "rusty"
+  ],
+  "id": 971
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "ruthless",
+  "family": [],
+  "id": 972
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "sacred",
+  "family": [],
+  "id": 973
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "saddle",
+  "family": [],
+  "id": 974
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "safeguard",
+  "family": [],
+  "id": 975
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "salmon",
+  "family": [],
+  "id": 976
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "salon",
+  "family": [],
+  "id": 977
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "salute",
+  "family": [
+   "salutation"
+  ],
+  "id": 978
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "salvage",
+  "family": [],
+  "id": 979
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "salvation",
+  "family": [],
+  "id": 980
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "sanction",
+  "family": [],
+  "id": 981
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "sanctuary",
+  "family": [],
+  "id": 982
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "sanitation",
+  "family": [
+   "sanitary"
+  ],
+  "id": 983
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "sarcasm",
+  "family": [
+   "sarcastic"
+  ],
+  "id": 984
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "satire",
+  "family": [
+   "satirical",
+   "satirist"
+  ],
+  "id": 985
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "saturate",
+  "family": [
+   "saturation"
+  ],
+  "id": 986
+ },
+ {
+  "page": 119,
+  "book_page": 114,
+  "star": true,
+  "head": "savage",
+  "family": [],
+  "id": 987
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scenario",
+  "family": [],
+  "id": 988
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scorn",
+  "family": [
+   "scornful"
+  ],
+  "id": 989
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scramble",
+  "family": [],
+  "id": 990
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scrap",
+  "family": [],
+  "id": 991
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scrape",
+  "family": [],
+  "id": 992
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scrub",
+  "family": [],
+  "id": 993
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "scrutiny",
+  "family": [
+   "scrutinize/-ise"
+  ],
+  "id": 994
+ },
+ {
+  "page": 120,
+  "book_page": 115,
+  "star": true,
+  "head": "sculpture",
+  "family": [],
+  "id": 995
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "secular",
+  "family": [],
+  "id": 996
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "seduce",
+  "family": [
+   "seduction",
+   "seductive"
+  ],
+  "id": 997
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "segregate",
+  "family": [
+   "segregation"
+  ],
+  "id": 998
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "sensation",
+  "family": [
+   "sensational"
+  ],
+  "id": 999
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "sentiment",
+  "family": [
+   "sentimental"
+  ],
+  "id": 1000
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "sergeant",
+  "family": [],
+  "id": 1001
+ },
+ {
+  "page": 121,
+  "book_page": 116,
+  "star": true,
+  "head": "serial",
+  "family": [],
+  "id": 1002
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shabby",
+  "family": [],
+  "id": 1003
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shaft",
+  "family": [],
+  "id": 1004
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shark",
+  "family": [],
+  "id": 1005
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shatter",
+  "family": [],
+  "id": 1006
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shepherd",
+  "family": [],
+  "id": 1007
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shield",
+  "family": [],
+  "id": 1008
+ },
+ {
+  "page": 122,
+  "book_page": 117,
+  "star": true,
+  "head": "shipyard",
+  "family": [],
+  "id": 1009
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "shorthand",
+  "family": [],
+  "id": 1010
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "shove",
+  "family": [],
+  "id": 1011
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "showcase",
+  "family": [],
+  "id": 1012
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "shred",
+  "family": [],
+  "id": 1013
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "shrewd",
+  "family": [],
+  "id": 1014
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "shrub",
+  "family": [
+   "shrubbery"
+  ],
+  "id": 1015
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "signify",
+  "family": [],
+  "id": 1016
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "simulate",
+  "family": [
+   "simulation"
+  ],
+  "id": 1017
+ },
+ {
+  "page": 123,
+  "book_page": 118,
+  "star": true,
+  "head": "simultaneous",
+  "family": [],
+  "id": 1018
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "sinister",
+  "family": [],
+  "id": 1019
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "skeptical/sceptical",
+  "family": [
+   "skeptic/sceptic",
+   "skepticism/scepticism"
+  ],
+  "id": 1020
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "skim",
+  "family": [],
+  "id": 1021
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "skull",
+  "family": [],
+  "id": 1022
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "slack",
+  "family": [],
+  "id": 1023
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "slam",
+  "family": [],
+  "id": 1024
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "slash",
+  "family": [],
+  "id": 1025
+ },
+ {
+  "page": 124,
+  "book_page": 119,
+  "star": true,
+  "head": "slaughter",
+  "family": [],
+  "id": 1026
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "slot",
+  "family": [],
+  "id": 1027
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "slum",
+  "family": [],
+  "id": 1028
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "slump",
+  "family": [],
+  "id": 1029
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "smuggle",
+  "family": [
+   "smuggling",
+   "smuggler"
+  ],
+  "id": 1030
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "snail",
+  "family": [],
+  "id": 1031
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "snap",
+  "family": [],
+  "id": 1032
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "snatch",
+  "family": [],
+  "id": 1033
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "sneak",
+  "family": [],
+  "id": 1034
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "sniff",
+  "family": [],
+  "id": 1035
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "snob",
+  "family": [
+   "snobbish"
+  ],
+  "id": 1036
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "sob",
+  "family": [],
+  "id": 1037
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "sober/-re",
+  "family": [],
+  "id": 1038
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "socket",
+  "family": [],
+  "id": 1039
+ },
+ {
+  "page": 125,
+  "book_page": 120,
+  "star": true,
+  "head": "sodium",
+  "family": [],
+  "id": 1040
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "solicit",
+  "family": [
+   "solicitor"
+  ],
+  "id": 1041
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "solidarity",
+  "family": [],
+  "id": 1042
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "solitary",
+  "family": [
+   "solitude"
+  ],
+  "id": 1043
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "solo",
+  "family": [],
+  "id": 1044
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "soothe",
+  "family": [],
+  "id": 1045
+ },
+ {
+  "page": 126,
+  "book_page": 121,
+  "star": true,
+  "head": "sovereign",
+  "family": [
+   "sovereignty"
+  ],
+  "id": 1046
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spaghetti",
+  "family": [],
+  "id": 1047
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spear",
+  "family": [],
+  "id": 1048
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "specialty/speciality",
+  "family": [],
+  "id": 1049
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spectacle",
+  "family": [
+   "spectacular"
+  ],
+  "id": 1050
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spectator",
+  "family": [],
+  "id": 1051
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spectrum",
+  "family": [],
+  "id": 1052
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spice",
+  "family": [
+   "spicy"
+  ],
+  "id": 1053
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spider",
+  "family": [],
+  "id": 1054
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spine",
+  "family": [
+   "spinal"
+  ],
+  "id": 1055
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "spiral",
+  "family": [],
+  "id": 1056
+ },
+ {
+  "page": 127,
+  "book_page": 122,
+  "star": true,
+  "head": "sponge",
+  "family": [
+   "spongy"
+  ],
+  "id": 1057
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "spotlight",
+  "family": [],
+  "id": 1058
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "sprawl",
+  "family": [],
+  "id": 1059
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "sprinkle",
+  "family": [],
+  "id": 1060
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "squad",
+  "family": [],
+  "id": 1061
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stab",
+  "family": [],
+  "id": 1062
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stagger",
+  "family": [],
+  "id": 1063
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stagnate",
+  "family": [
+   "stagnation",
+   "stagnant"
+  ],
+  "id": 1064
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stalk",
+  "family": [],
+  "id": 1065
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stall",
+  "family": [],
+  "id": 1066
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stammer",
+  "family": [],
+  "id": 1067
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "stance",
+  "family": [],
+  "id": 1068
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "standby",
+  "family": [],
+  "id": 1069
+ },
+ {
+  "page": 128,
+  "book_page": 123,
+  "star": true,
+  "head": "staple²",
+  "family": [
+   "stapler"
+  ],
+  "id": 1070
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stark",
+  "family": [],
+  "id": 1071
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "static",
+  "family": [],
+  "id": 1072
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stationery",
+  "family": [],
+  "id": 1073
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "statute",
+  "family": [
+   "statutory"
+  ],
+  "id": 1074
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stereotype",
+  "family": [],
+  "id": 1075
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stern",
+  "family": [],
+  "id": 1076
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "steward(ess)",
+  "family": [],
+  "id": 1077
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stifle",
+  "family": [],
+  "id": 1078
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stigma",
+  "family": [],
+  "id": 1079
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stipulate",
+  "family": [
+   "stipulation"
+  ],
+  "id": 1080
+ },
+ {
+  "page": 129,
+  "book_page": 124,
+  "star": true,
+  "head": "stitch",
+  "family": [],
+  "id": 1081
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "stoop",
+  "family": [],
+  "id": 1082
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "stout",
+  "family": [],
+  "id": 1083
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "strait",
+  "family": [],
+  "id": 1084
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "strand",
+  "family": [],
+  "id": 1085
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "strangle",
+  "family": [],
+  "id": 1086
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "stray",
+  "family": [],
+  "id": 1087
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "streak",
+  "family": [],
+  "id": 1088
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "streamline",
+  "family": [],
+  "id": 1089
+ },
+ {
+  "page": 130,
+  "book_page": 125,
+  "star": true,
+  "head": "stroll",
+  "family": [],
+  "id": 1090
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "stubborn",
+  "family": [],
+  "id": 1091
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "stumble",
+  "family": [],
+  "id": 1092
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "stump",
+  "family": [],
+  "id": 1093
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "stun",
+  "family": [
+   "stunning"
+  ],
+  "id": 1094
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "sturdy",
+  "family": [],
+  "id": 1095
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "submarine",
+  "family": [],
+  "id": 1096
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "submerge",
+  "family": [],
+  "id": 1097
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "subordinate",
+  "family": [
+   "subordination"
+  ],
+  "id": 1098
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "subscribe",
+  "family": [
+   "subscription",
+   "subscriber"
+  ],
+  "id": 1099
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "subsidy",
+  "family": [
+   "subsidize/-ise"
+  ],
+  "id": 1100
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "subsistence",
+  "family": [],
+  "id": 1101
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "subtle",
+  "family": [
+   "subtlety"
+  ],
+  "id": 1102
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "sue",
+  "family": [],
+  "id": 1103
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "suffice",
+  "family": [],
+  "id": 1104
+ },
+ {
+  "page": 131,
+  "book_page": 126,
+  "star": true,
+  "head": "suicide",
+  "family": [
+   "suicidal"
+  ],
+  "id": 1105
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "suite",
+  "family": [],
+  "id": 1106
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "sulfur/sulphur",
+  "family": [],
+  "id": 1107
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "summon",
+  "family": [],
+  "id": 1108
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "superintendent",
+  "family": [],
+  "id": 1109
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "superstition",
+  "family": [
+   "superstitious"
+  ],
+  "id": 1110
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "suppress",
+  "family": [
+   "suppression",
+   "suppressive"
+  ],
+  "id": 1111
+ },
+ {
+  "page": 132,
+  "book_page": 127,
+  "star": true,
+  "head": "surpass",
+  "family": [],
+  "id": 1112
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "surveillance",
+  "family": [],
+  "id": 1113
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "susceptible",
+  "family": [],
+  "id": 1114
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "swamp",
+  "family": [],
+  "id": 1115
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "swap",
+  "family": [],
+  "id": 1116
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "symmetry",
+  "family": [
+   "symmetric(al)"
+  ],
+  "id": 1117
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "symphony",
+  "family": [],
+  "id": 1118
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "symposium",
+  "family": [],
+  "id": 1119
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "syndicate",
+  "family": [],
+  "id": 1120
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "syndrome",
+  "family": [],
+  "id": 1121
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "synonym",
+  "family": [],
+  "id": 1122
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "synthesis",
+  "family": [
+   "synthetic",
+   "synthesize/-ise"
+  ],
+  "id": 1123
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "taboo",
+  "family": [],
+  "id": 1124
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "tack",
+  "family": [],
+  "id": 1125
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "tact",
+  "family": [
+   "tactful"
+  ],
+  "id": 1126
+ },
+ {
+  "page": 133,
+  "book_page": 128,
+  "star": true,
+  "head": "tactic",
+  "family": [],
+  "id": 1127
+ },
+ {
+  "page": 134,
+  "book_page": 129,
+  "star": true,
+  "head": "tan",
+  "family": [],
+  "id": 1128
+ },
+ {
+  "page": 134,
+  "book_page": 129,
+  "star": true,
+  "head": "tangle",
+  "family": [],
+  "id": 1129
+ },
+ {
+  "page": 134,
+  "book_page": 129,
+  "star": true,
+  "head": "tanker",
+  "family": [],
+  "id": 1130
+ },
+ {
+  "page": 134,
+  "book_page": 129,
+  "star": true,
+  "head": "tariff",
+  "family": [],
+  "id": 1131
+ },
+ {
+  "page": 134,
+  "book_page": 129,
+  "star": true,
+  "head": "tease",
+  "family": [],
+  "id": 1132
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "temperament",
+  "family": [],
+  "id": 1133
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tempo",
+  "family": [],
+  "id": 1134
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "temporal",
+  "family": [],
+  "id": 1135
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tempt",
+  "family": [
+   "temptation"
+  ],
+  "id": 1136
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tenant",
+  "family": [],
+  "id": 1137
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tentative",
+  "family": [],
+  "id": 1138
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tenure",
+  "family": [],
+  "id": 1139
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "terminate",
+  "family": [
+   "termination"
+  ],
+  "id": 1140
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "terrace",
+  "family": [],
+  "id": 1141
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "terrain",
+  "family": [],
+  "id": 1142
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "tertiary",
+  "family": [],
+  "id": 1143
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "testify",
+  "family": [],
+  "id": 1144
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "testimony",
+  "family": [],
+  "id": 1145
+ },
+ {
+  "page": 135,
+  "book_page": 130,
+  "star": true,
+  "head": "texture",
+  "family": [],
+  "id": 1146
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "thermal",
+  "family": [],
+  "id": 1147
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "thigh",
+  "family": [],
+  "id": 1148
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "thorn",
+  "family": [
+   "thorny"
+  ],
+  "id": 1149
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "threshold",
+  "family": [],
+  "id": 1150
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "thrift",
+  "family": [
+   "thrifty"
+  ],
+  "id": 1151
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "thrill",
+  "family": [
+   "thriller"
+  ],
+  "id": 1152
+ },
+ {
+  "page": 136,
+  "book_page": 131,
+  "star": true,
+  "head": "throne",
+  "family": [],
+  "id": 1153
+ },
+ {
+  "page": 137,
+  "book_page": 132,
+  "star": true,
+  "head": "tickle",
+  "family": [],
+  "id": 1154
+ },
+ {
+  "page": 137,
+  "book_page": 132,
+  "star": true,
+  "head": "tile",
+  "family": [],
+  "id": 1155
+ },
+ {
+  "page": 137,
+  "book_page": 132,
+  "star": true,
+  "head": "tilt",
+  "family": [],
+  "id": 1156
+ },
+ {
+  "page": 137,
+  "book_page": 132,
+  "star": true,
+  "head": "timid",
+  "family": [],
+  "id": 1157
+ },
+ {
+  "page": 137,
+  "book_page": 132,
+  "star": true,
+  "head": "toil",
+  "family": [],
+  "id": 1158
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "topple",
+  "family": [],
+  "id": 1159
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "tornado",
+  "family": [],
+  "id": 1160
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "tournament",
+  "family": [],
+  "id": 1161
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "tow",
+  "family": [],
+  "id": 1162
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "toxic",
+  "family": [],
+  "id": 1163
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "tract",
+  "family": [],
+  "id": 1164
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "trait",
+  "family": [],
+  "id": 1165
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "tranquil",
+  "family": [
+   "tranquility"
+  ],
+  "id": 1166
+ },
+ {
+  "page": 138,
+  "book_page": 133,
+  "star": true,
+  "head": "transcend",
+  "family": [],
+  "id": 1167
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "transient",
+  "family": [],
+  "id": 1168
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "transistor",
+  "family": [],
+  "id": 1169
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "transition",
+  "family": [
+   "transitional"
+  ],
+  "id": 1170
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trauma",
+  "family": [
+   "traumatic"
+  ],
+  "id": 1171
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "tread",
+  "family": [],
+  "id": 1172
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "treasury",
+  "family": [
+   "treasurer"
+  ],
+  "id": 1173
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trek",
+  "family": [],
+  "id": 1174
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trench",
+  "family": [],
+  "id": 1175
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "tribe",
+  "family": [
+   "tribal"
+  ],
+  "id": 1176
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "tribune",
+  "family": [],
+  "id": 1177
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "tribute",
+  "family": [],
+  "id": 1178
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trickle",
+  "family": [],
+  "id": 1179
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trillion",
+  "family": [],
+  "id": 1180
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trim",
+  "family": [],
+  "id": 1181
+ },
+ {
+  "page": 139,
+  "book_page": 134,
+  "star": true,
+  "head": "trivial",
+  "family": [],
+  "id": 1182
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "trophy",
+  "family": [],
+  "id": 1183
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "tropic",
+  "family": [
+   "tropical"
+  ],
+  "id": 1184
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "trumpet",
+  "family": [],
+  "id": 1185
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "tub",
+  "family": [],
+  "id": 1186
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "tuck",
+  "family": [],
+  "id": 1187
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "tug",
+  "family": [],
+  "id": 1188
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "tumble",
+  "family": [],
+  "id": 1189
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "turbulent",
+  "family": [
+   "turbulence"
+  ],
+  "id": 1190
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "turmoil",
+  "family": [],
+  "id": 1191
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "turnout",
+  "family": [],
+  "id": 1192
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "turnover",
+  "family": [],
+  "id": 1193
+ },
+ {
+  "page": 140,
+  "book_page": 135,
+  "star": true,
+  "head": "turtle",
+  "family": [],
+  "id": 1194
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "ultra",
+  "family": [],
+  "id": 1195
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unanimous",
+  "family": [],
+  "id": 1196
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "underlie",
+  "family": [
+   "underlying"
+  ],
+  "id": 1197
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unfold",
+  "family": [],
+  "id": 1198
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unify",
+  "family": [
+   "unification"
+  ],
+  "id": 1199
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unilateral",
+  "family": [],
+  "id": 1200
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unleash",
+  "family": [],
+  "id": 1201
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unprecedented",
+  "family": [],
+  "id": 1202
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "unveil",
+  "family": [],
+  "id": 1203
+ },
+ {
+  "page": 141,
+  "book_page": 136,
+  "star": true,
+  "head": "uphold",
+  "family": [],
+  "id": 1204
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "uprising",
+  "family": [],
+  "id": 1205
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "uranium",
+  "family": [],
+  "id": 1206
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "urine",
+  "family": [
+   "urinate"
+  ],
+  "id": 1207
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "vaccine",
+  "family": [
+   "vaccinate",
+   "vaccination"
+  ],
+  "id": 1208
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "valve",
+  "family": [],
+  "id": 1209
+ },
+ {
+  "page": 142,
+  "book_page": 137,
+  "star": true,
+  "head": "vegetation",
+  "family": [],
+  "id": 1210
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vein",
+  "family": [],
+  "id": 1211
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "velocity",
+  "family": [],
+  "id": 1212
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "velvet",
+  "family": [],
+  "id": 1213
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vent",
+  "family": [],
+  "id": 1214
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "ventilate",
+  "family": [
+   "ventilation"
+  ],
+  "id": 1215
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "venue",
+  "family": [],
+  "id": 1216
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "verdict",
+  "family": [],
+  "id": 1217
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "verge",
+  "family": [],
+  "id": 1218
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "versatile",
+  "family": [],
+  "id": 1219
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "verse",
+  "family": [],
+  "id": 1220
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vest",
+  "family": [],
+  "id": 1221
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "viable",
+  "family": [],
+  "id": 1222
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vibrate",
+  "family": [
+   "vibration"
+  ],
+  "id": 1223
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vice",
+  "family": [],
+  "id": 1224
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vicinity",
+  "family": [],
+  "id": 1225
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "vicious",
+  "family": [],
+  "id": 1226
+ },
+ {
+  "page": 143,
+  "book_page": 138,
+  "star": true,
+  "head": "virgin",
+  "family": [
+   "virginity"
+  ],
+  "id": 1227
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "vocal",
+  "family": [],
+  "id": 1228
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "vogue",
+  "family": [],
+  "id": 1229
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "void",
+  "family": [],
+  "id": 1230
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "volatile",
+  "family": [
+   "volatility"
+  ],
+  "id": 1231
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "voucher",
+  "family": [],
+  "id": 1232
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "vow",
+  "family": [],
+  "id": 1233
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "vulgar",
+  "family": [],
+  "id": 1234
+ },
+ {
+  "page": 144,
+  "book_page": 139,
+  "star": true,
+  "head": "waive",
+  "family": [
+   "waiver"
+  ],
+  "id": 1235
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "wardrobe",
+  "family": [],
+  "id": 1236
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "warrant",
+  "family": [],
+  "id": 1237
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "warranty",
+  "family": [],
+  "id": 1238
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "watt",
+  "family": [],
+  "id": 1239
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "weary",
+  "family": [
+   "weariness"
+  ],
+  "id": 1240
+ },
+ {
+  "page": 145,
+  "book_page": 140,
+  "star": true,
+  "head": "wedge",
+  "family": [],
+  "id": 1241
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "wharf",
+  "family": [],
+  "id": 1242
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "whereabouts",
+  "family": [],
+  "id": 1243
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "whereby",
+  "family": [],
+  "id": 1244
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "whirl",
+  "family": [],
+  "id": 1245
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "wholesale",
+  "family": [],
+  "id": 1246
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "wholesome",
+  "family": [],
+  "id": 1247
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "wicked",
+  "family": [],
+  "id": 1248
+ },
+ {
+  "page": 146,
+  "book_page": 141,
+  "star": true,
+  "head": "wield",
+  "family": [],
+  "id": 1249
+ },
+ {
+  "page": 147,
+  "book_page": 142,
+  "star": true,
+  "head": "wink",
+  "family": [],
+  "id": 1250
+ },
+ {
+  "page": 147,
+  "book_page": 142,
+  "star": true,
+  "head": "witch",
+  "family": [],
+  "id": 1251
+ },
+ {
+  "page": 147,
+  "book_page": 142,
+  "star": true,
+  "head": "wither",
+  "family": [],
+  "id": 1252
+ },
+ {
+  "page": 147,
+  "book_page": 142,
+  "star": true,
+  "head": "withhold",
+  "family": [],
+  "id": 1253
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "wrench",
+  "family": [],
+  "id": 1254
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "wrestle",
+  "family": [
+   "wrestling"
+  ],
+  "id": 1255
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "wretched",
+  "family": [],
+  "id": 1256
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "yacht",
+  "family": [],
+  "id": 1257
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "yawn",
+  "family": [],
+  "id": 1258
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "yearn",
+  "family": [
+   "yearning"
+  ],
+  "id": 1259
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "zeal",
+  "family": [
+   "zealous"
+  ],
+  "id": 1260
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "zigzag",
+  "family": [],
+  "id": 1261
+ },
+ {
+  "page": 148,
+  "book_page": 143,
+  "star": true,
+  "head": "zip",
+  "family": [
+   "zipper"
+  ],
+  "id": 1262
+ },
+ {
+  "page": 149,
+  "book_page": 144,
+  "star": true,
+  "head": "zoom",
+  "family": [],
+  "id": 1263
+ }
+]

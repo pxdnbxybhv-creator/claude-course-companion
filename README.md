@@ -103,6 +103,10 @@ The prompts are subject-agnostic. I developed them around my own computer scienc
 
 You may want to adjust the quiz format or the number of questions for courses that are more proof-based or more calculation-heavy. Contributions of subject-specific examples are welcome; see [Contributing](CONTRIBUTING.md).
 
+## Side projects
+
+- [`cet6-vocab/`](cet6-vocab/) — a 30-day CET-6 vocabulary handout for iPad (OSTEP-style). Design stage; see its [DESIGN.md](cet6-vocab/DESIGN.md).
+
 ## Project status
 
 This is an early, lightweight project based on a personal learning workflow. Feedback and improvements are welcome.
