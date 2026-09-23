@@ -14,7 +14,7 @@ VARIANTS = [  # (label, file token, path)
     ("Real-CUGAN 2x no-denoise", "cugan2x-nodenoise", O + "realcugan2x_nodenoise_4k.png"),
 ]
 SHORT = {
-    "region1-green-hair-face-flower-spear": "region1-green-face-flower-spear",
+    "region1-green-hair-face-flower-sword": "region1-green-face-flower-sword",
     "region2-silver-hair-face": "region2-silver-face",
     "region3-rock-brushstrokes": "region3-rock-brushstrokes",
     "region4-dark-blue-gradient": "region4-dark-blue-gradient",

@@ -8,7 +8,7 @@ FONT = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
 
 # (file key, box in 3840x2160 coords (left, top, right, bottom), Chinese title)
 REGIONS = [
-    ("region1-green-hair-face-flower-spear", (1260, 1330, 1720, 1640), "区域1 左侧绿发人物：脸、花饰、长枪"),
+    ("region1-green-hair-face-flower-sword", (1260, 1330, 1720, 1640), "区域1 左侧绿发人物：脸、花饰、长剑"),
     ("region2-silver-hair-face", (2960, 1080, 3360, 1360), "区域2 右侧银发人物的脸"),
     ("region3-rock-brushstrokes", (1800, 300, 2300, 650), "区域3 中间岩壁厚涂笔触"),
     ("region4-dark-blue-gradient", (3300, 100, 3800, 450), "区域4 右上角深蓝暗部渐变"),
