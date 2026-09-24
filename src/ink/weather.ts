@@ -233,13 +233,13 @@ export class Weather {
     else if (Math.abs(wind) > 0.35 && r() < 0.5) { p.x = wind > 0 ? -20 : w + 20; p.y = r() * h * 0.7; }
     else { p.x = r.range(-0.1, 1.1) * w; p.y = -20 - r() * 40; }
     if (kind === 'snow') {
-      p.size = lerp(3, 8.5, z * z);
+      p.size = lerp(5, 13, z * z);
       p.vy = lerp(12, 34, z);
     } else if (kind === 'petal') {
-      p.size = lerp(6, 11, z);
+      p.size = lerp(8, 14, z);
       p.vy = lerp(14, 26, z);
     } else {
-      p.size = lerp(8, 14, z);
+      p.size = lerp(11, 18, z);
       p.vy = lerp(20, 36, z);
     }
     return p;
@@ -448,7 +448,7 @@ export class Weather {
         kind: 'petal', x: x + r.gauss() * 3, y: y + r.gauss() * 3,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
         rot: r() * Math.PI * 2, vr: r.range(-4, 4), flip: r() * 6, vf: r.range(3, 7),
-        size: r.range(6, 10), sprite: r.int(0, 5), z: 0.8, phase: r() * 10, life, maxLife: life,
+        size: r.range(9, 14), sprite: r.int(0, 5), z: 0.8, phase: r() * 10, life, maxLife: life,
       });
       this.burstColors.push(col);
     }

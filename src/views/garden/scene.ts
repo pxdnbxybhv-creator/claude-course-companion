@@ -36,6 +36,31 @@ const BURST: Record<PlantKind, string | undefined> = {
   orchid: undefined, bamboo: undefined, pine: undefined,
 };
 const PARALLAX = 0.35;
+
+/**
+ * Where the ground should sit (fraction of scene height). On a tall phone canvas the plants should
+ * dominate and the pond take about a quarter; a wide desktop scroll can afford a deeper reflection.
+ */
+function groundTarget(w: number, h: number): number {
+  const a = w / h;
+  return clamp(0.725 - (a - 0.8) * 0.035, 0.67, 0.725);
+}
+
+/**
+ * The backdrop painter places its own ground line. To move it lower without reshaping the painting,
+ * paint the backdrop taller than the canvas and let the bottom of the pond fall outside the frame.
+ */
+export function backdropPaintHeight(w: number, h: number): number {
+  const target = groundTarget(w, h);
+  let h2 = h;
+  for (let i = 0; i < 4; i++) {
+    const g = groundLine(w, h2).groundY / h2;
+    const next = Math.max(h, Math.round((target * h) / g));
+    if (Math.abs(next - h2) < 1) break;
+    h2 = next;
+  }
+  return Math.min(h2, Math.round(h * 1.3));
+}
 const DEG = Math.PI / 180;
 const MAX_DPR = 2.5;
 
@@ -128,7 +153,7 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
   const n = items.length;
   if (n) {
     // When the painting has room, let the gaps breathe (each by what it can take) up to the width.
-    const spanOf = () => gaps.reduce((a, g) => a + g, 0) + L[0] * 0.6 + R[n - 1] * 0.6;
+    const spanOf = () => gaps.reduce((a, g) => a + g, 0) + L[0] + R[n - 1];
     const target = W - margin * 2;
     if (n >= 2 && spanOf() < target) {
       const room = gaps.map((g, i) => (i === 0 ? 0 : Math.max(0, (R[i - 1] + L[i]) * 1.05 + 24 - g)));
@@ -136,7 +161,7 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
       const extra = Math.min(target - spanOf(), total);
       if (total > 0) gaps.forEach((_, i) => (gaps[i] += (extra * room[i]) / total));
     }
-    let x = margin + L[0] * 0.6;
+    let x = margin + L[0];
     items.forEach((it, i) => { x += gaps[i]; it.x = x; });
   }
 
@@ -159,12 +184,12 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
     });
   }
 
-  const last = n ? items[n - 1].x + R[n - 1] * 0.6 : 0;
+  const last = n ? items[n - 1].x + R[n - 1] : 0;
   let worldW = Math.max(W, last + margin);
   const all = [...items, ...rocks];
   if (n && last + margin <= W + 0.5) {
     // Fits: centre the group; a lone plant stands toward the mountains, leaving open sky (留白).
-    const x0 = items[0].x - L[0] * 0.6;
+    const x0 = items[0].x - L[0];
     const want = n === 1 ? W * (0.5 + 0.13 * side) - items[0].x : (W - (last - x0)) / 2 - x0;
     for (const it of all) it.x += want;
     worldW = W;
@@ -278,7 +303,9 @@ export class GardenScene {
   private backdrop: Backdrop | null = null;
   private bdKey = '';
   private bdW = 0;
+  /** Canvas height the backdrop was painted for, and the (taller) height it was painted at. */
   private bdH = 0;
+  private bdPH = 0;
   private bdDue = 0;
   private plants: GardenPlant[] = [];
   private items: Placed[] = [];
@@ -529,17 +556,17 @@ export class GardenScene {
   }
 
   private get groundY(): number {
-    if (!this.backdrop) return groundLine(this.bdTargetW(), this.H).groundY;
+    if (!this.backdrop) return groundLine(this.bdTargetW(), backdropPaintHeight(this.bdTargetW(), this.H)).groundY;
     return this.backdrop.groundY * (this.H / this.bdH);
   }
 
   private get pondTop(): number {
-    if (!this.backdrop) return groundLine(this.bdTargetW(), this.H).pondTop;
+    if (!this.backdrop) return groundLine(this.bdTargetW(), backdropPaintHeight(this.bdTargetW(), this.H)).pondTop;
     return this.backdrop.pondTop * (this.H / this.bdH);
   }
 
   private get labelSize(): number {
-    return this.H > 470 ? 13 : 12;
+    return this.H > 470 ? 12 : 11;
   }
 
   private relayout(): void {
@@ -674,9 +701,11 @@ export class GardenScene {
     if (key !== this.bdKey && now >= this.bdDue) {
       const hadGround = this.backdrop ? this.groundY : -1;
       const bw = this.bdTargetW();
-      this.backdrop = paintBackdrop(bw, this.H, this.dpr, this.env);
+      const ph = backdropPaintHeight(bw, this.H);
+      this.backdrop = paintBackdrop(bw, ph, this.dpr, this.env);
       this.bdW = bw;
       this.bdH = this.H;
+      this.bdPH = ph;
       this.bdKey = key;
       this.bdDue = 0;
       if (Math.abs(hadGround - this.groundY) > 0.5 || this.backdrop.side !== undefined) this.relayout();
@@ -771,7 +800,7 @@ export class GardenScene {
       const k = H / this.bdH;
       const maxOff = Math.max(0, this.bdW * k - W);
       const off = clamp(this.pan * PARALLAX, 0, maxOff);
-      ctx.drawImage(bd.canvas, -off, 0, this.bdW * k, H);
+      ctx.drawImage(bd.canvas, -off, 0, this.bdW * k, this.bdPH * k);
     }
 
     // Plants and rocks, back to front.
@@ -864,7 +893,7 @@ export class GardenScene {
       if (x < -20 || x > this.W + 20) continue;
       const hot = this.hover === it.key;
       const done = it.plant.stats.doneToday;
-      const alpha = slot.appear * (hot ? 0.95 : done ? 0.78 : 0.56);
+      const alpha = slot.appear * (hot ? 0.9 : done ? 0.62 : 0.46);
       ctx.fillStyle = `rgba(52,46,38,${alpha.toFixed(3)})`;
       ctx.shadowColor = 'rgba(241,233,216,0.9)';
       ctx.shadowBlur = 3;
@@ -1001,12 +1030,12 @@ const yieldFrame = () => new Promise<void>((r) => setTimeout(r, 0));
 /** Paint a still image of the whole garden (backdrop, plants, rocks, pond) for export — no UI. */
 export async function renderGardenStill(o: { width: number; height: number; dpr: number; plants: GardenPlant[]; env: SceneEnv }): Promise<HTMLCanvasElement> {
   const { width: W, height: H, dpr } = o;
-  const bd = paintBackdrop(W, H, dpr, o.env);
+  const bd = paintBackdrop(W, backdropPaintHeight(W, H), dpr, o.env);
   const c = document.createElement('canvas');
   c.width = Math.round(W * dpr);
   c.height = Math.round(H * dpr);
   const ctx = c.getContext('2d')!;
-  ctx.drawImage(bd.canvas, 0, 0, c.width, c.height);
+  ctx.drawImage(bd.canvas, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const { items } = layoutGarden(o.plants, W, H, bd.groundY, bd.pondTop, true, bd.side ?? -1);
   for (const it of items) {

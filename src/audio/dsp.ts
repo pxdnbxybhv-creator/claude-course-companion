@@ -240,7 +240,7 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
   const vel = clamp(n.velocity ?? 0.7, 0.05, 1);
   const f0 = n.freq;
   const T0 = qinT60(f0) * (n.decay ?? 1);
-  const dur = n.dur ?? Math.min(6.5, 0.6 + T0 * 0.75);
+  const dur = n.dur ?? Math.min(7.5, 0.6 + T0 * 0.8);
   const len = Math.ceil(dur * sr);
   const out = new Float32Array(len);
   const step = 32;
@@ -261,23 +261,41 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
     exc[i] = tri * (1 - noiseMix) + comb * 0.5 * noiseMix;
   }
   // Softer plucks are darker: a one-pole low-pass on the excitation, run twice for a gentle slope.
-  const fc = 1200 + 7000 * vel * vel * (1 + 0.5 * (n.bright ?? 0));
+  const fc = 1000 + 4800 * vel * vel * (1 + 0.5 * (n.bright ?? 0));
   const k = Math.exp((-TAU * fc) / sr);
-  for (let pass = 0; pass < 2; pass++) {
+  for (let pass = 0; pass < 3; pass++) {
+    // circular: the shape is one period of a travelling wave, so let the filter wrap around
     let s = 0;
+    for (let i = 0; i < L0; i++) s = (1 - k) * exc[i] + k * s;
     for (let i = 0; i < L0; i++) { s = (1 - k) * exc[i] + k * s; exc[i] = s; }
   }
-  subtractMean(exc);
+  // Zero-mean without a step at t = 0: subtract a Hann-shaped bump rather than a constant.
+  {
+    let m = 0;
+    for (let i = 0; i < L0; i++) m += exc[i];
+    m /= L0;
+    const e0 = exc[0];
+    for (let i = 0; i < L0; i++) exc[i] -= e0 * (1 - i / L0) + (m - e0 / 2) * 2 * (0.5 - 0.5 * Math.cos((TAU * i) / L0));
+  }
 
   const Th = 0.6 + 0.35 * vel;
   runString(out, sr, f0, T0, Th, exc, contour, step, 0, 1);
   runString(out, sr, f0, T0 * 1.4, Th * 1.2, exc, contour, step, 1.3, 0.28);
 
   // The soundboard is driven by the force at the bridge — the string's slope, not its
-  // displacement — which tilts the spectrum up ~6 dB/oct above ~150 Hz (a leaky differentiator).
-  const z = Math.exp((-TAU * 150) / sr);
-  for (let i = len - 1; i > 0; i--) out[i] -= z * out[i - 1];
-  out[0] *= 1 - z;
+  // displacement — which tilts the spectrum up ~6 dB/oct; bounded to 150 Hz…2 kHz (a shelf) so the
+  // noisy top of the attack is not exaggerated.
+  {
+    const z = Math.exp((-TAU * 150) / sr), pz = Math.exp((-TAU * 2000) / sr);
+    const k = (1 - pz) / (1 - z) * 0.5; // unity-ish gain around 500 Hz
+    let x1 = 0, y1 = 0;
+    for (let i = 0; i < len; i++) {
+      const x0 = out[i];
+      y1 = x0 - z * x1 + pz * y1;
+      x1 = x0;
+      out[i] = y1 * k;
+    }
+  }
   // Body: DC block, paulownia air cavity and plate resonances, a little silk presence,
   // a gentle top roll-off for warmth.
   filter(out, highpass(sr, 32, 0.7));
@@ -287,8 +305,16 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
   filter(out, peaking(sr, 1350, 2, 1.5));
   filter(out, lowpass(sr, 5200, 0.6));
 
-  const pk = peakOf(out, 0, Math.min(len, Math.round(0.4 * sr))) || 1;
-  scale(out, (0.85 * Math.pow(vel, 1.25)) / pk);
+  // Level: set by the sustained tone (RMS 50–400 ms), not by the transient peak, so every pitch
+  // and brightness sounds equally loud; the peak is only limited.
+  let e = 0;
+  const a0 = Math.round(0.05 * sr), a1 = Math.min(len, Math.round(0.4 * sr));
+  for (let i = a0; i < a1; i++) e += out[i] * out[i];
+  const rms = Math.sqrt(e / Math.max(1, a1 - a0)) || 1;
+  let gain = (0.22 * Math.pow(vel, 1.25)) / rms;
+  const pk = peakOf(out, 0, a1) * gain;
+  if (pk > 0.9) gain *= 0.9 / pk;
+  scale(out, gain);
 
   // Fingertip-and-nail transient: a brief band-passed tick.
   addNoiseBurst(out, sr, rng, 0.22 * vel * vel, 0.0018, [bandpass(sr, 3200, 0.9), lowpass(sr, 7000)]);
@@ -308,7 +334,7 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
     filter(sq, lowpass(sr, 3500));
     for (let i = 0; i < len; i++) out[i] += sq[i];
   }
-  return fadeTail(out, sr, Math.min(0.4, dur * 0.2));
+  return fadeTail(out, sr, Math.min(0.6, dur * 0.2));
 }
 
 // ---------------------------------------------------------------------------

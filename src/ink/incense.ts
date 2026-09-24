@@ -121,6 +121,7 @@ export function censerDrawing(seed = 1): CenserLayout {
       [x + w * 0.13 + lean, foot], [x + w * 0.3 + lean, top + h * 0.8], [x + w * 0.47, top + h * 0.42], [x + w * 0.5, top],
     ];
     add({ kind: 'wash', pts: poly(spline(o, 4), 1), tone: 0.7, color: ochre });
+    add({ kind: 'wash', pts: poly(spline(o, 4), 1), tone: 0.22, color: ink });
     const half: P2[] = [[x + lean * 0.3, top], [x + lean * 0.6, top + h * 0.5], ...o.slice(4, 7)];
     add({ kind: 'wash', pts: poly(half.concat([[x + w * 0.5, top]]), 1.2), tone: 0.45, color: ink });
     add({ kind: 'brush', pts: line(spline(o.slice(3, 8).reverse(), 4).reverse(), taper(2.4, 0.1, 0.35)), tone: 0.85 });
@@ -152,7 +153,7 @@ export function censerDrawing(seed = 1): CenserLayout {
   add({ kind: 'wash', pts: poly(crescent(under, (t) => 14 * Math.sin(Math.PI * t) ** 0.6, 0, -1), 1.2), tone: 0.36, color: ink });
   add({ kind: 'wash', pts: poly(crescent(left.slice().reverse().filter(([, y]) => y > 92 && y < 136), (t) => 6 * Math.sin(Math.PI * t), 1, 0), 3), tone: 0.14, color: ink });
   // metallic sheen: a pale glint on the lit shoulder
-  add({ kind: 'wash', pts: poly(ellipsePts(cx - 46, 98, 11, 3.6, -0.35, Math.PI * 2 - 0.35, 16), 3), tone: 0.22, color: white });
+  add({ kind: 'wash', pts: poly(ellipsePts(cx - 46, 98, 12, 3.8, -0.35, Math.PI * 2 - 0.35, 16), 3), tone: 0.5, color: white });
   // a warm glow on the lit shoulder (宝光)
   add({ kind: 'wash', pts: poly(ellipsePts(cx - 42, 100, 19, 7, -0.3, Math.PI * 2 - 0.3, 18), 5), tone: 0.2, color: PIGMENTS.gamboge });
   // patina: a few malachite blooms and dark pits
@@ -206,7 +207,7 @@ export function censerDrawing(seed = 1): CenserLayout {
     add({ kind: 'brush', pts: line(off(-3.9), (t) => 0.7 + 1.1 * Math.sin(Math.PI * t) * (d > 0 ? 1 : 0.7)), tone: 0.78 });
     add({ kind: 'line', pts: line(off(3.8).slice(2, -2), () => 0.9), tone: 0.5 });
     // glint along the lit side of the loop
-    add({ kind: 'line', pts: line(off(-1.2).slice(2, pts.length * 0.45 | 0), () => 1), tone: 0.35, color: white });
+    add({ kind: 'line', pts: line(off(-1.4).slice(2, pts.length * 0.45 | 0), () => 1.2), tone: 0.7, color: white });
   };
   ear(-1);
   ear(1);
@@ -234,7 +235,7 @@ export function censerDrawing(seed = 1): CenserLayout {
   add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.5, 62, 9, 0.1, Math.PI - 0.1, 34), () => 0.9), tone: 0.6 });
   add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.5, 62, 9, Math.PI, 2 * Math.PI, 34), () => 0.8), tone: 0.8 });
   // light catching the top of the front lip
-  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.8, 67, 10.8, 0.45, Math.PI - 0.25, 30), () => 1.1), tone: 0.4, color: white });
+  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.8, 67, 10.8, 0.45, Math.PI - 0.25, 30), () => 1.3), tone: 0.75, color: white });
 
   return {
     drawing: { width: 200, height: 190, anchor: { x: 100, y: 182 }, strokes: S },
@@ -260,13 +261,16 @@ export function createIncenseScene(seed = 1): IncenseScene {
   let baseX = 0, baseY = 0, stickLen = 0;
   const tilt = (rng() - 0.5) * 0.035; // radians, a stick is never quite plumb
   let progress = 0, lit = false;
+  let glow = 0; // eased ember brightness 0..1
   let time = 0;
   let ashLen = 2 + rng() * 5;
   let ashBreak = 7 + rng() * 8;
   let lastTipLen = -1;
   const flakes: Flake[] = [];
 
-  const tipLen = () => stickLen * (1 - clamp(progress, 0, 1));
+  // a short stub always stays standing in the ash
+  const stub = () => 3.2 * (k / 1.2);
+  const tipLen = () => stub() + (stickLen - stub()) * (1 - clamp(progress, 0, 1));
   const tipPos = (len: number) => ({ x: baseX + Math.sin(tilt) * len, y: baseY - Math.cos(tilt) * len });
   const burning = () => lit && progress < 0.999;
 
@@ -329,7 +333,10 @@ export function createIncenseScene(seed = 1): IncenseScene {
       const t = tipPos(len);
       smoke.x = t.x + Math.sin(tilt) * ashLen;
       smoke.y = t.y - Math.max(0.6 * ashLen, 1.5);
-      smoke.emitting = burning();
+      glow += ((burning() ? 1 : 0) - glow) * (1 - Math.exp(-dt / (burning() ? 0.5 : 1.1)));
+      if (glow < 0.004) glow = 0;
+      smoke.emitting = glow > 0.12;
+      smoke.strength = clamp((glow - 0.12) / 0.88, 0, 1) ** 0.7;
       smoke.step(dt);
       for (const f of flakes) {
         if (f.rest > 0) { f.rest += dt; continue; }
@@ -393,8 +400,8 @@ export function createIncenseScene(seed = 1): IncenseScene {
           ctx.lineCap = 'butt';
         }
       }
-      if (burning() && len > 0.5) {
-        const fl = 0.78 + 0.16 * nFlick(time * 2.1, 0.5) + 0.08 * nFlick(time * 9.3, 4.1);
+      if (glow > 0 && len > 0.5) {
+        const fl = glow * (0.78 + 0.16 * nFlick(time * 2.1, 0.5) + 0.08 * nFlick(time * 9.3, 4.1));
         const gy = t.y - 0.6 * u;
         const R = 13 * u * (0.9 + 0.2 * fl);
         const g = ctx.createRadialGradient(t.x, gy, 0, t.x, gy, R);

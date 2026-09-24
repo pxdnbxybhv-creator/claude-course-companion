@@ -549,9 +549,9 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
     const q = S[Math.min(N, i * 8 - rng.int(1, 3))];
     const s = rng.chance(0.75) ? 1 : -1;
     const a = off(q, 0.88 * s);
-    const ang = Math.atan2(q.nx, q.ny) + Math.PI; // along the spine, pointing down
-    const b = add(a, dir(ang + rng.range(-0.25, 0.25)), rng.range(0.03, 0.055) * H);
-    push('brush', bowed(a, b, q.hw * 0.32, 0.7, rng.range(-0.1, 0.1), 3), rng.range(0.86, 0.95), 0.38 + i * 0.005, { dryness: 0.35 });
+    const ang = Math.atan2(q.ny, q.nx) + Math.PI; // along the spine, pointing down
+    const b = add(a, dir(ang + s * rng.range(-0.05, 0.12)), rng.range(0.025, 0.045) * H);
+    push('brush', bowed(a, b, q.hw * 0.28, 0.7, rng.range(-0.1, 0.1), 3), rng.range(0.82, 0.92), 0.38 + i * 0.005, { dryness: 0.35 });
   }
 
   // moss dots 苔点, in little groups straddling the contour
@@ -670,8 +670,8 @@ function paintBlossoms(
     const birth = 0.47 + 0.12 * (i / Math.max(1, buds.length - 1));
     const base = add(b.p, dir(b.a), -b.r * 0.75);
     if (style === 'rouge') push('dot', [{ ...b.p, w: b.r * 2 }], rng.range(0.6, 0.8), birth, { color: PIGMENTS.rouge });
-    else push('dot', [{ ...b.p, w: b.r * 1.8 }], rng.range(0.3, 0.5), birth);
-    push('dot', [{ ...base, w: b.r * 0.9 }], 0.9, birth);
+    else push('dot', [{ ...b.p, w: b.r * 1.5 }], rng.range(0.62, 0.8), birth);
+    push('dot', [{ ...base, w: b.r * 0.85 }], 0.92, birth);
   });
 
   // blossoms open (0.56–1): the first near the main focus, then spreading

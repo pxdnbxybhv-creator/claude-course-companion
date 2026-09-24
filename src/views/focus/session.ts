@@ -38,6 +38,8 @@ export const viewShown = signal(false);
 export const notifyAsk = signal(false);
 
 const NOTIFY_ASKED_KEY = 'banmu.focus.notifyAsked';
+/** A stick that burned out longer ago than this is logged without the completion sheet. */
+const STALE_DONE_MS = 6 * 3600_000;
 
 // --------------------------------------------------------------------------- storage (never throws)
 
@@ -194,7 +196,10 @@ function notifyDone(s: ActiveFocus): void {
   try {
     const n = new Notification(title, opts);
     n.onclick = () => {
-      try { window.focus(); } catch { /* ignore */ }
+      try {
+        window.focus();
+        if (route.value !== 'focus') location.hash = '#focus';
+      } catch { /* ignore */ }
       n.close();
     };
   } catch {
@@ -333,7 +338,9 @@ function restore(): void {
       active.value = d.session;
       persisted = true;
       finish(d.finishedAt, false);
-      if (route.value !== 'focus') toast(tr('离开时，一炷香已燃尽', 'Your incense burned out while you were away'), 4000);
+      // Long ago (another day, most likely): log it quietly instead of greeting with a sheet.
+      if (t - d.finishedAt > STALE_DONE_MS) completion.value = null;
+      if (route.value !== 'focus' || !completion.value) toast(tr('离开时，一炷香已燃尽，已记入香迹', 'Your incense burned out while you were away'), 4000);
       return;
     case 'stale':
       writeStored(null);

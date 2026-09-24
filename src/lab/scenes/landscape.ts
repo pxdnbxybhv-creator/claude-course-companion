@@ -6,7 +6,7 @@ import type { PlantKind } from '../../core/types';
 import type { Season, TimeOfDay, SceneEnv } from '../../ink/scene-types';
 import { plantDrawing } from '../../ink/plants';
 import { paintDrawing } from '../../ink/brush';
-import { paintBackdrop, rockDrawing, paintPond, paintLight } from '../../ink/landscape';
+import { paintBackdrop, rockDrawing, paintPond, paintLight, backdropTimings } from '../../ink/landscape';
 import { Weather } from '../../ink/weather';
 
 const HOURS: Record<TimeOfDay, number> = { dawn: 6.3, day: 11, dusk: 17.6, night: 21.5 };
@@ -77,11 +77,13 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     for (let k = 0; k < 12; k++) weather.step(1 / 30);
   }
 
+  const inset = p.get('pond') === 'inset';
+  const px = inset ? W * 0.12 : 0, pw = inset ? W * 0.76 : W;
   const frame = (t: number) => {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(scene, 0, 0);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    paintPond(ctx, { x: 0, y: bd.pondTop, w: W, h: H - bd.pondTop, t, source: scene, mirrorY: bd.pondTop, clarity: env.clarity, dpr, seed: env.seed, tod });
+    paintPond(ctx, { x: px, y: bd.pondTop, w: pw, h: H - bd.pondTop, t, source: scene, mirrorY: bd.pondTop, clarity: env.clarity, dpr, seed: env.seed, tod });
     paintLight(ctx, W, H, env);
     weather.draw(ctx);
   };
@@ -90,7 +92,7 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   if (perf) {
     const N = 60;
     let a = performance.now();
-    for (let i = 0; i < N; i++) paintPond(ctx, { x: 0, y: bd.pondTop, w: W, h: H - bd.pondTop, t: T + i / 30, source: scene, mirrorY: bd.pondTop, clarity: env.clarity, dpr, seed: env.seed, tod });
+    for (let i = 0; i < N; i++) paintPond(ctx, { x: px, y: bd.pondTop, w: pw, h: H - bd.pondTop, t: T + i / 30, source: scene, mirrorY: bd.pondTop, clarity: env.clarity, dpr, seed: env.seed, tod });
     ctx.getImageData(0, 0, 1, 1);
     const tPond = (performance.now() - a) / N;
     a = performance.now();
@@ -107,6 +109,7 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     frame(T);
     const msg = `backdrop ${tBackdrop.toFixed(0)}ms · plants ${tPlants.toFixed(0)}ms · pond ${tPond.toFixed(2)}ms · light ${tLight.toFixed(2)}ms · weather ${tWeather.toFixed(2)}ms · rockGen ${tRock.toFixed(1)}ms`;
     console.log(msg);
+    console.log('backdrop stages', JSON.stringify(Object.fromEntries(Object.entries(backdropTimings).map(([k, v]) => [k, Math.round(v)]))));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.font = '12px system-ui';
     ctx.fillStyle = 'rgba(0,0,0,.7)';

@@ -156,16 +156,22 @@ export interface InscriptionPlan {
  * column; two short verses may share), then the colophon — date, record, signature — in smaller kai,
  * indented one character, with room for the name seal under the signature.
  */
-export function planInscription(ins: Inscription, maxH: number, S: number, allowBreak = false): InscriptionPlan {
+export function planInscription(ins: Inscription, S: number): InscriptionPlan {
   const s = Math.round(S * 0.58);
   const leadP = 1.08, leadS = 1.14;
-  // a verse is never broken (up to 9 characters); longer lines are split evenly
-  const longestVerse = Math.max(0, ...ins.verses.map((v) => Array.from(v).length));
-  const maxP = Math.max(4, Math.min(10, Math.max(Math.floor(maxH / (S * leadP)), Math.min(9, longestVerse))));
-  // colophon phrases are never broken mid-phrase if they can be kept whole (up to 13 characters)
-  const longest = Math.max(0, ...[...ins.date, ...ins.record].map((p) => Array.from(p).length));
-  const maxS = Math.max(allowBreak ? 8 : 6, Math.floor((maxH - S * 1.05) / (s * leadS)), allowBreak ? 0 : Math.min(13, longest));
-  const poemCols = packColumns(ins.verses, maxP, false);
+  // one clause per column, never broken; a clause longer than 9 characters is halved evenly
+  const poemCols: (string | null)[][] = ins.verses.flatMap((v) => {
+    const chars = Array.from(v);
+    if (chars.length <= 9) return [chars];
+    const parts = Math.ceil(chars.length / 9), per = Math.ceil(chars.length / parts);
+    const out: string[][] = [];
+    for (let i = 0; i < chars.length; i += per) out.push(chars.slice(i, i + per));
+    return out;
+  });
+  const poemLen = Math.max(4, ...poemCols.map(cellsLen));
+  const poemH = poemLen * S * leadP;
+  // the colophon hangs from one character below the poem's top and ends no lower than the poem
+  const maxS = Math.max(7, Math.floor((poemH - S * 1.05) / (s * leadS)));
   const colW = S * 1.34;
   const colWs = s * 1.62;
   const colophon = packColumns([...ins.date, ...ins.record], maxS);
@@ -173,10 +179,9 @@ export function planInscription(ins: Inscription, maxH: number, S: number, allow
   const sealSize = Math.round(s * 1.9);
   const last = colophon[colophon.length - 1] ?? [];
   const sealCells = sealSize / (s * leadS) + 0.4;
-  if (last.length && cellsLen(last) + 1 + signCells.length + sealCells <= maxS) last.push(null, null, ...signCells);
+  if (last.length && cellsLen(last) + 1 + signCells.length + sealCells <= maxS + 1.5) last.push(null, null, ...signCells);
   else colophon.push(signCells);
   const width = poemCols.length * colW + S * 0.2 + colophon.length * colWs + S * 0.5;
-  const poemH = Math.max(...poemCols.map(cellsLen), 0) * S * leadP;
   const colH = Math.max(...colophon.map(cellsLen), 0) * s * leadS + S * 1.05;
   const lastH = cellsLen(colophon[colophon.length - 1] ?? []) * s * leadS + S * 1.05 + s * 0.35 + sealSize;
   return { S, s, leadP, leadS, colW, colWs, poemCols, colophon, sealSize, width, height: Math.max(poemH, colH, lastH) };

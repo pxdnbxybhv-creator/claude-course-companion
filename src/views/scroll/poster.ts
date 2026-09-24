@@ -60,11 +60,12 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
     const top = 176, head = 296, gapT = 44, gapB = 34, foot = 150, rollerD = 46;
     const pw = sw - 2 * 50;
     const py = top + head + gapT;
-    const ph = Math.round(H - 118 - py - gapB - foot - rollerD);
+    const bottomRoom = caption ? 150 : 118;
+    const ph = Math.round(H - bottomRoom - py - gapB - foot - rollerD);
     const P: Rect = { x: x + 50, y: py, w: pw, h: ph };
     const garden = await gardenCanvas(d, P, o);
     drawHangingScroll(ctx, { x, w: sw, top, head, gapB, foot, painting: P, rollerD, nailY: 64 }, pal, (g) => paintPainting(g, P, garden, ins, fonts, o, d));
-    if (caption) drawCaption(ctx, W, H - 58, caption, poemEn, fonts, pal);
+    if (caption) drawCaption(ctx, W, H - bottomRoom + 46, caption, poemEn, fonts, pal);
   } else {
     const m = caption ? 54 : 64;
     const outer: Rect = { x: m, y: m - (caption ? 16 : 0), w: W - 2 * m, h: W - 2 * m - (caption ? 30 : 0) };
@@ -81,6 +82,9 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
 async function gardenCanvas(d: PosterData, P: Rect, o: PosterOptions): Promise<HTMLCanvasElement | null> {
   const logicalW = o.format === 'tall' ? 410 : 540;
   const dpr = P.w / logicalW;
+  // paint a taller scene and keep its top: the ground line (≈63 % down) lands lower in the frame,
+  // so the pond is shortened and the garden and its sky fill the picture
+  const extra = o.format === 'tall' ? 1 : 0.75 / 0.63;
   const env: SceneEnv = {
     season: seasonOfTerm(d.termIndex),
     tod: 'day',
@@ -91,7 +95,7 @@ async function gardenCanvas(d: PosterData, P: Rect, o: PosterOptions): Promise<H
     seed: hashString('banmu-scroll'),
   };
   try {
-    return await renderGardenStill({ width: logicalW, height: Math.round(P.h / dpr), dpr, plants: d.plants, env });
+    return await renderGardenStill({ width: logicalW, height: Math.round((P.h / dpr) * extra), dpr, plants: d.plants, env });
   } catch (e) {
     console.warn('[scroll] garden still failed', e);
     return null;
@@ -104,18 +108,11 @@ function safe<T>(f: () => T, fallback: T): T {
 
 function paintPainting(ctx: CanvasRenderingContext2D, P: Rect, garden: HTMLCanvasElement | null, ins: Inscription, fonts: Fonts, o: PosterOptions, d: PosterData) {
   fillPaper(ctx, P.w, P.h, 11);
-  if (garden && garden.width > 0) ctx.drawImage(garden, 0, 0, P.w, P.h);
-  const S0 = Math.round(P.w * (o.format === 'tall' ? 0.05 : 0.044));
+  if (garden && garden.width > 0) ctx.drawImage(garden, 0, 0, garden.width, Math.min(garden.height, garden.width * (P.h / P.w)), 0, 0, P.w, P.h);
+  const tall = o.format === 'tall';
   const margin = Math.round(P.w * 0.075);
   const top = Math.round(margin * 0.95);
-  const map = inkMap(garden, P.w, P.h);
-  // try the full size first, then smaller hands until the inscription finds clear paper
-  let place = placeInscription(map, ins, P, S0, margin, top);
-  for (const [k, br] of [[1, true], [0.9, true], [0.84, true]] as const) {
-    if (!place.crowded) break;
-    const next = placeInscription(map, ins, P, Math.round(S0 * k), margin, top, br);
-    if (!next.crowded || next.busy < place.busy) place = next;
-  }
+  const place = placeInscription(inkMap(garden, P.w, P.h * (garden ? garden.height / (garden.width * (P.h / P.w)) : 1)), ins, P, P.w * (tall ? 0.05 : 0.046), P.w * (tall ? 0.034 : 0.03), margin, top);
   drawInscription(ctx, ins, place.plan, place.right, top, fonts, hashString(o.today) ^ (o.salt * 131) ^ d.year);
 }
 
@@ -173,39 +170,36 @@ function busyCells(m: InkMap, x0: number, y0: number, x1: number, y1: number): {
 }
 
 /**
- * Find clear paper for the inscription (留白): sweep the block from the right edge to the left, with
- * the tallest columns that stay clear of the painting; prefer the corners. If nothing is clear, take
- * the option that covers the least (and faintest) ink.
+ * Find clear paper for the inscription (留白): at the largest hand that fits, sweep the block from
+ * the upper-right corner to the upper-left, preferring the corners; the hand shrinks (never wraps)
+ * until a clause fits clear of plants, peaks and the sun. If nothing is clear, take the smallest
+ * hand where it covers the least (and faintest) ink.
  */
-function placeInscription(m: InkMap | null, ins: Inscription, P: Rect, S: number, margin: number, top: number, allowBreak = false): { plan: InscriptionPlan; right: number; crowded: boolean; busy: number } {
-  const tall = P.h / P.w > 1.2;
-  const fMax = tall ? 0.44 : 0.52, fMin = tall ? 0.2 : 0.22;
+function placeInscription(m: InkMap | null, ins: Inscription, P: Rect, S0: number, Smin: number, margin: number, top: number): { plan: InscriptionPlan; right: number } {
   if (!m) {
-    const plan = planInscription(ins, P.h * (tall ? 0.34 : 0.42), S);
-    return { plan, right: P.w - margin, crowded: false, busy: 0 };
+    const plan = planInscription(ins, Math.round(S0));
+    return { plan, right: P.w - margin };
   }
-  let best: { plan: InscriptionPlan; right: number; score: number } | null = null;
   let fallback: { plan: InscriptionPlan; right: number; busy: number } | null = null;
-  for (let f = fMax; f >= fMin - 1e-6; f -= 0.02) {
-    const plan = planInscription(ins, P.h * f, S, allowBreak);
-    const hi = P.w - margin, lo = margin + plan.width - S * 0.5;
-    const steps = 10;
+  for (let S = S0; S >= Smin - 0.01; S *= 0.93) {
+    const plan = planInscription(ins, Math.round(S));
+    const hi = P.w - margin, lo = margin + plan.width - plan.S * 0.5;
+    let best: { right: number; score: number } | null = null;
+    const steps = 12;
     for (let k = 0; k <= steps; k++) {
-      // alternate from both corners toward the middle
-      const t = k % 2 === 0 ? k / 2 / steps : 1 - (k + 1) / 2 / steps;
+      const t = k / steps;
       const right = hi + (lo - hi) * t;
       if (right < lo - 1) continue;
-      const b = busyCells(m, right - plan.width + S * 0.5 - S * 0.3, top - S * 0.4, right + S * 0.8, top + plan.height + S * 0.4);
+      const b = busyCells(m, right - plan.width + plan.S * 0.2, top - plan.S * 0.5, right + plan.S * 0.9, top + plan.height + plan.S * 0.5);
       const edge = Math.min(t, 1 - t); // 0 at a corner, 0.5 in the middle
       if (b.n <= 1) {
-        const score = f - edge * 0.5 + (t < 0.5 ? 0.02 : 0);
-        if (!best || score > best.score) best = { plan, right, score };
-      } else if (!fallback || b.sum < fallback.busy) fallback = { plan, right, busy: b.sum };
+        const score = -edge + (t < 0.5 ? 0.01 : 0);
+        if (!best || score > best.score) best = { right, score };
+      } else if (S * 0.93 < Smin && (!fallback || b.sum < fallback.busy)) fallback = { plan, right, busy: b.sum };
     }
-    if (best && best.score > f - 0.02) break; // a corner at this height — can't do better
+    if (best) return { plan, right: best.right };
   }
-  if (best) return { plan: best.plan, right: best.right, crowded: false, busy: 0 };
-  return { ...fallback!, crowded: true };
+  return fallback ?? { plan: planInscription(ins, Math.round(Smin)), right: P.w - margin };
 }
 
 function drawCaption(ctx: CanvasRenderingContext2D, W: number, y: number, text: string, sub: string, fonts: Fonts, pal: MountPalette) {

@@ -39,7 +39,7 @@ export function pluckNote(degree: number, velocity: number, note: Partial<QinNot
   };
 }
 const pluckVoice = (freq: number, o: VoiceOpts): VoiceOpts => ({
-  gain: 0.62, pan: Math.max(-0.25, Math.min(0.25, Math.log2(freq / 220) * 0.12)), send: 0.26, ...o,
+  gain: 0.8, pan: Math.max(-0.25, Math.min(0.25, Math.log2(freq / 220) * 0.12)), send: 0.26, ...o,
 });
 const harmJob = (degree: number, velocity: number, decay: number): Job =>
   ({ op: 'harm', freq: degreeFreq(degree), vel: velocity, decay, seed: nextSeed() });
@@ -50,12 +50,12 @@ const harmVoice = (degree: number, o: VoiceOpts): VoiceOpts => ({
 /** A 古琴 pluck. */
 export function playPluck(mix: Mixer, when: number, degree = 0, velocity = 0.7, note: Partial<QinNote> = {}, o: VoiceOpts = {}) {
   const n = pluckNote(degree, velocity, note);
-  mix.synth([{ op: 'qin', note: n }], ([c]) => mix.play(mix.buffer(c), mix.at(when), pluckVoice(n.freq, o)));
+  mix.synth([{ op: 'qin', note: n }], ([c]) => mix.play(mix.buffer(c), when, pluckVoice(n.freq, o)));
 }
 
 /** A 泛音 harmonic at the frequency of `degree`. */
 export function playHarmonic(mix: Mixer, when: number, degree: number, velocity = 0.6, decay = 1, o: VoiceOpts = {}) {
-  mix.synth([harmJob(degree, velocity, decay)], ([c]) => mix.play(mix.buffer(c), mix.at(when), harmVoice(degree, o)));
+  mix.synth([harmJob(degree, velocity, decay)], ([c]) => mix.play(mix.buffer(c), when, harmVoice(degree, o)));
 }
 
 /**
@@ -91,6 +91,7 @@ export function playChime(mix: Mixer, when: number, streak = 1) {
     plan.push({ at: t + 0.03, o: harmVoice(5, { gain: 0.35 }) });
   }
   mix.synth(jobs, (res) => {
+    if (mix.ctx.currentTime - when > 0.5) return; // too late to be a reward for that tap
     const t0 = mix.at(when);
     res.forEach((chans, i) => mix.play(mix.buffer(chans), t0 + plan[i].at, plan[i].o));
   });
@@ -98,12 +99,12 @@ export function playChime(mix: Mixer, when: number, streak = 1) {
 
 /** A struck bronze bowl (颂钵) at 宫, ringing ~8 s. */
 export function playBell(mix: Mixer, when: number, gain = 0.5) {
-  mix.cached('bell', { op: 'bell' }, (b) => mix.play(b, mix.at(when), { gain, send: 0.22 }));
+  mix.cached('bell', { op: 'bell' }, (b) => mix.play(b, when, { gain, send: 0.22 }, 2));
 }
 
 /** A soft wooden knock (木鱼): three cached variants, lightly varied in pitch. */
 export function playKnock(mix: Mixer, when: number, gain = 0.5) {
   const v = 1 + Math.floor(Math.random() * 3);
   mix.cached(`knock${v}`, { op: 'knock', seed: v }, (b) =>
-    mix.play(b, mix.at(when), { gain, send: 0.12, rate: 1 + (Math.random() - 0.5) * 0.02 }));
+    mix.play(b, when, { gain, send: 0.12, rate: 1 + (Math.random() - 0.5) * 0.02 }));
 }

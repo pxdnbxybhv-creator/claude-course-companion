@@ -393,15 +393,17 @@ export function orchid(spec: PlantSpec): Drawing {
   const flowerUnits: Stroke[][] = [];
   const stemUnits: Stroke[][] = [];
   const heads: V[] = [];
-  const pickStem = (lenR: [number, number], aR: number) => {
+  // Flowers must sit in open paper, not on the dark leaves: try many stems, keep the one whose
+  // flowering part has the most clearance from every leaf.
+  const pickStem = (lenR: [number, number], aR: number, ts: number[] = [1]) => {
     let bestC: { base: V; a0: number; len: number; bend: number; score: number } | null = null;
-    for (let i = 0; i < 28; i++) {
+    for (let i = 0; i < 44; i++) {
       const base = { x: rng.range(-0.012, 0.012) * H, y: 0 };
       const a0 = rng.range(-aR, aR) * DEG;
       const len = H * rng.range(lenR[0], lenR[1]);
       const bend = Math.sign(a0 || 1) * rng.range(4, 22) * DEG;
       const st = stem(base, a0, len, bend);
-      let score = Math.min(clearance(st.tip), H * 0.08);
+      let score = Math.min(H * 0.13, ...ts.map((t) => clearance(st.pts[Math.round(t * (st.pts.length - 1))])));
       for (const h of heads) score -= Math.max(0, H * 0.14 - Math.hypot(h.x - st.tip.x, h.y - st.tip.y)) * 2;
       if (!bestC || score > bestC.score) bestC = { base, a0, len, bend, score };
     }
@@ -423,7 +425,7 @@ export function orchid(spec: PlantSpec): Drawing {
   if (spring) {
     const n = rng.int(2, 3);
     for (let i = 0; i < n; i++) {
-      const c = pickStem([0.3, 0.55], 38);
+      const c = pickStem([0.3, 0.58], 44);
       const st = stem(c.base, c.a0, c.len, c.bend);
       heads.push(st.tip);
       stemUnits.push([{ kind: 'brush', pts: st.pts, tone: stemTone, color: petalColor, birth: 0, seed: sd() }, bract(st.pts, rng.range(0.2, 0.4), rng.chance(0.5) ? 1 : -1)]);
@@ -440,7 +442,7 @@ export function orchid(spec: PlantSpec): Drawing {
     }
   } else {
     // 蕙: one tall stem, flowers alternating along its upper half, the top one a bud
-    const c = pickStem([0.55, 0.72], 22);
+    const c = pickStem([0.55, 0.72], 26, [0.45, 0.6, 0.75, 0.9]);
     const st = stem(c.base, c.a0, c.len, c.bend);
     heads.push(st.tip);
     stemUnits.push([
@@ -462,7 +464,7 @@ export function orchid(spec: PlantSpec): Drawing {
         { x: p.x, y: p.y, w: minW(H * 0.005, 0.8) }, { x: head.x, y: head.y, w: minW(H * 0.004, 0.7) },
       ] };
       const phi = pa + side * rng.range(10, 40) * DEG;
-      flowerUnits.push([ped, ...blossom(head, phi, rng.range(0.78, 0.9) * (1 - i * 0.05))]);
+      flowerUnits.push([ped, ...blossom(head, phi, rng.range(0.86, 0.98) * (1 - i * 0.05))]);
       side = -side;
     }
     flowerUnits.push(topBud);
@@ -473,10 +475,12 @@ export function orchid(spec: PlantSpec): Drawing {
   // ------------------------------------------------------------ moss dots
   const moss: Stroke[] = [];
   const nm = rng.int(4, 7);
+  // dots gather in two little clusters, a big one and a small one
+  const mc = [-s * H * rng.range(0.07, 0.14), s * H * rng.range(0.1, 0.2)];
   for (let i = 0; i < nm; i++) {
-    const side = i % 3 === 2 ? s : -s;
-    const x = side * H * rng.range(0.05, 0.22);
-    moss.push({ kind: 'dot', pts: [{ x, y: rng.range(-0.006, 0.006) * H, w: minW(H * rng.range(0.009, 0.017), 1.4) }],
+    const x = mc[i % 3 === 2 ? 1 : 0] + rng.gauss() * 0.016 * H;
+    const d = H * (i < 3 ? rng.range(0.011, 0.017) : rng.range(0.006, 0.011));
+    moss.push({ kind: 'dot', pts: [{ x, y: rng.range(-0.006, 0.006) * H, w: minW(d, 1.4) }],
       tone: rng.chance(0.3) ? rng.range(0.35, 0.45) : rng.range(0.82, 0.95), birth: 0, seed: sd() });
   }
   add(0.07, moss.slice(0, 2), 0.002);

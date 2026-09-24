@@ -1,6 +1,6 @@
 // Month calendar: Gregorian numerals with the lunar day / solar term / festival beneath, an ink
 // ensō around today, ink dots for days with finished habits. Swipe or use the arrows; tap a day.
-import { useMemo, useRef, useState, useEffect } from 'preact/hooks';
+import { useMemo, useRef, useState, useLayoutEffect } from 'preact/hooks';
 import type { DateKey } from '../../core/types';
 import { fromKey } from '../../core/date';
 import { TERMS } from '../../data/terms';
@@ -41,7 +41,7 @@ export function MonthCalendar(props: { todayKey: DateKey }) {
   const inMonth = grid.days.some((d) => d.key === focusKey);
   const rovingKey = inMonth ? focusKey : (grid.days.find((d) => d.key === props.todayKey) ?? grid.days[0]).key;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!wantFocus.current) return;
     wantFocus.current = false;
     tableRef.current?.querySelector<HTMLButtonElement>(`[data-key="${rovingKey}"]`)?.focus();
@@ -68,7 +68,9 @@ export function MonthCalendar(props: { todayKey: DateKey }) {
     if (!s || s.id !== e.pointerId) return;
     const dx = e.clientX - s.x, dy = e.clientY - s.y;
     if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      // swallow the click this gesture may produce — but only briefly, or a later tap would be lost
       swiped.current = true;
+      setTimeout(() => (swiped.current = false), 400);
       shift(dx < 0 ? 1 : -1);
     }
   };
@@ -143,7 +145,7 @@ export function MonthCalendar(props: { todayKey: DateKey }) {
           }
         }}
       >
-        <table class={`alm-cal-grid dir-${ym.dir < 0 ? 'prev' : ym.dir > 0 ? 'next' : 'none'}`} key={`${ym.y}-${ym.m}`} ref={tableRef}>
+        <table class={`alm-cal-grid dir-${ym.dir < 0 ? 'prev' : ym.dir > 0 ? 'next' : 'none'}`} key={`${ym.y}-${ym.m}`} ref={tableRef} aria-labelledby={titleId}>
           <thead>
             <tr>
               {heads.map((w) => (

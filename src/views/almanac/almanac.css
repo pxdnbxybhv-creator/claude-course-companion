@@ -35,21 +35,27 @@
 .alm-hero-in { padding: 18px 20px 20px; }
 .alm-kicker { display: flex; justify-content: space-between; gap: 12px; margin: 0; font-size: 12.5px; letter-spacing: 0.14em; color: var(--ink-3); }
 :lang(en) .alm-kicker { font-family: var(--font-latin), var(--font-text); letter-spacing: 0.14em; text-transform: uppercase; font-size: 12px; }
-.alm-kicker-season { color: var(--ink-2); }
+.alm-kicker-when { color: var(--ink-3); text-align: right; }
+:lang(en) .alm-kicker-when { text-transform: none; letter-spacing: 0.02em; font-style: italic; font-size: 13.5px; }
 
 .alm-hero-main { display: flex; align-items: flex-start; gap: 16px; margin-top: 14px; }
 .alm-term-name {
   writing-mode: vertical-rl; text-orientation: upright;
   margin: -4px 0 0 -4px; font-size: clamp(92px, 27vw, 132px); line-height: 1; letter-spacing: 0.02em;
-  color: var(--ink); flex: none;
+  color: var(--ink);
 }
 .alm-term-meta { flex: 1; min-width: 0; padding-top: 4px; }
 .alm-pinyin { margin: 0; font-size: 19px; font-style: italic; line-height: 1.2; color: var(--ink-2); letter-spacing: 0.02em; }
 .alm-term-en { margin: 2px 0 0; font-size: 27px; line-height: 1.12; font-weight: 500; letter-spacing: 0.005em; }
-.alm-term-when { margin: 10px 0 0; font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.08em; }
+.alm-term-col { display: flex; flex-direction: column; align-items: center; flex: none; }
+.alm-term-seal { display: block; margin-top: 10px; transform: rotate(-2deg); opacity: 0.94; }
+.alm-term-season { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); letter-spacing: 0.2em; }
+:lang(en) .alm-term-season { font-family: var(--font-latin), var(--font-text); font-style: italic; font-size: 15px; letter-spacing: 0.02em; }
 .alm-blurb { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .alm-blurb-a { margin: 0; font-size: 16.5px; line-height: 1.8; letter-spacing: 0.04em; text-wrap: pretty; }
 .alm-blurb p, .alm-pentad-b, .alm-poem-en, .alm-ts-blurb p { text-wrap: pretty; }
+/* short poetic Chinese lines: break at punctuation, never mid-phrase (unless a phrase cannot fit) */
+.alm-blurb-a:not(.latin), .alm-blurb-b[lang='zh-CN'], .alm-ts-blurb p:first-child, .alm-day-a, .alm-lunar-a { word-break: keep-all; overflow-wrap: anywhere; }
 .alm-blurb-b { margin: 8px 0 0; font-size: 15.5px; line-height: 1.4; font-style: italic; color: var(--ink-2); }
 .alm-blurb-a.latin { font-size: 18px; line-height: 1.45; letter-spacing: 0; font-style: italic; }
 .alm-blurb-b[lang='zh-CN'] { font-style: normal; font-size: 14.5px; letter-spacing: 0.04em; line-height: 1.7; }
@@ -67,7 +73,7 @@
 .alm-pentad-a.latin { font-size: 16.5px; line-height: 1.25; letter-spacing: 0; }
 .alm-pentad-b[lang='zh-CN'] { font-style: normal; letter-spacing: 0.06em; font-size: 13px; }
 .alm-pentad.is-past .alm-pentad-a, .alm-pentad.is-future .alm-pentad-a { color: var(--ink-3); }
-.alm-pentad.is-now .alm-pentad-ord { color: var(--cinnabar); }
+.alm-pentad.is-now .alm-pentad-ord { color: var(--ink); }
 
 .alm-next { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 14px; margin: 22px 0 0; padding-top: 12px; border-top: 1px solid var(--line); }
 .alm-next-a { font-size: 16px; letter-spacing: 0.06em; }
@@ -317,7 +323,10 @@
   .alm-hero-in { padding: 26px 32px 28px; }
   .alm-hero-main { gap: 28px; margin-top: 18px; }
   .alm-term-name { font-size: 150px; }
-  .alm-term-en { font-size: 32px; }
+  .alm-term-en { font-size: 36px; }
+  .alm-blurb-a { font-size: 18px; }
+  .alm-blurb-b { font-size: 16.5px; }
+  .alm-term-seal { margin-top: 16px; }
   .alm-pinyin { font-size: 21px; }
   .alm-blurb { max-width: 30em; }
   .alm-pentads { margin-top: 30px; gap: 22px; }

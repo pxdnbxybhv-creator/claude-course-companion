@@ -14,6 +14,8 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const lit = p.get('lit') !== '0';
   const seed = Number(p.get('seed') ?? 1);
   const blow = p.get('blow') === '1';
+  // drag=S: a pointer swipe left→right through the smoke S seconds before the snapshot
+  const drag = p.has('drag') ? Number(p.get('drag')) : -1;
   const live = p.get('live') === '1';
   const zoom = Number(p.get('zoom') ?? 1); // >1: re-layout at zoom× and frame the censer
   const dpr = window.devicePixelRatio || 1;
@@ -35,6 +37,14 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     if (blow && i === steps - 90) {
       const tp = scene.tip();
       for (let j = 0; j < 8; j++) scene.disturb(tp.x - 40 + j * 12, tp.y - 70, 420, -60);
+    }
+    if (drag >= 0) {
+      const k0 = steps - Math.round(drag / dt);
+      if (i >= k0 && i < k0 + 20) {
+        const tp = scene.tip();
+        const f = (i - k0) / 20;
+        scene.disturb(W * (0.25 + 0.5 * f), tp.y - 110, (W * 0.5) / (20 * dt), -40);
+      }
     }
     scene.step(dt);
   }

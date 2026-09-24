@@ -95,21 +95,23 @@ export function pine(spec: PlantSpec): Drawing {
 
   // --- character -------------------------------------------------------------
   const side = rng.chance(0.5) ? 1 : -1; // lean
-  const lean = rng.range(0.05, 0.34);
-  const welcoming = rng.chance(0.45);
+  const u0 = rng();
+  const form: 'welcoming' | 'leaning' | 'upright' = u0 < 0.36 ? 'welcoming' : u0 < 0.66 ? 'leaning' : 'upright';
+  const lean = form === 'leaning' ? rng.range(0.34, 0.52) : form === 'upright' ? rng.range(0.02, 0.12) : rng.range(0.08, 0.3);
+  const welcoming = form === 'welcoming';
   const wheel = rng.chance(0.6); // 车轮 (马远) or 扇形 fans (八大)
   const washColor = rng.chance(0.6) ? PIGMENTS.indigo : undefined;
   const wBase = rng.range(0.085, 0.105) * H;
-  const trunkLen = rng.range(0.6, 0.72) * H;
+  const trunkLen = (form === 'upright' ? rng.range(0.68, 0.76) : rng.range(0.6, 0.7)) * H;
 
   // --- trunk spine: a slow S with a slight twist --------------------------------
   const nS = 6;
-  const ph = rng.range(0, 6.28), fr = rng.range(0.8, 1.3), amp = rng.range(0.12, 0.3);
+  const ph = rng.range(0, 6.28), fr = rng.range(0.8, 1.3), amp = form === 'leaning' ? rng.range(0.06, 0.16) : rng.range(0.12, 0.28);
   const raw: P[] = [{ x: 0, y: 0 }];
   for (let i = 1; i <= nS; i++) {
     const u = i / nS;
     let a = side * lean * (1 - 0.5 * u) + amp * Math.sin(ph + i * fr) * (0.3 + u) + rng.range(-0.06, 0.06);
-    if (i === nS) a -= side * rng.range(0.15, 0.45); // the crown turns back over the base
+    if (i === nS) a -= side * (form === 'leaning' ? rng.range(0.45, 0.75) : rng.range(0.15, 0.45)); // the crown turns back over the base
     raw.push(add(raw[i - 1], dir(a), trunkLen / nS));
   }
   const spine = smooth(raw, 3);
@@ -119,7 +121,7 @@ export function pine(spec: PlantSpec): Drawing {
 
   // --- limbs ---------------------------------------------------------------------
   const limbs: Limb[] = [];
-  const nL = rng.int(3, 4);
+  const nL = form === 'upright' ? 4 : rng.int(3, 4);
   const fs: number[] = [];
   for (let tries = 0; tries < 300 && fs.length < nL; tries++) {
     const f = rng.range(0.36, 0.88);
@@ -140,22 +142,27 @@ export function pine(spec: PlantSpec): Drawing {
     sL = -s;
     const t = trunkAt(f);
     const hi = clampN((f - 0.36) / 0.52, 0, 1); // 0 low … 1 high
-    const len = isW ? rng.range(0.48, 0.6) * H : rng.range(0.2, 0.32) * H * (1 - 0.4 * hi);
-    const segs = isW ? 4 : rng.int(2, 3);
+    // a leaning pine reaches far on its lean side and keeps short arms on the other
+    const lk = form === 'leaning' ? (s === side ? 1.3 : 0.6) : form === 'upright' ? 0.8 : 1;
+    const len = isW ? rng.range(0.48, 0.6) * H : rng.range(0.2, 0.32) * H * (1 - 0.4 * hi) * lk;
+    const segs = isW ? 4 : 3;
     const pts: P[] = [add(t.p, dir(t.a + (s * Math.PI) / 2), t.w * 0.15)];
     for (let i = 0; i < segs; i++) {
-      // out and nearly level, a droop, then the tip lifts (angles from vertical)
-      let a = i === 0 ? rng.range(0.95, 1.35) : i === segs - 1 ? rng.range(0.8, 1.15) : rng.range(1.4, 1.8);
-      a -= hi * 0.3;
-      pts.push(add(pts[i], dir(s * a), (len / segs) * rng.range(0.75, 1.25)));
+      // out and nearly level, an elbow that droops, then the tip lifts (angles from vertical)
+      let a = i === 0 ? rng.range(0.9, 1.3) : i === segs - 1 ? rng.range(0.55, 0.95) : rng.range(1.55, 1.95);
+      a -= hi * 0.3 * (i === segs - 1 ? 0.3 : 1);
+      const l = (len / segs) * (i === segs - 1 ? rng.range(0.6, 0.9) : rng.range(0.85, 1.3));
+      pts.push(add(pts[i], dir(s * a), l));
     }
     limbs.push({ pts, w0: t.w * (isW ? 0.68 : rng.range(0.52, 0.62)), w1: 2, f, side: s, birth: 0, crown: false });
   });
   // crown: two short arms from the top, flat like a parasol (平顶)
   {
     const aT = along(spine, 0.98).a;
-    for (const s of [1, -1]) {
-      const len = rng.range(0.09, 0.15) * H;
+    const big = rng.chance(0.5) ? 1 : -1;
+    const arms = rng.chance(0.4) ? [big] : [1, -1];
+    for (const s of arms) {
+      const len = (s === big ? rng.range(0.13, 0.19) : rng.range(0.05, 0.09)) * H;
       const p1 = add(top, dir(aT * 0.4 + s * rng.range(0.85, 1.2)), len * 0.55);
       const p2 = add(p1, dir(s * rng.range(1.0, 1.35)), len * 0.45);
       limbs.push({ pts: [top, p1, p2], w0: tw(1) * 0.75, w1: 1.6, f: 1, side: s, birth: 0, crown: true });
@@ -165,31 +172,35 @@ export function pine(spec: PlantSpec): Drawing {
   // --- foliage shelves -----------------------------------------------------------
   const pads: Pad[] = [];
   const padOk = (c: P, w: number, h: number) => pads.every((p) => Math.abs(p.c.x - c.x) > (p.w + w) * 0.4 || Math.abs(p.c.y - c.y) > (p.h + h) * 0.7);
-  const newPad = (c: P, w: number, root: P, limb?: Limb): void => {
+  const newPad = (c: P, w: number, root: P, limb?: Limb, force = false): boolean => {
     const h = w * rng.range(0.26, 0.34);
-    if (!padOk(c, w, h)) return;
+    if (!force && !padOk(c, w, h)) return false;
     const hubs: Hub[] = [];
-    const nF = clampN(Math.round(w / (0.08 * H)), 2, 3);
+    const nF = clampN(Math.round(w / (0.085 * H)), 2, 3);
     for (let k = 0; k < nF; k++) {
       const u = k / (nF - 1) - 0.5;
-      hubs.push({ c: { x: c.x + u * w * 0.62 + rng.range(-0.03, 0.03) * w, y: c.y + h * rng.range(0.02, 0.2) }, r: rng.range(0.055, 0.068) * H, front: true });
+      hubs.push({ c: { x: c.x + u * w * 0.62 + rng.range(-0.03, 0.03) * w, y: c.y + h * rng.range(0.02, 0.2) }, r: rng.range(0.062, 0.076) * H, front: true });
     }
     for (let k = 0; k < nF - 1; k++) {
       const u = (k + 0.5) / (nF - 1) - 0.5;
-      hubs.push({ c: { x: c.x + u * w * 0.62 + rng.range(-0.05, 0.05) * w, y: c.y - h * rng.range(0.28, 0.45) }, r: rng.range(0.048, 0.058) * H, front: false });
+      hubs.push({ c: { x: c.x + u * w * 0.62 + rng.range(-0.05, 0.05) * w, y: c.y - h * rng.range(0.28, 0.45) }, r: rng.range(0.054, 0.066) * H, front: false });
     }
     pads.push({ c, w, h, birth: 0, limb, root, hubs });
+    return true;
   };
+  const bare = new Set<Limb>();
   for (const l of limbs.slice().sort((a, b) => b.f - a.f)) {
     const L = polyLen(l.pts);
     const ts = L > 0.4 * H ? [0.5, 0.78, 1] : L > 0.19 * H ? [0.6, 1] : [1];
+    let any = false;
     for (const t0 of ts.reverse()) {
       const t = clampN(t0 + rng.range(-0.05, 0.02), 0, 1);
       const q = along(l.pts, t);
-      const w = rng.range(0.17, 0.23) * H * (t0 === 1 ? 1 : 0.85);
+      const w = rng.range(0.19, 0.26) * H * (t0 === 1 ? 1 : 0.85);
       const c = { x: q.p.x + l.side * w * 0.1, y: q.p.y - rng.range(0.02, 0.035) * H };
-      newPad(c, w, q.p, l);
+      any = newPad(c, w, q.p, l, !l.crown && t0 === 1 && ts.length === 1) || any;
     }
+    if (!any) bare.add(l);
   }
   // the top of the leader carries its own shelf
   newPad({ x: top.x, y: top.y - 0.035 * H }, rng.range(0.2, 0.26) * H, top, limbs[limbs.length - 1]);
@@ -200,6 +211,12 @@ export function pine(spec: PlantSpec): Drawing {
   const spSide = -(limbs.slice().sort((a, b) => a.f - b.f)[0]?.side ?? side);
   const spC = add(add(spT.p, dir(spT.a + (spSide * Math.PI) / 2), spT.w * 0.5 + 0.055 * H), dir(0), 0.025 * H);
 
+  // a crown arm that found no room for foliage is left out; a bare limb gets a tuft anyway
+  for (const l of bare) {
+    if (l.crown) limbs.splice(limbs.indexOf(l), 1);
+    else newPad(add(l.pts[l.pts.length - 1], dir(0), 0.025 * H), 0.16 * H, l.pts[l.pts.length - 1], l, true);
+  }
+
   // --- growth timeline: whorls from the ground up -------------------------------
   const sortedLimbs = limbs.slice().sort((a, b) => a.f - b.f || a.side - b.side);
   sortedLimbs.forEach((l, k) => (l.birth = 0.08 + 0.3 * (k / Math.max(1, sortedLimbs.length - 1))));
@@ -208,7 +225,7 @@ export function pine(spec: PlantSpec): Drawing {
 
   // budget needles so the whole tree stays near 400 strokes
   const nHubs = pads.reduce((s, p) => s + p.hubs.length, 0) + 1;
-  const strokesPerHub = clampN(Math.floor(230 / nHubs), 5, wheel ? 9 : 10);
+  const strokesPerHub = clampN(Math.floor(250 / nHubs), 5, wheel ? 10 : 11);
 
   // --- seedling (0–0.07) ----------------------------------------------------------
   {
@@ -249,10 +266,15 @@ export function pine(spec: PlantSpec): Drawing {
     });
   }
   for (const p of pads) {
-    paintWash(rng, nz, p, rng.range(0.18, 0.26), washColor, p.birth);
     p.hubs.forEach((h, k) => {
       if (!h.front) paintCluster(rng, h.c, h.r, strokesPerHub, wheel, rng.range(0.42, 0.55), p.birth + 0.01 + k * 0.002, 0.004, p.limb?.side ?? 1);
     });
+    // one dark tuft right away, so a young limb already reads as pine
+    const first = p.hubs[rng.int(0, p.hubs.filter((h) => h.front).length - 1)];
+    (first as Hub & { done?: boolean }).done = true;
+    paintCluster(rng, first.c, first.r * 0.95, strokesPerHub, wheel, rng.range(0.74, 0.86), p.birth + 0.014, 0.004, p.limb?.side ?? 1);
+    // the pale shelf is washed in over the first needles, pushing them back
+    paintWash(rng, nz, p, rng.range(0.18, 0.25), washColor, p.birth + 0.02);
   }
 
   // --- the trunk grows old (0.4–0.8) ----------------------------------------------
@@ -284,7 +306,7 @@ export function pine(spec: PlantSpec): Drawing {
       push('brush', [{ ...p.root, w: 2.2 }, { x: m.x, y: m.y + rng.range(-0.004, 0.004) * H, w: 1.6 }, { ...h.c, w: 1 }], rng.range(0.62, 0.74), birth, { dryness: 0.1 });
     }
     p.hubs.forEach((h, k) => {
-      if (h.front) paintCluster(rng, h.c, h.r, strokesPerHub, wheel, rng.range(0.78, 0.92), birth + 0.002 + k * 0.002, 0.004, p.limb?.side ?? 1);
+      if (h.front && !(h as Hub & { done?: boolean }).done) paintCluster(rng, h.c, h.r, strokesPerHub, wheel, rng.range(0.78, 0.92), birth + 0.002 + k * 0.002, 0.004, p.limb?.side ?? 1);
     });
   });
 
@@ -384,7 +406,7 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
     const a = { x: s * hw * rng.range(0.55, 0.85), y: -rng.range(0.012, 0.03) * H };
     const b = { x: s * (hw + rng.range(0.03, 0.065) * H), y: rng.range(0, 0.006) * H };
     const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - rng.range(0, 0.006) * H };
-    push('dry', [{ ...a, w: hw * 0.55 }, { ...m, w: hw * 0.3 }, { ...b, w: 1 }], s > 0 ? 0.66 : 0.5, 0.4, { dryness: 0.3 });
+    push('brush', [{ ...a, w: hw * 0.45 }, { ...m, w: hw * 0.25 }, { ...b, w: 0.8 }], s > 0 ? 0.62 : 0.48, 0.4, { dryness: 0.45 });
   }
 
   // body: an ochre-tinted wash inside the silhouette
@@ -392,10 +414,19 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
     const pts: StrokePoint[] = [];
     for (let i = 0; i <= N; i++) pts.push({ ...off(S[i], -0.95 * knob(S[i], 1)), w: i === 0 ? 2.5 : 0 });
     for (let i = N; i >= 0; i--) pts.push({ ...off(S[i], 0.95 * knob(S[i], 2)), w: 0 });
-    push('wash', pts, rng.range(0.16, 0.22), 0.41, { color: PIGMENTS.ochre, wet: 0.4 });
+    push('wash', pts, rng.range(0.22, 0.3), 0.41, { color: PIGMENTS.ochre, wet: 0.4 });
   }
   // a mid-tone rub on the shadow side, for roundness
-  push('dry', S.map((s) => ({ ...off(s, 0.4), w: s.hw * 1.1 })), rng.range(0.26, 0.34), 0.42, { dryness: 0.3 });
+  push('dry', S.map((s) => ({ ...off(s, 0.1), w: s.hw * 1.7 })), rng.range(0.22, 0.28), 0.415, { dryness: 0.3 });
+  push('dry', S.map((s) => ({ ...off(s, 0.42), w: s.hw * 1.1 })), rng.range(0.36, 0.44), 0.42, { dryness: 0.25 });
+  // bark rubs 皴 along the grain
+  const nTex = rng.int(4, 6);
+  for (let k = 0; k < nTex; k++) {
+    const i = rng.int(1, N - 8), j = Math.min(N, i + rng.int(4, 8));
+    const u = rng.range(-0.55, 0.7);
+    const pts = S.slice(i, j + 1).map((q, m, arr) => ({ ...off(q, u + 0.15 * nz(o1 + k * 7, m * 0.3)), w: q.hw * rng.range(0.2, 0.3) * Math.sin(Math.PI * (0.15 + 0.7 * (m / Math.max(1, arr.length - 1)))) }));
+    push('dry', pts, rng.range(0.42, 0.56), 0.46 + k * 0.004, { dryness: 0.45 });
+  }
 
   // contours: knobbly, broken dry edges; the shadow side (+normal) heavier
   for (const s of [1, -1]) {
@@ -413,15 +444,15 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
   }
 
   // a broken stub (枯枝) with its knot
-  if (rng.chance(0.65)) {
+  if (rng.chance(0.45)) {
     const f = rng.range(0.14, 0.34);
     const i = Math.round(f * N);
     const s = limbs.some((l) => Math.abs(l.f - f) < 0.12 && l.side === side) ? -side : side;
     const base = off(S[i], s * 0.8);
     const a = angOf(S[i].p, base) - s * rng.range(0.15, 0.5);
-    const L = rng.range(0.03, 0.05) * H;
+    const L = rng.range(0.022, 0.036) * H;
     const e = add(base, dir(a), L);
-    push('dry', [{ ...base, w: S[i].hw * 0.7 }, { ...mix(base, e, 0.6), w: S[i].hw * 0.55 }, { ...e, w: S[i].hw * 0.5 }], 0.72, 0.5, { dryness: 0.25 });
+    push('brush', [{ ...base, w: S[i].hw * 0.62 }, { ...mix(base, e, 0.55), w: S[i].hw * 0.42 }, { ...e, w: S[i].hw * 0.16 }], 0.7, 0.5, { dryness: 0.5 });
     const k = off(S[i], s * 0.35);
     const ring: StrokePoint[] = [];
     const rx = S[i].hw * 0.26, ry = rx * 0.75;
@@ -442,10 +473,10 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
     const s = S[i];
     const stepU = 0.5;
     for (let u = -0.85 + (row % 2) * stepU * 0.5 + rng.range(-0.08, 0.08); u < 0.9; u += stepU * rng.range(0.85, 1.15)) {
-      if (!rng.chance(u < -0.3 ? 0.35 : 0.8)) continue;
+      if (!rng.chance(u < -0.3 ? 0.5 : 0.8)) continue;
       const fore = Math.sqrt(Math.max(0.05, 1 - u * u));
-      const sw = s.hw * 0.24 * fore * rng.range(0.8, 1.2);
-      const sh = s.hw * 0.16 * rng.range(0.8, 1.2);
+      const sw = s.hw * 0.28 * fore * rng.range(0.8, 1.2);
+      const sh = s.hw * 0.2 * rng.range(0.8, 1.2);
       const c = off(s, u);
       const ax = -s.n.y, ay = s.n.x; // along the trunk (downward-ish for our normal)
       const pts: StrokePoint[] = [];
@@ -455,7 +486,7 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
         const lx = Math.cos(t) * sw, ly = Math.sin(t) * sh; // a ∪, convex toward the ground
         pts.push({ x: c.x + s.n.x * lx + ax * ly, y: c.y + s.n.y * lx + ay * ly, w: 1.3 * (0.4 + 0.6 * Math.sin(Math.PI * (j / 5))) });
       }
-      push('line', pts, u > 0.2 ? rng.range(0.62, 0.78) : rng.range(0.42, 0.58), 0.55 + 0.25 * f + cnt * 0.0005);
+      push('line', pts, u > 0.2 ? rng.range(0.7, 0.85) : rng.range(0.5, 0.65), 0.55 + 0.25 * f + cnt * 0.0005);
       cnt++;
     }
     f += (s.hw * rng.range(0.5, 0.7)) / (along(spine, 1) && polyLen(spine));

@@ -1,6 +1,7 @@
 /* 园圃 — the garden view. The painting is the star; the chrome is quiet paper and ink. */
 
 .garden { padding-bottom: 8px; }
+.garden .sheet:focus-visible { outline: none; } /* the sheet itself takes focus programmatically */
 
 /* ------------------------------------------------------------------ header */
 .garden-top {

@@ -1,10 +1,11 @@
 // /lab.html?scene=brush[&mode=grid|compose|progress][&vigor=1]
 // grid     — every stroke kind at the five ink tones plus a colour, several widths
 // compose  — a small painting: bamboo culm with leaves, orchid leaves, a plum branch in blossom
+// raster   — the same painting through rasterize() (transparent layer + ink grain), then blitted
 // progress — strokes at progress 0.2 … 1 (what StrokeAnimation shows mid-stroke)
 import type { Stroke, StrokeKind, StrokePoint } from '../../ink/types';
 import { PIGMENTS } from '../../ink/types';
-import { paintStroke } from '../../ink/brush';
+import { paintStroke, rasterize } from '../../ink/brush';
 import { fillPaper } from '../../ink/paper';
 import { makeRng } from '../../core/rng';
 
@@ -79,7 +80,7 @@ function grid(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: number
   });
 }
 
-function compose(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: number) {
+function compose(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: number, raster = false) {
   const S: Stroke[] = [];
   let seed = 1000;
   const add = (st: Omit<Stroke, 'birth' | 'seed'>) => S.push({ ...st, birth: 0, seed: seed++ });
@@ -170,7 +171,12 @@ function compose(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: num
     add({ kind: 'dot', tone: 0.9, color: PIGMENTS.rouge, pts: [{ x: X(822), y: Y(140), w: 7 }] });
     add({ kind: 'dot', tone: 0.9, pts: [{ x: X(826), y: Y(144), w: 3 }] });
   }
-  for (const st of S) paintStroke(ctx, st, { vigor });
+  if (raster) {
+    // through rasterize(): a transparent layer at device resolution, then composited on paper
+    const dpr = window.devicePixelRatio || 1;
+    const img = rasterize({ width: W, height: H, anchor: { x: 0, y: H }, strokes: S }, 1, dpr, vigor);
+    ctx.drawImage(img, 0, 0, W, H);
+  } else for (const st of S) paintStroke(ctx, st, { vigor });
 }
 
 function progressSheet(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: number) {
@@ -212,7 +218,7 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   }
   const mode = p.get('mode') ?? 'grid';
   const t0 = performance.now();
-  if (mode === 'compose') compose(ctx, W, H, vigor);
+  if (mode === 'compose' || mode === 'raster') compose(ctx, W, H, vigor, mode === 'raster');
   else if (mode === 'progress') progressSheet(ctx, W, H, vigor);
   else grid(ctx, W, H, vigor);
   const ms = performance.now() - t0;

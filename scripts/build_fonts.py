@@ -230,6 +230,11 @@ def subset_options(features: list[str] | str = '*') -> subset.Options:
     return o
 
 
+def load_font(path) -> TTFont:
+    # recalcTimestamp=False keeps head.modified from the source, so rebuilding is reproducible.
+    return TTFont(path, recalcTimestamp=False)
+
+
 def do_subset(font: TTFont, cps: set[int], features: list[str] | str = '*') -> TTFont:
     s = subset.Subsetter(options=subset_options(features))
     s.populate(unicodes=sorted(cps))
@@ -249,7 +254,7 @@ def save_woff2(font: TTFont, dest: Path) -> int:
 
 
 def cmap_of(path_or_font) -> set[int]:
-    font = path_or_font if isinstance(path_or_font, TTFont) else TTFont(path_or_font)
+    font = path_or_font if isinstance(path_or_font, TTFont) else load_font(path_or_font)
     return set(font.getBestCmap().keys())
 
 
@@ -286,7 +291,7 @@ def build_wenkai(cps: set[int], dest: Path, tmp: Path, label: str) -> tuple[TTFo
         if not want:
             continue
         src = fetch(f'{WENKAI_PKG}/files/{name}', CACHE / 'lxgw' / name)
-        font = TTFont(src)
+        font = load_font(src)
         want &= cmap_of(font)
         if not want:
             continue
@@ -298,15 +303,16 @@ def build_wenkai(cps: set[int], dest: Path, tmp: Path, label: str) -> tuple[TTFo
     if not parts:
         raise SystemExit(f'no WenKai glyphs for {label}')
     if len(parts) == 1:
-        merged = TTFont(parts[0])
+        merged = load_font(parts[0])
     else:
         opts = MergeOptions()
         opts.drop_tables = ['vmtx', 'vhea', 'DSIG', 'gasp']
         merged = Merger(options=opts).merge([str(p) for p in parts])
+        merged.recalcTimestamp = False
     # A final pass drops anything the merge carried over that we do not need and normalises tables.
     p = tmp / f'{label}-merged.ttf'
     merged.save(p)
-    merged = TTFont(p)
+    merged = load_font(p)
     covered = cmap_of(merged)
     do_subset(merged, cps & covered)
     return merged, cps & covered
@@ -394,15 +400,15 @@ def main() -> int:
 
         # --- Ma Shan Zheng: display set (eager) + the rest of the source's hanzi (lazy) ----------
         msz_src = fetch(f'{GFONTS}/mashanzheng/MaShanZheng-Regular.ttf', CACHE / 'MaShanZheng-Regular.ttf')
-        msz_all = cmap_of(TTFont(msz_src))
+        msz_all = cmap_of(load_font(msz_src))
         msz_cov = {ord(c) for c in brush_display} & msz_all
         absent |= {c for c in brush_display | used_han if is_cjkish(ord(c)) and ord(c) not in msz_all}
-        msz = do_subset(TTFont(msz_src), msz_cov)
+        msz = do_subset(load_font(msz_src), msz_cov)
         sizes['mashanzheng.woff2'] = save_woff2(msz, OUT / 'mashanzheng.woff2')
         copyright_msz = msz['name'].getDebugName(0)
         msz_ext_cov = ({ord(c) for c in used_han} & msz_all) - msz_cov
         if msz_ext_cov:
-            sizes['mashanzheng-ext.woff2'] = save_woff2(do_subset(TTFont(msz_src), msz_ext_cov), OUT / 'mashanzheng-ext.woff2')
+            sizes['mashanzheng-ext.woff2'] = save_woff2(do_subset(load_font(msz_src), msz_ext_cov), OUT / 'mashanzheng-ext.woff2')
 
         # --- Cormorant Garamond (variable wght 300–700) -------------------------------------
         latin = latin_chars()
@@ -414,7 +420,7 @@ def main() -> int:
         ):
             url_name = fname.replace('[', '%5B').replace(']', '%5D')
             src = fetch(f'{GFONTS}/cormorantgaramond/{url_name}', CACHE / fname)
-            cg = TTFont(src)
+            cg = load_font(src)
             do_subset(cg, latin & cmap_of(cg), feats)
             sizes[out] = save_woff2(cg, OUT / out)
             copyright_cg = cg['name'].getDebugName(0)

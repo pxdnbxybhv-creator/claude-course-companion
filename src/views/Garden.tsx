@@ -203,7 +203,7 @@ export function GardenView() {
         onClose={() => setSheet(null)}
         onSaved={(id, created) => {
           if (created) {
-            toast(t('种下了。明日起，每做一次，它便长一笔。', 'Planted. Each time you do it, it grows a stroke.'));
+            toast(t('种下了。每做一次，它便多长几笔。', 'Planted. Each time you do it, it grows a few brushstrokes.'));
             setTimeout(() => sceneRef.current?.focusPlant(id), 120);
           }
         }}

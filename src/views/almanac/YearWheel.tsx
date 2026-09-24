@@ -90,7 +90,7 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOpen(i))}
             >
               <line class="alm-wh-tick" x1={f(t1x)} y1={f(t1y)} x2={f(t2x)} y2={f(t2y)} />
-              <circle class="alm-wh-hit" cx={f(lx)} cy={f(ly)} r="21" />
+              <circle class="alm-wh-hit" cx={f(lx)} cy={f(ly)} r="23.5" />
               <text class="alm-wh-label" x={f(lx)} y={f(ly)} text-anchor="middle" dominant-baseline="central">{term.zh}</text>
               {md && (
                 <text class="alm-wh-date" x={f(dx)} y={f(dy)} text-anchor="middle" dominant-baseline="central">

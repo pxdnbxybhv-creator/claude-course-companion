@@ -22,6 +22,7 @@
 //   0.58–0.90  secondary branches, pale clusters behind, a far pale culm
 //   0.92–1.00  moss dots at the foot
 import type { Drawing, PlantSpec, Stroke, StrokePoint } from '../types';
+import { PIGMENTS } from '../types';
 import { makeRng, mixSeed } from '../../core/rng';
 
 type V = { x: number; y: number };
@@ -299,8 +300,19 @@ export function bamboo(spec: PlantSpec): Drawing {
     }
     const n = depth > 0 ? rng.pick([2, 3, 3]) : big ? rng.pick([4, 5, 6, 6]) : rng.pick([2, 3, 3]);
     const scale = depth > 0 ? 0.86 : big ? 1 : 0.9;
-    out.push(...cluster(p, leafAxis(c, side, u), n, c.leafLen * scale * rng.range(0.92, 1.08), c.leafW * scale, lt));
+    const axis = leafAxis(c, side, u);
+    out.push(...cluster(p, axis, n, c.leafLen * scale * rng.range(0.92, 1.08), c.leafW * scale, lt));
+    if (depth === 0 && !behind && (c.role === 'main' || c.role === 'mid')) backs.push({ c, p, axis, side, u, big });
     return out;
+  }
+
+  /** Where pale leaves can later be tucked in behind a dark cluster (浓淡 layering). */
+  const backs: { c: Culm; p: V; axis: number; side: number; u: number; big: boolean }[] = [];
+  function backCluster(b: (typeof backs)[number]): Stroke[] {
+    const rot = (rng.chance(0.5) ? 1 : -1) * rng.range(18, 34) * DEG;
+    const q = { x: b.p.x + rng.range(-0.03, 0.03) * b.c.leafLen, y: b.p.y + rng.range(-0.02, 0.04) * b.c.leafLen };
+    const n = b.big ? rng.pick([3, 3, 4]) : rng.pick([2, 3]);
+    return cluster(q, b.axis + rot, n, b.c.leafLen * rng.range(0.82, 0.95), b.c.leafW * 0.92, rng.range(0.3, 0.42));
   }
 
   /** Crown: young leaves springing from the top of the culm (燕尾 / 竹梢) — never symmetric. */
@@ -428,6 +440,8 @@ export function bamboo(spec: PlantSpec): Drawing {
   } else {
     place(main, 0.08, 0.5, 0.5, 0.33, 3, [0.18, 0.28]);
   }
+  // Pale leaves behind the leafy masses fill the plant out late in its growth.
+  for (const b of backs) if (b.big ? rng.chance(0.8) : rng.chance(0.3)) late.push(backCluster(b));
   // Late foliage in a shuffled but deterministic order.
   for (let i = late.length - 1; i > 0; i--) {
     const j = rng.int(0, i);
@@ -435,17 +449,21 @@ export function bamboo(spec: PlantSpec): Drawing {
   }
   schedule(late, 0.6, 0.88);
   if (far) {
-    units.push({ strokes: culmStrokes(far), birth: 0.62, step: 0.002 });
-    schedule(foliage(far, 0.45, 2, [0.14, 0.22]).map((f) => f.unit), 0.66, 0.84);
+    units.push({ strokes: culmStrokes(far), birth: 0.585, step: 0.002 });
+    const fol = foliage(far, 0.45, 2, [0.14, 0.22]).map((f) => f.unit);
+    // at most a whisper of indigo (花青) in the far leaves
+    if (rng.chance(0.4)) for (const u of fol) for (const st of u) { st.color = PIGMENTS.indigo; st.tone *= 0.9; }
+    schedule(fol, 0.615, 0.84);
   }
 
   // 苔点 moss dots and a blade or two of grass at the foot.
   const moss: Stroke[] = [];
   const nm = rng.int(4, 7);
+  // dots gather in two little clusters, a big one and a small one
+  const mc = [-dir * H * rng.range(0.05, 0.1), dir * H * rng.range(0.08, 0.15)];
   for (let i = 0; i < nm; i++) {
-    const side = i % 2 ? 1 : -1;
-    const x = side * H * rng.range(0.03, 0.16) + rng.range(-0.02, 0.02) * H;
-    const d = H * rng.range(0.008, 0.016);
+    const x = mc[i % 3 === 2 ? 1 : 0] + rng.gauss() * 0.014 * H;
+    const d = H * (i < 3 ? rng.range(0.011, 0.016) : rng.range(0.006, 0.011));
     moss.push({ kind: 'dot', pts: [{ x, y: rng.range(-0.004, 0.006) * H, w: minW(d, 1.4) }], tone: rng.chance(0.3) ? 0.45 : 0.88, birth: 0, seed: sd() });
   }
   const ng = rng.int(1, 3);

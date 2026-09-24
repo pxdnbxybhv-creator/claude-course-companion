@@ -41,13 +41,13 @@ function inkDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
     ctx.stroke();
     return;
   }
-  const a = 0.16 + 0.8 * Math.pow(share, 0.85);
-  const rr = r * (0.56 + 0.4 * share);
+  const a = 0.1 + 0.84 * Math.pow(share, 1.25);
+  const rr = r * (0.46 + 0.44 * share);
   // bleed: a pale halo where the wet ink crept into the fibres
-  ctx.globalAlpha = a * 0.16;
+  ctx.globalAlpha = a * 0.1;
   ctx.fillStyle = grainPattern(ctx, INK, 'wash');
   ctx.beginPath();
-  ctx.ellipse(x + rng.gauss() * r * 0.04, y + rng.gauss() * r * 0.04, rr * 1.22, rr * (1.12 + rng() * 0.1), rng() * Math.PI, 0, Math.PI * 2);
+  ctx.ellipse(x + rng.gauss() * r * 0.04, y + rng.gauss() * r * 0.04, rr * 1.16, rr * (1.08 + rng() * 0.08), rng() * Math.PI, 0, Math.PI * 2);
   ctx.fill();
   // body: two overlapping dabs, never a perfect circle
   ctx.fillStyle = INK;
@@ -88,7 +88,7 @@ function drawMonths(ctx: CanvasRenderingContext2D, g: Grid, o: PosterOptions, d:
   const days = daysOfYear(year);
   const cw = g.w / g.cols, ch = g.h / g.rows;
   const rng = makeRng(hashString('year' + year));
-  const r = g.pitch * 0.44;
+  const r = g.pitch * 0.4;
   for (let m = 0; m < 12; m++) {
     const cx = g.x + (m % g.cols) * cw;
     const cy = g.y + Math.floor(m / g.cols) * ch;
@@ -175,7 +175,7 @@ export async function drawYear(ctx: CanvasRenderingContext2D, W: number, H: numb
     const seal = makeSeal(sealName, { size: 62, dpr: 1, style: 'bai', seed: 7 });
     pressSeal(ctx, { canvas: seal, x: yx, y: yEnd + 50, size: 62, rot: -0.012 });
     const lz = 96;
-    pressSeal(ctx, { canvas: makeSeal(leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.6, y: ty + 30, size: lz, rot: 0.01 });
+    pressSeal(ctx, { canvas: makeSeal(leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.52, y: ty + 4, size: lz, rot: 0.01 });
     // the year's record, one phrase per column, read right to left
     const rs = 32;
     let rx = yx - ys * 2.4;
@@ -213,11 +213,11 @@ export async function drawYear(ctx: CanvasRenderingContext2D, W: number, H: numb
     const yx = tx - T * 0.95;
     const yEnd = drawColumn(ctx, [...Array.from(cnYearDigits(d.year)), null, ...Array.from(ganzhi + '年')], yx, ty + T * 0.3, ys, 1.12, fonts.text, rng, INK, 0.86);
     pressSeal(ctx, { canvas: makeSeal(sealName, { size: 52, dpr: 1, style: 'bai', seed: 7 }), x: yx, y: yEnd + 42, size: 52, rot: -0.012 });
-    pressSeal(ctx, { canvas: makeSeal(leisure, { size: 80, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.52, y: ty + 18, size: 80, rot: 0.01 });
-    // record under the title block, right column
+    pressSeal(ctx, { canvas: makeSeal(leisure, { size: 76, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.46, y: ty + 2, size: 76, rot: 0.01 });
+    // record under the title block, read right to left
     const rs = 26;
     let rx = tx;
-    const recTop = ty + T * 3.4;
+    const recTop = Math.max(ty + T * 3.35, yEnd + 42 + 26 + 36);
     for (const ph of rec.zh.slice(0, 3)) {
       drawColumn(ctx, Array.from(ph), rx, recTop, rs, 1.12, fonts.text, rng, INK, 0.8);
       rx -= rs * 1.7;

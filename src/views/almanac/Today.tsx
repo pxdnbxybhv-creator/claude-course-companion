@@ -7,7 +7,7 @@ import { useT } from '../../app/i18n';
 import { lang, state } from '../../app/store';
 import { paintMoon } from './paint';
 import { dayDate, dayInfo, hhmm, lunarEn, lunarZh, MONTH_EN, MONTH_ZH, WEEK_EN, WEEK_ZH } from './model';
-import { dpr, useDark } from './hooks';
+import { dpr, useDark, useMedia } from './hooks';
 import { LocationSheet, placeName, presetZone } from './LocationSheet';
 
 export function MoonCanvas(props: { phase: number; size: number; south?: boolean; label: string }) {
@@ -71,6 +71,7 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
   const moon = moonInfo(props.now);
   const loc = state.value.settings.location;
   const [sheet, setSheet] = useState(false);
+  const wide = useMedia('(min-width: 960px)');
 
   return (
     <section class="alm-today alm-card" aria-labelledby="alm-today-h">
@@ -93,7 +94,7 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
           </p>
         </div>
         <figure class="alm-moon">
-          <MoonCanvas phase={moon.phase} size={84} south={!!loc && loc.lat < 0} label={t(moon.zh, moon.en)} />
+          <MoonCanvas phase={moon.phase} size={wide ? 104 : 84} south={!!loc && loc.lat < 0} label={t(moon.zh, moon.en)} />
           <figcaption>
             <span class="alm-moon-name">{en ? <span class="latin">{moon.en}</span> : moon.zh}</span>
             <span class="alm-moon-sub latin">

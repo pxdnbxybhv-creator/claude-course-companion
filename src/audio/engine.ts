@@ -17,6 +17,8 @@ export interface AudioStats {
   ambient: AmbientKind;
   /** Beds still fading out. */
   fading: number;
+  /** Render jobs waiting for the synthesis worker. */
+  backlog: number;
   time: number;
 }
 
@@ -117,6 +119,7 @@ class WebAudioEngine implements AudioEngine {
     const m = this.live();
     const ctx = this.ctx;
     if (!m || !ctx) return;
+    if (m.backlog > 8) return; // tap-spam: the synthesis worker is already behind
     const run = () => { try { f(m, this.now()); } catch (e) { console.warn('[audio]', e); } };
     if (ctx.state === 'running') return run();
     const t0 = performance.now();
@@ -222,6 +225,7 @@ class WebAudioEngine implements AudioEngine {
       voices: this.mix?.voices ?? 0,
       ambient: this.bed?.kind ?? 'none',
       fading: this.fading.length,
+      backlog: this.mix?.backlog ?? 0,
       time: this.ctx?.currentTime ?? 0,
     };
   }

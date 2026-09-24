@@ -159,7 +159,7 @@ function leaf(c: Ctx, o: LeafOpts) {
   // Body wash: pale underlayer that ties the lobes together.
   const bodyC = mid(0.55);
   const tones = (dt: number) => clamp(o.tone + dt + rng.range(-0.06, 0.06), 0.18, 0.95);
-  if (rng.chance(0.6)) add(c, 'wash', poly(blot(bodyC, L * 0.36, L * 0.2 * wsc, midAng(0.56), noise, rng.range(0, 99), 18, 0.16, 0.3), 1.5 * u), tones(-0.12), b + 0.004, { wet: 0.7 });
+  if (rng.chance(0.6)) add(c, 'wash', poly(blot(bodyC, L * 0.36, L * 0.2 * wsc, midAng(0.56), noise, rng.range(0, 99), 18, 0.16, 0.3), 1.5 * u), tones(-0.12), b + 0.0005, { wet: 0.7 });
 
   // Lobes: side-brush dabs, pressed from the midrib outward. 3–5 per leaf, not symmetric.
   const lobes: { t: number; s: number; len: number; wid: number; ang: number }[] = [];
@@ -197,12 +197,12 @@ function leaf(c: Ctx, o: LeafOpts) {
       const w = W * (t < 0.3 ? lerp(0.6, 1, t / 0.3) : t < 0.6 ? 1 : lerp(1, 0.22, (t - 0.6) / 0.4));
       return { ...p, w };
     });
-    add(c, 'brush', sp, tones(k === 0 ? 0.05 : rng.range(-0.24, 0.04)), b + 0.006 + k * 0.002, { wet: 0.85, dryness: 0.15 });
+    add(c, 'brush', sp, tones(k === 0 ? 0.05 : rng.range(-0.24, 0.04)), b + 0.001 + k * 0.0005, { wet: 0.85, dryness: 0.15 });
   });
 
   // Veins 勾筋: burnt-ink hooks laid in while the lobes are wet.
   const vt = clamp(Math.max(o.tone + 0.25, 0.82), 0, 0.97);
-  const vb = b + 0.018;
+  const vb = b + 0.005;
   const rib: V[] = [];
   for (let i = 0; i <= 6; i++) rib.push(mid(lerp(pet * 0.9, 0.86, i / 6)));
   add(c, 'brush', rib.map((p, i) => ({ ...p, w: lerp(1.9, 0.5, i / 6) * u })), vt, vb, { wet: 0.45 });
@@ -298,22 +298,22 @@ function head(c: Ctx, o: HeadOpts) {
   const { rng, u } = c;
   const R = o.R;
   const colours = {
-    gamboge: { main: PIGMENTS.gamboge, heart: PIGMENTS.ochre, tone: 0.82, heartTone: 0.6 },
-    ochre: { main: PIGMENTS.ochre, heart: PIGMENTS.vermilion, tone: 0.62, heartTone: 0.5 },
+    gamboge: { main: PIGMENTS.gamboge, heart: PIGMENTS.gamboge, tone: 0.82, heartTone: 0.95 },
+    ochre: { main: PIGMENTS.ochre, heart: PIGMENTS.ochre, tone: 0.62, heartTone: 0.78 },
     rouge: { main: PIGMENTS.rouge, heart: PIGMENTS.rouge, tone: 0.55, heartTone: 0.78 },
     white: { main: PIGMENTS.gamboge, heart: PIGMENTS.ochre, tone: 0.14, heartTone: 0.3 },
   }[o.palette];
 
   // Calyx: a few dark green-ink bracts cupping the head from below/behind.
   const sd = o.stemDir;
-  const nb = o.bud ? rng.int(3, 4) : o.face > rad(70) ? rng.int(2, 3) : 0;
+  const nb = o.bud ? rng.int(3, 4) : 2;
   for (let i = 0; i < nb; i++) {
     const a = Math.atan2(-sd.y, -sd.x) + rng.range(-1.1, 1.1);
-    const len = R * (o.bud ? rng.range(0.45, 0.65) : rng.range(0.25, 0.4));
+    const len = R * (o.bud ? rng.range(0.45, 0.65) : rng.range(0.16, 0.24));
     const s0 = { x: o.c.x + sd.x * R * 0.12, y: o.c.y + sd.y * R * 0.12 };
     const e = { x: s0.x + Math.cos(a) * len, y: s0.y + Math.sin(a) * len };
     const m = { x: lerp(s0.x, e.x, 0.5) + rng.range(-1, 1) * len * 0.15, y: lerp(s0.y, e.y, 0.5) + rng.range(-1, 1) * len * 0.15 };
-    add(c, 'brush', brushPts([s0, m, e], R * 0.16, R * 0.08, 1.1, 0.2), rng.range(0.5, 0.72), o.birth, { wet: 0.7 });
+    add(c, 'brush', brushPts([s0, m, e], R * (o.bud ? 0.16 : 0.1), R * 0.06, 1.1, 0.2), rng.range(0.5, 0.72), o.birth, { wet: 0.7 });
   }
 
   // Rings: heart (tight, curled over), cup, open, drooping outer.
@@ -432,7 +432,7 @@ function head(c: Ctx, o: HeadOpts) {
 
 // ---------------------------------------------------------------------------------------------
 
-interface StemPlan { base: V; top: V; path: V[]; L: number[]; h: number; nodes: number[]; head: 'open' | 'bud' | 'side'; birth0: number; birth1: number }
+interface StemPlan { base: V; top: V; path: V[]; L: number[]; h: number; nodes: number[]; head: 'open' | 'bud' | 'side'; birth0: number; birth1: number; branch?: boolean }
 
 export function chrysanthemum(spec: PlantSpec): Drawing {
   const rng = makeRng(spec.seed * 7919 + 17);
@@ -474,6 +474,25 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     const birth1 = main ? rng.range(0.36, 0.4) : rng.range(0.4, 0.46);
     stems.push({ base, top: path[path.length - 1], path, L, h, nodes, head: kinds[s], birth0, birth1 });
   }
+  // A branch off the main stem carries a bud or a small head turned aside (always, for a lone stem).
+  if (nStems === 1 || (nStems === 2 && rng.chance(0.4))) {
+    const m = stems[0];
+    const tb = rng.range(0.4, 0.55);
+    const q = along(m.path, m.L, tb);
+    const out = (Math.sign(lean) || 1) * (nStems === 1 ? (rng.chance(0.65) ? -1 : 1) : 1);
+    const len = H * rng.range(0.2, 0.28);
+    const a = Math.atan2(q.d.y, q.d.x) + out * rng.range(0.8, 1.05);
+    const d = { x: Math.cos(a), y: Math.sin(a) };
+    const path = catmull([
+      q.p,
+      { x: q.p.x + d.x * len * 0.5, y: q.p.y + d.y * len * 0.5 },
+      { x: q.p.x + d.x * len * 0.9, y: q.p.y + d.y * len * 0.9 - len * 0.12 },
+      { x: q.p.x + d.x * len * 1.05, y: q.p.y + d.y * len * 1.05 - len * 0.26 },
+    ], 8);
+    const L = arcLengths(path);
+    const b0 = lerp(m.birth0, m.birth1, tb);
+    stems.push({ base: q.p, top: path[path.length - 1], path, L, h: len, nodes: [rng.range(0.4, 0.6)], head: nStems === 1 && rng.chance(0.6) ? 'side' : 'bud', birth0: b0, birth1: b0 + 0.08, branch: true });
+  }
 
   // --- Stems, jointed ------------------------------------------------------------------------
   const stemTone = rng.range(0.5, 0.62);
@@ -482,12 +501,12 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     for (let k = 0; k < cuts.length - 1; k++) {
       const t0 = cuts[k], t1 = cuts[k + 1];
       const seg = subPath(st.path, st.L, t0 + (k ? 0.006 : 0), t1, 6);
-      const wBase = lerp(4, 2.2, t0) * u * (si === 0 ? 1 : 0.85);
-      const wEnd = lerp(4, 2.2, t1) * u * (si === 0 ? 1 : 0.85);
+      const wBase = lerp(4, 2.2, t0) * u * (si === 0 ? 1 : st.branch ? 0.6 : 0.85);
+      const wEnd = lerp(4, 2.2, t1) * u * (si === 0 ? 1 : st.branch ? 0.6 : 0.85);
       const b = lerp(st.birth0, st.birth1, t0);
       add(c, 'brush', brushPts(seg, wBase, wEnd * 0.92, 1.25, 0.7), stemTone + rng.range(-0.05, 0.08), b, { wet: 0.5, dryness: 0.25 });
       // joint: a small dark knot at the node
-      if (k > 0 && rng.chance(0.7)) {
+      if (k > 0 && rng.chance(0.5)) {
         const q = along(st.path, st.L, t0);
         const nn = { x: -q.d.y, y: q.d.x };
         const s = rng.chance(0.5) ? 1 : -1;
@@ -546,7 +565,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     const q = along(st.path, st.L, 1);
     const Rmain = H * rng.range(0.15, 0.18);
     const kind = st.head;
-    const R = kind === 'bud' ? H * rng.range(0.07, 0.085) : si === 0 ? Rmain : H * rng.range(0.12, 0.15);
+    const R = kind === 'bud' ? H * rng.range(0.07, 0.085) : si === 0 ? Rmain : st.branch ? H * rng.range(0.1, 0.12) : H * rng.range(0.12, 0.15);
     const face = kind === 'side' ? rad(rng.range(74, 88)) : kind === 'bud' ? rad(rng.range(60, 90)) : rad(rng.range(45, 68));
     // heads lean with their stem, and nod a little
     const roll = clamp(Math.atan2(q.d.x, -q.d.y) * 0.8 + rng.range(-0.25, 0.25), -0.7, 0.7);

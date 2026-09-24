@@ -142,13 +142,6 @@ export function monthGrid(y: number, m: number, weekStart: number): MonthGrid {
   return g;
 }
 
-/** Drop every cache (the cores were hot-reloaded, or the day rolled over). */
-export function clearAlmanacCaches(): void {
-  yearTerms.clear();
-  dayCache.clear();
-  gridCache.clear();
-}
-
 /** Solar longitude (degrees, 0 = 春分) of an instant, interpolated between term instants. */
 export function sunLongitude(now: Date, current: TermInstant, next: TermInstant): number {
   const span = next.at.getTime() - current.at.getTime();

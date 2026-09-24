@@ -4,7 +4,7 @@
 import type { PlantKind } from '../../core/types';
 import { GENERATORS } from '../../ink/plants';
 
-export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
+export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const kinds = (p.get('kind') ?? 'chrysanthemum,lotus').split(',') as PlantKind[];
   const n = Number(p.get('n') ?? 200);
   const lines: string[] = [];
@@ -33,9 +33,27 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
       lines.push(`${kind} h=${height}: strokes ${minS}..${maxS} avg ${(sum / n).toFixed(0)} · early(≤0.06) min ${minEarly} · w/h ${minW.toFixed(2)}..${maxW.toFixed(2)} · boxH/h ${minH.toFixed(2)}..${maxH.toFixed(2)} · problems ${bad} · gen ${ms.toFixed(2)} ms`);
     }
   }
+  if (p.get('perf')) lines.push(...(await perf(kinds)));
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#000'; ctx.font = '14px monospace';
   lines.slice(0, 60).forEach((l, i) => ctx.fillText(l, 10, 20 + i * 18));
   for (const l of lines) console.warn(l);
+}
+
+// Rasterise timing: /lab.html?scene=cl-stats&perf=1
+export async function perf(kinds: PlantKind[]): Promise<string[]> {
+  const { rasterize } = await import('../../ink/brush');
+  const out: string[] = [];
+  for (const kind of kinds) {
+    const times: number[] = [];
+    for (let seed = 1; seed <= 8; seed++) {
+      const d = GENERATORS[kind]({ kind, seed, height: 320 });
+      const t0 = performance.now();
+      rasterize(d, 1, 2);
+      times.push(performance.now() - t0);
+    }
+    out.push(`${kind} rasterize@2: ${times.map((t) => t.toFixed(0)).join(' ')} ms`);
+  }
+  return out;
 }

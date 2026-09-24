@@ -151,14 +151,14 @@ function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   if (win > 0) chs = chs.map((c) => c.subarray(0, Math.min(c.length, Math.round(win * sr))));
   const mono = new Float32Array(chs[0].length);
   for (const c of chs) for (let i = 0; i < mono.length; i++) mono[i] += c[i] / chs.length;
-  const n = mono.length, dur = n / sr;
+  const n = mono.length;
   ctx.fillStyle = ok ? INK : RED;
   ctx.font = '600 13px system-ui';
   ctx.fillText(`${ok ? '✓' : '✗'} ${name}`, x, y + 12);
   ctx.font = '11px ui-monospace, monospace';
   ctx.fillStyle = MUTED;
   const db = (v: number) => (20 * Math.log10(Math.max(v, 1e-9))).toFixed(1);
-  ctx.fillText(`peak ${m.peak.toFixed(3)} (${db(m.peak)} dBFS)  rms ${db(m.rms)} dB  dc ${m.dc.toExponential(1)}  nan ${m.nans}  T-60 ${m.t60 == null ? '—' : m.t60.toFixed(2) + ' s'}  len ${dur.toFixed(1)} s ${extra}`, x, y + 27);
+  ctx.fillText(`peak ${m.peak.toFixed(3)} (${db(m.peak)})  rms ${db(m.rms)}  dc ${m.dc.toExponential(0)}  nan ${m.nans}  T60 ${m.t60 == null ? '—' : m.t60.toFixed(1) + 's'} ${extra}`, x, y + 27, w);
 
   // waveform + RMS envelope (dB, 0 → −80 over the strip height)
   const wy = y + 34, wh = 40;

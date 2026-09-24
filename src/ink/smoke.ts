@@ -12,7 +12,7 @@
 // folds thicken) × diffusion (wider → paler) × age fade. Segments are bucketed by (alpha, width)
 // so a frame is ~100 stroke() calls; within one stroke() overlapping joints do not double up.
 // A crisp core line is drawn at full resolution; a soft "mist" pass is drawn to a canvas at
-// 1/3 css resolution and upscaled with smoothing (cheap blur, Safari-safe).
+// 1/4 css resolution and upscaled with smoothing (cheap blur, Safari-safe).
 import { makeNoise2, mixSeed, clamp, smoothstep, type Noise2 } from '../core/rng';
 
 interface Particle {
@@ -21,6 +21,8 @@ interface Particle {
   /** Emission time (s, sim clock) — neighbours' Δte / distance gives the ribbon's line density. */
   te: number;
   age: number;
+  /** Source strength at emission (a dying ember gives thinner smoke). */
+  g: number;
 }
 
 interface Strand {
@@ -38,11 +40,15 @@ interface Impulse { x: number; y: number; vx: number; vy: number; age: number }
 
 export interface SmokeStats { particles: number; strokes: number; ms?: { build: number; mist: number; blit: number; core: number } }
 
+const A0 = 0.004, AR = 1.22;
 const ALPHA_LEVELS = (() => {
   const a: number[] = [];
-  for (let v = 0.004; v < 0.6; v *= 1.22) a.push(v);
+  for (let v = A0; v < 0.6; v *= AR) a.push(v);
   return a;
 })();
+const INV_LOG_AR = 1 / Math.log(AR);
+/** Nearest (geometric) alpha level. */
+const alphaLevel = (v: number) => clamp(Math.round(Math.log(v / A0) * INV_LOG_AR), 0, ALPHA_LEVELS.length - 1);
 const CORE_W = [0.7, 0.85, 1.0, 1.2, 1.45, 1.75, 2.1, 2.55, 3.1, 3.8, 4.6];
 const MIST_W = [1.5, 2.2, 3.2, 4.6, 6.5, 9, 12.5, 17];
 
@@ -63,6 +69,8 @@ export class SmokePlume {
   x = 0;
   y = 0;
   emitting = false;
+  /** 0..1 source strength; scales the density of newly emitted smoke. */
+  strength = 1;
   time = 0;
   stats: SmokeStats = { particles: 0, strokes: 0 };
 
@@ -76,8 +84,11 @@ export class SmokePlume {
   private nSlow: Noise2;
   private mist: HTMLCanvasElement | null = null;
   private mctx: CanvasRenderingContext2D | null = null;
-  private mistScale = 3;
-  private buckets = new Map<number, number[]>();
+  private mistScale = 4;
+  private coreB: number[][] = [];
+  private mistB: number[][] = [];
+  private coreEnd = new Int32Array(0);
+  private mistEnd = new Int32Array(0);
   private lastMist: [number, number, number, number] | null = null;
   private styleCache = new Map<number, string>();
 
@@ -162,7 +173,7 @@ export class SmokePlume {
         this.emitAcc -= 1 / rate;
         const age = this.emitAcc;
         for (const s of this.strands) {
-          s.pts.push({ x: this.x + s.off * u, y: this.y, vx: 0, vy: -30 * u, te: t - age, age });
+          s.pts.push({ x: this.x + s.off * u, y: this.y, vx: 0, vy: -30 * u, te: t - age, age, g: this.strength });
         }
       }
     } else this.emitAcc = 0;
@@ -179,6 +190,9 @@ export class SmokePlume {
     const life = 14;
     const imps = this.imps;
     const R2 = (40 * u) ** 2;
+    const tz = t * 0.045;
+    const nF = this.nFlow, nF2 = this.nFlow2;
+    const psi = (X: number, Y: number) => nF(X + tz, Y) + 0.5 * nF2(X * 2.1 - tz * 1.7, Y * 2.1 + tz);
 
     for (const s of this.strands) {
       const pts = s.pts;
@@ -190,9 +204,6 @@ export class SmokePlume {
         // curl of ψ(x, y + scroll·t, t)
         const nx = p.x * f + s.salt * T * 0.35;
         const ny = (p.y + scroll * t) * f;
-        const tz = t * 0.045;
-        const psi = (X: number, Y: number) =>
-          this.nFlow(X + tz, Y) + 0.5 * this.nFlow2(X * 2.1 - tz * 1.7, Y * 2.1 + tz);
         const p0 = psi(nx, ny);
         const dpx = (psi(nx + eps, ny) - p0) / eps;
         const dpy = (psi(nx, ny + eps) - p0) / eps;
@@ -204,7 +215,14 @@ export class SmokePlume {
         for (const im of imps) {
           const ex = p.x - im.x, ey = p.y - im.y;
           const w = Math.exp(-(ex * ex + ey * ey) / R2 - im.age / 0.35);
-          if (w > 0.002) { tx += im.vx * w * 0.6; ty += im.vy * w * 0.6; }
+          if (w > 0.002) {
+            tx += im.vx * w * 0.6; ty += im.vy * w * 0.6;
+            // a moving hand sheds a counter-rotating vortex pair: swirl on either side of its path
+            const side = Math.sign(im.vx * ey - im.vy * ex);
+            const sw = (Math.hypot(im.vx, im.vy) * 0.35 * side * w) / Math.sqrt(R2);
+            const wr = Math.exp(-im.age / 0.9) / Math.exp(-im.age / 0.35);
+            tx += -ey * sw * wr; ty += ex * sw * wr;
+          }
         }
         const k = 1 - Math.exp(-dt / (0.1 + 0.25 * T));
         p.vx += (tx - p.vx) * k;
@@ -235,7 +253,7 @@ export class SmokePlume {
         pts.splice(i, 0, {
           x: (a.x + b.x) / 2, y: (a.y + b.y) / 2,
           vx: (a.vx + b.vx) / 2, vy: (a.vy + b.vy) / 2,
-          te: (a.te + b.te) / 2, age: (a.age + b.age) / 2,
+          te: (a.te + b.te) / 2, age: (a.age + b.age) / 2, g: (a.g + b.g) / 2,
         });
         inserts++;
       } else if (d < (inserts >= 60 ? 3 : 1.6) * u && a.age > 0.6 && i > 1 && i < pts.length - 1) {
@@ -267,28 +285,30 @@ export class SmokePlume {
     const mctx = this.mctx!;
 
     const t0 = performance.now();
-    const buckets = this.buckets;
-    for (const arr of buckets.values()) arr.length = 0;
-    // run continuity: last particle id pushed into each bucket
-    const lastEnd = new Map<number, number>();
+    const NA = ALPHA_LEVELS.length;
+    if (!this.coreB.length) {
+      for (let i = 0; i < NA * 16; i++) this.coreB.push([]);
+      for (let i = 0; i < NA * 8; i++) this.mistB.push([]);
+      this.coreEnd = new Int32Array(NA * 16);
+      this.mistEnd = new Int32Array(NA * 8);
+    }
+    const coreB = this.coreB, mistB = this.mistB, coreEnd = this.coreEnd, mistEnd = this.mistEnd;
+    for (const arr of coreB) arr.length = 0;
+    for (const arr of mistB) arr.length = 0;
+    coreEnd.fill(-1);
+    mistEnd.fill(-1);
 
     const U0 = 40 * u;
     const w0 = 0.9 * u;
+    const aMin = ALPHA_LEVELS[0] * 0.7;
     let particles = 0;
-
     let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity, bw = 0;
-    const push = (key: number, x0: number, y0: number, x1: number, y1: number, startId: number, endId: number) => {
-      let arr = buckets.get(key);
-      if (!arr) { arr = []; buckets.set(key, arr); }
-      if (lastEnd.get(key) !== startId) arr.push(0, x0, y0);
-      arr.push(1, x1, y1);
-      lastEnd.set(key, endId);
-    };
 
     for (const s of this.strands) {
       const pts = s.pts;
       particles += pts.length;
       let rhoS = 1;
+      let mAnchor = pts.length - 1; // the mist ribbon uses every other particle
       for (let i = pts.length - 1; i > 0; i--) {
         // walk from the source outward so the running density smoothing starts on the fresh thread
         const a = pts[i], b = pts[i - 1];
@@ -296,33 +316,45 @@ export class SmokePlume {
         const age = (a.age + b.age) * 0.5;
         const dte = Math.abs(a.te - b.te);
         // line density relative to the fresh laminar thread (mass conservation along the ribbon)
-        const rho = clamp((U0 * 0.8 * dte) / L, 0.06, 2.5);
+        const rho = clamp((U0 * 0.8 * dte) / L, 0.12, 2.5);
         rhoS += (rho - rhoS) * 0.35;
         const T = smoothstep(1.0, 4.5, age);
         const w = w0 + (0.22 + 0.55 * T) * age * u;
         const puff = 0.7 + 0.3 * this.nSlow(a.te * 0.5, 3.7 + s.salt);
         const fadeIn = smoothstep(0, 0.18, age);
         const life = Math.exp(-age / 7.5) * smoothstep(14, 9.5, age);
-        const base = s.gain * puff * fadeIn * life * Math.pow(rhoS, 0.7) * Math.pow(w0 / w, 0.35);
-        const id0 = s.id * 1e6 + i, id1 = s.id * 1e6 + i - 1;
+        const base = s.gain * (a.g + b.g) * 0.5 * puff * fadeIn * life * Math.pow(rhoS, 0.55) * Math.pow(w0 / w, 0.35);
+        const id0 = s.id * 1e6 + i, id1 = id0 - 1;
         // core: crisp thread, thins out as the smoke diffuses
         const ca = 0.38 * base * (1 - 0.45 * T);
-        if (ca > ALPHA_LEVELS[0] * 0.7) {
-          const ai = levelOf(ALPHA_LEVELS, ca), wi = levelOf(CORE_W, Math.min(w, 4.6));
-          push(ai * 64 + wi, a.x, a.y, b.x, b.y, id0, id1);
+        if (ca > aMin) {
+          const key = alphaLevel(ca) * 16 + levelOf(CORE_W, Math.min(w, 4.6));
+          const arr = coreB[key];
+          if (coreEnd[key] !== id0) arr.push(0, a.x, a.y);
+          arr.push(1, b.x, b.y);
+          coreEnd[key] = id1;
         }
-        // mist: wider, softer, lingers
-        const ma = 0.2 * base * smoothstep(0.6, 3, age);
-        if (ma > ALPHA_LEVELS[0] * 0.7) {
-          const mwid = (w * 2.6 + 3 * u) / ms;
-          const ai = levelOf(ALPHA_LEVELS, ma), wi = levelOf(MIST_W, mwid);
-          const mx0 = a.x / ms, my0 = a.y / ms, mx1 = b.x / ms, my1 = b.y / ms;
-          push(100000 + ai * 64 + wi, mx0, my0, mx1, my1, id0, id1);
-          if (mx0 < bx0) bx0 = mx0; if (mx0 > bx1) bx1 = mx0;
-          if (my0 < by0) by0 = my0; if (my0 > by1) by1 = my0;
-          if (mx1 < bx0) bx0 = mx1; if (mx1 > bx1) bx1 = mx1;
-          if (my1 < by0) by0 = my1; if (my1 > by1) by1 = my1;
-          if (MIST_W[wi] > bw) bw = MIST_W[wi];
+        // mist: wider, softer, lingers — decimated ×2 (it is blurred anyway)
+        if (((mAnchor - (i - 1)) & 1) === 0 || i === 1) {
+          const ma = 0.2 * base * smoothstep(0.6, 3, age);
+          const m = pts[mAnchor];
+          const idA = s.id * 1e6 + mAnchor;
+          mAnchor = i - 1;
+          if (ma > aMin) {
+            const mwid = (w * 2.6 + 3 * u) / ms;
+            const wi = levelOf(MIST_W, mwid);
+            const key = alphaLevel(ma) * 8 + wi;
+            const mx0 = m.x / ms, my0 = m.y / ms, mx1 = b.x / ms, my1 = b.y / ms;
+            const arr = mistB[key];
+            if (mistEnd[key] !== idA) arr.push(0, mx0, my0);
+            arr.push(1, mx1, my1);
+            mistEnd[key] = id1;
+            if (mx0 < bx0) bx0 = mx0; if (mx0 > bx1) bx1 = mx0;
+            if (my0 < by0) by0 = my0; if (my0 > by1) by1 = my0;
+            if (mx1 < bx0) bx0 = mx1; if (mx1 > bx1) bx1 = mx1;
+            if (my1 < by0) by0 = my1; if (my1 > by1) by1 = my1;
+            if (MIST_W[wi] > bw) bw = MIST_W[wi];
+          }
         }
       }
     }
@@ -341,10 +373,10 @@ export class SmokePlume {
     mctx.lineJoin = 'round';
     let strokes = 0;
     const MIST_RGB = '74,80,88', CORE_RGB = '48,50,56';
-    for (const [key, arr] of buckets) {
-      if (!arr.length || key < 100000) continue;
-      const k = key - 100000;
-      const ai = Math.floor(k / 64), wi = k % 64;
+    for (let key = 0; key < mistB.length; key++) {
+      const arr = mistB[key];
+      if (!arr.length) continue;
+      const ai = key >> 3, wi = key & 7;
       mctx.strokeStyle = this.style(MIST_RGB, ALPHA_LEVELS[ai]);
       mctx.lineWidth = MIST_W[wi];
       mctx.beginPath();
@@ -364,9 +396,10 @@ export class SmokePlume {
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'round';
     const minW = 0.75 / Math.max(1, dpr);
-    for (const [key, arr] of buckets) {
-      if (!arr.length || key >= 100000) continue;
-      const ai = Math.floor(key / 64), wi = key % 64;
+    for (let key = 0; key < coreB.length; key++) {
+      const arr = coreB[key];
+      if (!arr.length) continue;
+      const ai = key >> 4, wi = key & 15;
       let wpx = CORE_W[wi], al = ALPHA_LEVELS[ai];
       // sub-pixel lines: keep coverage by trading width for alpha
       if (wpx < minW) { al *= wpx / minW; wpx = minW; }

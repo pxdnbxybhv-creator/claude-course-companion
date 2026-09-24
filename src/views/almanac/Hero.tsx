@@ -9,6 +9,8 @@ import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
 import { paintHeroBackdrop } from './paint';
 import { dpr, useSize } from './hooks';
+import { SealMark } from './YiJi';
+import { MONTH_EN } from './model';
 import { chinaMD, termProgress, SEASON_ZH } from './model';
 
 const MENG = ['孟', '仲', '季'];
@@ -50,18 +52,23 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
       <div class="alm-hero-in">
         <p class="alm-kicker">
           <span>{t(`二十四节气 · 第${cnNumber(i + 1)}`, `Solar term ${i + 1} of 24`)}</span>
-          <span class="alm-kicker-season">{t(`${MENG[sub]}${SEASON_ZH[season]}`, `${MENG_EN[sub]} ${season}`)}</span>
+          <span class="alm-kicker-when">
+            {t(`${start.m}月${start.d}日 ${start.hh} 交节`, `from ${MONTH_EN[start.m - 1].slice(0, 3)} ${start.d}, ${start.hh} CST`)}
+          </span>
         </p>
         <div class="alm-hero-main">
-          <h2 id="alm-term-title" class="alm-term-name brush" lang="zh-CN" aria-label={en ? `${term.en} · ${term.zh}` : term.zh}>
-            {term.zh}
-          </h2>
+          <div class="alm-term-col">
+            <h2 id="alm-term-title" class="alm-term-name brush" lang="zh-CN" aria-label={en ? `${term.en} · ${term.zh}` : term.zh}>
+              {term.zh}
+            </h2>
+            <span class="alm-term-seal" title={t(`${MENG[sub]}${SEASON_ZH[season]}`, `${MENG_EN[sub]} ${season}`)}>
+              <SealMark text={`${MENG[sub]}${SEASON_ZH[season]}`} size={34} kind="yi" seed={31 + i} />
+            </span>
+          </div>
           <div class="alm-term-meta">
             <p class="alm-pinyin latin">{term.pinyin}</p>
             <p class="alm-term-en latin">{term.en}</p>
-            <p class="alm-term-when">
-              {t(`${start.m}月${start.d}日 ${start.hh} 交节`, `Began ${start.m}/${start.d}, ${start.hh} (China time)`)}
-            </p>
+            <p class="alm-term-season">{t(`${MENG[sub]}${SEASON_ZH[season]}之节`, `${MENG_EN[sub]} ${season}`)}</p>
             {(term.blurbZh || term.blurbEn) && (
               <div class="alm-blurb">
                 {en ? (

@@ -225,8 +225,12 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
     else u = clamp(u, 0.12, 0.88);
     const x = w * lerp(0.07, 0.93, clamp(u, 0, 1));
     const alt = Math.pow(Math.max(0, Math.sin(Math.PI * clamp(u, 0, 1))), 0.8);
-    const y = lerp(hz - Hz * 0.12, skyTop + Hz * 0.05, alt);
-    body = { kind: 'sun', x, y, r: r0 };
+    let y = lerp(hz - Hz * 0.12, skyTop + Hz * 0.05, alt);
+    // a low sun rests on the hills rather than showing through their thin wash
+    let top = Infinity;
+    for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, highest(x + dx));
+    y = Math.min(y, top - r0 * 0.85);
+    body = { kind: 'sun', x, y: Math.max(r0 * 1.5, y), r: r0 };
   } else {
     const transit = 12 + env.moonPhase * 24;
     let u = ((((env.hour - (transit - 6)) % 24) + 24) % 24) / 12;
@@ -298,12 +302,17 @@ function palette(season: Season, tod: TimeOfDay): Palette {
 // ---------------------------------------------------------------------------
 // the backdrop
 
+/** Wall-clock ms spent in each stage of the last paintBackdrop (for the lab). */
+export const backdropTimings: Record<string, number> = {};
+
 /** Everything behind the plants. Expensive — call once per size/env change and cache. */
 export function paintBackdrop(w: number, h: number, dpr: number, env: SceneEnv): Backdrop {
   const c = makeCanvas(w * dpr, h * dpr);
   const ctx = c.getContext('2d')!;
   ctx.scale(dpr, dpr);
+  const tp = performance.now();
   fillPaper(ctx, w, h, env.seed);
+  const tPaper = performance.now() - tp;
   const L = sceneLayout(w, h, env);
   const pal = palette(env.season, env.tod);
   const rng = makeRng(mixSeed(env.seed, 0x6ac3));
@@ -311,15 +320,24 @@ export function paintBackdrop(w: number, h: number, dpr: number, env: SceneEnv):
   // field resolution: ~0.25 device px per field px for washes (they are soft anyway)
   const fr = (k: number) => clamp(k * dpr, 0.12, 0.75);
 
+  const T = backdropTimings;
+  let t0 = performance.now();
+  const lap = (k: string) => { const t1 = performance.now(); T[k] = (T[k] ?? 0) + t1 - t0; t0 = t1; };
+  for (const k of Object.keys(T)) delete T[k];
   paintSky(ctx, L, env, noise, fr(0.2));
   paintBody(ctx, L, env, noise);
+  lap('sky');
   for (let i = 0; i < 3; i++) {
     const R = L.ridges[i];
     paintHillWash(ctx, L, R, pal.hills[i], pal.tones[i], env, noise, fr([0.2, 0.28, 0.4][i]));
+    lap('hills');
     if (i === 1) paintMiDots(ctx, L, R, pal, env, rng.fork(1), noise);
     if (i === 2) paintHempStrokes(ctx, L, R, pal, env, rng.fork(2), noise);
+    lap('texture');
   }
   paintGround(ctx, L, pal, env, rng.fork(3), noise, fr(0.35));
+  lap('ground');
+  T.paper = tPaper;
   return { canvas: c, groundY: L.groundY, pondTop: L.pondTop, side: L.side, body: { ...L.body } };
 }
 
@@ -330,7 +348,7 @@ function paintSky(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, noise
   let top = 0, horizon = 0, col: RGB = INK;
   let warm = 0, warmCol: RGB = ROUGE;
   switch (env.tod) {
-    case 'night': top = 0.3; horizon = 0.1; col = mixRgb(INK, INDIGO, 0.55); break;
+    case 'night': top = 0.34; horizon = 0.1; col = mixRgb(INK, INDIGO, 0.75); break;
     case 'dawn': top = 0.03; horizon = 0; col = INDIGO; warm = 0.1; warmCol = mixRgb(ROUGE, CINNABAR, 0.3); break;
     case 'dusk': top = 0.04; horizon = 0; col = mixRgb(INK, INDIGO, 0.6); warm = 0.13; warmCol = mixRgb(OCHRE, GAMBOGE, 0.35); break;
     default: top = env.season === 'summer' ? 0.025 : 0; horizon = 0; col = INDIGO;
@@ -349,8 +367,10 @@ function paintSky(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, noise
       const dx = x - b.x, dy = y - b.y;
       const dd = Math.sqrt(dx * dx + dy * dy);
       if (b.kind === 'moon') {
-        // 烘云托月 — the wash thins out around the moon
+        // 烘云托月 — the wash thins out around the moon, and a few long cloud wisps catch its light
         a *= 1 - 0.8 * Math.exp(-((dd / haloR) ** 2)) * (0.85 + 0.15 * noise(x / 30, y / 30));
+        const wisp = Math.max(0, noise(x / 220 + 3.3, y / 16)) * Math.exp(-(((y - b.y) / (haloR * 1.4)) ** 2));
+        a *= 1 - 0.55 * smoothstep(0.1, 0.45, wisp);
       }
     }
     if (warm > 0) {
@@ -473,8 +493,8 @@ function paintHillWash(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, col: 
     if (snow) {
       // 雪景: ridges keep the paper, gullies and the lower flanks take the ink
       const cap = smoothstep(H * 0.04, H * 0.3, d);
-      const gully = Math.max(0, noise(x / 11, y / 45 + R.depth * 3));
-      ink *= cap * (0.45 + 1.8 * gully);
+      const gully = Math.max(0, noise(x / 12, y / 26 + R.depth * 3));
+      ink *= cap * (0.55 + 1.4 * gully);
       white = dens * 0.9;
     } else if (washed) {
       // mountains stand in front of a tinted sky: occlude it a little with paper
@@ -498,36 +518,54 @@ function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Pa
   const scale = clamp(Math.sqrt(L.w * L.h) / 820, 0.6, 1.3);
   // 积墨: clusters of wet horizontal dabs — pale, broad ones first, then smaller, darker ones
   // crowding the crests and the shadowed flanks. Clusters fuse into masses and leave gaps.
-  const limit = Math.round(clamp(L.w * 0.9, 220, 1100));
-  const clusters = Math.round(limit / 9);
+  // The first two passes are painted wet-in-wet: onto a half-resolution layer that is then
+  // laid down smoothly upscaled, so the dabs bleed into one another (破墨). The last pass —
+  // small dark accents on the crests — goes on crisp, once the "paper has dried".
+  const limit = Math.round(clamp(L.w * 0.7, 160, 800) * (snow ? 0.5 : 1));
+  const clusters = Math.round(limit / 8);
+  const m = ctx.getTransform();
+  const dev = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
+  const k = dev * 0.5;
+  const wet = makeCanvas(L.w * k, L.h * k);
+  const wctx = wet.getContext('2d')!;
+  wctx.scale(k, k);
   let count = 0;
   const xs: number[] = [];
   for (let x = 0; x < L.w; x += 4) if (R.base - ridgeAt(R, x) > 16) xs.push(x);
   if (xs.length) {
     for (let pass = 0; pass < 3 && count < limit; pass++) {
-      const nc = Math.round(clusters * [0.35, 0.4, 0.25][pass]);
+      if (pass === 2) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(wet, 0, 0, L.w, L.h);
+        ctx.restore();
+      }
+      const target = pass < 2 ? wctx : ctx;
+      const nc = Math.round(clusters * [0.4, 0.38, 0.22][pass]);
       for (let c = 0; c < nc; c++) {
         const cx = rng.pick(xs) + rng.range(-4, 4);
         const r = ridgeAt(R, cx);
         const H = R.base - r;
         const sl = (ridgeAt(R, cx + 4) - ridgeAt(R, cx - 4)) / 8;
-        // darker passes hug the crest; shadowed (right-facing) flanks collect more
-        const depthK = [0.34, 0.2, 0.08][pass] * (sl > 0 ? 1.2 : 0.8);
+        // shadowed (right-facing) flanks and the crest collect the ink; lit flanks stay wash
+        if (sl < -0.05 && rng.chance(pass === 2 ? 0.6 : 0.4)) continue;
+        const depthK = [0.3, 0.17, 0.06][pass] * (sl > 0 ? 1.2 : 0.8);
         const cy = r + 2 + Math.abs(rng.gauss()) * H * depthK;
         const dens = hillDensity(L, R, cx, cy, noise);
         if (dens < 0.3) continue;
         if (snow && cy - r < H * 0.1) continue;
-        const nd = rng.int(4, 10);
-        const spread = [16, 12, 8][pass] * scale;
-        for (let k = 0; k < nd; k++) {
+        const nd = rng.int(3, pass === 2 ? 6 : 9);
+        const spread = [15, 11, 6][pass] * scale;
+        for (let q = 0; q < nd; q++) {
           const x = cx + rng.gauss() * spread;
           const rr = ridgeAt(R, x);
           const y = Math.max(rr + 1.5, cy + rng.gauss() * spread * 0.35 + (rr - r) * 0.8);
-          const len = [12, 9, 6.5][pass] * scale * rng.range(0.7, 1.3);
-          const wd = [5.5, 4.2, 3.2][pass] * scale * rng.range(0.8, 1.2);
-          const tone = clamp(pal.tones[1] * [0.7, 1.25, 2][pass] * rng.range(0.8, 1.2) * (0.5 + 0.5 * dens), 0.08, 0.6);
+          const len = [13, 9.5, 6][pass] * scale * rng.range(0.6, 1.4);
+          const wd = [6, 4.4, 2.8][pass] * scale * rng.range(0.75, 1.25);
+          const tone = clamp(pal.tones[1] * [0.75, 1.35, 1.9][pass] * rng.range(0.7, 1.25) * (0.5 + 0.5 * dens), 0.08, 0.6);
           const tilt = rng.range(-0.12, 0.08) * len;
-          paintStroke(ctx, {
+          paintStroke(target, {
             kind: 'brush', tone, color: col, birth: 0, seed: rng.int(1, 1e9), wet: 0.85,
             pts: [P(x - len / 2, y - tilt / 2 + 0.3, wd * 0.75), P(x - len * 0.08, y, wd), P(x + len / 2, y + tilt / 2 - 0.2, wd * 0.3)],
           });
@@ -1294,7 +1332,7 @@ function buildLight(w: number, h: number, env: SceneEnv): HTMLCanvasElement {
         v += 0.1 * Math.exp(-((dd / (b.r * 7)) ** 2)) + 0.25 * Math.exp(-((dd / (b.r * 1.6)) ** 2));
       }
       v = clamp(v, 0, 1);
-      r = 255 * (v - 0.045 * (1 - v) * 4); g = 255 * (v - 0.02 * (1 - v) * 4); bl = 255 * Math.min(1, v + 0.03);
+      r = 255 * (v - 0.07 * (1 - v) * 4); g = 255 * (v - 0.035 * (1 - v) * 4); bl = 255 * Math.min(1, v + 0.02);
     } else {
       const warm: RGB = tod === 'dawn' ? [250, 218, 210] : [249, 214, 166];
       const band = Math.exp(-(((y - hzY) / (h * 0.28)) ** 2));

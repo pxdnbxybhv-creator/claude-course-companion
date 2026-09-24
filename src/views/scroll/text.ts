@@ -145,7 +145,7 @@ export function composeInscription(d: PosterData, poemLines: readonly string[], 
     if (d.kinds.length === 1) {
       const n = d.plants.length;
       record.push(`园中植${chars}${cnCount(n)}本`);
-    } else record.push(`园中植${chars}${cnCount(d.kinds.length)}种`);
+    } else record.push(d.kinds.length <= 3 ? `园中植${chars}${cnCount(d.kinds.length)}种` : `园中植${chars}`);
     if (d.daysTended > 0) record.push(`计功${cnCount(d.daysTended)}日`);
   }
   if (d.incense > 0) record.push(`焚香${cnCount(d.incense)}炷`);

@@ -50,10 +50,11 @@ function DaySticks(props: { d: DaySummary; i: number; scale: number; isToday: bo
         const h = Math.max(10, (Math.min(s.minutes, scale) / scale) * (BASE - TOP - 6));
         const lean = off * 0.35 + rng.range(-1.2, 1.2);
         return (
-          <path
-            d={stickPath(cx + off, h, lean, hashString(String(s.start)))}
-            class={s.completed ? 'fx-stick' : 'fx-stick is-out'}
-          />
+          <g class={s.completed ? 'fx-stick' : 'fx-stick is-out'}>
+            <path d={stickPath(cx + off, h, lean, hashString(String(s.start)))} fill="url(#fx-stick-ink)" />
+            {/* a crumb of pale ash where it burned down to */}
+            {s.completed && <ellipse cx={cx + off + lean} cy={BASE - h + 0.6} rx="1.5" ry="2.1" class="fx-ash-tip" />}
+          </g>
         );
       })}
       {d.sessions.length > MAX_STICKS && (
@@ -87,6 +88,13 @@ export function History() {
       </h2>
       <figure class="fx-week">
         <svg viewBox={`0 0 ${COL * 7} ${VB_H}`} role="img" aria-label={summary}>
+          <defs>
+            <linearGradient id="fx-stick-ink" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0" stop-color="currentColor" stop-opacity="0.95" />
+              <stop offset="0.7" stop-color="currentColor" stop-opacity="0.78" />
+              <stop offset="1" stop-color="currentColor" stop-opacity="0.5" />
+            </linearGradient>
+          </defs>
           {days.map((d, i) => (
             <DaySticks d={d} i={i} scale={scale} isToday={i === 6} />
           ))}

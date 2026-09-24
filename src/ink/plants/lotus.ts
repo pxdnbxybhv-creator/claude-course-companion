@@ -233,7 +233,7 @@ function leaf(c: Ctx, o: LeafOpts) {
   }
   // 3. a few broad side-brush strokes swept out to the rim along the veins, running dry at
   //    the edge (飞白), where the far side of the leaf is darkest.
-  const nS = rng.int(0, 2);
+  const nS = rng.chance(0.3) ? 1 : 0;
   const dA = TAU / 11;
   const sBase = -Math.PI / 2 - o.ang + rng.range(-0.8, 0.8); // the far side
   for (let i = 0; i < nS; i++) {
@@ -350,7 +350,8 @@ function makePetal(o: FlowerOpts, phi: number, elev: number, len: number, wid: n
   const side: V3 = [-Math.sin(phi), Math.cos(phi), 0];
   const spine: V3[] = [];
   const inward: V3[] = [];
-  let p: V3 = [Math.cos(phi) * o.R * 0.08, Math.sin(phi) * o.R * 0.08, 0];
+  const r0 = o.R * (inner ? 0.17 : 0.2);
+  let p: V3 = [Math.cos(phi) * r0, Math.sin(phi) * r0, inner ? o.R * 0.04 : 0];
   for (let i = 0; i < N; i++) {
     const t = i / (N - 1);
     const a = elev + curl * t * t;
@@ -393,7 +394,7 @@ function flower(c: Ctx, o: FlowerOpts) {
   const off = rng.range(0, TAU);
   for (let i = 0; i < nIn; i++) {
     const phi = off + (i / nIn) * TAU + rng.range(-0.25, 0.25);
-    petals.push(makePetal(o, phi, rad(rng.range(60, 74)), R * rng.range(0.78, 0.9), R * rng.range(0.66, 0.76), 0.75, rad(rng.range(6, 18)), true));
+    petals.push(makePetal(o, phi, rad(rng.range(54, 66)), R * rng.range(0.66, 0.78), R * rng.range(0.6, 0.7), 0.75, rad(rng.range(6, 18)), true));
   }
   const off2 = off + Math.PI / nOut;
   for (let i = 0; i < nOut; i++) {
@@ -403,7 +404,7 @@ function flower(c: Ctx, o: FlowerOpts) {
   }
 
   // Pod and stamens (3-D): a flat-topped inverted cone above the receptacle.
-  const podH = R * 0.26, podTop = R * 0.25, podBot = R * 0.1;
+  const podH = R * 0.24, podTop = R * 0.22, podBot = R * 0.1;
   const P3 = (q: V3): V => { const r = project(q, o.face, o.roll); return { x: o.c.x + r[0], y: o.c.y - r[1] }; };
   const top: V[] = [], bot: V[] = [];
   for (let i = 0; i < 16; i++) {
@@ -605,19 +606,19 @@ export function lotus(spec: PlantSpec): Drawing {
   }
 
   // --- the flower(s) ------------------------------------------------------------------------
-  const flowerAt = (top: V, R: number, birth0: number, birthA: number, birthB: number) => {
+  const flowerAt = (top: V, R: number, birth0: number, birthA: number, birthB: number, face: number) => {
     const b0 = { x: baseX(), y: 0 };
     const st = makeStem(b0, top, rng.range(-0.05, 0.05), rng);
     paintStem(c, { ...st, w: 2.6 * u, birth0, birth1: birthA - 0.01 }, stemTone, true);
     const q = along(st.path, st.L, 1);
     flower(c, {
-      c: { x: q.p.x, y: q.p.y }, R, face: rad(rng.range(58, 80)),
+      c: { x: q.p.x, y: q.p.y }, R, face,
       roll: clamp(Math.atan2(q.d.x, -q.d.y) * 0.8 + rng.range(-0.15, 0.15), -0.4, 0.4), birthA, birthB, tone: rng.range(0.2, 0.27),
     });
   };
-  flowerAt(mainTop, H * rng.range(0.15, 0.18), 0.44, 0.57, 0.72);
+  flowerAt(mainTop, H * rng.range(0.15, 0.18), 0.44, 0.57, 0.72, rad(rng.range(42, 60)));
   {
-    if (layout === 'pair') flowerAt({ x: -side * rng.range(0.16, 0.24) * H, y: -rng.range(0.52, 0.6) * H }, H * rng.range(0.12, 0.14), 0.5, 0.66, 0.82);
+    if (layout === 'pair') flowerAt({ x: -side * rng.range(0.16, 0.24) * H, y: -rng.range(0.52, 0.6) * H }, H * rng.range(0.12, 0.14), 0.5, 0.62, 0.8, rad(rng.range(62, 80)));
   }
 
   // --- reeds at the water line (some seeds) ---------------------------------------------------

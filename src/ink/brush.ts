@@ -249,9 +249,19 @@ function truncate(sp: Spine, progress: number): Spine {
     out[i] = lerp ? arr[i - 1] + (arr[i] - arr[i - 1]) * t : arr[i];
     return out;
   };
-  const h = cut(sp.h);
-  h[i] *= 0.75; // the wet front of a brush in motion is slightly rounded
-  return { n, x: cut(sp.x), y: cut(sp.y), h, s: cut(sp.s), nx: cut(sp.nx, false), ny: cut(sp.ny, false), L: sp.L, hmax: sp.hmax };
+  // the wet front of a brush in motion is rounded: extend the cut by a short cap
+  const r = sp.h[i - 1] + (sp.h[i] - sp.h[i - 1]) * t;
+  const capN = r > 1 ? 2 : 0;
+  const m = n + capN;
+  const x = new Float64Array(m), y = new Float64Array(m), h = new Float64Array(m), s = new Float64Array(m), nx = new Float64Array(m), ny = new Float64Array(m);
+  x.set(cut(sp.x)); y.set(cut(sp.y)); h.set(cut(sp.h)); s.set(cut(sp.s)); nx.set(cut(sp.nx, false)); ny.set(cut(sp.ny, false));
+  const tx = sp.ny[i], ty = -sp.nx[i];
+  [[0.45, 0.8], [0.75, 0.4]].slice(0, capN).forEach(([d, q], k) => {
+    const j = n + k;
+    x[j] = x[n - 1] + tx * r * d; y[j] = y[n - 1] + ty * r * d;
+    h[j] = r * q; s[j] = s[n - 1] + r * d; nx[j] = nx[n - 1]; ny[j] = ny[n - 1];
+  });
+  return { n: m, x, y, h, s, nx, ny, L: sp.L, hmax: sp.hmax };
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +320,9 @@ function setGrain(P: Paint, color: string, variant: 'fine' | 'wash' = 'fine', ox
     const g = P.gs * scaleMul;
     pat.setTransform(new DOMMatrix([g, 0, 0, g, ox, oy]));
   }
+  // fine grain is sampled at an integer scale without smoothing (much cheaper per pixel);
+  // the wash mottle is magnified and needs smoothing
+  P.ctx.imageSmoothingEnabled = variant === 'wash';
   P.ctx.fillStyle = pat;
 }
 
@@ -445,7 +458,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
     }
     traceRuns(ctx, sp, ink, lo, ro);
     setGrain(P, thin);
-    shadow(P, thin, 0.6, bleed * 2.4 + 0.8);
+    if (hmax >= 3.5) shadow(P, thin, 0.6, bleed * 2.4 + 0.8); // tiny strokes: bleed without blur
     fillWith(P, share(tone, 0.12 + 0.1 * wet));
     noShadow(P);
   }
@@ -474,9 +487,10 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
       const lam = Math.max(hmax * 1.2, 6) * rng.range(0.7, 1.5), bias = rng.range(-0.35, 0.15);
       for (let i = 0; i < n; i++) G[k][i] = gw * (N1(ox + k * 397.3 + 57.1 + sp.s[i] / lam) + bias);
     }
-    for (let parity = 0; parity < 2; parity++) {
+    const passes = hmax >= 5 ? 2 : 1; // small strokes: all strips in one fill
+    for (let parity = 0; parity < passes; parity++) {
       ctx.beginPath();
-      for (let j = parity; j < K; j += 2) {
+      for (let j = parity; j < K; j += passes) {
         for (let i = 0; i < n; i++) {
           const g = bodyW(body[i]);
           let top = mapU(U[j + 1], i) - (j < K - 1 ? G[j + 1][i] / 2 : 0);
@@ -491,7 +505,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
     }
     // 側鋒: the brush held at a slant leaves its tip-side edge darker than the heel side
     ctx.fillStyle = color; // minor layers skip the grain pattern: it is the costly part of a fill
-    if (hmax > 2.5) {
+    if (hmax > 3.5) {
       const side = rng() < 0.5 ? -1 : 1, depth = rng.range(0.35, 0.7);
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
@@ -507,7 +521,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // --- pooling: denser ink where the brush is pressed widest (brush only) -------------------
-  if (!isDry && hmax > 4) {
+  if (!isDry && hmax > 5) {
     ctx.beginPath();
     const off = rng.range(-0.25, 0.25);
     for (let i = 0; i < n; i++) {
@@ -526,7 +540,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   const nb = isDry ? clamp(Math.round(hmax / 1.25), 6, 30) : clamp(Math.round(hmax / 2), 3, 10);
   const lamF = Math.max(hmax * (isDry ? 2.4 : 2), 10);
   // bristles are grouped into a few fills (each group its own ink load) to keep the draw count low
-  const groups = isDry ? 3 : 2;
+  const groups = isDry ? (hmax > 6 ? 3 : 2) : hmax > 5 ? 2 : 1;
   const gShare = Array.from({ length: groups }, () => (isDry ? rng.range(0.3, 0.7) : rng.range(0.08, 0.22)));
   for (let gi = 0; gi < groups; gi++) {
     ctx.beginPath();
@@ -832,7 +846,7 @@ export function paintStroke(ctx: Ctx2D, stroke: Stroke, o: PaintOptions = {}): v
   const tone = clamp(stroke.tone, 0, 1) * (0.42 + 0.58 * vigor);
   if (tone <= 0.003) return;
   ctx.save();
-  const P: Paint = { ctx, A0: ctx.globalAlpha, gs: clamp(xf.k * 0.75, 1, 2.5) };
+  const P: Paint = { ctx, A0: ctx.globalAlpha, gs: clamp(Math.round(xf.k * 0.75), 1, 3) };
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   try {
     switch (stroke.kind) {

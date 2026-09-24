@@ -114,12 +114,13 @@
 .fx-out { color: var(--ink-2); }
 
 .fx-ask {
-  display: flex; align-items: center; gap: 4px; max-width: 100%;
-  padding: 2px 4px 2px 14px; border-radius: 999px; border: 1px dashed var(--line-strong);
+  display: flex; align-items: center; flex-wrap: wrap; justify-content: center; column-gap: 2px;
+  max-width: 100%; padding: 0 4px 0 14px; border-radius: 22px; background: var(--paper-2); border: 1px solid var(--line);
   animation: fx-rise 0.5s var(--ease);
 }
-.fx-ask p { margin: 0 6px 0 0; font-size: 13.5px; color: var(--ink-2); min-width: 0; }
-.fx-ask .btn { min-height: 38px; padding: 0 12px; }
+.fx-ask p { margin: 0 4px 0 0; font-size: 13.5px; color: var(--ink-2); min-width: 0; }
+.fx-ask .btn { min-height: 44px; padding: 0 12px; border-color: transparent; }
+.fx-ask .btn:first-of-type { color: var(--cinnabar); }
 
 .fx-burning .sheet { text-align: left; }
 .fx-confirm-body { margin: 6px 0 18px; color: var(--ink-2); font-size: 15px; }
@@ -128,12 +129,14 @@
 
 /* ------------------------------------------------------------ log */
 
+.fx-hist .section-title { font-weight: 400; }
 .fx-hist .section-title:first-child { margin-top: 10px; }
 .fx-hist-total { letter-spacing: 0.06em; text-transform: none; color: var(--ink-2); font-size: 13px; }
 .fx-week { margin: 0; color: var(--ink); }
 .fx-week svg { display: block; width: 100%; height: auto; max-height: 160px; overflow: visible; }
-.fx-stick { fill: currentColor; opacity: 0.84; }
-.fx-stick.is-out { opacity: 0.26; }
+.fx-stick { opacity: 0.9; }
+.fx-stick.is-out { opacity: 0.28; }
+.fx-ash-tip { fill: #a39c92; }
 .fx-ash { fill: currentColor; }
 .fx-wd { font-size: 11px; fill: var(--ink-3); font-family: var(--font-text); }
 .fx-wd.is-today { fill: var(--cinnabar); }
@@ -183,17 +186,20 @@
 
 @media (min-width: 760px) {
   .fx {
+    --fx-gap: clamp(28px, 5vw, 64px);
     max-width: 1180px;
     grid-template-columns: auto minmax(280px, 360px);
     grid-template-areas: 'stage controls' 'stage side';
     grid-template-rows: auto 1fr;
     justify-content: center; align-items: start;
-    column-gap: clamp(28px, 5vw, 64px); row-gap: 8px;
+    column-gap: var(--fx-gap); row-gap: 8px;
     padding-top: 28px;
   }
+  /* A tall 5:8 hanging panel, as large as the window allows in both directions. */
   .fx-stage {
-    height: clamp(500px, calc(100dvh - var(--tabbar-h) - 64px), 920px);
-    aspect-ratio: 5 / 8;
+    --fx-h: clamp(460px, calc(100dvh - var(--tabbar-h) - 64px), 920px);
+    height: auto; aspect-ratio: 5 / 8;
+    width: min(calc(var(--fx-h) * 5 / 8), calc(100vw - 2 * var(--gutter) - 296px - var(--fx-gap)));
     position: sticky; top: 24px;
   }
   .fx-mount { padding: 9px; border-radius: 6px; }
@@ -206,11 +212,12 @@
   .fx-clock { justify-items: start; }
   .fx-actions { justify-content: flex-start; }
   .fx-amb.is-compact { justify-content: flex-start; margin-left: -6px; }
+  .fx-ask { justify-self: start; }
 }
 
 @media (min-width: 900px) {
   /* The tab bar floats as a pill here (bottom 18px); keep the painting clear of it. */
-  .fx-stage { height: clamp(500px, calc(100dvh - 148px), 940px); }
+  .fx-stage { --fx-h: clamp(460px, calc(100dvh - 148px), 940px); }
 }
 
 @media (min-width: 1180px) {
@@ -220,8 +227,8 @@
     grid-template-rows: auto;
     align-items: center;
   }
+  .fx-stage { position: relative; top: 0; width: min(calc(var(--fx-h) * 5 / 8), calc(100vw - 2 * var(--gutter) - 536px - 2 * var(--fx-gap))); }
   .fx-controls, .fx-side { align-self: center; }
-  .fx-stage { position: relative; top: 0; }
   .fx-hist .section-title:first-child { margin-top: 0; }
 }
 

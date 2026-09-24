@@ -40,27 +40,36 @@ export function placeName(l: Settings['location'], en: boolean): string {
   return l.label && l.label !== 'gps' ? l.label : coords(l);
 }
 
-function locate(): Promise<Loc> {
-  return new Promise((resolve, reject) => {
-    try {
-      const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
-      if (!geo) return reject(new Error('unsupported'));
-      const timer = setTimeout(() => reject(new Error('timeout')), 12_000);
-      geo.getCurrentPosition(
-        (p) => {
-          clearTimeout(timer);
-          resolve({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 });
-        },
-        (e) => {
-          clearTimeout(timer);
-          reject(e);
-        },
-        { enableHighAccuracy: false, timeout: 10_000, maximumAge: 6 * 3600_000 },
-      );
-    } catch (e) {
-      reject(e);
-    }
-  });
+/**
+ * Ask the browser once. `onFail` fires on refusal, error, or after `ms` without an answer (a
+ * sandboxed frame refuses at once; a person may simply not answer the prompt). An answer that
+ * arrives late is still honoured through `onOk` — the person did say yes.
+ */
+function locate(onOk: (l: Loc) => void, onFail: () => void, ms = 10_000): void {
+  let settled = false;
+  const fail = () => {
+    if (!settled) onFail();
+    settled = true;
+  };
+  try {
+    const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
+    if (!geo) return fail();
+    const timer = setTimeout(fail, ms);
+    geo.getCurrentPosition(
+      (p) => {
+        clearTimeout(timer);
+        settled = true;
+        onOk({ lat: Math.round(p.coords.latitude * 100) / 100, lon: Math.round(p.coords.longitude * 100) / 100 });
+      },
+      () => {
+        clearTimeout(timer);
+        fail();
+      },
+      { enableHighAccuracy: false, timeout: ms, maximumAge: 6 * 3600_000 },
+    );
+  } catch {
+    fail();
+  }
 }
 
 export function LocationSheet(props: { open: boolean; onClose: () => void }) {
@@ -84,17 +93,19 @@ export function LocationSheet(props: { open: boolean; onClose: () => void }) {
     toast(t(`已设为 ${placeName(l, false)}`, `Location set: ${placeName(l, true)}`));
   };
 
-  const useMine = async () => {
+  const useMine = () => {
     setBusy(true);
     setFailed(false);
-    try {
-      const l = await locate();
-      save(l);
-    } catch {
-      setFailed(true);
-    } finally {
-      setBusy(false);
-    }
+    locate(
+      (l) => {
+        setBusy(false);
+        save(l);
+      },
+      () => {
+        setBusy(false);
+        setFailed(true);
+      },
+    );
   };
 
   const latN = Number(lat), lonN = Number(lon);

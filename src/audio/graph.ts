@@ -150,9 +150,16 @@ export class Mixer {
     return b;
   }
 
-  /** Plays a buffer once; all nodes are disconnected when it ends. */
-  play(buf: AudioBuffer, when: number, o: VoiceOpts = {}): AudioBufferSourceNode {
+  /** Render jobs in flight (worker backlog). */
+  get backlog() { return this.pending.size; }
+
+  /**
+   * Plays a buffer once at `when` (or as soon as possible if that has just passed); all nodes are
+   * disconnected when it ends. Sounds whose moment passed more than `maxLate` s ago are dropped.
+   */
+  play(buf: AudioBuffer, when: number, o: VoiceOpts = {}, maxLate = 0.25): AudioBufferSourceNode | null {
     const ctx = this.ctx;
+    if (ctx.currentTime - when > maxLate) return null;
     const src = ctx.createBufferSource();
     src.buffer = buf;
     if (o.rate && o.rate !== 1) src.playbackRate.value = o.rate;
@@ -182,7 +189,7 @@ export class Mixer {
       for (const n of nodes) n.disconnect();
       src.onended = null;
     };
-    src.start(Math.max(when, 0));
+    src.start(Math.max(when, ctx.currentTime, 0));
     return src;
   }
 
