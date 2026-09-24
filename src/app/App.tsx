@@ -1,12 +1,13 @@
 import { useEffect } from 'preact/hooks';
 import { route, go, type Route } from './router';
-import { lang } from './store';
+import { lang, state } from './store';
 import { useT } from './i18n';
 import { GardenView } from '../views/Garden';
 import { FocusView } from '../views/Focus';
 import { AlmanacView } from '../views/Almanac';
 import { ScrollView } from '../views/Scroll';
 import { SettingsView } from '../views/Settings';
+import { ToastHost } from '../ui/kit';
 import './app.css';
 
 const TABS: { id: Route; glyph: string; en: string }[] = [
@@ -19,9 +20,15 @@ const TABS: { id: Route; glyph: string; en: string }[] = [
 export function App() {
   const t = useT();
   const r = route.value;
+  const theme = state.value.settings.theme;
   useEffect(() => {
     document.documentElement.lang = lang.value === 'zh' ? 'zh-CN' : 'en';
   }, [lang.value]);
+  useEffect(() => {
+    const el = document.documentElement;
+    if (theme === 'auto') el.removeAttribute('data-theme');
+    else el.setAttribute('data-theme', theme);
+  }, [theme]);
 
   return (
     <div class="shell" data-route={r}>
@@ -44,6 +51,7 @@ export function App() {
           </button>
         ))}
       </nav>
+      <ToastHost />
     </div>
   );
 }

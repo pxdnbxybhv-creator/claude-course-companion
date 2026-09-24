@@ -48,8 +48,10 @@ export function sanitize(raw: unknown): AppState {
           plant: (PLANT_KINDS as readonly string[]).includes(h.plant) ? h.plant : 'bamboo',
           seed: Number.isFinite(h.seed) ? h.seed >>> 0 : hashString(h.id),
           createdAt: isValidKey(h.createdAt) ? h.createdAt : todayKey(),
-          days: Array.isArray(h.days) ? h.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6) : undefined,
-          archived: !!h.archived,
+          ...(Array.isArray(h.days) && h.days.some((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+            ? { days: [...new Set(h.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))].sort() }
+            : {}),
+          ...(h.archived ? { archived: true } : {}),
         }))
     : [];
   const checkins: Record<string, DateKey[]> = {};
