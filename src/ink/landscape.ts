@@ -1042,6 +1042,7 @@ interface PondCache {
   pond: HTMLCanvasElement; pctx: CanvasRenderingContext2D;
   refl: HTMLCanvasElement; rctx: CanvasRenderingContext2D; rs: number; pr: number;
   tint: HTMLCanvasElement;
+  water: HTMLCanvasElement;
   silt: HTMLCanvasElement;
   mask: HTMLCanvasElement;
   ripples: { c: HTMLCanvasElement; w: number; h: number }[];
@@ -1049,7 +1050,7 @@ interface PondCache {
 }
 const pondCaches: PondCache[] = [];
 
-function buildPondCache(o: PondOptions, key: string): PondCache {
+function buildPondCache(o: PondOptions, key: string, full: boolean): PondCache {
   const { w, h, dpr } = o;
   const seed = o.seed ?? 1;
   const cl = Math.round(clamp(o.clarity, 0, 1) * 10) / 10;
@@ -1094,6 +1095,15 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
       tc.drawImage(silt, 0, 0);
       tc.globalAlpha = 1;
     }
+  }
+  // upscale the water tone once, to the exact device size it is drawn at (a 1:1 blit per frame)
+  const tr = full ? dpr : pr;
+  const water = makeCanvas(w * tr, h * tr);
+  {
+    const wc = water.getContext('2d')!;
+    wc.imageSmoothingEnabled = true;
+    wc.imageSmoothingQuality = 'high';
+    wc.drawImage(tint, 0, 0, tint.width - 2, tint.height - 2, 0, 0, water.width, water.height);
   }
   // mask: fade the side ends so the water sits in the paper, not in a box
   const mask = makeCanvas(w * pr, 4);
@@ -1144,7 +1154,7 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
       out[0] = 255; out[1] = 253; out[2] = 246; out[3] = a;
     });
   }
-  return { key, pond, pctx, refl, rctx, rs, pr, tint, silt, mask, ripples, glint };
+  return { key, pond, pctx, refl, rctx, rs, pr, tint, water, silt, mask, ripples, glint };
 }
 
 const hash01 = (a: number, b: number) => mixSeed(a, b) / 4294967296;
@@ -1153,11 +1163,14 @@ const hash01 = (a: number, b: number) => mixSeed(a, b) / 4294967296;
 export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   if (o.w < 2 || o.h < 2) return;
   const clarity = clamp(o.clarity, 0, 1);
-  const key = `${o.w}|${o.h}|${o.dpr}|${Math.round(clarity * 10)}|${o.seed ?? 1}`;
+  // A pond spanning the whole width is painted straight onto the scene; a narrower one goes
+  // through its own layer so its ends can be feathered into the paper.
+  const full = o.x <= 0.5 && o.x + o.w >= ctx.canvas.width / o.dpr - 0.5;
+  const key = `${o.w}|${o.h}|${o.dpr}|${Math.round(clarity * 10)}|${o.seed ?? 1}|${full}`;
   // a few sizes stay cached (the garden, the scroll export…); most recent first
   let ci = pondCaches.findIndex((c) => c.key === key);
   if (ci < 0) {
-    pondCaches.unshift(buildPondCache(o, key));
+    pondCaches.unshift(buildPondCache(o, key, full));
     if (pondCaches.length > 3) pondCaches.pop();
     ci = 0;
   }
@@ -1184,9 +1197,6 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
 
   rctx.getImageData(0, 0, 1, 1); __lap('flip');
   // 2 · draw it in strips, displaced sideways by waves that grow toward the viewer
-  // A pond spanning the whole width is painted straight onto the scene (clipped); a narrower
-  // one goes through its own layer so its ends can be feathered into the paper.
-  const full = o.x <= 0.5 && o.x + w >= ctx.canvas.width / dpr - 0.5;
   let p: CanvasRenderingContext2D;
   if (full) {
     p = ctx;
@@ -1202,14 +1212,14 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     p.clearRect(0, 0, C.pond.width, C.pond.height);
     p.setTransform(pr, 0, 0, pr, 0, 0);
   }
-  p.drawImage(C.tint, 0, 0, C.tint.width - 2, C.tint.height - 2, 0, 0, w, h);
+  p.drawImage(C.water, 0, 0, w, h);
   __lap('tint');
   const ampK = lerp(1.35, 0.8, clarity);
   const a0 = lerp(0.12, 0.5, clarity);
   let y = 0;
   while (y < h) {
     const dn = y / h;
-    const sh = 1.2 + 2.6 * dn;
+    const sh = 1.6 + 3.6 * dn;
     const ph = 5.5 / (dn + 0.1);
     const dx = ampK * (0.3 + 4.2 * dn) * (Math.sin(ph + t * 1.15) + 0.45 * Math.sin(ph * 2.3 - t * 0.8 + 1.7));
     // brief breaks in the reflection where a wave crest catches the sky

@@ -85,14 +85,17 @@ BASE_CJK = (
 )
 # Typographic punctuation that WenKai should carry for mixed text.
 BASE_PUNCT = '–—‘’“”…‧·•′″※→←↑↓×÷−±≈≠≤≥°℃'
+# Pinyin with tone marks (the almanac shows e.g. lìchūn), for both WenKai and Cormorant.
+BASE_PINYIN = 'āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜüńňǹḿ' + 'ĀÁǍÀĒÉĚÈĪÍǏÌŌÓǑÒŪÚǓÙǕǗǙǛÜ'
 
 # Blocks that the lazily loaded common-character face is declared for.
 HAN_BLOCKS = [(0x3000, 0x303F), (0x3400, 0x4DBF), (0x4E00, 0x9FFF), (0xF900, 0xFAFF), (0xFF00, 0xFFEF)]
 
-# Google Fonts' "latin" subset (+ a few typographic extras).
+# Google Fonts' "latin" subset + Latin Extended-A, the pinyin tone letters (U+01CD–01DC) and
+# combining tone marks (U+0300–0304).
 LATIN_RANGES = [
-    (0x0000, 0x00FF), (0x0131, 0x0131), (0x0152, 0x0153), (0x02BB, 0x02BC), (0x02C6, 0x02C6),
-    (0x02DA, 0x02DA), (0x02DC, 0x02DC), (0x0304, 0x0304), (0x0308, 0x0308), (0x0329, 0x0329),
+    (0x0000, 0x00FF), (0x0100, 0x017F), (0x01CD, 0x01DC), (0x02BB, 0x02BC), (0x02C6, 0x02C6),
+    (0x02DA, 0x02DA), (0x02DC, 0x02DC), (0x0300, 0x0304), (0x0308, 0x0308), (0x0329, 0x0329),
     (0x2000, 0x206F), (0x20AC, 0x20AC), (0x2122, 0x2122), (0x2190, 0x2193), (0x2212, 0x2212),
     (0x2215, 0x2215), (0xFEFF, 0xFEFF), (0xFFFD, 0xFFFD),
 ]
@@ -114,6 +117,11 @@ def is_cjkish(cp: int) -> bool:
         or 0xFF00 <= cp <= 0xFFEF  # half/full-width forms
         or 0x20000 <= cp <= 0x3FFFF  # ext B+
     )
+
+
+def is_latin_ext(cp: int) -> bool:
+    """Accented Latin (pinyin, names) that WenKai should carry too."""
+    return 0x00A0 <= cp <= 0x024F or 0x0300 <= cp <= 0x036F or 0x1E00 <= cp <= 0x1EFF
 
 
 def is_han(cp: int) -> bool:
@@ -171,7 +179,7 @@ def collect_used() -> set[str]:
     used: set[str] = set()
     for f in source_files():
         text = f.read_text(encoding='utf-8', errors='replace')
-        used |= {c for c in text if is_cjkish(ord(c)) or c in BASE_PUNCT}
+        used |= {c for c in text if is_cjkish(ord(c)) or is_latin_ext(ord(c)) or c in BASE_PUNCT}
     return used
 
 
@@ -180,7 +188,7 @@ def ascii_chars() -> set[str]:
 
 
 def latin_chars() -> set[int]:
-    return {cp for a, b in LATIN_RANGES for cp in range(a, b + 1)}
+    return {cp for a, b in LATIN_RANGES for cp in range(a, b + 1)} | {ord(c) for c in BASE_PINYIN}
 
 
 def load_frequency() -> list[str]:
@@ -361,7 +369,7 @@ def main() -> int:
     args = ap.parse_args()
 
     used = collect_used() | read_brush_chars()
-    base = set(BASE_CJK) | set(BASE_PUNCT)
+    base = set(BASE_CJK) | set(BASE_PUNCT) | set(BASE_PINYIN)
     text_chars = used | base | ascii_chars()
     brush_display = read_brush_chars() | set(BASE_CJK) | ascii_chars()
     used_han = {c for c in used if is_han(ord(c))}

@@ -66,7 +66,7 @@ export const POEMS: Poem[] = [
 
   // ── 兰 orchid ──────────────────────────────────────────────────────────────
   { lines: ['谁知林栖者，闻风坐相悦。', '草木有本心，何求美人折？'], author: '张九龄', dynasty: '唐', title: '感遇十二首·其一', authorEn: 'Zhang Jiuling',
-    en: 'Who knows the hermit of the woods, glad at their scent on the wind? Plants have their own true hearts — why would they wait to be picked by a beauty?',
+    en: 'Who would think the hermits of the woods, catching their scent on the wind, would come to love them? Plants have their own true hearts; they do not ask a beauty to pick them.',
     plants: ['orchid'], themes: ['focus'] },
   { lines: ['兰若生春夏，芊蔚何青青。', '幽独空林色，朱蕤冒紫茎。'], author: '陈子昂', dynasty: '唐', title: '感遇·其二', authorEn: 'Chen Zi\'ang',
     en: 'Orchid and pollia grow in spring and summer, lush and deep green; alone in the empty wood they are its colour, red tassels crowning purple stems.',

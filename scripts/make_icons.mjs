@@ -147,8 +147,8 @@ const fmt = (v) => {
   const s = r1(v).toFixed(1);
   return (s.endsWith('.0') ? s.slice(0, -2) : s).replace(/^(-?)0\./, '$1.');
 };
-/** Join numbers the way SVG path data allows: a minus sign or a leading dot needs no space. */
-const nums = (arr) => arr.map((v, i) => (i && !/^[-.]/.test(v) && !/\./.test(arr[i - 1]) ? ' ' : i && !/^-/.test(v) && /^\./.test(v) && !/\./.test(arr[i - 1]) ? ' ' : i && !/^-/.test(v) ? ' ' : '') + v).join('');
+/** Join numbers as SVG path data allows: a minus sign already separates two numbers. */
+const nums = (arr) => arr.map((v, i) => (i && !v.startsWith('-') ? ' ' : '') + v).join('');
 
 /** Polygon path in relative coordinates (deltas between rounded points, so nothing drifts). */
 function pathD(polys) {

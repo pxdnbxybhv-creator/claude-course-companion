@@ -261,10 +261,49 @@ function isCJK(s: string): boolean {
   return /[㐀-鿿豈-﫿]/.test(s);
 }
 
+// ---------------------------------------------------------------------------------------------- caches
+
+// Module-level caches outlive the view, so coming back to the garden paints instantly.
+const BMP_BUDGET = 18_000_000; // pixels (~72 MB of bitmaps)
+const bmpCache = new Map<string, HTMLCanvasElement>();
+let bmpPixels = 0;
+
+function bmpKey(ident: string, n: number, vigor: number, px: number): string {
+  return `${ident}|${n}|${vigor}|${px}`;
+}
+
+function bmpGet(k: string): HTMLCanvasElement | undefined {
+  const c = bmpCache.get(k);
+  if (c) {
+    bmpCache.delete(k);
+    bmpCache.set(k, c); // most recently used last
+  }
+  return c;
+}
+
+function bmpPut(k: string, c: HTMLCanvasElement): void {
+  const old = bmpCache.get(k);
+  if (old) {
+    bmpPixels -= old.width * old.height;
+    bmpCache.delete(k);
+  }
+  bmpCache.set(k, c);
+  bmpPixels += c.width * c.height;
+  for (const [key, v] of bmpCache) {
+    if (bmpPixels <= BMP_BUDGET || bmpCache.size <= 1) break;
+    bmpCache.delete(key);
+    bmpPixels -= v.width * v.height;
+  }
+}
+
+let backdropCache: { key: string; bd: Backdrop; w: number; h: number; ph: number } | null = null;
+
 // ---------------------------------------------------------------------------------------------- scene
 
 interface Slot {
   key: string;
+  /** Identity of what is painted (habit, kind, seed) — the bitmap cache key prefix. */
+  ident: string;
   drawing: Drawing;
   kind?: PlantKind;
   /** What the bitmap shows. */
@@ -591,12 +630,18 @@ export class GardenScene {
       const want = { growth, n: bornCount(it.drawing, growth), vigor, px };
       let slot = this.slots.get(it.key);
       if (!slot || slot.drawing !== it.drawing) {
+        const ident = `${it.key}|${it.plant?.habit.plant ?? 'rock'}|${it.seed}`;
         slot = {
-          key: it.key, drawing: it.drawing, kind: it.plant?.habit.plant, shown: null, want, bmp: null, prev: null,
+          key: it.key, ident, drawing: it.drawing, kind: it.plant?.habit.plant, shown: null, want, bmp: null, prev: null,
           fade: 1, appear: 0, anim: null, overlay: null, queued: false, nodAt: -1e9, animAt: 0, phase: (it.seed % 1000) * 0.37,
         };
         this.slots.set(it.key, slot);
-        this.enqueue(slot);
+        const hit = bmpGet(bmpKey(ident, want.n, want.vigor, want.px));
+        if (hit) {
+          slot.bmp = hit;
+          slot.shown = { n: want.n, vigor: want.vigor, px: want.px };
+          slot.appear = 1;
+        } else this.enqueue(slot);
         continue;
       }
       const grewFrom = slot.want.n;
@@ -627,7 +672,12 @@ export class GardenScene {
   }
 
   private startGrowth(slot: Slot, fromN: number, toN: number): void {
-    const bmp = slot.bmp!;
+    // Paint onto a copy: the old bitmap stays valid in the cache under its own growth.
+    const bmp = document.createElement('canvas');
+    bmp.width = slot.bmp!.width;
+    bmp.height = slot.bmp!.height;
+    bmp.getContext('2d')!.drawImage(slot.bmp!, 0, 0);
+    slot.bmp = bmp;
     const strokes = slot.drawing.strokes.slice(fromN, toN);
     const ov = document.createElement('canvas');
     ov.width = bmp.width;
@@ -652,7 +702,12 @@ export class GardenScene {
     const { growth, n, vigor, px } = slot.want;
     const sh = slot.shown;
     if (sh && sh.n === n && sh.vigor === vigor && sh.px === px && slot.bmp) return;
-    const bmp = rasterize(slot.drawing, growth, px, vigor);
+    const k = bmpKey(slot.ident, n, vigor, px);
+    let bmp = bmpGet(k);
+    if (!bmp) {
+      bmp = rasterize(slot.drawing, growth, px, vigor);
+      bmpPut(k, bmp);
+    }
     if (slot.bmp && slot.appear > 0) {
       slot.prev = slot.bmp;
       slot.fade = this.reduced ? 1 : 0;
@@ -702,11 +757,17 @@ export class GardenScene {
     // Backdrop (expensive, cached).
     const e = this.env;
     const key = `${this.W}x${this.H}@${this.dpr}|${this.bdTargetW()}|${e.season}|${e.tod}|${Math.round(e.hour * 2)}|${e.moonPhase.toFixed(2)}|${e.termIndex}|${e.seed}`;
+    let paintedBackdrop = false;
     if (key !== this.bdKey && now >= this.bdDue) {
       const hadGround = this.backdrop ? this.groundY : -1;
       const bw = this.bdTargetW();
       const ph = backdropPaintHeight(bw, this.H);
-      this.backdrop = paintBackdrop(bw, ph, this.dpr, this.env);
+      if (backdropCache?.key === key) this.backdrop = backdropCache.bd;
+      else {
+        this.backdrop = paintBackdrop(bw, ph, this.dpr, this.env);
+        backdropCache = { key, bd: this.backdrop, w: bw, h: this.H, ph };
+        paintedBackdrop = true;
+      }
       this.bdW = bw;
       this.bdH = this.H;
       this.bdPH = ph;
@@ -746,8 +807,8 @@ export class GardenScene {
       }
     }
 
-    // Rasterise queued plants.
-    this.work();
+    // Rasterise queued plants — not in the frame that painted the backdrop, so it shows first.
+    if (!paintedBackdrop) this.work();
 
     // Fades, stroke animations.
     const ms = dt * 1000;
@@ -765,6 +826,7 @@ export class GardenScene {
         if (s.anim.done) {
           s.anim = null;
           s.overlay = null;
+          if (s.bmp && s.shown) bmpPut(bmpKey(s.ident, s.shown.n, s.shown.vigor, s.shown.px), s.bmp);
           const w = s.want;
           if (s.shown && (w.n !== s.shown.n || w.vigor !== s.shown.vigor || w.px !== s.shown.px)) this.enqueue(s);
         }

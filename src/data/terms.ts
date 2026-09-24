@@ -66,7 +66,7 @@ export const TERMS: TermText[] = [
     'Wheat to bring in, rice to plant, and the plum rains on their way.',
     [p('螳螂生', 'Mantises hatch'), p('鵙始鸣', 'Shrikes begin to call'), p('反舌无声', 'The mockingbird falls silent')]),
   t('夏至', 'xiàzhì', 'Summer Solstice',
-    '白昼走到尽头，此后每天还夜一点。',
+    '白昼走到尽头，从此每天还给夜晚一点。',
     'Daylight has gone as far as it goes; from now on each day gives a little back to the night.',
     [p('鹿角解', 'Deer shed their antlers'), p('蜩始鸣', 'Cicadas begin to sing'), p('半夏生', 'Pinellia, the “half-summer” herb, sprouts')]),
   t('小暑', 'xiǎoshǔ', 'Minor Heat',

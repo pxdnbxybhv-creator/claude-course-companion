@@ -3,6 +3,7 @@
 import { plum } from '../../ink/plants/plum';
 import { pine } from '../../ink/plants/pine';
 import type { Drawing, PlantGenerator } from '../../ink/types';
+import { rasterize } from '../../ink/brush';
 
 function check(name: string, gen: PlantGenerator, seed: number, height: number): string[] {
   const kind = name as 'plum' | 'pine';
@@ -46,7 +47,19 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     }
   }
   lines.unshift(`${bad} failing cases; max strokes ${maxN}`);
-  console.warn(lines[0]);
+  // raster cost of a full-grown plant at scale 2 (budget ≲ 150 ms)
+  for (const k of kinds) {
+    const gen = k === 'plum' ? plum : pine;
+    const ts: number[] = [];
+    for (let seed = 1; seed <= 4; seed++) {
+      const d = gen({ kind: k as 'plum' | 'pine', seed, height: 320 });
+      const t0 = performance.now();
+      rasterize(d, 1, 2);
+      ts.push(Math.round(performance.now() - t0));
+    }
+    lines.unshift(`${k} rasterize@2: ${ts.join(', ')} ms`);
+  }
+  console.warn(lines.slice(0, kinds.length + 1).join(' | '));
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#fff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);

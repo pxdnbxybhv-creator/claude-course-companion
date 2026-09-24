@@ -220,7 +220,7 @@ function leaf(c: Ctx, o: LeafOpts) {
     for (let i = 1; i < 4; i++) pts.push(rim(lerp(a1, a0, i / 4), r0));
     const far = -Math.sin((a0 + a1) / 2 + o.ang);
     const tone = clamp(o.tone * (0.62 + 0.25 * far) + rng.range(-0.05, 0.05), 0.22, 0.88);
-    add(c, 'wash', poly(pts, 3 * u), tone, b + 0.001 + k * 0.001, { wet: 0.9, color: k === 1 && col ? col : undefined });
+    add(c, 'wash', poly(pts, 3 * u), tone, b + 0.0005 + k * 0.0005, { wet: 0.9, color: k === 1 && col ? col : undefined });
   }
   // a darker band along part of the far rim, where the leaf turns away from us
   {
@@ -229,7 +229,7 @@ function leaf(c: Ctx, o: LeafOpts) {
     const pts: V[] = [];
     for (let i = 0; i <= 12; i++) pts.push(rim(lerp(a0, a1, i / 12), rng.range(0.95, 1.0)));
     for (let i = 0; i <= 8; i++) pts.push(rim(lerp(a1, a0, i / 8), rng.range(0.45, 0.7)));
-    add(c, 'wash', poly(pts, 2 * u), clamp(o.tone * 1.08, 0.3, 0.9), b + 0.003, { wet: 0.8 });
+    add(c, 'wash', poly(pts, 2 * u), clamp(o.tone * 1.08, 0.3, 0.9), b + 0.0015, { wet: 0.8 });
   }
   // 3. veins radiating from the navel — curved by the cup of the leaf, some left out
   const nv = rng.int(8, 11);
@@ -245,9 +245,9 @@ function leaf(c: Ctx, o: LeafOpts) {
       const t = lerp(0.1, 1, k / 5);
       pts.push({ x: lerp(o.navel.x, end.x, t) + bow.x * Math.sin(Math.PI * t), y: lerp(o.navel.y, end.y, t) + bow.y * Math.sin(Math.PI * t), w: lerp(1.2, 0.35, k / 5) * u });
     }
-    add(c, 'line', pts, clamp(o.tone + rng.range(0.04, 0.2), 0.5, 0.82), b + 0.006 + i * 0.0003, { wet: 0.55 });
+    add(c, 'line', pts, clamp(o.tone + rng.range(0.04, 0.2), 0.5, 0.82), b + 0.002 + i * 0.0001, { wet: 0.55 });
   }
-  add(c, 'dot', [{ x: o.navel.x, y: o.navel.y, w: 3.4 * u }], 0.85, b + 0.009, { wet: 0.4 });
+  add(c, 'dot', [{ x: o.navel.x, y: o.navel.y, w: 3.4 * u }], 0.85, b + 0.0032, { wet: 0.4 });
 
   // 4. burnt-ink rim, in one or two places only
   const nr = rng.int(1, 2);
@@ -255,7 +255,7 @@ function leaf(c: Ctx, o: LeafOpts) {
     const a0 = rng.range(0, TAU), span = rng.range(0.5, 1.1);
     const pts: V[] = [];
     for (let i = 0; i <= 8; i++) pts.push(rim(a0 + (span * i) / 8, 0.94));
-    add(c, 'brush', brushPts(pts, rng.range(1.6, 2.6) * u, rng.range(1.2, 2) * u, 1.0, 0.3), rng.range(0.78, 0.9), b + 0.01 + k * 0.0005, { wet: 0.5, dryness: 0.6 });
+    add(c, 'brush', brushPts(pts, rng.range(1.6, 2.6) * u, rng.range(1.2, 2) * u, 1.0, 0.3), rng.range(0.78, 0.9), b + 0.0034 + k * 0.0001, { wet: 0.5, dryness: 0.6 });
   }
 }
 
@@ -398,8 +398,8 @@ function flower(c: Ctx, o: FlowerOpts) {
 
   const paintPetal = (p: Petal, b: number, ground: boolean) => {
     if (ground) add(c, 'fill', poly(p.poly, 0.8 * u), 0.88, b, { color: PIGMENTS.white, wet: 0.1 });
-    add(c, 'fill', poly(p.poly, 1.2 * u), o.tone * rng.range(0.6, 0.85), b + 0.0002, { color: rouge, wet: 0.45 });
-    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 5 * u), clamp(o.tone * 1.5, 0.28, 0.45), b + 0.0003, { color: rouge, wet: 0.8 });
+    add(c, 'fill', poly(p.poly, 1.2 * u), o.tone * rng.range(0.6, 0.85), b, { color: rouge, wet: 0.45 });
+    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 5 * u), clamp(o.tone * 1.5, 0.28, 0.45), b, { color: rouge, wet: 0.8 });
   };
   const nearerOf = (p: Petal) => petals.filter((q) => q !== p && q.z > p.z);
   const outlinePetal = (p: Petal, b: number) => {
@@ -420,7 +420,7 @@ function flower(c: Ctx, o: FlowerOpts) {
     for (const v of p.veins) {
       if (p.z < 0 || rng.chance(0.4)) continue;
       let vr: StrokePoint[] = [];
-      const vflush = () => { if (vr.length >= 3) add(c, 'line', vr, 0.3, b + 0.0001, { color: rouge, wet: 0.3 }); vr = []; };
+      const vflush = () => { if (vr.length >= 3) add(c, 'line', vr, 0.3, b, { color: rouge, wet: 0.3 }); vr = []; };
       for (const q of v) {
         if (nearer.some((r) => pointInPoly(q.x, q.y, r.poly))) vflush();
         else vr.push({ ...q, w: 0.5 * u });
@@ -430,20 +430,20 @@ function flower(c: Ctx, o: FlowerOpts) {
   };
 
   // Stage A: the inner cup (reads as a flower just opening), pod between back and front.
+  // Each stage appears as one unit (a shared birth); ties keep paint order: back → pod → front.
   let b = o.birthA;
-  const step = 0.004;
   const backIn = inner.filter((p) => p.z <= podZ), frontIn = inner.filter((p) => p.z > podZ);
-  for (const p of backIn) { paintPetal(p, b, true); b += step; }
+  for (const p of backIn) paintPetal(p, b, true);
   // pod
   const hull = convexHull([...top, ...bot]);
   add(c, 'fill', poly(hull, 1 * u), 0.62, b, { color: PIGMENTS.gamboge, wet: 0.4 });
-  add(c, 'fill', poly(top, 1.5 * u), 0.42, b + 0.0005, { color: PIGMENTS.malachite, wet: 0.5 });
-  add(c, 'line', [...top, top[0]].map((q) => ({ ...q, w: 0.7 * u })), 0.55, b + 0.001, { wet: 0.2 });
+  add(c, 'fill', poly(top, 1.5 * u), 0.42, b, { color: PIGMENTS.malachite, wet: 0.5 });
+  add(c, 'line', [...top, top[0]].map((q) => ({ ...q, w: 0.7 * u })), 0.55, b, { wet: 0.2 });
   const nSeeds = rng.int(6, 9);
   for (let i = 0; i < nSeeds; i++) {
     const a = rng.range(0, TAU), r = Math.sqrt(rng()) * podTop * 0.7;
     const q = P3([Math.cos(a) * r, Math.sin(a) * r, podH]);
-    add(c, 'dot', [{ ...q, w: R * 0.045 }], 0.6, b + 0.0015, { color: PIGMENTS.malachite, wet: 0.2 });
+    add(c, 'dot', [{ ...q, w: R * 0.045 }], 0.6, b, { color: PIGMENTS.malachite, wet: 0.2 });
   }
   // stamens
   const nSt = rng.int(14, 20);
@@ -453,18 +453,17 @@ function flower(c: Ctx, o: FlowerOpts) {
     const el = rad(rng.range(55, 80)), ln = R * rng.range(0.2, 0.28);
     const s1: V3 = [s0[0] + Math.cos(a) * Math.cos(el) * ln, s0[1] + Math.sin(a) * Math.cos(el) * ln, s0[2] + Math.sin(el) * ln];
     const pa = P3(s0), pb = P3(s1);
-    add(c, 'line', [{ ...pa, w: 0.7 * u }, { x: lerp(pa.x, pb.x, 0.5) + rng.range(-0.6, 0.6) * u, y: lerp(pa.y, pb.y, 0.5), w: 0.7 * u }, { ...pb, w: 0.6 * u }], 0.75, b + 0.002, { color: PIGMENTS.gamboge, wet: 0.2 });
-    if (i % 2 === 0) add(c, 'dot', [{ ...pb, w: 2 * u }], 0.8, b + 0.0021, { color: PIGMENTS.ochre, wet: 0.2 });
+    add(c, 'line', [{ ...pa, w: 0.7 * u }, { x: lerp(pa.x, pb.x, 0.5) + rng.range(-0.6, 0.6) * u, y: lerp(pa.y, pb.y, 0.5), w: 0.7 * u }, { ...pb, w: 0.6 * u }], 0.75, b, { color: PIGMENTS.gamboge, wet: 0.2 });
+    if (i % 2 === 0) add(c, 'dot', [{ ...pb, w: 2 * u }], 0.8, b, { color: PIGMENTS.ochre, wet: 0.2 });
   }
-  b += step;
-  for (const p of frontIn) { paintPetal(p, b, true); b += step; }
-  for (const p of inner) outlinePetal(p, o.birthA + 0.03);
+  for (const p of frontIn) paintPetal(p, b, true);
+  for (const p of inner) outlinePetal(p, o.birthA + 0.002);
 
   // Stage B: the outer petals fall open. Those behind the cup are left translucent (no white
   // ground), so they tint rather than hide the inner petals they sit behind.
   b = o.birthB;
-  for (const p of outer) { paintPetal(p, b, p.z > podZ); b += step * 1.5; }
-  for (const p of outer) outlinePetal(p, o.birthB + 0.06);
+  for (const p of outer) paintPetal(p, b, p.z > podZ);
+  for (const p of outer) outlinePetal(p, o.birthB + 0.002);
 }
 
 /** 荷苞: a closed bud — a pointed teardrop of three visible petals. */
@@ -490,15 +489,14 @@ function bud(c: Ctx, base: V, dir: number, h: number, birth: number) {
   const right = petal(1, 0.7, 0.34);
   const tone = rng.range(0.22, 0.3);
   const rouge = PIGMENTS.rouge;
-  let b = birth;
+  const b = birth;
   for (const p of [back, left, right]) {
     add(c, 'fill', poly(p, 0.8 * u), 0.85, b, { color: PIGMENTS.white, wet: 0.1 });
-    add(c, 'fill', poly(p, 1.2 * u), tone, b + 0.0002, { color: rouge, wet: 0.45 });
+    add(c, 'fill', poly(p, 1.2 * u), tone, b, { color: rouge, wet: 0.45 });
     // dark tip
     const tip = p.filter((_, i) => i >= 6 && i <= 14);
-    add(c, 'fill', poly(tip, 4 * u), 0.38, b + 0.0003, { color: rouge, wet: 0.8 });
-    add(c, 'line', p.map((q) => ({ ...q, w: 0.7 * u })), 0.58, b + 0.0004, { color: rouge, wet: 0.2 });
-    b += 0.003;
+    add(c, 'fill', poly(tip, 4 * u), 0.38, b, { color: rouge, wet: 0.8 });
+    add(c, 'line', p.map((q) => ({ ...q, w: 0.7 * u })), 0.58, b, { color: rouge, wet: 0.2 });
   }
 }
 
