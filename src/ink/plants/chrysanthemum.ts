@@ -476,7 +476,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
       { x: q.p.x + d.x * len * 1.05, y: q.p.y + d.y * len * 1.05 - len * 0.26 },
     ], 8);
     const L = arcLengths(path);
-    const b0 = lerp(m.birth0, m.birth1, tb);
+    const b0 = lerp(m.birth0, m.birth1, tb) + 0.1; // branches break out once the stem has leafed
     stems.push({ base: q.p, top: path[path.length - 1], path, L, h: len, nodes: [rng.range(0.4, 0.6)], head: nStems === 1 && rng.chance(0.6) ? 'side' : 'bud', birth0: b0, birth1: b0 + 0.08, branch: true });
   }
 

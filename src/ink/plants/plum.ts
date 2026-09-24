@@ -208,10 +208,26 @@ export function plum(spec: PlantSpec): Drawing {
   const twigs: Branch[] = [];
   const cumTrunk = (i: number) => polyLen(trunk.pts.slice(0, i + 1));
 
+  // 忌平行: painters avoid shoots running parallel to their neighbours
+  const placed: { m: P; a: number }[] = [];
+  const place = (pts: P[]) => {
+    space.addPath(pts);
+    placed.push({ m: mix(pts[0], pts[pts.length - 1], 0.5), a: angOf(pts[0], pts[pts.length - 1]) });
+  };
+  const parallel = (pts: P[]) => {
+    const m = mix(pts[0], pts[pts.length - 1], 0.5), a = angOf(pts[0], pts[pts.length - 1]);
+    let pen = 0;
+    for (const q of placed) {
+      if (dist(q.m, m) > 0.3 * H) continue;
+      const d = Math.abs(Math.atan2(Math.sin(a - q.a), Math.cos(a - q.a)));
+      if (d < 0.3) pen += 18 * (1 - d / 0.3);
+    }
+    return pen;
+  };
   function chooseBest<C extends { pts: P[] }>(cands: C[], skip: number): C {
     let best = cands[0], bs = -1e9;
     for (const c of cands) {
-      const s = space.score(c.pts, skip) + rng.range(0, 6);
+      const s = space.score(c.pts, skip) + rng.range(0, 6) - parallel(c.pts);
       if (s > bs) { bs = s; best = c; }
     }
     return best;
@@ -230,7 +246,7 @@ export function plum(spec: PlantSpec): Drawing {
     const c = chooseBest(cands, 10);
     const w0 = trunk.w[topIdx] * (brokenTop ? 0.6 : 0.78);
     limbs.push({ kind: 'limb', pts: c.pts, w: widths(c.pts.length - 1, w0, 2.4, 0.7), d0: cumTrunk(topIdx), birth: 0 });
-    space.addPath(c.pts);
+    place(c.pts);
   }
   // one or two side limbs from lower trunk joints, reaching out sideways (or a young twin trunk)
   const nSide = rng.chance(0.55) ? 2 : 1;
@@ -248,7 +264,7 @@ export function plum(spec: PlantSpec): Drawing {
     const c = chooseBest(cands, 14);
     const w0 = isTwin ? wBase * 0.42 : trunk.w[j] * rng.range(0.42, 0.52);
     limbs.push({ kind: 'limb', pts: c.pts, w: widths(c.pts.length - 1, w0, 2, 0.7), d0: isTwin ? 0.05 * H : cumTrunk(j), birth: 0 });
-    space.addPath(c.pts);
+    place(c.pts);
   }
 
   // whips 长条: long straight young shoots rising from the limbs
@@ -268,7 +284,7 @@ export function plum(spec: PlantSpec): Drawing {
     const c = chooseBest(cands, 12);
     const w0 = Math.min(c.w * 0.5, 4);
     whips.push({ kind: 'whip', pts: c.pts, w: [w0, w0 * 0.55, 0.5], d0: c.par.d0 + c.t * polyLen(c.par.pts), birth: 0 });
-    space.addPath(c.pts);
+    place(c.pts);
   }
 
   // secondaries from limb joints, alternating sides, steered into empty space; straighter than limbs
@@ -286,10 +302,10 @@ export function plum(spec: PlantSpec): Drawing {
         cands.push({ pts: zig(rng, from, a0, len, rng.range(0.055, 0.075) * H, rng.range(0.15, 0.32), 0.2) });
       }
       const c = chooseBest(cands, 8);
-      if (space.score(c.pts, 8) < 10) continue; // too crowded: leave the space empty
+      if (space.score(c.pts, 8) - parallel(c.pts) < 10) continue; // too crowded or too regular: leave it empty
       const w0 = Math.min(L.w[j] * 0.58, 5.5);
       secs.push({ kind: 'sec', pts: c.pts, w: widths(c.pts.length - 1, w0, 1.1, 0.7), d0: L.d0 + polyLen(L.pts.slice(0, j + 1)), birth: 0 });
-      space.addPath(c.pts);
+      place(c.pts);
       sg = -sg;
     }
   }
@@ -300,9 +316,9 @@ export function plum(spec: PlantSpec): Drawing {
     const aP = angOf(S.pts[j - 1], S.pts[j]);
     const a0 = (aP + (rng.chance(0.5) ? 1 : -1) * rng.range(0.5, 0.9)) * 0.85;
     const pts = zig(rng, S.pts[j], a0, rng.range(0.05, 0.1) * H, 0.05 * H, 0.2, 0.2);
-    if (space.score(pts, 6) < 10) continue;
+    if (space.score(pts, 6) - parallel(pts) < 10) continue;
     secs.push({ kind: 'sec', pts, w: widths(pts.length - 1, Math.min(S.w[j] * 0.6, 3), 0.9), d0: S.d0 + polyLen(S.pts.slice(0, j + 1)), birth: 0 });
-    space.addPath(pts);
+    place(pts);
   }
 
   // spurs 刺 / short twigs, the dark punctuation of a plum branch
@@ -655,7 +671,7 @@ function paintBlossoms(
     if (!rng.chance(b.kind === 'twig' ? 0.45 : 0.75)) continue;
     const p = b.pts[b.pts.length - 1];
     const a = angOf(b.pts[b.pts.length - 2], p);
-    const r = r0 * rng.range(0.26, 0.4);
+    const r = r0 * rng.range(0.24, 0.36);
     const c = add(p, dir(a + rng.range(-0.4, 0.4)), r * 0.7);
     if (!flowers.every((f) => dist(f.c, c) > f.r + r * 0.6)) continue;
     buds.push({ p: c, a, r });
