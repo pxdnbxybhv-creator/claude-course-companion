@@ -5,3 +5,4 @@ dist/
 dist-single/
 .snaps/
 *.log
+.cache/
