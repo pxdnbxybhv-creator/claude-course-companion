@@ -28,7 +28,7 @@ export interface GardenPlant {
 /** Plants are generated at one reference height (a stable memo key) and scaled to the canvas. */
 const REF_H = 300;
 /** Full-grown height as a fraction of the scene height, per kind (bamboo and pine stand tallest). */
-const KIND_H: Record<PlantKind, number> = { bamboo: 0.585, pine: 0.565, plum: 0.55, lotus: 0.49, chrysanthemum: 0.465, orchid: 0.44 };
+const KIND_H: Record<PlantKind, number> = { bamboo: 0.59, pine: 0.57, plum: 0.55, lotus: 0.47, chrysanthemum: 0.45, orchid: 0.4 };
 /** Sway amplitude in degrees: bamboo and orchid leaves move, the old pine barely does. */
 const KIND_SWAY: Record<PlantKind, number> = { bamboo: 1.35, orchid: 1.15, lotus: 1.0, chrysanthemum: 0.9, plum: 0.65, pine: 0.45 };
 const BURST: Record<PlantKind, string | undefined> = {
@@ -120,6 +120,8 @@ interface Placed {
 
 interface Layout { items: Placed[]; worldW: number }
 
+const rockMemo = new Map<number, Drawing>();
+
 /** Minimum distance between two plant anchors: room for the name inscription. */
 const MIN_GAP = 62;
 
@@ -136,10 +138,12 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
   const L: number[] = [], R: number[] = [], gaps: number[] = [0];
   plants.forEach((p, i) => {
     const r = makeRng(p.habit.seed ^ 0x5bd1e995);
-    const frac = clamp(KIND_H[p.habit.plant] + r.range(-0.025, 0.025), 0.42, 0.6) * portrait;
-    const s = (frac * H) / REF_H;
+    const frac = clamp(KIND_H[p.habit.plant] + r.range(-0.025, 0.025), 0.36, 0.6) * portrait;
     const d = plantDrawing({ kind: p.habit.plant, seed: p.habit.seed, height: REF_H });
     const e = extentOf(d, 1);
+    // Wide plants (an orchid's leaves can span 2× its height) are held to a width, so no one plant dominates.
+    const maxW = Math.min(H * 0.62, W * (portrait < 1 ? 0.7 : 0.4));
+    const s = Math.min((frac * H) / REF_H, maxW / Math.max(1, e.maxX - e.minX));
     L.push(Math.max(10, (d.anchor.x - e.minX) * s));
     R.push(Math.max(10, (e.maxX - d.anchor.x) * s));
     if (i > 0) {
@@ -168,7 +172,8 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
   // Rocks for composition: one beside every third plant (on the left, away from the inscription).
   const rocks: Placed[] = [];
   const addRock = (cx: number, size: number, seed: number, y: number) => {
-    const d = rockDrawing(seed, 100);
+    let d = rockMemo.get(seed);
+    if (!d) rockMemo.set(seed, (d = rockDrawing(seed, 100)));
     const s = size / d.width;
     rocks.push({ key: `rock:${seed}`, drawing: d, s, x: cx, y, seed });
   };
@@ -298,6 +303,24 @@ function bmpPut(k: string, c: HTMLCanvasElement): void {
 
 let backdropCache: { key: string; bd: Backdrop; w: number; h: number; ph: number } | null = null;
 
+/**
+ * Time-of-day light in backdrop space (so the moonlit patch sits on the painted moon while the
+ * scroll pans): paintLight multiplied onto white at quarter resolution — it is a soft map anyway.
+ */
+function buildLightLayer(bd: Backdrop, w: number, h: number, env: SceneEnv): HTMLCanvasElement | null {
+  if (env.tod === 'day') return null;
+  const k = 0.25;
+  const c = document.createElement('canvas');
+  c.width = Math.max(2, Math.ceil(w * k));
+  c.height = Math.max(2, Math.ceil(h * k));
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.scale(k, k);
+  paintLight(ctx, w, h, env, { body: bd.body && bd.body.r > 0 ? { x: bd.body.x, y: bd.body.y, r: bd.body.r } : undefined });
+  return c;
+}
+
 // ---------------------------------------------------------------------------------------------- scene
 
 interface Slot {
@@ -347,6 +370,8 @@ export class GardenScene {
   /** Canvas height the backdrop was painted for, and the (taller) height it was painted at. */
   private bdH = 0;
   private bdPH = 0;
+  private light: HTMLCanvasElement | null = null;
+  private lightKey = '';
   private bdDue = 0;
   private plants: GardenPlant[] = [];
   private items: Placed[] = [];
@@ -914,7 +939,22 @@ export class GardenScene {
     if (bd && pondTop < H) {
       paintPond(ctx, { x: 0, y: pondTop, w: W, h: H - pondTop, t: this.t, source: this.canvas, mirrorY: pondTop, clarity: this.env.clarity, dpr, seed: this.env.seed, tod: this.env.tod });
     }
-    paintLight(ctx, W, H, this.env);
+    if (bd) {
+      const e = this.env;
+      const lk = `${this.bdKey}|${e.tod}|${e.hour.toFixed(2)}|${e.moonPhase.toFixed(3)}`;
+      if (lk !== this.lightKey) {
+        this.light = buildLightLayer(bd, this.bdW, this.bdPH, e);
+        this.lightKey = lk;
+      }
+      if (this.light) {
+        const k = H / this.bdH;
+        const off = clamp(this.pan * PARALLAX, 0, Math.max(0, this.bdW * k - W));
+        ctx.save();
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.drawImage(this.light, -off, 0, this.bdW * k, this.bdPH * k);
+        ctx.restore();
+      }
+    }
 
     this.drawLabels();
 
@@ -1154,6 +1194,6 @@ export async function renderGardenStill(o: { width: number; height: number; dpr:
   if (bd.pondTop < H) {
     paintPond(ctx, { x: 0, y: bd.pondTop, w: W, h: H - bd.pondTop, t: 0, source: c, mirrorY: bd.pondTop, clarity: o.env.clarity, dpr, seed: o.env.seed, tod: o.env.tod });
   }
-  paintLight(ctx, W, H, o.env);
+  paintLight(ctx, W, H, o.env, { body: bd.body && bd.body.r > 0 ? { x: bd.body.x, y: bd.body.y, r: bd.body.r } : undefined });
   return c;
 }
