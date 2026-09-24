@@ -27,7 +27,7 @@ import './garden/garden.css';
     if (flag !== '1' && flag !== '0') return;
     const l = q.get('lang');
     const lng = l === 'en' || l === 'zh' ? l : state.value.settings.lang;
-    if (flag === '1') replaceState(demoState(today.value, lng));
+    if (flag === '1') seedDemo(today.value, lng);
     else replaceState({ ...emptyState(), settings: { ...state.value.settings, lang: lng }, onboarded: true });
     q.delete('demo');
     q.delete('lang');
@@ -35,6 +35,13 @@ import './garden/garden.css';
     history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
   } catch { /* not in a browser */ }
 })();
+
+/** Plant the demo garden, keeping the visitor's own settings (theme, sound, seal). */
+function seedDemo(day: DateKey, lng: 'zh' | 'en'): void {
+  const cur = state.value.settings;
+  const demo = demoState(day, lng);
+  replaceState({ ...demo, settings: { ...cur, lang: lng, sealName: cur.sealName || demo.settings.sealName } });
+}
 
 type SheetState = { kind: 'add' } | { kind: 'edit'; id: string } | { kind: 'detail'; id: string } | null;
 
@@ -156,7 +163,7 @@ export function GardenView() {
             <p class="garden-empty-lead">{t('这半亩地还空着。种下一个习惯，看它一笔一笔长起来。', 'This half-acre is still bare. Plant a habit and watch it grow, stroke by stroke.')}</p>
             <div class="garden-empty-actions">
               <button class="btn btn-primary" onClick={() => setSheet({ kind: 'add' })}>{t('种下第一株', 'Plant a habit')}</button>
-              <button class="btn" onClick={() => { replaceState(demoState(day, lang.value)); toast(t('示例园子已种好，可随时在设置中清空', 'Demo garden planted — reset it any time in Settings')); }}>
+              <button class="btn" onClick={() => { seedDemo(day, lang.value); toast(t('示例园子已种好，可随时在设置中清空', 'Demo garden planted — reset it any time in Settings')); }}>
                 {t('看看示例园子', 'Explore a demo garden')}
               </button>
             </div>
@@ -230,7 +237,7 @@ export function GardenView() {
         open={welcome && !sheet}
         onClose={finishWelcome}
         onPlant={() => { finishWelcome(); setSheet({ kind: 'add' }); }}
-        onDemo={() => { setWelcome(false); replaceState(demoState(day, lang.value)); }}
+        onDemo={() => { setWelcome(false); seedDemo(day, lang.value); }}
       />
     </section>
   );
