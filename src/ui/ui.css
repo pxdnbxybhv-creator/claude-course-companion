@@ -79,6 +79,8 @@
 
 /* Toast */
 .toast-wrap { position: fixed; left: 0; right: 0; top: calc(env(safe-area-inset-top) + 14px); z-index: 60; display: flex; justify-content: center; pointer-events: none; }
+.toast.has-action { pointer-events: auto; display: flex; align-items: center; gap: 14px; padding-right: 8px; }
+.toast-action { min-height: 32px; padding: 0 12px; border-radius: 999px; color: var(--paper); border: 1px solid color-mix(in srgb, var(--paper) 40%, transparent); font-size: 13px; letter-spacing: 0.08em; }
 .toast { max-width: min(92vw, 520px); padding: 10px 18px; border-radius: 999px; background: var(--ink); color: var(--paper); font-size: 14px; box-shadow: var(--shadow); animation: toast-in 0.35s var(--ease); text-align: center; }
 @keyframes toast-in { from { transform: translateY(-10px); opacity: 0; } }
 

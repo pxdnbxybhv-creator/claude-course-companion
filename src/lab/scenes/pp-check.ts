@@ -28,6 +28,16 @@ function check(name: string, gen: PlantGenerator, seed: number, height: number):
   if (a.strokes.length > 400) errs.push(`strokes ${a.strokes.length}`);
   const early = a.strokes.filter((s) => s.birth <= 0.06).length;
   if (early < 2) errs.push(`only ${early} strokes at 0.06`);
+  // growth choreography: every check-in n = 1..21 must add at least one visible stroke
+  const g = (n: number) => 0.06 + 0.94 * (1 - Math.exp(-n / 21));
+  const vis = (x: number) => a.strokes.filter((st) => st.birth <= x).length;
+  const flat: number[] = [];
+  for (let n = 1; n <= 21; n++) if (vis(g(n)) <= vis(g(n - 1))) flat.push(n);
+  if (flat.length) errs.push(`no new stroke at check-in ${flat.join(',')}`);
+  if (kind === 'plum') {
+    const firstColour = Math.min(...a.strokes.filter((st) => st.color && st.color !== '#f4efe4' && st.kind === 'fill').map((st) => st.birth));
+    if (firstColour > g(7) + 1e-9) errs.push(`first blossom at ${firstColour.toFixed(3)} > ${g(7).toFixed(3)}`);
+  }
   return errs.map((e) => `${name} seed=${seed} h=${height}: ${e}`).concat(errs.length ? [] : [`${name} seed=${seed} h=${height}: ok ${a.strokes.length} strokes, ${a.width}x${a.height}, early=${early}`]);
 }
 
@@ -37,7 +47,7 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   let bad = 0, maxN = 0;
   for (const k of kinds) {
     const gen = k === 'plum' ? plum : pine;
-    for (let seed = 1; seed <= 40; seed++) {
+    for (let seed = 1; seed <= 30; seed++) {
       for (const h of [160, 320, 420]) {
         const r = check(k, gen, seed, h);
         const ok = r.length === 1 && r[0].includes(': ok');

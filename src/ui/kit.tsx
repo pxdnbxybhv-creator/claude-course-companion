@@ -54,17 +54,40 @@ export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void
   return <button type="button" class="toggle" role="switch" aria-checked={props.checked} aria-label={props.label} onClick={() => props.onChange(!props.checked)} />;
 }
 
-const toastMsg = signal<{ text: string; id: number } | null>(null);
+interface ToastAction { label: string; run: () => void }
+const toastMsg = signal<{ text: string; id: number; action?: ToastAction } | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-/** Show a short message above the tab bar. */
-export function toast(text: string, ms = 2600): void {
-  toastMsg.value = { text, id: Date.now() };
+let toastSeq = 0;
+/** Show a short message at the top of the screen, optionally with one action (e.g. 撤销 · Undo). */
+export function toast(text: string, opts: number | { ms?: number; action?: ToastAction } = 2600): void {
+  const o = typeof opts === 'number' ? { ms: opts } : opts;
+  toastMsg.value = { text, id: ++toastSeq, action: o.action };
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (toastMsg.value = null), ms);
+  toastTimer = setTimeout(() => (toastMsg.value = null), o.ms ?? (o.action ? 5000 : 2600));
 }
 export function ToastHost() {
   const m = toastMsg.value;
-  return <div class="toast-wrap" aria-live="polite">{m && <div class="toast" key={m.id}>{m.text}</div>}</div>;
+  return (
+    <div class="toast-wrap" aria-live="polite">
+      {m && (
+        <div class={'toast' + (m.action ? ' has-action' : '')} key={m.id}>
+          <span>{m.text}</span>
+          {m.action && (
+            <button
+              type="button"
+              class="toast-action"
+              onClick={() => {
+                m.action!.run();
+                toastMsg.value = null;
+              }}
+            >
+              {m.action.label}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** A hand-drawn-looking horizontal brush line. */
