@@ -1,6 +1,6 @@
 // Almanac view model: cached, pure-ish helpers around the lunar / solar-term / astro cores.
 import type { DateKey } from '../../core/types';
-import { toKey } from '../../core/date';
+import { addDays, toKey } from '../../core/date';
 import { toLunar, festivalsOn, type Festival, type LunarDate } from '../../core/lunar';
 import { termOnDay, termsOfYear, type TermInstant } from '../../core/solarterms';
 
@@ -28,7 +28,7 @@ export function ordinal(n: number): string {
 
 /** "Year of the Horse, 8th month, day 14" */
 export function lunarEn(l: LunarDate): string {
-  return `Year of the ${l.zodiacEn}, ${l.leap ? 'leap ' : ''}${ordinal(l.month)} month, day ${l.day}`;
+  return `Year of the\u00a0${l.zodiacEn}, ${l.leap ? 'leap\u00a0' : ''}${ordinal(l.month)}\u00a0month, day\u00a0${l.day}`;
 }
 
 /** "八月十四" (闰 is already part of monthName). */
@@ -170,3 +170,18 @@ export function termProgress(day: Date, current: TermInstant, next: TermInstant)
 
 export const SEASON_ZH = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' } as const;
 export const SEASON_EN = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' } as const;
+
+const nextFestCache = new Map<DateKey, { key: DateKey; days: number; fest: Festival } | null>();
+/** The next traditional festival after `from` (within ~4 months), cached per day. */
+export function nextFestival(from: DateKey): { key: DateKey; days: number; fest: Festival } | null {
+  if (nextFestCache.has(from)) return nextFestCache.get(from)!;
+  let hit: { key: DateKey; days: number; fest: Festival } | null = null;
+  for (let n = 1; n <= 130 && !hit; n++) {
+    const k = addDays(from, n);
+    const f = dayInfo(k).festivals.find((x) => x.kind !== 'solar') ?? dayInfo(k).festivals[0];
+    if (f) hit = { key: k, days: n, fest: f };
+  }
+  if (nextFestCache.size > 16) nextFestCache.clear();
+  nextFestCache.set(from, hit);
+  return hit;
+}

@@ -231,28 +231,7 @@ function leaf(c: Ctx, o: LeafOpts) {
     for (let i = 0; i <= 8; i++) pts.push(rim(lerp(a1, a0, i / 8), rng.range(0.45, 0.7)));
     add(c, 'wash', poly(pts, 2 * u), clamp(o.tone * 1.08, 0.3, 0.9), b + 0.003, { wet: 0.8 });
   }
-  // 3. a few broad side-brush strokes swept out to the rim along the veins, running dry at
-  //    the edge (飞白), where the far side of the leaf is darkest.
-  const nS = rng.chance(0.3) ? 1 : 0;
-  const dA = TAU / 11;
-  const sBase = -Math.PI / 2 - o.ang + rng.range(-0.8, 0.8); // the far side
-  for (let i = 0; i < nS; i++) {
-    const th = sBase + (i - (nS - 1) / 2) * dA * rng.range(0.9, 1.3);
-    const kIn = rng.range(0.25, 0.45), kOut = rng.range(0.88, 1.0);
-    const wf = rng.range(0.7, 1.0);
-    const pts: StrokePoint[] = [];
-    for (let k = 0; k <= 6; k++) {
-      const t = k / 6;
-      const kk = lerp(kIn, kOut, t);
-      const p0 = rim(th - dA * 0.5, kk), p1 = rim(th + dA * 0.5, kk);
-      const mid = rim(th, kk);
-      const w = Math.hypot(p1.x - p0.x, p1.y - p0.y) * wf * (t < 0.25 ? lerp(0.4, 1, t / 0.25) : 1);
-      pts.push({ x: mid.x, y: mid.y, w: Math.max(w, 2 * u) });
-    }
-    add(c, 'brush', pts, clamp(o.tone * rng.range(0.85, 1.1), 0.3, 0.92), b + 0.004 + i * 0.0004, { wet: 0.8, dryness: rng.range(0.5, 0.8) });
-  }
-
-  // 4. veins radiating from the navel — curved by the cup of the leaf, some left out
+  // 3. veins radiating from the navel — curved by the cup of the leaf, some left out
   const nv = rng.int(8, 11);
   const v0 = rng.range(0, TAU);
   for (let i = 0; i < nv; i++) {
@@ -264,13 +243,13 @@ function leaf(c: Ctx, o: LeafOpts) {
     const pts: StrokePoint[] = [];
     for (let k = 0; k <= 5; k++) {
       const t = lerp(0.1, 1, k / 5);
-      pts.push({ x: lerp(o.navel.x, end.x, t) + bow.x * Math.sin(Math.PI * t), y: lerp(o.navel.y, end.y, t) + bow.y * Math.sin(Math.PI * t), w: lerp(1.3, 0.4, k / 5) * u });
+      pts.push({ x: lerp(o.navel.x, end.x, t) + bow.x * Math.sin(Math.PI * t), y: lerp(o.navel.y, end.y, t) + bow.y * Math.sin(Math.PI * t), w: lerp(1.2, 0.35, k / 5) * u });
     }
-    add(c, 'line', pts, clamp(o.tone + rng.range(0.1, 0.28), 0.55, 0.9), b + 0.006 + i * 0.0003, { wet: 0.55 });
+    add(c, 'line', pts, clamp(o.tone + rng.range(0.04, 0.2), 0.5, 0.82), b + 0.006 + i * 0.0003, { wet: 0.55 });
   }
   add(c, 'dot', [{ x: o.navel.x, y: o.navel.y, w: 3.4 * u }], 0.85, b + 0.009, { wet: 0.4 });
 
-  // 5. burnt-ink rim, in one or two places only
+  // 4. burnt-ink rim, in one or two places only
   const nr = rng.int(1, 2);
   for (let k = 0; k < nr; k++) {
     const a0 = rng.range(0, TAU), span = rng.range(0.5, 1.1);
@@ -421,7 +400,7 @@ function flower(c: Ctx, o: FlowerOpts) {
   const paintPetal = (p: Petal, b: number, ground: boolean) => {
     if (ground) add(c, 'fill', poly(p.poly, 0.8 * u), 0.88, b, { color: PIGMENTS.white, wet: 0.1 });
     add(c, 'fill', poly(p.poly, 1.2 * u), o.tone * rng.range(0.6, 0.85), b + 0.0002, { color: rouge, wet: 0.45 });
-    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 2.5 * u), clamp(o.tone * 1.5, 0.28, 0.45), b + 0.0003, { color: rouge, wet: 0.7 });
+    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 5 * u), clamp(o.tone * 1.5, 0.28, 0.45), b + 0.0003, { color: rouge, wet: 0.8 });
   };
   const nearerOf = (p: Petal) => petals.filter((q) => q !== p && q.z > p.z);
   const outlinePetal = (p: Petal, b: number) => {
@@ -518,7 +497,7 @@ function bud(c: Ctx, base: V, dir: number, h: number, birth: number) {
     add(c, 'fill', poly(p, 1.2 * u), tone, b + 0.0002, { color: rouge, wet: 0.45 });
     // dark tip
     const tip = p.filter((_, i) => i >= 6 && i <= 14);
-    add(c, 'fill', poly(tip, 2 * u), 0.38, b + 0.0003, { color: rouge, wet: 0.7 });
+    add(c, 'fill', poly(tip, 4 * u), 0.38, b + 0.0003, { color: rouge, wet: 0.8 });
     add(c, 'line', p.map((q) => ({ ...q, w: 0.7 * u })), 0.58, b + 0.0004, { color: rouge, wet: 0.2 });
     b += 0.003;
   }

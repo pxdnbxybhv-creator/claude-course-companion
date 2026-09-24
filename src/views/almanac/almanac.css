@@ -116,6 +116,12 @@
 .alm-tag .latin { letter-spacing: 0.02em; font-size: 15.5px; }
 .alm-tag-zh { font-size: 13px; letter-spacing: 0.1em; opacity: 0.8; }
 
+.alm-nextfest { margin: 12px 0 0; font-size: 15px; letter-spacing: 0.08em; color: var(--ink-2); }
+.alm-nextfest b { font-weight: 500; font-size: 19px; color: var(--ink); margin: 0 2px; font-variant-numeric: lining-nums; }
+.alm-nextfest-name { color: var(--ink); margin: 0 1px; }
+.alm-nextfest-en { display: inline-block; margin-left: 12px; font-style: italic; color: var(--ink-3); letter-spacing: 0; font-size: 14.5px; }
+.alm-nextfest .latin:first-child { letter-spacing: 0; font-size: 16.5px; }
+.alm-nextfest-zh { color: var(--ink-3); font-size: 13.5px; }
 .alm-sun { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line); }
 .alm-locate { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14.5px; letter-spacing: 0.06em; color: var(--ink-2); border-radius: 999px; }
 .alm-locate:hover { color: var(--ink); }
@@ -292,6 +298,11 @@
 .alm-day-habits li { display: flex; align-items: center; gap: 8px; font-size: 15.5px; }
 .alm-day-note { margin: 12px 0 0; padding: 2px 0 2px 14px; border-left: 2px solid var(--line-strong); font-size: 16px; line-height: 1.7; color: var(--ink-2); }
 .alm-day-empty { margin: 0; font-size: 15px; color: var(--ink-3); }
+:lang(en) .alm-day-rel { letter-spacing: 0.02em; font-style: italic; font-family: var(--font-latin), var(--font-text); font-size: 15px; }
+:lang(en) .alm-day-h, :lang(en) .alm-loc-h { font-family: var(--font-latin), var(--font-text); letter-spacing: 0.1em; font-variant: small-caps; text-transform: lowercase; font-size: 15px; }
+:lang(en) .alm-loc-note, :lang(en) .alm-day-empty { font-family: var(--font-latin), var(--font-text); font-size: 16px; }
+:lang(en) .alm-ts-ord { font-family: var(--font-latin), var(--font-text); letter-spacing: 0.08em; font-variant: small-caps; text-transform: lowercase; font-size: 14px; }
+.alm-day-term, .alm-day-a { text-wrap: pretty; }
 
 .alm-foot { margin: 26px auto 6px; padding: 0 var(--gutter); text-align: center; font-size: 12.5px; letter-spacing: 0.12em; color: var(--ink-3); }
 :lang(en) .alm-foot { font-family: var(--font-latin), var(--font-text); font-style: italic; font-size: 14px; letter-spacing: 0.02em; }

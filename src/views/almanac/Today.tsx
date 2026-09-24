@@ -6,7 +6,7 @@ import { moonInfo, sunTimes } from '../../core/astro';
 import { useT } from '../../app/i18n';
 import { lang, state } from '../../app/store';
 import { paintMoon } from './paint';
-import { dayDate, dayInfo, hhmm, lunarEn, lunarZh, MONTH_EN, MONTH_ZH, WEEK_EN, WEEK_ZH } from './model';
+import { dayDate, dayInfo, hhmm, lunarEn, lunarZh, nextFestival, MONTH_EN, MONTH_ZH, WEEK_EN, WEEK_ZH } from './model';
 import { dpr, useDark, useMedia } from './hooks';
 import { LocationSheet, placeName, presetZone } from './LocationSheet';
 
@@ -70,6 +70,7 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
   const L = info.lunar;
   const moon = moonInfo(props.now);
   const loc = state.value.settings.location;
+  const next = nextFestival(props.dayKey);
   const [sheet, setSheet] = useState(false);
   const wide = useMedia('(min-width: 960px)');
 
@@ -122,6 +123,21 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
       </div>
 
       <Festivals list={info.festivals} />
+      {next && (
+        <p class="alm-nextfest">
+          {next.days === 1 ? (
+            en ? (
+              <><span class="latin">{next.fest.en} tomorrow</span> <span class="alm-nextfest-zh" lang="zh-CN">明日{next.fest.zh}</span></>
+            ) : (
+              <>明日<span class="alm-nextfest-name">{next.fest.zh}</span><span class="alm-nextfest-en latin" lang="en">{next.fest.en} tomorrow</span></>
+            )
+          ) : en ? (
+            <><span class="latin">{next.fest.en} in <b>{next.days}</b> days</span> <span class="alm-nextfest-zh" lang="zh-CN">{next.fest.zh}</span></>
+          ) : (
+            <>距<span class="alm-nextfest-name">{next.fest.zh}</span>还有 <b class="latin">{next.days}</b> 天<span class="alm-nextfest-en latin" lang="en">{next.fest.en} in {next.days} days</span></>
+          )}
+        </p>
+      )}
 
       <div class="alm-sun">
         {loc ? <SunLine dayKey={props.dayKey} lat={loc.lat} lon={loc.lon} onEdit={() => setSheet(true)} /> : (

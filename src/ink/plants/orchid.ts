@@ -102,7 +102,7 @@ export function orchid(spec: PlantSpec): Drawing {
   const add = (birth: number, strokes: Stroke[], step?: number) => units.push({ birth, strokes, step });
 
   const s = rng.chance(0.5) ? 1 : -1; // the long first leaf sweeps to this side
-  const leafW = H * rng.range(0.019, 0.023);
+  const leafW = H * rng.range(0.021, 0.025);
   const allSpines: V[][] = [];
 
   function leafStroke(lp: LeafPlan): Stroke {
@@ -146,7 +146,8 @@ export function orchid(spec: PlantSpec): Drawing {
     for (let i = 0; i < n; i++) {
       const th = (i / n) * Math.PI * 2;
       const k = 1 + rng.range(-0.12, 0.12);
-      pts.push({ x: cx + Math.cos(th) * rx * k, y: H * 0.004 + Math.sin(th) * ry * k, w: i === 0 ? H * 0.03 : 0 });
+      const sy = Math.sin(th);
+      pts.push({ x: cx + Math.cos(th) * rx * k, y: H * 0.002 + sy * ry * k * (sy > 0 ? 0.45 : 1), w: i === 0 ? H * 0.03 : 0 });
     }
     add(0, [{ kind: 'wash', pts, tone: 0.1, birth: 0, seed: sd() }]);
   }
@@ -218,8 +219,8 @@ export function orchid(spec: PlantSpec): Drawing {
 
   // 1 — the long arc: leans away first, then sweeps over to side s and droops
   const L1 = lift(plan({
-    base: { x: -s * H * 0.01, y: 0 }, a0: -s * rng.range(6, 16) * DEG, len: H * rng.range(1.2, 1.4),
-    a1: s * rng.range(105, 140) * DEG, p: rng.range(1.5, 2), wid: leafW * 1.08, tone: rng.range(0.84, 0.92),
+    base: { x: -s * H * 0.01, y: 0 }, a0: -s * rng.range(2, 12) * DEG, len: H * rng.range(1.2, 1.4),
+    a1: s * rng.range(100, 128) * DEG, p: rng.range(1.2, 1.55), wid: leafW * 1.08, tone: rng.range(0.84, 0.92),
     belly: rng.range(0.2, 0.26), twist: rng.chance(0.55) ? rng.range(0.42, 0.52) : 0,
   }), H * 0.08);
   const sp1 = spine(L1);

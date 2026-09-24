@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ACTIVE_KEY, STALE_PAUSE_MS, clampMinutes, cleanIntent, cnInt, cnRemaining, decideRestore, elapsedMs, enRemaining,
   finishAt, formatClock, isFinished, isPaused, light, msToNextSecond, parseActive, pause, progress, remainingMs, resume,
-  serialize, toSession,
+  serialize, toSession, burnedMinutes,
 } from '../src/views/focus/timer';
-import { formatMinutes, recentDays, sessionsOn } from '../src/views/focus/stats';
+import { burnedOf, formatMinutes, recentDays, sessionsOn, summarize } from '../src/views/focus/stats';
 
 const T0 = Date.UTC(2026, 8, 24, 3, 0, 0);
 const MIN = 60_000;
@@ -95,7 +95,19 @@ describe('focus timer', () => {
 
   it('builds a log entry', () => {
     expect(toSession(light(30, 'read', T0), true)).toEqual({ start: T0, minutes: 30, completed: true, intent: 'read' });
+    expect(toSession(light(30, 'read', T0), true, T0 + 30 * MIN)).not.toHaveProperty('burned');
     expect(toSession(light(15, '', T0), false)).toEqual({ start: T0, minutes: 15, completed: false });
+  });
+
+  it('records minutes burned (pauses excluded) when put out early', () => {
+    let s = light(30, undefined, T0);
+    expect(burnedMinutes(s, T0 + 6 * MIN + 10_000)).toBe(6.2);
+    s = resume(pause(s, T0 + 4 * MIN), T0 + 20 * MIN); // 16 min paused
+    expect(toSession(s, false, T0 + 22 * MIN + 3_000)).toEqual({ start: T0, minutes: 30, completed: false, burned: 6.1 });
+    // Still paused: time since the pause does not count.
+    expect(toSession(pause(s, T0 + 25 * MIN), false, T0 + 99 * MIN).burned).toBe(9);
+    expect(burnedMinutes(s, T0 - MIN)).toBe(0);
+    expect(burnedMinutes(light(10, '', T0), T0 + 3 * 3600_000)).toBe(10);
   });
 
   it('schedules ticks on whole displayed seconds', () => {
@@ -133,7 +145,8 @@ describe('focus stats', () => {
   const log = [
     { start: at(24, 9), minutes: 30, completed: true, intent: 'read' },
     { start: at(24, 14), minutes: 45, completed: true },
-    { start: at(24, 8), minutes: 25, completed: false },
+    { start: at(24, 8), minutes: 25, completed: false, burned: 6.4 },
+    { start: at(23, 8), minutes: 25, completed: false }, // put out before `burned` existed: counts 0
     { start: at(22, 9), minutes: 60, completed: true },
     { start: at(17, 9), minutes: 30, completed: true }, // 8 days ago: outside the week
     { start: at(25, 9), minutes: 30, completed: true }, // tomorrow: ignored
@@ -146,15 +159,30 @@ describe('focus stats', () => {
   it('summarises the last seven days', () => {
     const week = recentDays(log, '2026-09-24');
     expect(week.map((d) => d.day)).toEqual(['2026-09-18', '2026-09-19', '2026-09-20', '2026-09-21', '2026-09-22', '2026-09-23', '2026-09-24']);
-    expect(week[6]).toMatchObject({ count: 2, minutes: 75 });
+    // 30 + 45 burned through, plus 6.4 of a stick put out early → 81 (rounded for display).
+    expect(week[6]).toMatchObject({ count: 2, minutes: 81 });
     expect(week[6].sessions).toHaveLength(3);
+    expect(week[5]).toMatchObject({ count: 0, minutes: 0 });
     expect(week[4]).toMatchObject({ count: 1, minutes: 60 });
-    expect(week.reduce((a, d) => a + d.minutes, 0)).toBe(135);
+    expect(week.reduce((a, d) => a + d.minutes, 0)).toBe(141);
+  });
+
+  it('counts burned minutes sensibly', () => {
+    expect(burnedOf({ start: 0, minutes: 30, completed: true })).toBe(30);
+    expect(burnedOf({ start: 0, minutes: 30, completed: false, burned: 12.5 })).toBe(12.5);
+    expect(burnedOf({ start: 0, minutes: 30, completed: false, burned: 99 })).toBe(30);
+    expect(burnedOf({ start: 0, minutes: 30, completed: false })).toBe(0);
+    const d = summarize('2026-09-24', [
+      { start: 0, minutes: 25, completed: false, burned: 0.4 },
+      { start: 1, minutes: 25, completed: false, burned: 0.4 },
+    ]);
+    expect(d).toMatchObject({ count: 0, minutes: 1 });
   });
 
   it('formats minutes', () => {
     expect(formatMinutes(75, true)).toBe('1 小时 15 分');
     expect(formatMinutes(45, true)).toBe('45 分钟');
     expect(formatMinutes(120, false)).toBe('2 h');
+    expect(formatMinutes(44.6, true)).toBe('45 分钟');
   });
 });

@@ -4,7 +4,7 @@ import { useT } from '../../app/i18n';
 import { weekday } from '../../core/date';
 import { hashString, makeRng } from '../../core/rng';
 import type { FocusSession } from '../../core/types';
-import { clockOf, formatMinutes, recentDays, sessionsOn, type DaySummary } from './stats';
+import { burnedOf, clockOf, formatMinutes, recentDays, sessionsOn, type DaySummary } from './stats';
 
 const WD_ZH = ['日', '一', '二', '三', '四', '五', '六'];
 const WD_EN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -47,7 +47,8 @@ function DaySticks(props: { d: DaySummary; i: number; scale: number; isToday: bo
       />
       {shown.map((s, k) => {
         const off = n > 1 ? (k - (n - 1) / 2) * spread : 0;
-        const h = Math.max(10, (Math.min(s.minutes, scale) / scale) * (BASE - TOP - 6));
+        // A stick put out early stands only as tall as it burned (a stub if unknown).
+        const h = Math.max(s.completed ? 10 : 5, (Math.min(burnedOf(s), scale) / scale) * (BASE - TOP - 6));
         const lean = off * 0.35 + rng.range(-1.2, 1.2);
         return (
           <g class={s.completed ? 'fx-stick' : 'fx-stick is-out'}>
@@ -116,7 +117,7 @@ export function History() {
         <span>{t('今日', 'Today')}</span>
         <span class="spacer" />
         <span class="fx-hist-total">
-          {todayDone.count
+          {todayDone.count || todayDone.minutes
             ? t(`已燃 ${todayDone.count} 炷 · ${todayDone.minutes} 分钟`, `${todayDone.count} stick${todayDone.count === 1 ? '' : 's'} · ${todayDone.minutes} min`)
             : ''}
         </span>
@@ -132,6 +133,9 @@ export function History() {
   );
 }
 
+/** 6.2 → "6.2", 6 → "6". */
+const fmtBurned = (m: number): string => (Math.round(m * 10) / 10).toString();
+
 function SessionRow({ s }: { s: FocusSession }) {
   const t = useT();
   return (
@@ -140,11 +144,15 @@ function SessionRow({ s }: { s: FocusSession }) {
       <span class="fx-row-main">
         <span class="fx-row-intent">{s.intent || t('静心', 'Quiet focus')}</span>
         <span class="fx-row-sub">
-          {s.minutes} {t('分钟', 'min')} · {s.completed ? t('燃尽', 'burned through') : t('中途熄灭', 'put out early')}
+          {s.completed
+            ? <>{s.minutes} {t('分钟', 'min')} · {t('燃尽', 'burned through')}</>
+            : s.burned !== undefined
+              ? t(`燃了 ${fmtBurned(s.burned)} / ${s.minutes} 分钟 · 中途熄灭`, `${fmtBurned(s.burned)} of ${s.minutes} min · put out early`)
+              : <>{s.minutes} {t('分钟', 'min')} · {t('中途熄灭', 'put out early')}</>}
         </span>
       </span>
       <svg class="fx-row-mark" viewBox="0 0 12 28" aria-hidden="true">
-        <path d={stickPath(6, s.completed ? 22 : 11, 0.6, hashString(String(s.start)), 26)} />
+        <path d={stickPath(6, s.completed ? 22 : Math.max(3, 22 * (s.burned ?? s.minutes / 2) / s.minutes), 0.6, hashString(String(s.start)), 26)} />
       </svg>
     </li>
   );

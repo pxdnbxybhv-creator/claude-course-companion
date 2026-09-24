@@ -220,7 +220,8 @@ export function pine(spec: PlantSpec): Drawing {
   // --- growth timeline: whorls from the ground up -------------------------------
   const sortedLimbs = limbs.slice().sort((a, b) => a.f - b.f || a.side - b.side);
   sortedLimbs.forEach((l, k) => (l.birth = 0.08 + 0.3 * (k / Math.max(1, sortedLimbs.length - 1))));
-  for (const p of pads) p.birth = (p.limb?.birth ?? 0.38) + 0.01 + 0.004 * dist(p.root, p.limb?.pts[0] ?? p.root) / H;
+  // a shelf arrives with its limb, so a young tree never shows bare arms
+  for (const p of pads) p.birth = (p.limb?.birth ?? 0.38) + 0.001 + 0.004 * dist(p.root, p.limb?.pts[0] ?? p.root) / H;
   pads.sort((a, b) => a.birth - b.birth);
 
   // budget needles so the whole tree stays near 400 strokes
@@ -267,14 +268,14 @@ export function pine(spec: PlantSpec): Drawing {
   }
   for (const p of pads) {
     p.hubs.forEach((h, k) => {
-      if (!h.front) paintCluster(rng, h.c, h.r, strokesPerHub, wheel, rng.range(0.42, 0.55), p.birth + 0.01 + k * 0.002, 0.004, p.limb?.side ?? 1);
+      if (!h.front) paintCluster(rng, h.c, h.r, strokesPerHub, wheel, rng.range(0.42, 0.55), p.birth + k * 0.0005, 0.0005, p.limb?.side ?? 1);
     });
     // one dark tuft right away, so a young limb already reads as pine
     const first = p.hubs[rng.int(0, p.hubs.filter((h) => h.front).length - 1)];
     (first as Hub & { done?: boolean }).done = true;
-    paintCluster(rng, first.c, first.r * 0.95, strokesPerHub, wheel, rng.range(0.74, 0.86), p.birth + 0.014, 0.004, p.limb?.side ?? 1);
+    paintCluster(rng, first.c, first.r * 0.95, strokesPerHub, wheel, rng.range(0.74, 0.86), p.birth + 0.003, 0.0005, p.limb?.side ?? 1);
     // the pale shelf is washed in over the first needles, pushing them back
-    paintWash(rng, nz, p, rng.range(0.18, 0.25), washColor, p.birth + 0.02);
+    paintWash(rng, nz, p, rng.range(0.18, 0.25), washColor, p.birth + 0.004);
   }
 
   // --- the trunk grows old (0.4–0.8) ----------------------------------------------
@@ -403,10 +404,10 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
   for (let k = 0; k < nR; k++) {
     const s = k === 0 ? -1 : k === 1 ? 1 : rng.chance(0.5) ? 1 : -1;
     const hw = tw(0) / 2;
-    const a = { x: s * hw * rng.range(0.55, 0.85), y: -rng.range(0.012, 0.03) * H };
-    const b = { x: s * (hw + rng.range(0.03, 0.065) * H), y: rng.range(0, 0.006) * H };
-    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - rng.range(0, 0.006) * H };
-    push('brush', [{ ...a, w: hw * 0.45 }, { ...m, w: hw * 0.25 }, { ...b, w: 0.8 }], s > 0 ? 0.62 : 0.48, 0.4, { dryness: 0.45 });
+    const a = { x: s * hw * rng.range(0.6, 0.85), y: -rng.range(0.01, 0.022) * H };
+    const b = { x: s * (hw + rng.range(0.022, 0.045) * H), y: rng.range(0.002, 0.006) * H };
+    const m = { x: a.x * 0.45 + b.x * 0.55, y: (a.y + b.y) / 2 + rng.range(0, 0.004) * H };
+    push('dry', [{ ...a, w: hw * 0.32 }, { ...m, w: hw * 0.2 }, { ...b, w: 0.7 }], s > 0 ? 0.6 : 0.46, 0.4, { dryness: 0.35 });
   }
 
   // body: an ochre-tinted wash inside the silhouette

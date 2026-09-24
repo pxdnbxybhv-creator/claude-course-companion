@@ -60,8 +60,8 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   }
   times.sort((a, b) => a - b);
   // feature ablation: which part of the pipeline costs raster time
-  const ablate = (label: string, opts: CanvasRenderingContext2DSettings | undefined, sh: boolean, gr: boolean, unit = false) => {
-    brushFlags.shadows = sh; brushFlags.grain = gr; brushFlags.unitGrain = unit;
+  const ablate = (label: string, opts: CanvasRenderingContext2DSettings | undefined, sh: boolean, gr: boolean) => {
+    brushFlags.shadows = sh; brushFlags.grain = gr;
     const ts: number[] = [];
     for (let r = 0; r < 3; r++) {
       const t0 = performance.now();
@@ -72,7 +72,7 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
       x.getImageData(0, 0, 1, 1);
       ts.push(performance.now() - t0);
     }
-    brushFlags.shadows = true; brushFlags.grain = true; brushFlags.unitGrain = false;
+    brushFlags.shadows = true; brushFlags.grain = true;
     ts.sort((a, b) => a - b);
     return `${label}: ${ts[1].toFixed(1)} ms`;
   };
@@ -81,7 +81,6 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     ablate('gpu  no shadow', undefined, false, true),
     ablate('gpu  no grain', undefined, true, false),
     ablate('gpu  neither', undefined, false, false),
-    ablate('gpu  unit grain', undefined, true, true, true),
     ablate('cpu  all', { willReadFrequently: true }, true, true),
     ablate('cpu  no shadow', { willReadFrequently: true }, false, true),
     ablate('cpu  no grain', { willReadFrequently: true }, true, false),

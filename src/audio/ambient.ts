@@ -105,19 +105,26 @@ abstract class BaseBed implements Bed {
       g.gain.setValueAtTime(g.gain.value, when);
       g.gain.setTargetAtTime(0, when, FADE_OUT_TAU);
     }
-    const end = when + FADE_OUT_TAU * 7;
-    const srcs = this.sources;
-    if (!srcs.length) { this.release(); return; }
+    const end = when + FADE_OUT_TAU * 7; // −56 dB
+    // A silent sentinel guarantees an 'ended' event at the end of the fade even for beds with no
+    // continuous layers (the qin), so ringing notes fade instead of being cut.
+    const ctx = this.mix.ctx;
+    const sentinel = this.track(ctx.createBufferSource());
+    sentinel.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+    sentinel.loop = true;
+    sentinel.connect(this.out);
+    sentinel.start(when);
+    const srcs = [...this.sources, sentinel];
     let left = srcs.length;
     for (const s of srcs) {
       s.onended = () => { if (--left === 0) this.release(); };
-      try { s.stop(end); } catch { /* already stopped */ }
+      try { s.stop(end); } catch { if (--left === 0) this.release(); }
     }
   }
 
   private release() {
-    // One-shot voices inside the bed disconnect themselves; give the longest (a qin note, ≤ 6.5 s)
-    // time to finish before the faders go.
+    // One-shot voices inside the bed disconnect themselves when they end; by now the faders are
+    // at −56 dB, so disconnecting them is inaudible.
     for (const n of this.nodes) n.disconnect();
     this.out.disconnect();
     this.wet.disconnect();

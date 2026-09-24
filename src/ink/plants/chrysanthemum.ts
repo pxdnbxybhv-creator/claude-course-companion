@@ -469,7 +469,10 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     const L = arcLengths(path);
     const nNodes = main ? rng.int(4, 5) : rng.int(3, 4);
     const nodes: number[] = [];
-    for (let i = 0; i < nNodes; i++) nodes.push(clamp(lerp(0.1, 0.9, (i + rng.range(0.1, 0.9)) / nNodes), 0.06, 0.94));
+    // the main stem's first joint sits low, so the seedling is a short stub between leaves
+    if (main) nodes.push(rng.range(0.07, 0.11));
+    const lo = main ? 0.2 : 0.1;
+    for (let i = 0; i < nNodes; i++) nodes.push(clamp(lerp(lo, 0.9, (i + rng.range(0.1, 0.9)) / nNodes), 0.06, 0.94));
     const birth0 = main ? 0 : rng.range(0.1, 0.2);
     const birth1 = main ? rng.range(0.36, 0.4) : rng.range(0.4, 0.46);
     stems.push({ base, top: path[path.length - 1], path, L, h, nodes, head: kinds[s], birth0, birth1 });
@@ -544,10 +547,10 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     // lower leaves spread and droop; upper leaves reach up
     const spread = rad(lerp(40, 80, lowness) + rng.range(-12, 12));
     const dir = up + ls.side * spread;
-    const size = ls.big < 0 ? 0.1 : ls.t > 0.85 ? rng.range(0.15, 0.19) : lerp(0.15, 0.22, Math.sin(Math.PI * ls.t)) * rng.range(0.85, 1.12);
+    const size = ls.big < 0 ? 0.12 : ls.t > 0.85 ? rng.range(0.15, 0.19) : lerp(0.15, 0.22, Math.sin(Math.PI * ls.t)) * rng.range(0.85, 1.12);
     const dark = rng.chance(ls.t > 0.75 ? 0.55 : 0.35);
     const tone = dark ? rng.range(0.68, 0.82) : rng.range(0.34, 0.46);
-    const birth = ls.big < 0 ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.02, 0.06);
+    const birth = ls.big < 0 ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.015, 0.045);
     leaf(c, {
       base: q.p, dir, len: H * size, tone, birth, squash: rng.range(0.55, 1), side: ls.side,
       droop: lerp(0.05, 0.35, lowness) * rng.range(0.6, 1.3),

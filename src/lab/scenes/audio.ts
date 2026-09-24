@@ -50,6 +50,28 @@ function cases(): Case[] {
     bedCase('stream', 12, 'ambient stream 溪'),
     bedCase('pines', 16, 'ambient pines 松风'),
     bedCase('qin', 40, 'ambient qin 琴 (generative)'),
+    (() => {
+      const beds: ReturnType<typeof createBed>[] = [];
+      return {
+        name: 'crossfade rain → qin (4 s) → none (9 s)', dur: 14,
+        play: (m: Mixer) => {
+          const off = m.ctx as OfflineAudioContext;
+          const rain = createBed('rain', m, 0.05, 1);
+          rain?.tick(4.6);
+          beds.push(rain);
+          // stop() is called mid-render, as the realtime engine would, via suspend/resume
+          off.suspend(4).then(() => {
+            rain?.stop(4.05);
+            const qin = createBed('qin', m, 4.05, 5);
+            qin?.tick(9.6);
+            beds.push(qin);
+            off.suspend(9).then(() => { qin?.stop(9.05); off.resume(); });
+            off.resume();
+          });
+        },
+        notes: () => `released: ${beds.map((b) => `${b?.kind} ${b?.done ? '✓' : '✗'}`).join(', ')}`,
+      } satisfies Case;
+    })(),
     {
       name: 'stress: 3 loud plucks + chime(30) + bell + knock + qin bed', dur: 10,
       play: (m) => {
@@ -330,7 +352,9 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     }
     const ms = performance.now() - t0;
     extra += `  ${ms.toFixed(0)} ms`;
+    await new Promise((r) => setTimeout(r, 30)); // let 'ended' events land
     const score = c.notes?.();
+    if (score?.startsWith('released')) { extra += '  ' + score; ok &&= !score.includes('✗'); }
     if (score) console.log('[audio-lab] score', c.name, score);
     if (score && p.get('report')) console.warn('[audio-lab] score', score);
     results.push({ c, chs, m, extra, ok, ms });

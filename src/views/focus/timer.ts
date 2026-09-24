@@ -72,8 +72,18 @@ export function resume(s: ActiveFocus, now: number): ActiveFocus {
   return { ...s, pausedMs: s.pausedMs + Math.max(0, now - s.pausedAt), pausedAt: null };
 }
 
-export function toSession(s: ActiveFocus, completed: boolean): FocusSession {
-  return { start: s.start, minutes: s.minutes, completed, ...(s.intent ? { intent: s.intent } : {}) };
+/** Minutes actually burned (pauses excluded), to one decimal. */
+export const burnedMinutes = (s: ActiveFocus, now: number): number => Math.round(elapsedMs(s, now) / 6_000) / 10;
+
+/** The log entry. A stick put out early records how long it really burned (`now` required then). */
+export function toSession(s: ActiveFocus, completed: boolean, now?: number): FocusSession {
+  return {
+    start: s.start,
+    minutes: s.minutes,
+    completed,
+    ...(s.intent ? { intent: s.intent } : {}),
+    ...(!completed && now !== undefined ? { burned: burnedMinutes(s, now) } : {}),
+  };
 }
 
 export const serialize = (s: ActiveFocus): string => JSON.stringify(s);

@@ -300,6 +300,8 @@ export function createIncenseScene(seed = 1): IncenseScene {
   const scene: IncenseScene = {
     resize(w, h, dpr) {
       if (w === W && h === H && dpr === DPR && bitmap) return;
+      const hadLayout = !!bitmap;
+      const oldTip = hadLayout ? tipPos(tipLen()) : null;
       W = w; H = h; DPR = dpr;
       const d = layout.drawing;
       k = Math.min((W * 0.6) / d.width, (H * 0.3) / d.height);
@@ -310,8 +312,14 @@ export function createIncenseScene(seed = 1): IncenseScene {
       baseY = oy + layout.stickBase.y * k;
       stickLen = Math.min(H * 0.46, baseY - H * 0.14);
       smoke.setUnit(Math.max(0.6, Math.min(W, H * 0.62) / 470));
-      if (lastTipLen < 0) ashLen = (3 + rng() * 5) * (k / 1.2);
+      if (!hadLayout) ashLen = (3 + rng() * 5) * (k / 1.2);
       lastTipLen = -1;
+      if (oldTip) {
+        // keep the smoke (and falling ash) attached to the tip across re-layouts
+        const nt = tipPos(tipLen());
+        smoke.translate(nt.x - oldTip.x, nt.y - oldTip.y);
+        for (const f of flakes) { f.x += nt.x - oldTip.x; f.y += nt.y - oldTip.y; f.floor += nt.y - oldTip.y; }
+      }
     },
     setProgress(p) { progress = clamp(p, 0, 1); },
     setLit(v) { lit = v; },
@@ -326,8 +334,13 @@ export function createIncenseScene(seed = 1): IncenseScene {
       time += dt;
       const len = tipLen();
       if (lastTipLen >= 0 && len < lastTipLen && burning()) {
-        ashLen += (lastTipLen - len) * 0.85;
-        if (ashLen > ashBreak) breakAsh();
+        const d = lastTipLen - len;
+        // a big jump (the view was away for a while): the ash has long since fallen
+        if (d > 14 * (k / 1.2)) ashLen = (2 + rng() * 5) * (k / 1.2);
+        else {
+          ashLen += d * 0.85;
+          if (ashLen > ashBreak) breakAsh();
+        }
       }
       lastTipLen = len;
       const t = tipPos(len);
@@ -414,8 +427,8 @@ export function createIncenseScene(seed = 1): IncenseScene {
         const cg = ctx.createLinearGradient(t.x, t.y + 3 * u, t.x, t.y - 1.2 * u);
         cg.addColorStop(0, 'rgba(160,40,20,0)');
         cg.addColorStop(0.45, `rgba(214,70,34,${(0.9 * fl).toFixed(3)})`);
-        cg.addColorStop(0.8, `rgba(255,${Math.round(140 + 60 * fl)},80,1)`);
-        cg.addColorStop(1, 'rgba(255,190,110,0.6)');
+        cg.addColorStop(0.8, `rgba(255,${Math.round(120 + 80 * fl)},80,${Math.min(1, 1.15 * fl).toFixed(3)})`);
+        cg.addColorStop(1, `rgba(255,190,110,${(0.6 * fl).toFixed(3)})`);
         ctx.strokeStyle = cg;
         ctx.lineWidth = sw * 1.08;
         ctx.beginPath(); ctx.moveTo(t.x, t.y + 3 * u); ctx.lineTo(t.x, t.y - 1.2 * u); ctx.stroke();

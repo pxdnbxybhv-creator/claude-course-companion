@@ -112,6 +112,12 @@ export class SmokePlume {
     return n;
   }
 
+  /** Move all existing smoke (e.g. when the scene is re-laid out and the source moves). */
+  translate(dx: number, dy: number) {
+    for (const s of this.strands) for (const p of s.pts) { p.x += dx; p.y += dy; }
+    for (const im of this.imps) { im.x += dx; im.y += dy; }
+  }
+
   /** Remove all smoke immediately. */
   clear() {
     for (const s of this.strands) s.pts.length = 0;

@@ -157,8 +157,6 @@
 
 /* ------------------------------------------------------------ completion */
 
-/* The kit focuses the dialog itself; no ring around the whole sheet. */
-.sheet:has(.fx-done):focus-visible, .sheet:has(.fx-confirm-body):focus-visible { outline: none; }
 
 .fx-done { display: grid; gap: 14px; padding: 4px 0 2px; text-align: center; }
 .fx-done-head { display: grid; justify-items: center; gap: 2px; }

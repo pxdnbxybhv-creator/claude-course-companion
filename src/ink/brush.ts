@@ -311,12 +311,12 @@ interface Paint {
 }
 
 /** Debug switches for the perf lab (not part of the painting contract). */
-export const brushFlags = { shadows: true, grain: true, unitGrain: false };
+export const brushFlags = { shadows: true, grain: true };
 
 function setGrain(P: Paint, color: string, variant: 'fine' | 'wash' = 'fine', ox = 0, oy = 0, scaleMul = 1) {
   if (!brushFlags.grain) { P.ctx.fillStyle = color; return; }
   const pat = grainPattern(P.ctx, color, variant);
-  if (typeof pat !== 'string' && typeof pat.setTransform === 'function' && !(brushFlags.unitGrain && variant === 'fine')) {
+  if (typeof pat !== 'string' && typeof pat.setTransform === 'function') {
     const g = P.gs * scaleMul;
     pat.setTransform(new DOMMatrix([g, 0, 0, g, ox, oy]));
   }
@@ -536,7 +536,10 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // --- bristles: streaks that outlast the body and break up as the brush runs dry (飞白) ---
-  setGrain(P, color);
+  // dry-brush bristles *are* the stroke and carry the grain; wet-brush bristles sit on grainy
+  // strips, so a solid fill is indistinguishable and much cheaper
+  if (isDry) setGrain(P, color);
+  else ctx.fillStyle = color;
   const nb = isDry ? clamp(Math.round(hmax / 1.25), 6, 30) : clamp(Math.round(hmax / 2), 3, 10);
   const lamF = Math.max(hmax * (isDry ? 2.4 : 2), 10);
   // bristles are grouped into a few fills (each group its own ink load) to keep the draw count low
@@ -707,7 +710,8 @@ function paintWash(P: Paint, st: Stroke, xf: Xf, progress: number, tone: number,
   const rng = makeRng(st.seed ^ 0x77);
   const wet = clamp(st.wet ?? 0.75, 0, 1) * (0.6 + 0.4 * vigor);
   const { poly, size } = devicePoly(st, xf, progress);
-  const soft = Math.max(1, (st.pts[0].w || 4) * xf.k) * (0.6 + 0.8 * wet);
+  // softness can't exceed a fraction of the shape's thickness, or thin washes dissolve
+  const soft = Math.min(Math.max(1, (st.pts[0].w || 4) * xf.k) * (0.6 + 0.8 * wet), Math.max(1, size * 0.2));
   let per = 0;
   for (let i = 0; i < poly.length; i++) per += Math.hypot(poly[(i + 1) % poly.length].x - poly[i].x, poly[(i + 1) % poly.length].y - poly[i].y);
   const base = smoothClosed(poly, Math.max(2, soft * 0.6, per / 360));

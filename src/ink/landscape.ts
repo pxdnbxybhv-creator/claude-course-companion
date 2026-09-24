@@ -223,13 +223,19 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
     if (env.tod === 'dawn') u = clamp(u, -0.02, 0.2);
     else if (env.tod === 'dusk') u = clamp(u, 0.8, 1.02);
     else u = clamp(u, 0.12, 0.88);
-    const x = w * lerp(0.07, 0.93, clamp(u, 0, 1));
+    let x = w * lerp(0.07, 0.93, clamp(u, 0, 1));
     const alt = Math.pow(Math.max(0, Math.sin(Math.PI * clamp(u, 0, 1))), 0.8);
     let y = lerp(hz - Hz * 0.12, skyTop + Hz * 0.05, alt);
-    // a low sun rests on the hills rather than showing through their thin wash
-    let top = Infinity;
-    for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, highest(x + dx));
-    y = Math.min(y, top - r0 * 0.85);
+    // a low sun rests on the hills rather than showing through their thin wash: slide it
+    // toward open sky first, and only lift it if the hills fill the whole way
+    const clearAt = (cx: number) => {
+      let top = Infinity;
+      for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, highest(cx + dx));
+      return top - r0 * 0.85;
+    };
+    const dir = x < w / 2 ? 1 : -1;
+    for (let k = 0; k < 40 && clearAt(x) < y && Math.abs(x - w * lerp(0.07, 0.93, clamp(u, 0, 1))) < w * 0.35; k++) x += dir * r0 * 0.5;
+    y = Math.min(y, clearAt(x));
     body = { kind: 'sun', x, y: Math.max(r0 * 1.5, y), r: r0 };
   } else {
     const transit = 12 + env.moonPhase * 24;
@@ -369,8 +375,8 @@ function paintSky(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, noise
       if (b.kind === 'moon') {
         // 烘云托月 — the wash thins out around the moon, and a few long cloud wisps catch its light
         a *= 1 - 0.8 * Math.exp(-((dd / haloR) ** 2)) * (0.85 + 0.15 * noise(x / 30, y / 30));
-        const wisp = Math.max(0, noise(x / 220 + 3.3, y / 16)) * Math.exp(-(((y - b.y) / (haloR * 1.4)) ** 2));
-        a *= 1 - 0.55 * smoothstep(0.1, 0.45, wisp);
+        const wisp = Math.max(0, noise(x / 320 + 3.3, y / 18)) * Math.exp(-(((y - b.y) / (haloR * 1.4)) ** 2));
+        a *= 1 - 0.5 * smoothstep(0.22, 0.5, wisp);
       }
     }
     if (warm > 0) {
@@ -480,14 +486,16 @@ function paintHillWash(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, col: 
     const d = y - r;
     const H = R.base - r;
     // light from the upper left: slopes rising to the right face the light, the others turn away
-    const sl = (ridgeAt(R, x + 4) - ridgeAt(R, x - 4)) / 8;
+    // (slope of the ridge, smoothed more with depth so it shapes flanks, not columns)
+    const win = 6 + d * 0.6;
+    const sl = (ridgeAt(R, x + win) - ridgeAt(R, x - win)) / (2 * win);
     const shade = clamp(0.5 + sl * 1.6, 0, 1);
     // gullies flow down the slope (sheared streaks), plus a fine wet mottle
-    const gully = noise(x / (7 + R.depth * 3) - (d * sl) / 9, y / 55 + R.depth * 5);
+    const gully = noise(x / (7 + R.depth * 3) - (d * sl) / 9, y / 22 + R.depth * 5);
     const mott = 0.8 + 0.3 * noise(x / 40 - y / 90, y / 13) + 0.1 * noise(x / 6, y / 5);
     const struct = R.depth === 0 ? 1
       : R.depth === 1 ? (0.75 + 0.4 * shade) * (0.85 + 0.3 * noise(x / 50, y / 9))
-      : (0.62 + 0.55 * shade) * (0.8 + 0.4 * Math.max(0, gully) * Math.min(1, d / 8));
+      : (0.62 + 0.55 * shade) * (0.88 + 0.22 * gully * Math.min(1, d / 8));
     let ink = dens * tone * mott * struct;
     let white = 0;
     if (snow) {
@@ -908,8 +916,10 @@ export function rockDrawing(seed: number, size: number): Drawing {
         return out;
       };
       add({ kind: 'wash', tone: 0.22, wet: 0.5, pts: ring(1, 18).slice(0, 18).map((p) => ({ ...p, w: 1.2 * s })) });
-      // depth pools at the lower right of the opening
-      add({ kind: 'wash', tone: 0.5, wet: 0.4, pts: ring(0.62, 12).slice(0, 12).map((p) => ({ ...p, x: p.x + q.rx * 0.38, y: p.y + q.ry * 0.28, w: 1 * s })) });
+      // the cavity's shadow falls under the upper lip: a crescent, not a pupil
+      const outer = ring(0.92, 10, Math.PI * 1.05, Math.PI * 1.95);
+      const inner = ring(0.5, 10, Math.PI * 1.95, Math.PI * 1.05).map((p) => ({ ...p, y: p.y + q.ry * 0.2 }));
+      add({ kind: 'wash', tone: 0.5, wet: 0.4, pts: [...outer, ...inner].map((p) => ({ ...p, w: 1 * s })) });
       const a0 = Math.PI * rng.range(0.7, 0.9), a1 = Math.PI * rng.range(1.9, 2.15);
       const lip = ring(1.05, 12, a0, a1);
       lip.forEach((p, i) => (p.w = (0.5 + 2 * Math.sin((Math.PI * i) / 12)) * s));

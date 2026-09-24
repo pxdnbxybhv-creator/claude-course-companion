@@ -308,6 +308,9 @@ def build_wenkai(cps: set[int], dest: Path, tmp: Path, label: str) -> tuple[TTFo
         opts = MergeOptions()
         opts.drop_tables = ['vmtx', 'vhea', 'DSIG', 'gasp']
         merged = Merger(options=opts).merge([str(p) for p in parts])
+        # fontTools.merge stamps head.created/modified with the current time; keep the source's.
+        first = load_font(parts[0])['head']
+        merged['head'].created, merged['head'].modified = first.created, first.modified
         merged.recalcTimestamp = False
     # A final pass drops anything the merge carried over that we do not need and normalises tables.
     p = tmp / f'{label}-merged.ttf'

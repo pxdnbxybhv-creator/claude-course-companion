@@ -13,13 +13,19 @@ export interface DaySummary {
   sessions: FocusSession[];
   /** Burned sticks. */
   count: number;
-  /** Minutes of incense that burned to the end. */
+  /** Minutes of incense burned — whole sticks plus the part of any put out early (rounded). */
   minutes: number;
 }
 
+/** Minutes a session really burned: all of it if completed, else what was recorded (0 if unknown). */
+export const burnedOf = (f: FocusSession): number =>
+  f.completed ? f.minutes : Math.max(0, Math.min(f.minutes, Number.isFinite(f.burned) ? f.burned! : 0));
+
 export function summarize(day: DateKey, sessions: FocusSession[]): DaySummary {
-  const done = sessions.filter((s) => s.completed);
-  return { day, sessions, count: done.length, minutes: done.reduce((a, s) => a + s.minutes, 0) };
+  const count = sessions.filter((s) => s.completed).length;
+  // Whole minutes for display; the fractions of sticks put out early add up first.
+  const minutes = Math.round(sessions.reduce((a, s) => a + burnedOf(s), 0));
+  return { day, sessions, count, minutes };
 }
 
 /** The last `n` local days ending today, oldest first. */
@@ -39,6 +45,7 @@ export function recentDays(focus: readonly FocusSession[], today: DateKey, n = 7
 
 /** 90 → "1 小时 30 分" / "1 h 30 min". */
 export function formatMinutes(m: number, zh: boolean): string {
+  m = Math.round(m);
   const h = Math.floor(m / 60), r = m % 60;
   if (zh) return h ? `${h} 小时${r ? ` ${r} 分` : ''}` : `${m} 分钟`;
   return h ? `${h} h${r ? ` ${r} min` : ''}` : `${m} min`;

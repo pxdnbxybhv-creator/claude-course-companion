@@ -284,7 +284,7 @@ export function extinguish(): void {
   restProgress.value = progress(s, t);
   set(null);
   audio.setAmbient('none');
-  logFocus(toSession(s, false));
+  logFocus(toSession(s, false, t));
 }
 
 export function chooseAmbient(kind: AmbientKind): void {
@@ -344,7 +344,7 @@ function restore(): void {
       return;
     case 'stale':
       writeStored(null);
-      logFocus(toSession(d.session, false));
+      logFocus(toSession(d.session, false, t));
       return;
   }
 }
