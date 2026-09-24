@@ -34,8 +34,12 @@ export interface SealOptions {
   wear?: number;
   /** CSS font-family list for the glyphs. Default SEAL_FONT. */
   font?: string;
-  /** Three characters: '1-2' = right column one tall char, left column two (default); '2-1' the reverse. */
-  layout3?: '1-2' | '2-1';
+  /**
+   * Three characters: '1-2' = right column one tall char, left column two; '2-1' = right column
+   * two, left column one tall char. 'auto' (default) gives the tall cell to whichever of the first /
+   * last character is taller in shape.
+   */
+  layout3?: '1-2' | '2-1' | 'auto';
 }
 
 /**
@@ -93,6 +97,14 @@ function layoutCells(n: number, box: Cell, gut: number, shape: string, layout3: 
   ];
 }
 
+function inkAspect(ctx: CanvasRenderingContext2D, ch: string, font: string): number {
+  ctx.font = `100px ${font}`;
+  const m = ctx.measureText(ch);
+  const w = m.actualBoundingBoxLeft + m.actualBoundingBoxRight;
+  const h = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  return w > 1 && h > 1 ? h / w : 1;
+}
+
 /** Draw one glyph filling `cell` (ink box scaled non-uniformly, anisotropy limited), thickened by `lw` px. */
 function carveGlyph(ctx: CanvasRenderingContext2D, ch: string, cell: Cell, font: string, lw: number) {
   const F = 200;
@@ -106,7 +118,9 @@ function carveGlyph(ctx: CanvasRenderingContext2D, ch: string, cell: Cell, font:
   const inkW = l + r, inkH = asc + desc;
   const cw = Math.max(1, cell.w - lw), chh = Math.max(1, cell.h - lw);
   let sx = cw / inkW, sy = chh / inkH;
-  const lo = Math.min(sx, sy), maxAniso = 1.45;
+  // Carvers squash or stretch a glyph to fill its cell; allow more of that in long cells.
+  const cellAsp = Math.max(cell.w / cell.h, cell.h / cell.w);
+  const lo = Math.min(sx, sy), maxAniso = 1.35 + 0.5 * Math.min(1, (cellAsp - 1) / 1.2);
   sx = Math.min(sx, lo * maxAniso);
   sy = Math.min(sy, lo * maxAniso);
   ctx.save();
@@ -213,7 +227,9 @@ export function makeSeal(text: string, o: SealOptions): HTMLCanvasElement {
   }
   const box: Cell = { x: cx - bw, y: cy - bh, w: bw * 2, h: bh * 2 };
   const gut = U * (style === 'bai' ? 4.2 : 5);
-  const cells = layoutCells(n, box, gut, shape, o.layout3 ?? '1-2');
+  let l3 = o.layout3 ?? 'auto';
+  if (l3 === 'auto') l3 = n === 3 && inkAspect(g, chars[2], font) > inkAspect(g, chars[0], font) * 1.15 ? '2-1' : '1-2';
+  const cells = layoutCells(n, box, gut, shape, l3);
 
   g.globalCompositeOperation = style === 'bai' ? 'destination-out' : 'source-over';
   chars.forEach((ch, i) => {
@@ -301,13 +317,16 @@ export function makeSeal(text: string, o: SealOptions): HTMLCanvasElement {
       const low = nLow.fbm(u * 3.4, v * 3.4, 3);
       let dens = (0.9 + 0.12 * low) * (1 - pAmt * light);
       // Paper showing through where the paste did not take.
+      const patch = nLow(u * 9 + 17.3, v * 9 + 4.1);
       const s = nSpk(u * 62, v * 62) * 0.7 + nSpk(u * 150 + 3.1, v * 150 + 7.7) * 0.5;
-      const th = 0.5 - 0.28 * light * spkAmt - 0.08 * spkAmt;
+      const th = 0.62 - 0.3 * light * spkAmt - 0.1 * spkAmt - 0.26 * spkAmt * Math.max(0, patch);
       if (s > th) dens *= 1 - Math.min(1, (s - th) * 7) * (0.55 + 0.4 * spkAmt);
       dens *= 0.93 + 0.07 * nGrain(u * 240, v * 240);
       const al = c * clamp(dens, 0, 1);
       // Thick paste reads slightly deeper; thin paste slightly warmer.
-      const deep = 1 - 0.1 * Math.max(0, low) - 0.05 * (1 - light);
+      // Paste squeezed to the rims of each red area prints a touch deeper.
+      const rim = bv < 0.97 ? 1 - Math.abs(bv - 0.62) * 2.2 : 0;
+      const deep = 1 - 0.1 * Math.max(0, low) - 0.05 * (1 - light) - 0.1 * Math.max(0, rim);
       d[o4] = R0 * deep + (1 - dens) * 12;
       d[o4 + 1] = G0 * deep;
       d[o4 + 2] = B0 * deep;

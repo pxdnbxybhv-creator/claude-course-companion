@@ -1,0 +1,222 @@
+/* 一炷香 — the focus view. Phone: painting on top, controls below, log beneath.
+   ≥760px: tall painting beside a column of controls + log. ≥1180px: controls · painting · log. */
+
+.fx {
+  --fx-on-paper: #1b1916;
+  --fx-on-paper-2: #4a443c;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'stage' 'controls' 'side';
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: calc(10px + env(safe-area-inset-top)) var(--gutter) 8px;
+}
+.fx-stage { grid-area: stage; min-width: 0; height: clamp(340px, calc(100svh - var(--tabbar-h) - env(safe-area-inset-bottom) - env(safe-area-inset-top) - 292px), 720px); }
+.fx-controls { grid-area: controls; min-width: 0; }
+.fx-side { grid-area: side; min-width: 0; }
+
+/* ------------------------------------------------------------ the painting */
+
+.fx-mount {
+  position: relative; height: 100%;
+  padding: 5px; border-radius: 5px;
+  background: var(--mount);
+  box-shadow: 0 0 0 1px var(--line), 0 18px 40px -26px rgba(40, 30, 10, 0.55);
+}
+.fx-canvas { position: relative; width: 100%; height: 100%; overflow: hidden; border-radius: 2px; background: #f1e9d8; }
+.fx-canvas canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.fx-ink { touch-action: pan-y; cursor: default; }
+.fx[data-phase='burning'] .fx-ink { touch-action: none; cursor: grab; }
+.fx[data-phase='burning'] .fx-ink:active { cursor: grabbing; }
+
+/* 题款: a vertical inscription at the top right of the paper. */
+.fx-inscription {
+  position: absolute; top: 18px; right: 16px; z-index: 1; pointer-events: none;
+  display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 4px;
+  color: var(--fx-on-paper);
+}
+.fx-ins-title { writing-mode: vertical-rl; font-size: 30px; line-height: 1; letter-spacing: 0.08em; opacity: 0.86; }
+.fx-ins-col { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 30px; }
+.fx-ins-sub { writing-mode: vertical-rl; text-orientation: upright; font-size: 14px; line-height: 1; letter-spacing: 0.22em; color: var(--fx-on-paper-2); opacity: 0.85; font-family: var(--font-text); transition: opacity 0.6s var(--ease); }
+.fx-seal { display: block; width: 26px; height: 26px; }
+.fx-seal canvas { display: block; }
+
+/* ------------------------------------------------------------ intro (wide screens only) */
+
+.fx-intro { display: none; }
+.fx-intro-title { margin: 0; font-size: 44px; line-height: 1.1; }
+.fx-intro-text { margin: 8px 0 18px; font-size: 14.5px; color: var(--ink-3); line-height: 1.8; }
+
+/* ------------------------------------------------------------ setup */
+
+.fx-setup { display: grid; gap: 12px; animation: fx-rise 0.45s var(--ease); }
+.fx-durs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.fx-dur {
+  min-height: 54px; padding: 4px 2px; border-radius: 14px; border: 1px solid var(--line-strong);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  color: var(--ink); transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.15s var(--ease);
+}
+.fx-dur:active { transform: scale(0.96); }
+.fx-dur-n { font-size: 23px; line-height: 1; }
+.fx-dur-l { font-size: 11px; line-height: 1.2; color: var(--ink-3); letter-spacing: 0.04em; white-space: nowrap; }
+.fx-dur[aria-checked='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.fx-dur[aria-checked='true'] .fx-dur-l { color: color-mix(in srgb, var(--paper) 72%, transparent); }
+
+.fx-custom { display: flex; align-items: center; justify-content: center; gap: 10px; animation: fx-rise 0.3s var(--ease); }
+.fx-step { font-size: 20px; font-family: var(--font-latin); }
+.fx-custom-field { display: flex; align-items: baseline; gap: 6px; color: var(--ink-3); font-size: 14px; }
+.fx-custom-field input {
+  width: 76px; text-align: center; font-size: 28px; line-height: 1.2; color: var(--ink);
+  border: 0; border-bottom: 1px solid var(--line-strong); background: transparent; border-radius: 0; padding: 2px 0; outline: none;
+  -moz-appearance: textfield; appearance: textfield;
+}
+.fx-custom-field input::-webkit-outer-spin-button, .fx-custom-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fx-custom-field input:focus { border-bottom-color: var(--cinnabar); }
+
+.fx-intent .input { font-size: 17px; min-height: 44px; }
+.fx-intent .input::placeholder { color: var(--ink-3); opacity: 0.8; letter-spacing: 0.06em; }
+
+.fx-amb { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.fx-amb-btn { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: var(--ink-2); border-radius: 12px; }
+.fx-amb-glyph {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 20px; line-height: 1; border: 1px solid var(--line-strong);
+  transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.3s var(--ease);
+}
+.fx-amb-cap { font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em; white-space: nowrap; }
+.fx-amb-btn[aria-checked='true'] .fx-amb-glyph { background: var(--ink); color: var(--paper); border-color: var(--ink); transform: rotate(-4deg); }
+.fx-amb-btn[aria-checked='true'] .fx-amb-cap { color: var(--ink); }
+.fx-amb.is-compact { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+.fx-amb.is-compact .fx-amb-btn { min-width: 44px; min-height: 44px; }
+.fx-amb.is-compact .fx-amb-glyph { width: 32px; height: 32px; font-size: 17px; }
+.fx-amb.is-compact .fx-amb-cap { display: none; }
+.fx-amb.is-compact .fx-amb-btn:not([aria-checked='true']) .fx-amb-glyph { border-color: transparent; color: var(--ink-3); }
+
+.fx-light { width: 100%; min-height: 52px; font-size: 17px; letter-spacing: 0.24em; }
+.fx-light-glyph { font-size: 22px; line-height: 1; letter-spacing: 0; opacity: 0.9; }
+
+/* ------------------------------------------------------------ burning */
+
+.fx-burning { display: grid; gap: 10px; justify-items: center; text-align: center; animation: fx-rise 0.5s var(--ease); }
+.fx-clock { display: grid; justify-items: center; gap: 2px; padding-top: 2px; }
+.fx-time {
+  font-size: clamp(50px, 15vw, 68px); line-height: 1; font-weight: 400; color: var(--ink);
+  font-variant-numeric: oldstyle-nums tabular-nums; letter-spacing: 0.02em;
+  transition: opacity 0.6s var(--ease);
+}
+.fx-reading { font-size: 14px; letter-spacing: 0.22em; color: var(--ink-3); }
+.fx-for { max-width: 100%; margin-top: 2px; font-size: 15px; color: var(--ink-2); overflow-wrap: anywhere; }
+.fx-burning.is-paused .fx-time { opacity: 0.42; animation: fx-breathe 4s ease-in-out infinite; }
+.fx-actions { display: flex; justify-content: center; gap: 10px; margin-top: 4px; }
+.fx-actions .btn { min-width: 116px; }
+.fx-out { color: var(--ink-2); }
+
+.fx-ask {
+  width: 100%; max-width: 420px; margin-top: 4px; padding: 12px 14px; border-radius: var(--radius);
+  background: var(--paper-2); border: 1px solid var(--line); text-align: left; animation: fx-rise 0.5s var(--ease);
+}
+.fx-ask p { margin: 0 0 8px; font-size: 14px; color: var(--ink-2); }
+.fx-ask-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.fx-ask-btns .btn { min-height: 40px; }
+
+.fx-confirm-body { margin: 6px 0 18px; color: var(--ink-2); font-size: 15px; }
+.fx-confirm-btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.fx-confirm-btns .btn { flex: 1 1 140px; }
+
+/* ------------------------------------------------------------ log */
+
+.fx-hist .section-title:first-child { margin-top: 10px; }
+.fx-hist-total { letter-spacing: 0.06em; text-transform: none; color: var(--ink-2); font-size: 13px; }
+.fx-week { margin: 0; color: var(--ink); }
+.fx-week svg { display: block; width: 100%; height: auto; max-height: 160px; overflow: visible; }
+.fx-stick { fill: currentColor; opacity: 0.84; }
+.fx-stick.is-out { opacity: 0.26; }
+.fx-ash { fill: currentColor; }
+.fx-wd { font-size: 11px; fill: var(--ink-3); font-family: var(--font-text); }
+.fx-wd.is-today { fill: var(--cinnabar); }
+.fx-today-dot { fill: var(--cinnabar); }
+.fx-more { font-size: 9px; fill: var(--ink-3); font-family: var(--font-latin); }
+
+.fx-empty { margin: 4px 0 0; color: var(--ink-3); font-size: 14px; }
+.fx-list { list-style: none; margin: 0; padding: 0; }
+.fx-row { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.fx-row:last-child { border-bottom: 0; }
+.fx-row-time { flex: none; width: 3.2em; font-size: 17px; color: var(--ink-2); }
+.fx-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.fx-row-intent { font-size: 15.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-row-sub { font-size: 12.5px; color: var(--ink-3); }
+.fx-row-mark { flex: none; width: 12px; height: 28px; fill: currentColor; opacity: 0.8; }
+.fx-row.is-out .fx-row-intent { color: var(--ink-2); }
+.fx-row.is-out .fx-row-mark { opacity: 0.3; }
+
+/* ------------------------------------------------------------ completion */
+
+.fx-done { display: grid; gap: 14px; padding: 4px 0 2px; text-align: center; }
+.fx-done-head { display: grid; justify-items: center; gap: 2px; }
+.fx-done-glyph { font-size: 40px; line-height: 1.1; color: var(--cinnabar); letter-spacing: 0.1em; }
+.fx-done-title { margin: 4px 0 0; font-size: 19px; font-weight: 400; letter-spacing: 0.1em; }
+.fx-done-sub { margin: 0; font-size: 14px; color: var(--ink-3); overflow-wrap: anywhere; }
+.fx-done-sub .num { font-size: 16px; }
+.fx-poem { margin: 4px auto; padding: 16px 12px; max-width: 440px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.fx-poem blockquote { margin: 0; font-size: 18px; line-height: 1.9; letter-spacing: 0.08em; color: var(--ink); }
+.fx-poem blockquote p { margin: 0; }
+.fx-poem.is-vertical { display: flex; flex-direction: row-reverse; justify-content: center; align-items: flex-start; gap: 10px; }
+.fx-poem.is-vertical blockquote { writing-mode: vertical-rl; font-size: 20px; line-height: 2; letter-spacing: 0.16em; max-height: 360px; }
+.fx-poem.is-vertical figcaption { writing-mode: vertical-rl; font-size: 13px; letter-spacing: 0.14em; padding-top: 3.2em; }
+.fx-poem figcaption { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+.fx-poem-en { margin: 10px 0 0; font-family: var(--font-latin); font-size: 16px; font-style: italic; line-height: 1.55; color: var(--ink-2); }
+.fx-poem-by { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+.fx-done-today { margin: 0; font-size: 15px; color: var(--ink-2); letter-spacing: 0.06em; }
+.fx-done-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.fx-done-btns .btn { min-width: 128px; }
+
+@keyframes fx-rise { from { opacity: 0; transform: translateY(6px); } }
+@keyframes fx-breathe { 50% { opacity: 0.7; } }
+
+/* ------------------------------------------------------------ wide screens */
+
+@media (min-width: 760px) {
+  .fx {
+    max-width: 1180px;
+    grid-template-columns: auto minmax(280px, 360px);
+    grid-template-areas: 'stage controls' 'stage side';
+    grid-template-rows: auto 1fr;
+    justify-content: center; align-items: start;
+    column-gap: clamp(28px, 5vw, 64px); row-gap: 8px;
+    padding-top: 28px;
+  }
+  .fx-stage {
+    height: clamp(500px, calc(100dvh - var(--tabbar-h) - 64px), 920px);
+    aspect-ratio: 5 / 8;
+    position: sticky; top: 24px;
+  }
+  .fx-mount { padding: 9px; border-radius: 6px; }
+  .fx-ins-title { font-size: 36px; }
+  .fx-ins-sub { font-size: 15px; }
+  .fx-inscription { top: 26px; right: 24px; }
+  .fx-intro { display: block; }
+  .fx-hist .section-title:first-child { margin-top: 28px; }
+  .fx-burning { justify-items: stretch; text-align: left; }
+  .fx-clock { justify-items: start; }
+  .fx-actions { justify-content: flex-start; }
+  .fx-amb.is-compact { justify-content: flex-start; margin-left: -6px; }
+}
+
+@media (min-width: 1180px) {
+  .fx {
+    grid-template-columns: minmax(260px, 320px) auto minmax(260px, 320px);
+    grid-template-areas: 'controls stage side';
+    grid-template-rows: auto;
+    align-items: center;
+  }
+  .fx-controls, .fx-side { align-self: center; }
+  .fx-stage { position: relative; top: 0; }
+  .fx-hist .section-title:first-child { margin-top: 0; }
+}
+
+@media (max-width: 380px) {
+  .fx-dur-l { font-size: 10px; letter-spacing: 0; }
+  .fx-dur-n { font-size: 21px; }
+}
