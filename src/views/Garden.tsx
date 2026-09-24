@@ -85,6 +85,11 @@ export function GardenView() {
       const streak = p.stats.streak + (p.stats.scheduledToday ? 1 : 0);
       if (state.value.settings.sound) audio.chime(streak);
       try { navigator.vibrate?.(12); } catch { /* unsupported */ }
+      const cs = state.value.checkins;
+      const due = activeHabits.value.filter((h) => isScheduled(h, day));
+      if (p.stats.scheduledToday && due.length > 1 && due.every((h) => (cs[h.id] ?? []).includes(day))) {
+        setTimeout(() => toast(t('今日功课圆满。园中无事，且听风声。', 'All done for today. Nothing left but the wind.'), 3600), 900);
+      }
       const chosen = pickPoem({ plant: p.habit.plant, salt: hashString(day + p.habit.id) });
       // Written into the emptiest part of the sky, away from the plant.
       const side = sceneRef.current?.poemSide(p.habit.id) ?? openSide;
@@ -161,11 +166,15 @@ export function GardenView() {
             <h2 class="section-title">
               <span>{t('今日', 'Today')}</span>
               <span class="spacer" />
-              {scheduled.length > 0 && (
+              {scheduled.length > 0 && (doneCount === scheduled.length ? (
+                <span class="garden-count is-complete" aria-label={t('今日已圆满', 'All done today')}>
+                  <span class="brush">{t('圆满', 'All done')}</span>
+                </span>
+              ) : (
                 <span class="garden-count num" aria-label={t(`已完成 ${doneCount} / ${scheduled.length}`, `${doneCount} of ${scheduled.length} done`)}>
                   {doneCount} / {scheduled.length}
                 </span>
-              )}
+              ))}
             </h2>
             {scheduled.length === 0 && <p class="garden-rest-all muted">{t('今日园中无事，且听风声。', 'Nothing is due today. Listen to the wind.')}</p>}
             <ul class="hlist">

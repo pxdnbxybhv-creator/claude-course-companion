@@ -5,7 +5,7 @@
 //   live     1 = keep animating (for a browser); otherwise one still frame
 // Prints average step+draw ms (and the paper blit separately) at the bottom.
 import { createIncenseScene } from '../../ink/incense';
-import { fillPaper, makePaperTile } from '../../ink/paper';
+import { makePaperTile } from '../../ink/paper';
 
 export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const T = Number(p.get('t') ?? 20);
@@ -116,5 +116,4 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     };
     requestAnimationFrame(loop);
   }
-  void fillPaper;
 }

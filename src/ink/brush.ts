@@ -385,7 +385,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   const thin = st.color ?? INK_THIN;
   const isDry = kind === 'dry', isLine = kind === 'line';
   const wet = clamp(st.wet ?? (isDry ? 0.15 : isLine ? 0.3 : 0.5), 0, 1) * (0.5 + 0.5 * vigor);
-  const dry = clamp((st.dryness ?? (isDry ? 0.55 : isLine ? 0.12 : 0.2)) + (1 - vigor) * 0.6, 0, 1);
+  const dry = clamp((st.dryness ?? (isDry ? 0.55 : isLine ? 0.12 : 0.2)) + (1 - vigor) * 0.45, 0, 1);
 
   // Edge offsets. ELs/ERs: smooth silhouette (slow pressure wobble + mid-frequency irregularity);
   // EL/ER add the fine fibrous roughness where ink wicks into the paper.
@@ -505,7 +505,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
     }
     // 側鋒: the brush held at a slant leaves its tip-side edge darker than the heel side
     ctx.fillStyle = color; // minor layers skip the grain pattern: it is the costly part of a fill
-    if (hmax > 3.5) {
+    if (hmax > 3.5 && tone < 0.85) {
       const side = rng() < 0.5 ? -1 : 1, depth = rng.range(0.35, 0.7);
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
@@ -521,7 +521,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // --- pooling: denser ink where the brush is pressed widest (brush only) -------------------
-  if (!isDry && hmax > 5) {
+  if (!isDry && hmax > 5 && tone < 0.85) { // invisible under near-saturated ink
     ctx.beginPath();
     const off = rng.range(-0.25, 0.25);
     for (let i = 0; i < n; i++) {

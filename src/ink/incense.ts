@@ -5,9 +5,15 @@
 // The scene is TRANSPARENT: draw() paints no background, so put the canvas over paper (a CSS
 // background or a paper canvas underneath) and clear it every frame before draw().
 //
-// Cost: resize() rasterises the censer once through the brush engine (~50–150 ms, cached as a
-// device-resolution bitmap). A frame (step + draw) is a blit, a handful of stick/ember paths, and
-// the smoke (~100 bucketed strokes + one upscaled mist layer): ~1–2.5 ms at 420×760 @2x.
+// Cost: resize() rasterises the censer once through the brush engine (~80–200 ms, cached as a
+// device-resolution bitmap; a same-size resize is a no-op). A frame (step + draw) is one blit, a
+// handful of stick/ember paths and the smoke (≈1–1.2k particles, ~90 bucketed strokes + one
+// quarter-res mist layer): ≈0.6 ms step + ≈2 ms draw at 420×760 @2x in headless Chromium on a
+// heavily loaded 4-core box (software GL) — expect well under that on a real device.
+//
+// Usage per frame:  scene.setProgress(p); scene.step(dt); ctx.clearRect(…); scene.draw(ctx).
+// Pointer drags → scene.disturb(x, y, vx, vy). scene.tip() gives the ember position (e.g. to aim
+// a "blow" at it). Pausing: setLit(false) — the ember dims over ~1 s and the smoke thins and fades.
 import type { Drawing, Stroke, StrokePoint } from './types';
 import { PIGMENTS } from './types';
 import { rasterize } from './brush';
@@ -153,9 +159,9 @@ export function censerDrawing(seed = 1): CenserLayout {
   add({ kind: 'wash', pts: poly(crescent(under, (t) => 14 * Math.sin(Math.PI * t) ** 0.6, 0, -1), 1.2), tone: 0.36, color: ink });
   add({ kind: 'wash', pts: poly(crescent(left.slice().reverse().filter(([, y]) => y > 92 && y < 136), (t) => 6 * Math.sin(Math.PI * t), 1, 0), 3), tone: 0.14, color: ink });
   // metallic sheen: a pale glint on the lit shoulder
-  add({ kind: 'wash', pts: poly(ellipsePts(cx - 46, 98, 12, 3.8, -0.35, Math.PI * 2 - 0.35, 16), 3), tone: 0.5, color: white });
+  add({ kind: 'wash', pts: poly(ellipsePts(cx - 46, 99, 15, 4.6, -0.35, Math.PI * 2 - 0.35, 18), 7), tone: 0.34, color: white });
   // a warm glow on the lit shoulder (宝光)
-  add({ kind: 'wash', pts: poly(ellipsePts(cx - 42, 100, 19, 7, -0.3, Math.PI * 2 - 0.3, 18), 5), tone: 0.2, color: PIGMENTS.gamboge });
+  add({ kind: 'wash', pts: poly(ellipsePts(cx - 40, 101, 22, 8, -0.3, Math.PI * 2 - 0.3, 18), 8), tone: 0.14, color: PIGMENTS.gamboge });
   // patina: a few malachite blooms and dark pits
   for (let i = 0; i < 4; i++) {
     const px = cx + rng.range(-40, 66), py = rng.range(106, 134);
@@ -179,7 +185,10 @@ export function censerDrawing(seed = 1): CenserLayout {
   }
   // contour: the shadow side heavier; the left edge broken once where the light hits it
   const rightC = right.filter(([, y]) => y > 76);
-  add({ kind: 'brush', pts: line(rightC, (t) => 1.4 + 2.6 * Math.sin(Math.PI * clamp(t * 1.1, 0, 1))), tone: 0.88, dryness: 0.35 });
+  const rc = Math.floor(rightC.length * 0.42);
+  // two strokes that overlap at the widest point: shoulder → belly, belly → foot
+  add({ kind: 'brush', pts: line(rightC.slice(0, rc + 2), (t) => 0.9 + 2.2 * Math.sin(Math.PI * (0.15 + 0.7 * t))), tone: 0.84, dryness: 0.3 });
+  add({ kind: 'brush', pts: line(rightC.slice(rc - 1).map(([x, y]) => [x + 0.4, y] as P2), (t) => 3.2 * Math.sin(Math.PI * (0.12 + 0.8 * t)) + 0.4), tone: 0.88, dryness: 0.45 });
   const leftC = left.slice().reverse().filter(([, y]) => y > 76);
   const cut = Math.floor(leftC.length * 0.28);
   add({ kind: 'brush', pts: line(leftC.slice(0, cut), taper(1.6, 0.2, 0.5)), tone: 0.7 });

@@ -53,8 +53,10 @@ export function Inscription(props: {
   );
 }
 
+/** The English for the first couplet: its first sentence (cut at a semicolon only if very long). */
 function firstSentence(s: string): string {
-  const m = s.match(/^.*?[.;!?](\s|$)/);
-  const out = (m ? m[0] : s).trim();
-  return out.length < 24 && s.length > out.length ? s.split(/(?<=[.;!?])\s/).slice(0, 2).join(' ') : out;
+  const m = s.match(/^.*?[.!?](?=\s|$)/);
+  let out = (m ? m[0] : s).trim();
+  if (out.length > 130 && out.includes(';')) out = out.slice(0, out.indexOf(';')) + '.';
+  return out;
 }

@@ -65,8 +65,12 @@
 .garden-page { padding-top: 2px; }
 .garden-page .section-title { margin-top: 22px; }
 .garden-count { font-size: 15px; color: var(--ink-2); letter-spacing: 0.04em; text-transform: none; }
+.garden-count.is-complete { color: var(--ink); animation: ink-in 0.9s var(--ease) both; }
+.garden-count.is-complete .brush { font-size: 20px; letter-spacing: 0.1em; }
+:lang(en) .garden-count.is-complete .brush { font-family: var(--font-latin); font-style: italic; font-size: 16px; letter-spacing: 0.02em; }
 .garden-subtitle { margin: 22px 0 2px; font-size: 13px; font-weight: 400; letter-spacing: 0.18em; color: var(--ink-3); }
 .garden-rest-all { font-size: 15px; margin: 6px 0; }
+:lang(en) .garden-subtitle, :lang(en) .daynote-label { letter-spacing: 0.06em; font-size: 14px; font-style: italic; }
 
 .hlist { list-style: none; margin: 0; padding: 0; }
 .hrow { display: flex; align-items: center; gap: 6px; min-height: 68px; border-bottom: 1px solid var(--line); }

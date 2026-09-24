@@ -6,9 +6,10 @@ import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
 import { dpr, useDark } from './hooks';
 
-export function SealMark(props: { text: string; size: number; kind: 'yi' | 'ji'; seed?: number }) {
+/** A seal stamp. `paper` = it sits on a painting, which stays on paper in dark mode too. */
+export function SealMark(props: { text: string; size: number; kind: 'yi' | 'ji'; seed?: number; paper?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const dark = useDark();
+  const dark = useDark() && !props.paper;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;

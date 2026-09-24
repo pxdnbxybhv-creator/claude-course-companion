@@ -346,7 +346,7 @@ export function plum(spec: PlantSpec): Drawing {
     st.push({ x: e1.p.x, y: e1.p.y, w: 0.009 * H }, { x: e2.p.x, y: e2.p.y, w: 0.004 * H });
     push('brush', st, 0.6, 0, { dryness: 0, wet: 0.4 });
     // two little twigs following the first reach of other limbs, each ending in a bud
-    const hosts = limbs.slice(1).concat(secs.slice(0, 1)).slice(0, 2);
+    const hosts = limbs.slice(1, 3); // side limbs all leave the trunk, so their first reach touches the stem
     hosts.forEach((b, k) => {
       const L = polyLen(b.pts);
       const tip = at(b, Math.min(1, (0.07 * H) / L));

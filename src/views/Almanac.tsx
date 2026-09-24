@@ -13,13 +13,6 @@ import { YearWheel } from './almanac/YearWheel';
 import { dayDate, dayInfo } from './almanac/model';
 import { useMedia } from './almanac/hooks';
 import './almanac/almanac.css';
-import { replaceState } from '../app/store';
-import { demoState } from '../app/demo';
-
-// DEV-only: `?demo` seeds the demo garden so the calendar's ink dots and notes can be seen.
-if (import.meta.env.DEV && typeof location !== 'undefined' && /[?&]demo\b/.test(location.search)) {
-  replaceState(demoState(today.value, lang.value));
-}
 
 export function AlmanacView() {
   const t = useT();

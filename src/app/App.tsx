@@ -8,6 +8,7 @@ import { AlmanacView } from '../views/Almanac';
 import { ScrollView } from '../views/Scroll';
 import { SettingsView } from '../views/Settings';
 import { ToastHost } from '../ui/kit';
+import { audio } from '../audio/engine';
 import './app.css';
 
 const TABS: { id: Route; glyph: string; en: string }[] = [
@@ -20,7 +21,21 @@ const TABS: { id: Route; glyph: string; en: string }[] = [
 export function App() {
   const t = useT();
   const r = route.value;
-  const theme = state.value.settings.theme;
+  const { theme, sound, volume } = state.value.settings;
+  useEffect(() => {
+    audio.setEnabled(sound);
+    audio.setVolume(volume);
+  }, [sound, volume]);
+  useEffect(() => {
+    // Browsers (iOS especially) only allow audio after a gesture: unlock on the first touches.
+    const unlock = () => { if (state.value.settings.sound) void audio.unlock(); };
+    window.addEventListener('pointerdown', unlock, { passive: true });
+    window.addEventListener('keydown', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+    };
+  }, []);
   useEffect(() => {
     document.documentElement.lang = lang.value === 'zh' ? 'zh-CN' : 'en';
   }, [lang.value]);

@@ -69,7 +69,7 @@ export function playChime(mix: Mixer, when: number, streak = 1) {
   const phrases: number[][] =
     s >= 7 ? [[5, 7, 8, 10], [6, 7, 8, 10], [3, 6, 8, 10]]
     : s >= 3 ? [[7, 8, 10], [6, 8, 10]]
-    : [[8, 10], [7, 10]];
+    : [[7, 10], [8, 10]]; // index s % n: streak 1 → sol→do, the most resolved
   const phrase = phrases[s % phrases.length];
   const jobs: Job[] = [];
   const plan: { at: number; o: VoiceOpts }[] = [];

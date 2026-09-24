@@ -277,7 +277,7 @@ function floatingLeaf(c: Ctx, at: V, rx: number, color: string | undefined, birt
 
 /** 卷荷: a young leaf still rolled into a horn. */
 function rolledLeaf(c: Ctx, base: V, dir: number, len: number, birth: number) {
-  const { rng, u } = c;
+  const { u } = c;
   const d = { x: Math.cos(dir), y: Math.sin(dir) };
   const n = { x: -d.y, y: d.x };
   const w = len * 0.24;
@@ -303,7 +303,6 @@ function rolledLeaf(c: Ctx, base: V, dir: number, len: number, birth: number) {
   }
   add(c, 'brush', sp, 0.82, birth + 0.004, { wet: 0.5 });
   add(c, 'brush', brushPts([spine(0.05, w * 0.3), spine(0.5, w * 0.48), spine(0.92, w * 0.35)], 1.8 * u, 1.1 * u, 1.2, 0.3), 0.7, birth + 0.005, { wet: 0.5 });
-  void rng;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -553,7 +552,7 @@ export function lotus(spec: PlantSpec): Drawing {
       rx, ry: rx * rng.range(0.14, 0.22), lift: -rx * rng.range(0.1, 0.22), droop: rng.range(0.25, 0.4), ang: -side * rng.range(0.05, 0.3), tone: rng.range(0.55, 0.72), birth: 0.285,
     });
   }
-  if (nLeaves >= 3) {
+  if (nLeaves >= 3 && layout !== 'low') {
     // leaf 3: smaller, higher, far behind — paler
     const rx = H * rng.range(0.13, 0.17);
     plans.push({
@@ -561,7 +560,7 @@ export function lotus(spec: PlantSpec): Drawing {
       rx, ry: rx * rng.range(0.25, 0.4), lift: rx * 0.05, droop: rng.range(0.05, 0.2), ang: rng.range(-0.2, 0.2), tone: rng.range(0.4, 0.5), birth: 0.38,
     });
   }
-  // paint far → near is by birth; order leaves so the far/pale one comes last but under? keep birth order
+  // each leaf rises on its own stem, then unfurls
   plans.forEach((lp, i) => {
     const b0 = { x: baseX(), y: 0 };
     const st = makeStem(b0, lp.navel, rng.range(-0.06, 0.06), rng);

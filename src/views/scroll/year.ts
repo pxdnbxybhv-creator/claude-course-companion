@@ -42,7 +42,7 @@ function inkDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
     return;
   }
   const a = 0.1 + 0.84 * Math.pow(share, 1.25);
-  const rr = r * (0.46 + 0.44 * share);
+  const rr = r * (0.42 + 0.42 * share);
   // bleed: a pale halo where the wet ink crept into the fibres
   ctx.globalAlpha = a * 0.1;
   ctx.fillStyle = grainPattern(ctx, INK, 'wash');
@@ -167,15 +167,15 @@ export async function drawYear(ctx: CanvasRenderingContext2D, W: number, H: numb
   if (tall) {
     // title block, upper right: 岁时记 in large running script, the year beside it, then the record
     const T = 112;
-    const tx = W - 150, ty = 116;
+    const tx = W - 150, ty = 176;
     drawColumn(ctx, Array.from('岁时记'), tx, ty, T, 1.04, fonts.brush, rng, INK, 0.95);
-    const ys = 40;
+    const ys = 36;
     const yx = tx - T * 0.98;
     const yEnd = drawColumn(ctx, [...Array.from(cnYearDigits(d.year)), null, ...Array.from(ganzhi + '年')], yx, ty + T * 0.35, ys, 1.12, fonts.text, rng, INK, 0.86);
     const seal = makeSeal(sealName, { size: 62, dpr: 1, style: 'bai', seed: 7 });
     pressSeal(ctx, { canvas: seal, x: yx, y: yEnd + 50, size: 62, rot: -0.012 });
-    const lz = 96;
-    pressSeal(ctx, { canvas: makeSeal(leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.52, y: ty + 4, size: lz, rot: 0.01 });
+    const lz = 84;
+    pressSeal(ctx, { canvas: makeSeal(leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: 8 }), x: tx + T * 0.3, y: ty - lz * 0.52, size: lz, rot: 0.01 });
     // the year's record, one phrase per column, read right to left
     const rs = 32;
     let rx = yx - ys * 2.4;
@@ -201,7 +201,7 @@ export async function drawYear(ctx: CanvasRenderingContext2D, W: number, H: numb
       }
       ctx.restore();
     }
-    const grid: Grid = { x: 84, y: 600, w: W - 168, h: 1180, cols: 3, rows: 4, pitch: 37, label: 42 };
+    const grid: Grid = { x: 84, y: 640, w: W - 168, h: 1140, cols: 3, rows: 4, pitch: 36, label: 42 };
     drawMonths(ctx, grid, o, d, fonts);
     legend(ctx, 104, H - 108, 30, fonts, o, 24);
     inkText(ctx, '半亩', W - 104, H - 108, 30, fonts.brush, 12, { align: 'right', alpha: 0.75 });

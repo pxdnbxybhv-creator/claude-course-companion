@@ -69,7 +69,7 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
               {term.zh}
             </h2>
             <span class="alm-term-seal" title={t(`${MENG[sub]}${SEASON_ZH[season]}`, `${MENG_EN[sub]} ${season}`)}>
-              <SealMark text={`${MENG[sub]}${SEASON_ZH[season]}`} size={34} kind="yi" seed={31 + i} />
+              <SealMark text={`${MENG[sub]}${SEASON_ZH[season]}`} size={34} kind="yi" seed={31 + i} paper />
             </span>
           </div>
           <div class="alm-term-meta">

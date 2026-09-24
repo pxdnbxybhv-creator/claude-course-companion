@@ -546,7 +546,8 @@ function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Pa
     Hmax = Math.max(Hmax, H);
   }
   if (xs.length) {
-    for (let pass = 0; pass < 3 && count < limit; pass++) {
+    // in snow only the dark accents remain — rock and scrub showing through (雪景)
+    for (let pass = snow ? 2 : 0; pass < 3 && count < limit; pass++) {
       if (pass === 2) {
         ctx.save();
         ctx.imageSmoothingEnabled = true;
@@ -565,7 +566,7 @@ function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Pa
         const sl = (ridgeAt(R, cx + 4) - ridgeAt(R, cx - 4)) / 8;
         // shadowed (right-facing) flanks and the crest collect the ink; lit flanks stay wash
         if (sl < -0.05 && rng.chance(pass === 2 ? 0.6 : 0.4)) continue;
-        const depthK = [0.3, 0.17, 0.06][pass] * (sl > 0 ? 1.2 : 0.8);
+        const depthK = (snow ? 0.3 : [0.3, 0.17, 0.06][pass]) * (sl > 0 ? 1.2 : 0.8);
         const cy = r + 2 + Math.abs(rng.gauss()) * H * depthK;
         const dens = hillDensity(L, R, cx, cy, noise);
         if (dens < 0.3) continue;
@@ -1046,7 +1047,7 @@ interface PondCache {
   ripples: { c: HTMLCanvasElement; w: number; h: number }[];
   glint: HTMLCanvasElement;
 }
-let pondCache: PondCache | null = null;
+const pondCaches: PondCache[] = [];
 
 function buildPondCache(o: PondOptions, key: string): PondCache {
   const { w, h, dpr } = o;
@@ -1153,8 +1154,14 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   if (o.w < 2 || o.h < 2) return;
   const clarity = clamp(o.clarity, 0, 1);
   const key = `${o.w}|${o.h}|${o.dpr}|${Math.round(clarity * 10)}|${o.seed ?? 1}`;
-  if (!pondCache || pondCache.key !== key) pondCache = buildPondCache(o, key);
-  const C = pondCache;
+  // a few sizes stay cached (the garden, the scroll export…); most recent first
+  let ci = pondCaches.findIndex((c) => c.key === key);
+  if (ci < 0) {
+    pondCaches.unshift(buildPondCache(o, key));
+    if (pondCaches.length > 3) pondCaches.pop();
+    ci = 0;
+  }
+  const C = pondCaches[ci];
   const { w, h, t, dpr } = o;
   const pr = C.pr;
   const seed = o.seed ?? 1;

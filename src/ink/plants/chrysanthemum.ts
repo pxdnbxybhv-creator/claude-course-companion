@@ -323,10 +323,11 @@ function head(c: Ctx, o: HeadOpts) {
   const env = (phi: number) => 1 + 0.22 * c.noise(Math.cos(phi) * 0.9 + envSeed, Math.sin(phi) * 0.9 + envSeed);
   rings.forEach((rg, ri) => {
     const off = rng.range(0, TAU);
-    for (let i = 0; i < rg.n; i++) {
+    const nP = o.outline ? Math.round(rg.n * 0.8) : rg.n; // outlines are busier: fewer petals
+    for (let i = 0; i < nP; i++) {
       // wild: skip some outer petals, jitter angles and lengths
       if (ri >= 2 && rng.chance(0.12)) continue;
-      const phi = off + (i / rg.n) * TAU + rng.range(-0.35, 0.35) * (TAU / rg.n);
+      const phi = off + (i / nP) * TAU + rng.range(-0.35, 0.35) * (TAU / nP);
       const len = R * rng.range(rg.len[0], rg.len[1]) * (ri >= 1 ? env(phi) : 1);
       const a0 = rad(rng.range(rg.a0[0], rg.a0[1]));
       const curl = rad(rng.range(rg.curl[0], rg.curl[1]));
@@ -425,7 +426,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
 
   // --- Composition ------------------------------------------------------------------------
   const nStems = rng.pick([1, 2, 2, 2, 3, 3]);
-  const lean = (rng.chance(0.5) ? -1 : 1) * rng.range(0.08, 0.2); // whole plant leans one way
+  const lean = (rng.chance(0.5) ? -1 : 1) * rng.range(0.06, 0.26); // whole plant leans one way
   const outline = rng.chance(0.3);
   const stems: StemPlan[] = [];
   const kinds: ('open' | 'bud' | 'side')[] = nStems === 1 ? ['open'] : nStems === 2 ? ['open', rng.pick(['bud', 'side', 'open'] as const)] : ['open', rng.pick(['side', 'open'] as const), 'bud'];
