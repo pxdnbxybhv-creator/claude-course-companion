@@ -73,7 +73,8 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
           const lon = (315 + 15 * i) % 360;
           const [t1x, t1y] = pt(lon, R - (MAJOR.has(i) ? 9 : 5));
           const [t2x, t2y] = pt(lon, R + (MAJOR.has(i) ? 9 : 5));
-          const [lx, ly] = pt(lon, R + 26);
+          // side labels sit a little further out, clear of the sun dot
+          const [lx, ly] = pt(lon, R + 24 + 9 * Math.abs(Math.sin(rad(screen(lon)))));
           const [dx, dy] = pt(lon, R - 34);
           const at = dates.get(i);
           const md = at ? chinaMD(at) : null;
@@ -99,7 +100,7 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
             </g>
           );
         })}
-        <circle class="alm-wh-sun-halo" cx={f(sx)} cy={f(sy)} r="13" />
+        <circle class="alm-wh-sun-halo" cx={f(sx)} cy={f(sy)} r="11" />
         <circle class="alm-wh-sun" cx={f(sx)} cy={f(sy)} r="6" />
         <text class="alm-wh-year brush" x="0" y="-8" text-anchor="middle" dominant-baseline="central">{props.yearGanZhi}</text>
         <text class="alm-wh-year-sub" x="0" y="26" text-anchor="middle" dominant-baseline="central">

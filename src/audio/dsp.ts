@@ -197,25 +197,41 @@ function runString(out: Float32Array, sr: number, f0: number, T0: number, Th: nu
   for (let j = 0; j < Lc.length; j++) if (Lc[j] > maxL) maxL = Lc[j];
   while (N < maxL + 8) N <<= 1;
   const mask = N - 1;
-  const dl = new Float32Array(N);
+  const dl = new Float64Array(N);
   const a = 1 - p;
   const len = out.length, ne = exc.length, inv = 1 / step;
   let lp = 0;
-  for (let i = 0; i < len; i++) {
-    const j = (i / step) | 0;
-    const L = Lc[j] + (Lc[j + 1] - Lc[j]) * (i - j * step) * inv;
-    const r = i - L;
-    const ri = Math.floor(r);
-    const d = r - ri;
-    const xm = dl[(ri - 1) & mask], x0 = dl[ri & mask], x1 = dl[(ri + 1) & mask], x2 = dl[(ri + 2) & mask];
-    // 4-point, 3rd-order Lagrange fractional delay
-    const dm1 = d - 1, dm2 = d - 2, dp1 = d + 1;
-    const y = (-d * dm1 * dm2 * xm) / 6 + (dp1 * dm1 * dm2 * x0) / 2 - (dp1 * d * dm2 * x1) / 2 + (dp1 * d * dm1 * x2) / 6;
-    lp = a * y + p * lp;
-    let v = g * lp;
-    if (i < ne) v += exc[i];
-    dl[i & mask] = v;
-    out[i] += v * gain;
+  let i = 0;
+  for (let j = 0; i < len; j++) {
+    const end = Math.min(len, i + step);
+    let L = Lc[j];
+    const dL = (Lc[j + 1] - L) * inv;
+    if (Math.abs(dL) < 1e-7) {
+      // Fixed length over this block: the fractional-delay coefficients are constant.
+      const r = i - L, ri = Math.floor(r), d = r - ri;
+      const dm1 = d - 1, dm2 = d - 2, dp1 = d + 1;
+      const c0 = (-d * dm1 * dm2) / 6, c1 = (dp1 * dm1 * dm2) / 2, c2 = (-dp1 * d * dm2) / 2, c3 = (dp1 * d * dm1) / 6;
+      for (let k = ri - i; i < end; i++) {
+        const q = i + k;
+        const y = c0 * dl[(q - 1) & mask] + c1 * dl[q & mask] + c2 * dl[(q + 1) & mask] + c3 * dl[(q + 2) & mask];
+        lp = a * y + p * lp;
+        const v = i < ne ? g * lp + exc[i] : g * lp;
+        dl[i & mask] = v;
+        out[i] += v * gain;
+      }
+    } else {
+      for (; i < end; i++, L += dL) {
+        const r = i - L, ri = Math.floor(r), d = r - ri;
+        const dm1 = d - 1, dm2 = d - 2, dp1 = d + 1;
+        // 4-point, 3rd-order Lagrange fractional delay
+        const y = (-d * dm1 * dm2 * dl[(ri - 1) & mask]) / 6 + (dp1 * dm1 * dm2 * dl[ri & mask]) / 2
+          - (dp1 * d * dm2 * dl[(ri + 1) & mask]) / 2 + (dp1 * d * dm1 * dl[(ri + 2) & mask]) / 6;
+        lp = a * y + p * lp;
+        const v = i < ne ? g * lp + exc[i] : g * lp;
+        dl[i & mask] = v;
+        out[i] += v * gain;
+      }
+    }
   }
 }
 
@@ -245,7 +261,7 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
     exc[i] = tri * (1 - noiseMix) + comb * 0.5 * noiseMix;
   }
   // Softer plucks are darker: a one-pole low-pass on the excitation, run twice for a gentle slope.
-  const fc = 900 + 6500 * vel * vel * (1 + 0.5 * (n.bright ?? 0));
+  const fc = 1200 + 7000 * vel * vel * (1 + 0.5 * (n.bright ?? 0));
   const k = Math.exp((-TAU * fc) / sr);
   for (let pass = 0; pass < 2; pass++) {
     let s = 0;
@@ -253,10 +269,15 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
   }
   subtractMean(exc);
 
-  const Th = 0.45 + 0.25 * vel;
+  const Th = 0.6 + 0.35 * vel;
   runString(out, sr, f0, T0, Th, exc, contour, step, 0, 1);
   runString(out, sr, f0, T0 * 1.4, Th * 1.2, exc, contour, step, 1.3, 0.28);
 
+  // The soundboard is driven by the force at the bridge — the string's slope, not its
+  // displacement — which tilts the spectrum up ~6 dB/oct above ~150 Hz (a leaky differentiator).
+  const z = Math.exp((-TAU * 150) / sr);
+  for (let i = len - 1; i > 0; i--) out[i] -= z * out[i - 1];
+  out[0] *= 1 - z;
   // Body: DC block, paulownia air cavity and plate resonances, a little silk presence,
   // a gentle top roll-off for warmth.
   filter(out, highpass(sr, 32, 0.7));

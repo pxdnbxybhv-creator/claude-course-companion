@@ -8,6 +8,7 @@ import type { AmbientKind } from '../core/types';
 import { Mixer } from './graph';
 import { playBell, playChime, playKnock, playPluck } from './voices';
 import { createBed, type Bed } from './ambient';
+import RenderWorker from './render.worker.ts?worker&inline';
 
 export interface AudioStats {
   state: AudioContextState | 'none' | 'unsupported';
@@ -63,7 +64,9 @@ class WebAudioEngine implements AudioEngine {
       let ctx: AudioContext;
       try { ctx = new C({ latencyHint: 'interactive' }); } catch { ctx = new C(); }
       this.ctx = ctx;
-      this.mix = new Mixer(ctx);
+      let worker: Worker | null = null;
+      try { worker = new RenderWorker({ name: 'banmu-audio' }); } catch { worker = null; } // sync fallback
+      this.mix = new Mixer(ctx, { worker });
       this.mix.master.gain.value = this.targetGain();
       document.addEventListener('visibilitychange', this.onVisible);
       return this.mix;
@@ -105,10 +108,19 @@ class WebAudioEngine implements AudioEngine {
     return (this.ctx?.currentTime ?? 0) + 0.01;
   }
 
+  /**
+   * Runs a one-shot now. If the context is not running yet (first gesture, or iOS after an
+   * interruption) it waits briefly for resume(); a sound that cannot start soon is dropped
+   * rather than queued, so nothing stale bursts out at the next unlock.
+   */
   private safely(f: (m: Mixer, t: number) => void) {
     const m = this.live();
-    if (!m) return;
-    try { f(m, this.now()); } catch (e) { console.warn('[audio]', e); }
+    const ctx = this.ctx;
+    if (!m || !ctx) return;
+    const run = () => { try { f(m, this.now()); } catch (e) { console.warn('[audio]', e); } };
+    if (ctx.state === 'running') return run();
+    const t0 = performance.now();
+    ctx.resume().then(() => { if (ctx.state === 'running' && performance.now() - t0 < 400) run(); }).catch(() => {});
   }
 
   async unlock(): Promise<void> {

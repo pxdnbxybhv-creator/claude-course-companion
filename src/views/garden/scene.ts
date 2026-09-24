@@ -14,7 +14,7 @@ import type { Drawing } from '../../ink/types';
 import { PIGMENTS } from '../../ink/types';
 import { plantDrawing } from '../../ink/plants';
 import { rasterize, StrokeAnimation } from '../../ink/brush';
-import { paintBackdrop, paintPond, paintLight, rockDrawing, type Backdrop } from '../../ink/landscape';
+import { groundLine, paintBackdrop, paintPond, paintLight, rockDrawing, type Backdrop } from '../../ink/landscape';
 import { Weather } from '../../ink/weather';
 import { clamp, lerp, makeNoise2, makeRng } from '../../core/rng';
 
@@ -89,6 +89,8 @@ interface Placed {
   x: number;
   y: number;
   seed: number;
+  /** world css x of the name inscription's centre line */
+  labelX?: number;
 }
 
 interface Layout { items: Placed[]; worldW: number }
@@ -96,33 +98,47 @@ interface Layout { items: Placed[]; worldW: number }
 /** Minimum distance between two plant anchors: room for the name inscription. */
 const MIN_GAP = 62;
 
-function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: number, pondTop: number, fit: boolean): Layout {
-  const margin = Math.max(26, W * 0.06);
+/**
+ * Place plants along the ground with a rhythm (clusters and pauses, never a grid), a few rocks,
+ * slightly different depths. `side` is where the mountains lean (the other side is open sky).
+ */
+function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: number, pondTop: number, fit: boolean, side: -1 | 1 = -1): Layout {
+  const margin = Math.max(24, W * 0.055);
   const yBack = groundY - H * 0.03;
   const yFront = Math.min(groundY + H * 0.014, pondTop - 3);
+  const portrait = W < H * 0.95 ? 0.9 : 1;
   const items: Placed[] = [];
-  const meta: { left: number; right: number }[] = [];
-  let x = margin;
-  let prevRight = 0;
+  const L: number[] = [], R: number[] = [], gaps: number[] = [0];
   plants.forEach((p, i) => {
     const r = makeRng(p.habit.seed ^ 0x5bd1e995);
-    const frac = clamp(KIND_H[p.habit.plant] + r.range(-0.025, 0.025), 0.42, 0.6);
+    const frac = clamp(KIND_H[p.habit.plant] + r.range(-0.025, 0.025), 0.42, 0.6) * portrait;
     const s = (frac * H) / REF_H;
     const d = plantDrawing({ kind: p.habit.plant, seed: p.habit.seed, height: REF_H });
     const e = extentOf(d, 1);
-    const left = Math.max(10, (d.anchor.x - e.minX) * s);
-    const right = Math.max(10, (e.maxX - d.anchor.x) * s);
-    if (i === 0) x = margin + left * 0.55;
-    else {
-      // A rhythm, not a grid: some plants lean into their neighbour, some stand apart.
-      const k = r.chance(0.32) ? r.range(0.38, 0.5) : r.range(0.58, 0.8);
-      x += Math.max(MIN_GAP, (prevRight + left) * k);
+    L.push(Math.max(10, (d.anchor.x - e.minX) * s));
+    R.push(Math.max(10, (e.maxX - d.anchor.x) * s));
+    if (i > 0) {
+      // Some plants lean into their neighbour, some stand apart.
+      const k = r.chance(0.32) ? r.range(0.4, 0.52) : r.range(0.6, 0.8);
+      gaps.push(Math.max(MIN_GAP, (R[i - 1] + L[i]) * k));
     }
     const depth = r();
-    items.push({ key: p.habit.id, plant: p, drawing: d, s, x, y: lerp(yBack, yFront, depth), seed: p.habit.seed });
-    meta.push({ left, right });
-    prevRight = right;
+    items.push({ key: p.habit.id, plant: p, drawing: d, s, x: 0, y: lerp(yBack, yFront, depth), seed: p.habit.seed });
   });
+  const n = items.length;
+  if (n) {
+    // When the painting has room, let the gaps breathe (each by what it can take) up to the width.
+    const spanOf = () => gaps.reduce((a, g) => a + g, 0) + L[0] * 0.6 + R[n - 1] * 0.6;
+    const target = W - margin * 2;
+    if (n >= 2 && spanOf() < target) {
+      const room = gaps.map((g, i) => (i === 0 ? 0 : Math.max(0, (R[i - 1] + L[i]) * 1.05 + 24 - g)));
+      const total = room.reduce((a, b) => a + b, 0);
+      const extra = Math.min(target - spanOf(), total);
+      if (total > 0) gaps.forEach((_, i) => (gaps[i] += (extra * room[i]) / total));
+    }
+    let x = margin + L[0] * 0.6;
+    items.forEach((it, i) => { x += gaps[i]; it.x = x; });
+  }
 
   // Rocks for composition: one beside every third plant (on the left, away from the inscription).
   const rocks: Placed[] = [];
@@ -131,27 +147,25 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
     const s = size / d.width;
     rocks.push({ key: `rock:${seed}`, drawing: d, s, x: cx, y, seed });
   };
-  if (plants.length === 0) {
-    addRock(W * 0.27, H * 0.17, 11, yFront);
-    addRock(W * 0.27 + H * 0.13, H * 0.075, 12, yFront + 2);
+  if (n === 0) {
+    addRock(W * (0.5 + 0.2 * side), H * 0.16, 11, yFront);
   } else {
     items.forEach((it, i) => {
-      if (i % 3 !== (plants.length <= 2 ? 0 : 1)) return;
+      if (i % 3 !== (n <= 2 ? 0 : 1)) return;
       const r = makeRng(it.seed ^ 0x2545f491);
-      const size = H * r.range(0.1, 0.15);
-      const cx = Math.max(size * 0.35, it.x - meta[i].left * 0.35 - size * 0.3);
-      addRock(cx, size, it.seed % 1000 + 3, Math.min(yFront + 2, it.y + H * 0.012));
+      const size = H * r.range(0.1, 0.14) * portrait;
+      const cx = Math.max(size * 0.35, it.x - L[i] * 0.35 - size * 0.3);
+      addRock(cx, size, (it.seed % 1000) + 3, Math.min(yFront + 2, it.y + H * 0.012));
     });
   }
 
-  const last = items.length ? items[items.length - 1].x + meta[meta.length - 1].right * 0.55 : 0;
+  const last = n ? items[n - 1].x + R[n - 1] * 0.6 : 0;
   let worldW = Math.max(W, last + margin);
   const all = [...items, ...rocks];
-  if (items.length && last + margin < W) {
-    // Fits: centre the group (a lone plant sits left of centre, leaving the right side empty — 留白).
-    const x0 = items[0].x - meta[0].left;
-    const x1 = items[items.length - 1].x + meta[meta.length - 1].right;
-    const want = items.length === 1 ? W * 0.4 - items[0].x : (W - (x1 - x0)) / 2 - x0 - W * 0.02;
+  if (n && last + margin <= W + 0.5) {
+    // Fits: centre the group; a lone plant stands toward the mountains, leaving open sky (留白).
+    const x0 = items[0].x - L[0] * 0.6;
+    const want = n === 1 ? W * (0.5 + 0.13 * side) - items[0].x : (W - (last - x0)) / 2 - x0;
     for (const it of all) it.x += want;
     worldW = W;
   } else if (fit && worldW > W) {
@@ -161,6 +175,57 @@ function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: numb
   }
   all.sort((a, b) => a.y - b.y);
   return { items: all, worldW };
+}
+
+const reachCache = new WeakMap<Drawing, Map<string, { left: number; right: number }>>();
+
+/** How far the plant reaches left/right of its stem below `bandTop` (drawing units). */
+function baseReach(d: Drawing, g: number, bandTop: number): { left: number; right: number } {
+  const n = bornCount(d, g);
+  const key = `${n}:${Math.round(bandTop)}`;
+  let m = reachCache.get(d);
+  if (!m) reachCache.set(d, (m = new Map()));
+  const hit = m.get(key);
+  if (hit) return hit;
+  let left = 0, right = 0;
+  for (let i = 0; i < n; i++) {
+    const st = d.strokes[i];
+    const r = st.kind === 'wash' || st.kind === 'fill' ? 0 : 0.5;
+    for (const p of st.pts) {
+      if (p.y < bandTop) continue;
+      left = Math.max(left, d.anchor.x - (p.x - p.w * r));
+      right = Math.max(right, p.x + p.w * r - d.anchor.x);
+    }
+  }
+  const out = { left, right };
+  m.set(key, out);
+  return out;
+}
+
+/** Height (css px) of a plant's vertical name inscription. */
+function labelHeight(name: string, size: number): number {
+  const n = [...name.trim()].length;
+  return isCJK(name) ? Math.min(n, 9) * size * 1.18 : Math.min(n, 18) * size * 0.5;
+}
+
+/** Stand each name in the clearest gap beside its plant: right of the stem if free, else left. */
+function placeLabels(items: Placed[], growthOf: (key: string) => number, size: number): void {
+  const plants = items.filter((i) => i.plant).sort((a, b) => a.x - b.x);
+  const reach = plants.map((it) => {
+    const band = (labelHeight(it.plant!.habit.name, size) + 10) / it.s;
+    const r = baseReach(it.drawing, growthOf(it.key), it.drawing.anchor.y - band);
+    return { left: r.left * it.s, right: r.right * it.s };
+  });
+  const half = size * 0.6;
+  let prevEdge = -Infinity;
+  plants.forEach((it, i) => {
+    const rx = it.x + Math.max(11, reach[i].right + 7);
+    const nextEdge = i + 1 < plants.length ? plants[i + 1].x - reach[i + 1].left : Infinity;
+    const lx = it.x - Math.max(11, reach[i].left + 7);
+    if (rx + half < nextEdge - 2 || lx - half <= prevEdge + 2) it.labelX = rx;
+    else it.labelX = lx;
+    prevEdge = Math.max(it.x + reach[i].right, it.labelX + half);
+  });
 }
 
 function vigorFor(freshness: number): number {
@@ -202,10 +267,10 @@ export class GardenScene {
   onPick?: (id: string) => void;
   /** Called when the scene becomes (non-)pannable, so the view can expose keyboard panning. */
   onPannable?: (pannable: boolean) => void;
+  /** Called when the backdrop is (re)painted: which side is open sky, where the sun/moon sits (css px). */
+  onBackdrop?: (info: { openSide: 'left' | 'right'; body?: { x: number; y: number; r: number } }) => void;
 
   private ctx: CanvasRenderingContext2D;
-  private upper = document.createElement('canvas');
-  private upperCtx: CanvasRenderingContext2D;
   private W = 0;
   private H = 0;
   private dpr = 1;
@@ -247,7 +312,6 @@ export class GardenScene {
   constructor(canvas: HTMLCanvasElement, env: SceneEnv) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d')!;
-    this.upperCtx = this.upper.getContext('2d')!;
     this.env = env;
     this.mq = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
     this.reduced = !!this.mq?.matches;
@@ -296,7 +360,7 @@ export class GardenScene {
 
   setEnv(env: SceneEnv): void {
     this.env = env;
-    if (this.weather) this.weather.env = env;
+    this.weather?.setEnv(env);
     this.kick();
   }
 
@@ -341,6 +405,48 @@ export class GardenScene {
     const it = this.items.find((i) => i.key === id);
     if (!it) return null;
     return it.x - (this.tween ? this.tween.to : this.pan);
+  }
+
+  /**
+   * Which side of the sky a poem should be written on: the side with the least ink in the upper
+   * part of the view, away from the sun or moon and from the plant being celebrated.
+   */
+  poemSide(id?: string): 'left' | 'right' {
+    const W = this.W, H = this.H;
+    if (!W) return 'right';
+    const pan = this.tween ? this.tween.to : clamp(this.pan, 0, this.maxPan);
+    const y0 = H * 0.04, y1 = H * 0.5;
+    const zones = [[W * 0.02, W * 0.42], [W * 0.58, W * 0.98]];
+    const ink = [0, 0];
+    for (const it of this.items) {
+      if (!it.plant) continue;
+      const d = it.drawing;
+      const n = bornCount(d, this.slots.get(it.key)?.want.growth ?? 0);
+      const sx = it.x - pan;
+      for (let i = 0; i < n; i++) {
+        const st = d.strokes[i];
+        const wgt = st.kind === 'wash' || st.kind === 'fill' ? 6 : 1;
+        for (const p of st.pts) {
+          const X = sx + (p.x - d.anchor.x) * it.s, Y = it.y + (p.y - d.anchor.y) * it.s;
+          if (Y < y0 || Y > y1) continue;
+          for (let z = 0; z < 2; z++) if (X >= zones[z][0] && X <= zones[z][1]) ink[z] += Math.max(1, p.w * it.s) * wgt * st.tone;
+        }
+      }
+    }
+    const total = ink[0] + ink[1] + 1;
+    const cost = [ink[0] / total, ink[1] / total];
+    if (id) {
+      const x = this.plantScreenX(id);
+      if (x !== null) { if (x < W * 0.45) cost[0] += 0.35; else if (x > W * 0.55) cost[1] += 0.35; }
+    }
+    const bd = this.backdrop;
+    if (bd?.body && bd.body.r > 0) {
+      const k = H / this.bdH;
+      const bx = bd.body.x * k - clamp(pan * PARALLAX, 0, Math.max(0, this.bdW * k - W));
+      if (bx < W * 0.42) cost[0] += 0.12; else if (bx > W * 0.58) cost[1] += 0.12;
+    }
+    cost[(bd?.side ?? -1) === 1 ? 1 : 0] += 0.08; // mountains lean this way: prefer the open sky
+    return cost[0] <= cost[1] ? 'left' : 'right';
   }
 
   /** Width of the scene in css px. */
@@ -423,18 +529,22 @@ export class GardenScene {
   }
 
   private get groundY(): number {
-    if (!this.backdrop) return Math.round(this.H * 0.72);
+    if (!this.backdrop) return groundLine(this.bdTargetW(), this.H).groundY;
     return this.backdrop.groundY * (this.H / this.bdH);
   }
 
   private get pondTop(): number {
-    if (!this.backdrop) return Math.round(this.H * 0.72) + 14;
+    if (!this.backdrop) return groundLine(this.bdTargetW(), this.H).pondTop;
     return this.backdrop.pondTop * (this.H / this.bdH);
+  }
+
+  private get labelSize(): number {
+    return this.H > 470 ? 13 : 12;
   }
 
   private relayout(): void {
     if (!this.W) return;
-    const L = layoutGarden(this.plants, this.W, this.H, this.groundY, this.pondTop, false);
+    const L = layoutGarden(this.plants, this.W, this.H, this.groundY, this.pondTop, false, this.backdrop?.side ?? -1);
     this.items = L.items;
     this.worldW = L.worldW;
     this.pan = clamp(this.pan, 0, this.maxPan);
@@ -476,6 +586,7 @@ export class GardenScene {
       }
     }
     for (const k of [...this.slots.keys()]) if (!seen.has(k)) this.slots.delete(k);
+    placeLabels(this.items, (k) => this.slots.get(k)?.want.growth ?? 0, this.labelSize);
     this.queue = this.queue.filter((k) => this.slots.has(k));
     this.kick();
   }
@@ -568,7 +679,8 @@ export class GardenScene {
       this.bdH = this.H;
       this.bdKey = key;
       this.bdDue = 0;
-      if (Math.abs(hadGround - this.groundY) > 0.5) this.relayout();
+      if (Math.abs(hadGround - this.groundY) > 0.5 || this.backdrop.side !== undefined) this.relayout();
+      this.reportBackdrop();
     }
 
     // Timed events.
@@ -632,6 +744,15 @@ export class GardenScene {
     }
   }
 
+  private reportBackdrop(): void {
+    const bd = this.backdrop;
+    if (!bd || !this.onBackdrop) return;
+    const k = this.H / this.bdH;
+    const off = clamp(this.pan * PARALLAX, 0, Math.max(0, this.bdW * k - this.W));
+    const b = bd.body && bd.body.r > 0 ? { x: bd.body.x * k - off, y: bd.body.y * k, r: bd.body.r * k } : undefined;
+    this.onBackdrop({ openSide: (bd.side ?? -1) === 1 ? 'left' : 'right', body: b });
+  }
+
   private bdTargetW(): number {
     // Wider than the view when the scroll pans; quantised so adding a habit rarely repaints it.
     if (!this.pannable) return this.W;
@@ -688,20 +809,10 @@ export class GardenScene {
       ctx.restore();
     }
 
-    // Pond: reflect the composed upper scene.
+    // Pond: reflect the composed upper scene (the pond painter grabs the band it needs first).
     const pondTop = this.pondTop;
     if (bd && pondTop < H) {
-      const uh = Math.max(1, Math.ceil(pondTop * dpr));
-      const uw = this.canvas.width;
-      if (this.upper.width !== uw || this.upper.height !== uh) {
-        this.upper.width = uw;
-        this.upper.height = uh;
-      }
-      const u = this.upperCtx;
-      u.globalCompositeOperation = 'copy';
-      u.drawImage(this.canvas, 0, 0, uw, uh, 0, 0, uw, uh);
-      u.globalCompositeOperation = 'source-over';
-      paintPond(ctx, { x: 0, y: pondTop, w: W, h: H - pondTop, t: this.t, source: this.upper, mirrorY: pondTop, clarity: this.env.clarity, dpr });
+      paintPond(ctx, { x: 0, y: pondTop, w: W, h: H - pondTop, t: this.t, source: this.canvas, mirrorY: pondTop, clarity: this.env.clarity, dpr, seed: this.env.seed, tod: this.env.tod });
     }
     paintLight(ctx, W, H, this.env);
 
@@ -737,7 +848,7 @@ export class GardenScene {
       const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-text').trim() || 'serif';
       this.labelFont = fam;
     }
-    const size = this.H > 470 ? 13 : 12;
+    const size = this.labelSize;
     const lh = size * 1.18;
     ctx.save();
     ctx.textAlign = 'center';
@@ -749,7 +860,7 @@ export class GardenScene {
       if (!slot?.bmp) continue;
       const name = it.plant.habit.name.trim();
       if (!name) continue;
-      const x = it.x - this.pan + 13;
+      const x = (it.labelX ?? it.x + 13) - this.pan;
       if (x < -20 || x > this.W + 20) continue;
       const hot = this.hover === it.key;
       const done = it.plant.stats.doneToday;
@@ -897,7 +1008,7 @@ export async function renderGardenStill(o: { width: number; height: number; dpr:
   const ctx = c.getContext('2d')!;
   ctx.drawImage(bd.canvas, 0, 0, c.width, c.height);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const { items } = layoutGarden(o.plants, W, H, bd.groundY, bd.pondTop, true);
+  const { items } = layoutGarden(o.plants, W, H, bd.groundY, bd.pondTop, true, bd.side ?? -1);
   for (const it of items) {
     const growth = it.plant ? it.plant.stats.growth : 1;
     const vigor = it.plant ? vigorFor(it.plant.stats.freshness) : 1;
@@ -907,11 +1018,7 @@ export async function renderGardenStill(o: { width: number; height: number; dpr:
     await yieldFrame();
   }
   if (bd.pondTop < H) {
-    const upper = document.createElement('canvas');
-    upper.width = c.width;
-    upper.height = Math.max(1, Math.ceil(bd.pondTop * dpr));
-    upper.getContext('2d')!.drawImage(c, 0, 0, upper.width, upper.height, 0, 0, upper.width, upper.height);
-    paintPond(ctx, { x: 0, y: bd.pondTop, w: W, h: H - bd.pondTop, t: 0, source: upper, mirrorY: bd.pondTop, clarity: o.env.clarity, dpr });
+    paintPond(ctx, { x: 0, y: bd.pondTop, w: W, h: H - bd.pondTop, t: 0, source: c, mirrorY: bd.pondTop, clarity: o.env.clarity, dpr, seed: o.env.seed, tod: o.env.tod });
   }
   paintLight(ctx, W, H, o.env);
   return c;

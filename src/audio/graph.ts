@@ -5,7 +5,8 @@
 //   beds ───► ambient ──────────────────────────────────────────────┼► master (volume) ─► compressor ─► soft clip ─► destination
 //
 // Every one-shot voice disconnects its nodes when it ends, so nothing accumulates.
-import { renderDrop, renderIR, renderNoise, type NoiseColour } from './dsp';
+import { renderDrop, type NoiseColour } from './dsp';
+import { runJob, type Job, type JobRequest, type JobResult } from './jobs';
 import { makeRng } from '../core/rng';
 
 export interface VoiceOpts {
@@ -36,6 +37,12 @@ function softClipCurve(): Float32Array<ArrayBuffer> {
 
 export interface DropBanks { rain: AudioBuffer[]; bubble: AudioBuffer[]; eave: AudioBuffer[] }
 
+export interface MixerOptions {
+  /** Synthesis worker (realtime). Without one, jobs render synchronously (offline tests). */
+  worker?: Worker | null;
+  dest?: AudioNode;
+}
+
 export class Mixer {
   readonly ctx: BaseAudioContext;
   readonly master: GainNode;
@@ -45,11 +52,36 @@ export class Mixer {
   /** Live one-shot voices (sources started and not yet ended). */
   voices = 0;
   private noiseCache = new Map<NoiseColour, AudioBuffer>();
+  private noiseWaiters = new Map<NoiseColour, ((b: AudioBuffer) => void)[]>();
+  private bufCache = new Map<string, AudioBuffer>();
   private drops?: DropBanks;
   private hasPanner: boolean;
+  private worker: Worker | null;
+  private pending = new Map<number, { job: Job; cb: (c: Float32Array[]) => void }>();
+  private nextId = 1;
 
-  constructor(ctx: BaseAudioContext, dest: AudioNode = ctx.destination) {
+  constructor(ctx: BaseAudioContext, opts: MixerOptions = {}) {
     this.ctx = ctx;
+    this.worker = opts.worker ?? null;
+    if (this.worker) {
+      this.worker.onmessage = (e: MessageEvent<JobResult>) => {
+        const p = this.pending.get(e.data.id);
+        if (!p) return;
+        this.pending.delete(e.data.id);
+        if (e.data.chans) p.cb(e.data.chans);
+        else this.runLocal(p.job, p.cb);
+      };
+      this.worker.onerror = (e) => {
+        // Worker unavailable (CSP, old browser…): fall back to the main thread for good.
+        e.preventDefault?.();
+        this.worker?.terminate();
+        this.worker = null;
+        const jobs = [...this.pending.values()];
+        this.pending.clear();
+        for (const p of jobs) this.runLocal(p.job, p.cb);
+      };
+    }
+    const dest = opts.dest ?? ctx.destination;
     this.hasPanner = typeof ctx.createStereoPanner === 'function';
     this.master = ctx.createGain();
     const comp = ctx.createDynamicsCompressor();
@@ -71,14 +103,46 @@ export class Mixer {
     this.send = ctx.createGain();
     const verb = ctx.createConvolver();
     verb.normalize = false;
-    const [l, r] = renderIR(ctx.sampleRate);
-    verb.buffer = this.buffer([l, r]);
+    this.synth([{ op: 'ir' }], ([ir]) => { verb.buffer = this.buffer(ir); });
     const wet = ctx.createGain();
     wet.gain.value = 0.9;
     this.send.connect(verb).connect(wet).connect(this.master);
   }
 
   get sampleRate() { return this.ctx.sampleRate; }
+
+  private runLocal(job: Job, cb: (c: Float32Array[]) => void) {
+    let chans: Float32Array[];
+    try { chans = runJob(this.ctx.sampleRate, job); } catch (e) { console.warn('[audio] render', e); return; }
+    cb(chans);
+  }
+
+  /**
+   * Renders several jobs and calls back once with all results, in order — synchronously when
+   * there is no worker, so offline renders can schedule everything before startRendering().
+   */
+  synth(jobs: Job[], cb: (results: Float32Array[][]) => void) {
+    const out: Float32Array[][] = new Array(jobs.length);
+    let left = jobs.length;
+    jobs.forEach((job, i) => {
+      const done = (c: Float32Array[]) => { out[i] = c; if (--left === 0) cb(out); };
+      if (!this.worker) return this.runLocal(job, done);
+      const id = this.nextId++;
+      this.pending.set(id, { job, cb: done });
+      this.worker.postMessage({ id, sr: this.ctx.sampleRate, job } satisfies JobRequest);
+    });
+  }
+
+  /** Like synth() for one job, memoised as an AudioBuffer under `key`. */
+  cached(key: string, job: Job, cb: (b: AudioBuffer) => void) {
+    const hit = this.bufCache.get(key);
+    if (hit) return cb(hit);
+    this.synth([job], ([c]) => {
+      const b = this.bufCache.get(key) ?? this.buffer(c);
+      this.bufCache.set(key, b);
+      cb(b);
+    });
+  }
 
   buffer(chans: Float32Array[]): AudioBuffer {
     const b = this.ctx.createBuffer(chans.length, chans[0].length, this.ctx.sampleRate);
@@ -122,17 +186,27 @@ export class Mixer {
     return src;
   }
 
-  /** A seamless stereo noise loop (generated once per context). */
-  noise(colour: NoiseColour): AudioBuffer {
-    let b = this.noiseCache.get(colour);
-    if (!b) {
-      const sr = this.ctx.sampleRate;
-      const secs = colour === 'brown' ? 9 : 7;
-      const seed = colour === 'white' ? 101 : colour === 'pink' ? 202 : 303;
-      b = this.buffer([renderNoise(colour, sr, secs, seed), renderNoise(colour, sr, secs, seed + 1)]);
-      this.noiseCache.set(colour, b);
-    }
-    return b;
+  /** A seamless stereo noise loop (generated once per context, delivered via callback). */
+  noise(colour: NoiseColour, cb: (b: AudioBuffer) => void) {
+    const b = this.noiseCache.get(colour);
+    if (b) return cb(b);
+    const waiting = this.noiseWaiters.get(colour);
+    if (waiting) { waiting.push(cb); return; }
+    this.noiseWaiters.set(colour, [cb]);
+    const secs = colour === 'brown' ? 9 : 7;
+    const seed = colour === 'white' ? 101 : colour === 'pink' ? 202 : 303;
+    this.synth([{ op: 'noise', colour, secs, seed }], ([c]) => {
+      const buf = this.buffer(c);
+      this.noiseCache.set(colour, buf);
+      const ws = this.noiseWaiters.get(colour) ?? [];
+      this.noiseWaiters.delete(colour);
+      for (const w of ws) w(buf);
+    });
+  }
+
+  /** Earliest time a sound that was meant for `when` can still start. */
+  at(when: number) {
+    return Math.max(when, this.ctx.currentTime + 0.003);
   }
 
   /** Banks of pre-rendered droplets and bubbles, varied further at playback by rate/gain/pan. */

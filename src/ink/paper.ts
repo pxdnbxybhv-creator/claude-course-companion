@@ -153,23 +153,73 @@ export function makePaperTile(size = 512, seed = 7, res = 1): HTMLCanvasElement 
   }
   ctx.restore();
 
-  // 3 · fine tooth: per-pixel luminance noise (cheap hash, no fbm).
-  const px = ctx.getImageData(0, 0, N, N);
-  const d = px.data;
-  let h = (seed * 2654435761) >>> 0;
+  // 3 · fine tooth: a small noise pattern (white-noise-like, so its repeat is invisible)
+  const tooth = ctx.createPattern(toothTile(), 'repeat');
+  if (tooth) {
+    ctx.fillStyle = tooth;
+    ctx.fillRect(0, 0, N, N);
+  }
+
+  if (tileCache.size > 8) tileCache.delete(tileCache.keys().next().value!);
+  tileCache.set(key, c);
+  return c;
+}
+
+let toothCache: HTMLCanvasElement | null = null;
+
+/** 128² px of per-pixel tooth: tiny lighter and darker specks, alpha only. */
+function toothTile(): HTMLCanvasElement {
+  if (toothCache) return toothCache;
+  const N = 128;
+  const c = canvas(N);
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(N, N);
+  const d = img.data;
+  let h = 0x6d2b79f5;
   for (let k = 0; k < d.length; k += 4) {
     h ^= h << 13; h >>>= 0;
     h ^= h >>> 17;
     h ^= h << 5; h >>>= 0;
-    const r = ((h & 1023) / 1023 - 0.5) * 5.5;
-    d[k] += r;
-    d[k + 1] += r;
-    d[k + 2] += r * 0.9;
+    const r = (h & 1023) / 1023 - 0.5;
+    const light = r > 0;
+    d[k] = light ? 255 : 120;
+    d[k + 1] = light ? 252 : 100;
+    d[k + 2] = light ? 244 : 70;
+    d[k + 3] = Math.abs(r) * (light ? 22 : 16);
   }
-  ctx.putImageData(px, 0, 0);
+  ctx.putImageData(img, 0, 0);
+  toothCache = c;
+  return c;
+}
 
-  if (tileCache.size > 8) tileCache.delete(tileCache.keys().next().value!);
-  tileCache.set(key, c);
+const macroCache = new Map<string, HTMLCanvasElement>();
+
+/**
+ * Large, non-repeating clouds of denser/thinner pulp over a whole sheet (w×h user units), as a
+ * low-resolution canvas to be drawn smoothly upscaled. Hides the paper tile's repeat.
+ */
+function macroMottle(w: number, h: number, seed: number): HTMLCanvasElement {
+  const cell = 12;
+  const mw = Math.max(2, Math.ceil(w / cell) + 1), mh = Math.max(2, Math.ceil(h / cell) + 1);
+  const key = `${mw}x${mh}|${seed}`;
+  const hit = macroCache.get(key);
+  if (hit) return hit;
+  const c = canvas(mw, mh);
+  const ctx = c.getContext('2d')!;
+  const img = ctx.createImageData(mw, mh);
+  const d = img.data;
+  const nz = makeNoise2(seed * 13 + 101);
+  for (let j = 0; j < mh; j++) {
+    for (let i = 0; i < mw; i++) {
+      const v = nz.fbm((i * cell) / 420, (j * cell) / 420, 3, 2.1, 0.5) * 1.6;
+      const k = (j * mw + i) * 4;
+      if (v > 0) { d[k] = 196; d[k + 1] = 178; d[k + 2] = 146; d[k + 3] = clamp(v, 0, 1) * 34; }
+      else { d[k] = 255; d[k + 1] = 251; d[k + 2] = 242; d[k + 3] = clamp(-v, 0, 1) * 60; }
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  if (macroCache.size > 6) macroCache.delete(macroCache.keys().next().value!);
+  macroCache.set(key, c);
   return c;
 }
 
@@ -192,6 +242,10 @@ export function fillPaper(ctx: CanvasRenderingContext2D, w: number, h: number, s
     ctx.fillStyle = pat;
   } else ctx.fillStyle = PAPER_BASE;
   ctx.fillRect(0, 0, w, h);
+  const macro = macroMottle(w, h, seed);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(macro, 0, 0, macro.width * 12, macro.height * 12);
   ctx.restore();
 }
 
@@ -243,7 +297,7 @@ export function inkGrainTile(variant: 'fine' | 'wash' | 'punch' = 'fine'): HTMLC
   // pale fibres resisting the ink
   const rng = makeRng(variant === 'wash' ? 41 : 43);
   ctx.lineCap = 'round';
-  const nf = variant === 'punch' ? 26 : 34;
+  const nf = variant === 'punch' ? 26 : variant === 'wash' ? 0 : 34;
   for (let f = 0; f < nf; f++) {
     const x = rng() * N, y = rng() * N, len = rng.range(10, 60);
     const pts = fibrePath(rng, x, y, len, 0.2);

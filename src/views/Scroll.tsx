@@ -185,48 +185,39 @@ export function ScrollView() {
         </div>
 
         <div class="scroll-panel">
-          <div class="scroll-field">
-            <span class="scroll-label">{t('画题', 'Poster')}</span>
-            <Segmented<PosterKind>
-              label={t('画题', 'Poster')}
-              value={kind}
-              onChange={setKind}
-              options={[
-                { value: 'garden', label: t('园景', 'Garden') },
-                { value: 'year', label: t('岁时记', 'Year in ink') },
-              ]}
-            />
+          <div class="scroll-controls">
+            <div class="scroll-field">
+              <span class="scroll-label">{t('画题', 'Poster')}</span>
+              <Segmented<PosterKind>
+                label={t('画题', 'Poster')}
+                value={kind}
+                onChange={setKind}
+                options={[
+                  { value: 'garden', label: t('园景', 'Garden') },
+                  { value: 'year', label: t('岁时记', 'Year in ink') },
+                ]}
+              />
+            </div>
+            <div class="scroll-field">
+              <span class="scroll-label">{t('幅式', 'Format')}</span>
+              <Segmented<PosterFormat>
+                label={t('幅式', 'Format')}
+                value={format}
+                onChange={setFormat}
+                options={[
+                  { value: 'tall', label: <span title="9:16">{t('立轴', 'Tall')}</span> },
+                  { value: 'square', label: <span title="1:1">{t('斗方', 'Square')}</span> },
+                ]}
+              />
+            </div>
           </div>
-          <div class="scroll-field">
-            <span class="scroll-label">{t('幅式', 'Format')}</span>
-            <Segmented<PosterFormat>
-              label={t('幅式', 'Format')}
-              value={format}
-              onChange={setFormat}
-              options={[
-                { value: 'tall', label: t('立轴 9:16', 'Wallpaper 9:16') },
-                { value: 'square', label: t('斗方 1:1', 'Square 1:1') },
-              ]}
-            />
-          </div>
-          <p class="scroll-note">
-            {kind === 'garden'
-              ? t('立轴宜作手机壁纸，斗方宜分享。题诗随节气，落款钤印。', 'The tall scroll makes a phone wallpaper; the square suits a post. The poem follows the season.')
-              : t('一日一点：墨色愈浓，当日功课愈全；朱圈为今日。', 'One dot a day: the darker the ink, the more habits kept. Today is ringed in red.')}
-          </p>
-          {kind === 'garden' && (
-            <button class="btn btn-ghost btn-small scroll-reroll" onClick={() => setSalt((x) => x + 1)} disabled={busy}>
-              {t('换一首诗', 'Another poem')}
-            </button>
-          )}
-          {empty && kind === 'garden' && (
-            <p class="scroll-note scroll-empty">
-              {t('园中尚无草木，画里只有山水。', 'Your garden is still empty — only hills and water so far.')}{' '}
-              <button class="link" onClick={() => go('garden')}>{t('去种一株', 'Plant a habit')}</button>
-            </p>
-          )}
           <div class="scroll-actions">
-            <button class="btn btn-primary" onClick={save} disabled={!out || busy}>
+            {kind === 'garden' && (
+              <button class="btn scroll-reroll" onClick={() => setSalt((x) => x + 1)} disabled={busy} aria-label={t('换一首诗', 'Another poem')}>
+                <span aria-hidden="true">↻</span> {t('换诗', 'Poem')}
+              </button>
+            )}
+            <button class="btn btn-primary scroll-save-btn" onClick={save} disabled={!out || busy}>
               {t('保存图片', 'Save image')}
             </button>
             {canShare && (
@@ -235,6 +226,19 @@ export function ScrollView() {
               </button>
             )}
           </div>
+          {empty && kind === 'garden' && (
+            <p class="scroll-note scroll-empty">
+              {t('园中尚无草木，画里只有山水。', 'Your garden is still empty — only hills and water so far.')}{' '}
+              <button class="link" onClick={() => go('garden')}>{t('去种一株', 'Plant a habit')}</button>
+            </p>
+          )}
+          <p class="scroll-note">
+            {kind === 'garden'
+              ? format === 'tall'
+                ? t('立轴 9:16，宜作手机壁纸。题诗随节气，落款钤印。', 'A 9:16 hanging scroll — made for a phone wallpaper. The poem follows the season.')
+                : t('斗方 1:1，宜分享于朋友圈。题诗随节气，落款钤印。', 'A 1:1 square panel — made for sharing. The poem follows the season.')
+              : t('一日一点：墨色愈浓，当日功课愈全；朱圈为今日。', 'One dot a day: the darker the ink, the more habits kept that day. Today is ringed in red.')}
+          </p>
           <p class="scroll-hint muted">{t('亦可长按或右键画面直接保存', 'You can also long-press or right-click the picture to save it')}</p>
         </div>
       </div>

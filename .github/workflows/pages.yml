@@ -1,0 +1,69 @@
+# Build, test and publish 半亩 · Half-Acre to GitHub Pages.
+# One-time setup: repository Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# The site uses relative URLs (vite `base: './'`), so it works at https://<user>.github.io/<repo>/.
+# Fonts are subsetted and committed (`npm run fonts`), so CI needs no font downloads.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let an in-progress deployment finish rather than cancelling it.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build (web + PWA)
+        run: npm run build
+
+      - name: Build the single-file edition
+        run: |
+          npm run build:single
+          cp dist-single/index.html dist/half-acre.html
+
+      # Warn (without failing the deploy) when new Chinese text is missing from the committed fonts.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Check font coverage
+        continue-on-error: true
+        run: |
+          python -m pip install --quiet fonttools brotli
+          python scripts/build_fonts.py --check || { echo "::warning title=Fonts out of date::Run \`npm run fonts\` and commit the result."; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

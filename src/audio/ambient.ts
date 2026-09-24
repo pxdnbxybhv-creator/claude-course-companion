@@ -5,7 +5,7 @@
 import type { AmbientKind } from '../core/types';
 import { makeRng, type Rng } from '../core/rng';
 import type { Mixer } from './graph';
-import type { NoiseColour } from './dsp';
+import { TAU, type NoiseColour } from './dsp';
 import { OPEN_STRINGS, playHarmonic, playPluck } from './voices';
 
 export interface Bed {
@@ -64,13 +64,17 @@ abstract class BaseBed implements Bed {
     b.Q.value = q;
     return b;
   }
-  /** A looping noise source starting at a random point of its loop. */
+  /** A looping noise source starting at a random point of its loop (once its buffer exists). */
   protected noise(colour: NoiseColour): AudioBufferSourceNode {
     const s = this.track(this.mix.ctx.createBufferSource());
-    s.buffer = this.mix.noise(colour);
     s.loop = true;
-    s.start(this.start, this.rng() * s.buffer.duration);
-    this.sources.push(s);
+    const offset = this.rng();
+    this.mix.noise(colour, (b) => {
+      if (this.stopped) return;
+      s.buffer = b;
+      s.start(this.mix.at(this.start), offset * b.duration);
+      this.sources.push(s);
+    });
     return s;
   }
   /** A slow sine LFO driving `param` by ±depth around its value. */
@@ -137,14 +141,14 @@ class RainBed extends BaseBed {
   private eaveSpots: number[];
 
   constructor(mix: Mixer, when: number, seed: number) {
-    super(mix, when, 0.62, 0.06, seed);
+    super(mix, when, 0.24, 0.025, seed);
     const hissG = this.gain(0.5);
     this.chain(this.noise('pink'), this.biquad('highpass', 420, 0.5), this.biquad('lowpass', 6500, 0.4), hissG, this.out);
     this.lfo(hissG.gain, 0.019, 0.12);
     const patterG = this.gain(0.16);
     this.chain(this.noise('white'), this.biquad('bandpass', 3200, 0.5), this.biquad('lowpass', 8000, 0.5), patterG, this.out);
     this.lfo(patterG.gain, 0.031, 0.05);
-    this.chain(this.noise('brown'), this.biquad('lowpass', 380, 0.6), this.gain(0.5), this.out);
+    this.chain(this.noise('brown'), this.biquad('lowpass', 380, 0.6), this.gain(0.18), this.out);
     this.nextDrop = when + 0.3;
     this.nextEave = when + 1.5 + this.rng() * 2;
     this.eaveSpots = [-0.55, 0.2, 0.62];
@@ -182,9 +186,9 @@ class StreamBed extends BaseBed {
   private nextBubble: number;
 
   constructor(mix: Mixer, when: number, seed: number) {
-    super(mix, when, 0.7, 0.05, seed);
-    this.chain(this.noise('brown'), this.biquad('lowpass', 320, 0.6), this.gain(0.42), this.out);
-    const bands: [number, number, number][] = [[240, 2.5, 0.5], [560, 3.5, 0.42], [1250, 4, 0.3], [2700, 3, 0.16], [5200, 2, 0.06]];
+    super(mix, when, 0.26, 0.02, seed);
+    this.chain(this.noise('brown'), this.biquad('lowpass', 320, 0.6), this.gain(0.1), this.out);
+    const bands: [number, number, number][] = [[240, 2.5, 0.7], [560, 3.5, 1.1], [1250, 4, 1], [2700, 3, 0.55], [5200, 2, 0.2]];
     for (const [f, q, g] of bands) {
       const bp = this.biquad('bandpass', f, q);
       const gg = this.gain(g);
@@ -227,7 +231,7 @@ class PinesBed extends BaseBed {
   private whistleG: GainNode;
 
   constructor(mix: Mixer, when: number, seed: number) {
-    super(mix, when, 0.8, 0.04, seed);
+    super(mix, when, 0.38, 0.016, seed);
     this.core = this.biquad('lowpass', 400, 0.5);
     this.coreG = this.gain(0.25);
     this.chain(this.noise('brown'), this.core, this.coreG, this.out);
@@ -244,11 +248,11 @@ class PinesBed extends BaseBed {
   }
 
   private setWind(t: number, s: number, tau: number) {
-    this.core.frequency.setTargetAtTime(220 + 900 * s, t, tau);
-    this.coreG.gain.setTargetAtTime(0.18 + 0.42 * s, t, tau);
-    this.midG.gain.setTargetAtTime(0.04 + 0.16 * s, t, tau);
-    this.needleG.gain.setTargetAtTime(0.012 + 0.07 * s * s, t, tau * 1.2);
-    this.whistleG.gain.setTargetAtTime(0.004 + 0.02 * s * s, t, tau * 1.4);
+    this.core.frequency.setTargetAtTime(300 + 1100 * s, t, tau);
+    this.coreG.gain.setTargetAtTime(0.05 + 0.12 * s, t, tau);
+    this.midG.gain.setTargetAtTime(0.1 + 0.5 * s, t, tau);
+    this.needleG.gain.setTargetAtTime(0.025 + 0.15 * s * s, t, tau * 1.2);
+    this.whistleG.gain.setTargetAtTime(0.006 + 0.03 * s * s, t, tau * 1.4);
   }
 
   tick(until: number) {
@@ -280,6 +284,8 @@ interface QinEvent { t: number; deg: number; vel: number; tex: Texture; slide?: 
 
 class QinBed extends BaseBed {
   readonly kind = 'qin' as const;
+  /** Last ~64 played events (for the lab's score view). */
+  readonly history: QinEvent[] = [];
   private queue: QinEvent[] = [];
   private phraseAt: number;
   private tonic: number;
@@ -307,55 +313,66 @@ class QinBed extends BaseBed {
     const tex = this.pickTexture();
     const [lo, hi] = tex === 'san' ? [-7, 2] : tex === 'an' ? [-3, 7] : [5, 13];
     const n = tex === 'fan' ? r.int(4, 7) : r.int(3, 6);
-    // contour: vary a remembered motif (transposed) or take a fresh random walk
-    let steps: number[];
-    if (this.motifs.length && r.chance(0.3)) {
-      steps = r.pick(this.motifs).slice(0, n).map((s) => (r.chance(0.2) ? -s : s));
-    } else {
-      steps = [];
-      for (let i = 0; i < n; i++) {
-        const x = r();
-        steps.push((x < 0.62 ? 1 : x < 0.87 ? 2 : r.pick([3, 5])) * (r.chance(0.5) ? 1 : -1));
-      }
-      this.motifs = [...this.motifs.slice(-3), steps];
-    }
-    let d = Math.max(lo, Math.min(hi, this.last + (tex === 'fan' ? 5 : tex === 'san' ? -5 : 0)));
-    const ioi = tex === 'fan' ? [0.45, 0.9] : tex === 'an' ? [0.8, 1.6] : [0.9, 1.9];
-    let t = t0;
+    // Phrase contour: the line leans towards an arch, a fall, a rise or a wave of a few degrees.
+    const shape = r.pick([(u: number) => Math.sin(Math.PI * u), (u: number) => -u, (u: number) => u, (u: number) => Math.sin(TAU * u)]);
+    const span = r.int(2, 4) * (r.chance(0.5) ? 1 : -1);
+    // A remembered motif (its intervals, maybe inverted) biases the choices — variation, not a copy.
+    const motif = this.motifs.length && r.chance(0.35) ? r.pick(this.motifs).map((x) => (r.chance(0.3) ? -x : x)) : null;
     const cadence = [this.tonic, this.tonic + 3, this.tonic - 2]; // tonic, fifth above, fourth below
-    for (let i = 0; i < n; i++) {
+    const isCadence = (d: number) => cadence.some((c) => (((d - c) % 5) + 5) % 5 === 0);
+    const IW = [0.25, 1, 0.6, 0.25, 0.1, 0.22]; // weight by interval size in scale steps (5 = octave)
+
+    // start near where the last phrase ended, moved into this texture's register
+    let start = this.last;
+    while (start < lo) start += 5;
+    while (start > hi) start -= 5;
+    start = Math.max(lo, Math.min(hi, start + r.int(-1, 1)));
+    const degs = [start];
+    for (let i = 1; i < n; i++) {
+      const prev = degs[i - 1], prev2 = i > 1 ? degs[i - 2] : NaN;
+      const target = start + span * shape(i / (n - 1));
+      const last = i === n - 1;
+      const cands: number[] = [], ws: number[] = [];
+      for (let c = prev - 5; c <= prev + 5; c++) {
+        const iv = Math.abs(c - prev);
+        if (c < lo || c > hi || (iv > 3 && iv < 5)) continue;
+        if (last && !isCadence(c)) continue;
+        let w = IW[iv] * Math.exp(-((c - target) ** 2) / 4.5);
+        const pingPong = c === prev2 && prev !== prev2 && (i < 3 || degs[i - 3] === prev);
+        if (c === prev2 && prev !== prev2) w *= pingPong ? 0.03 : 0.35; // no A-B-A-B
+        if (c === prev && prev === prev2) w *= 0.05; // no triple repeats
+        if (motif && c - prev === motif[(i - 1) % motif.length] && !pingPong) w *= 3;
+        if (last) w *= iv <= 2 ? 2 : 0.3; // approach the cadence by step
+        cands.push(c); ws.push(w);
+      }
+      if (!cands.length) { degs.push(prev); continue; }
+      let x = r() * ws.reduce((a, b) => a + b, 0), k = 0;
+      while (k < ws.length - 1 && (x -= ws[k]) > 0) k++;
+      degs.push(cands[k]);
+    }
+    this.motifs = [...this.motifs.slice(-3), degs.slice(1).map((d, i) => d - degs[i])];
+
+    // Rhythm in beats: mostly even, some short pairs and held notes; the penultimate note broadens.
+    const beat = tex === 'fan' ? r.range(0.42, 0.6) : tex === 'an' ? r.range(0.7, 0.95) : r.range(0.85, 1.15);
+    let t = t0;
+    degs.forEach((d, i) => {
       const lastNote = i === n - 1;
-      if (i > 0) {
-        d += steps[i];
-        if (d < lo || d > hi) d -= 2 * steps[i]; // reflect off the register walls
-      }
-      if (lastNote) {
-        // cadence: settle on the nearest tonic/fifth in any octave
-        let best = d, bd = 99;
-        for (const c of cadence) for (let o = -3; o <= 3; o++) {
-          const cand = c + 5 * o;
-          if (cand >= lo && cand <= hi && Math.abs(cand - d) < bd) { bd = Math.abs(cand - d); best = cand; }
-        }
-        d = best;
-      }
-      const ev: QinEvent = { t, deg: d, vel: (i === 0 ? 0.62 : 0.44) + r.range(-0.06, 0.08), tex };
-      if (tex === 'san') {
-        // open strings where the pitch exists on one, stopped otherwise
-        if (!OPEN_STRINGS.includes(d)) ev.tex = 'an';
-      }
+      const ev: QinEvent = { t, deg: d, vel: (i === 0 ? 0.62 : 0.46) + r.range(-0.06, 0.08), tex };
+      if (tex === 'san' && !OPEN_STRINGS.includes(d)) ev.tex = 'an'; // open string where one exists
+      let beats = r.pick([1, 1, 1, 0.5, 1.5, 2]);
       if (ev.tex === 'an') {
         if (r.chance(0.28)) ev.glide = r.pick([-1, 1]) * r.range(60, 140); // 綽 / 注
-        if (!lastNote && r.chance(0.22)) ev.slide = r.pick([-1, 1]); // 上 / 下 one scale step
+        if (!lastNote && r.chance(0.2)) { ev.slide = r.pick([-1, 1]); beats = Math.max(beats, 1.5); } // 上 / 下
         ev.vib = r.chance(0.55) || lastNote;
       }
-      if (tex !== 'fan' && r.chance(0.1)) ev.dyad = d - 5; // 撮: octave below
+      if (tex !== 'fan' && (i === 0 || lastNote) && d - 5 >= -7 && r.chance(0.18)) ev.dyad = d - 5; // 撮 octave
+      if (i === n - 2) beats *= 1.4;
       this.queue.push(ev);
-      const dt = r.range(ioi[0], ioi[1]) * (i === n - 2 ? 1.35 : 1) * (r.chance(0.15) ? 0.5 : 1);
-      t += dt;
-      this.last = d;
-    }
-    // 留白: a long rest before the next phrase
-    return t + r.range(2.5, 7.5) + (tex === 'fan' ? 1.5 : 0);
+      t += beats * beat * r.range(0.92, 1.08);
+    });
+    this.last = degs[n - 1];
+    // 留白: rest before the next phrase
+    return t + r.range(1.8, 5.5) + (tex === 'fan' ? 1 : 0);
   }
 
   tick(until: number) {
@@ -368,6 +385,8 @@ class QinBed extends BaseBed {
     const semis = [0, 2, 4, 7, 9];
     while (this.queue.length && this.queue[0].t < until) {
       const ev = this.queue.shift()!;
+      this.history.push(ev);
+      if (this.history.length > 64) this.history.shift();
       const o = { dest: this.out, sendDest: this.wet, send: 1 };
       if (ev.tex === 'fan') {
         playHarmonic(this.mix, ev.t, ev.deg, ev.vel * 0.9, 0.9, { ...o, gain: 0.42 });

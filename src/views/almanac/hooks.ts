@@ -42,3 +42,18 @@ export function useSize(ref: RefObject<HTMLElement>): { w: number; h: number } {
 export function dpr(): number {
   return Math.min(3, Math.max(1, (typeof window !== 'undefined' && window.devicePixelRatio) || 1));
 }
+
+/** Reactive `matchMedia(query).matches`. */
+export function useMedia(query: string): boolean {
+  const get = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(query).matches;
+  const [m, setM] = useState(get);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const q = window.matchMedia(query);
+    const on = () => setM(q.matches);
+    on();
+    q.addEventListener?.('change', on);
+    return () => q.removeEventListener?.('change', on);
+  }, [query]);
+  return m;
+}

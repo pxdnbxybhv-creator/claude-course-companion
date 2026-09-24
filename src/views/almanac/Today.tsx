@@ -8,7 +8,7 @@ import { lang, state } from '../../app/store';
 import { paintMoon } from './paint';
 import { dayDate, dayInfo, hhmm, lunarEn, lunarZh, MONTH_EN, MONTH_ZH, WEEK_EN, WEEK_ZH } from './model';
 import { dpr, useDark } from './hooks';
-import { LocationSheet, placeName } from './LocationSheet';
+import { LocationSheet, placeName, presetZone } from './LocationSheet';
 
 export function MoonCanvas(props: { phase: number; size: number; south?: boolean; label: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -39,9 +39,28 @@ export function Festivals(props: { list: { zh: string; en: string }[] }) {
   );
 }
 
-function dur(min: number, en: boolean): string {
-  const h = Math.floor(min / 60), m = Math.round(min % 60);
-  return en ? `${h} h ${String(m).padStart(2, '0')} m` : `${h} 时 ${String(m).padStart(2, '0')} 分`;
+function Dur(props: { min: number; en: boolean }) {
+  const h = Math.floor(props.min / 60), m = Math.round(props.min % 60);
+  return (
+    <>
+      <span class="latin">{h}</span>
+      <small>{props.en ? 'h' : '时'}</small>
+      <span class="latin">{String(m).padStart(2, '0')}</span>
+      <small>{props.en ? 'm' : '分'}</small>
+    </>
+  );
+}
+
+/** HH:MM in the preset city's own zone when known, else in the device's zone. */
+function clock(d: Date, tz?: string): string {
+  if (tz) {
+    try {
+      return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+    } catch {
+      /* unknown zone: fall through */
+    }
+  }
+  return hhmm(d);
 }
 
 export function Today(props: { dayKey: DateKey; now: Date }) {
@@ -106,7 +125,11 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
       <div class="alm-sun">
         {loc ? <SunLine dayKey={props.dayKey} lat={loc.lat} lon={loc.lon} onEdit={() => setSheet(true)} /> : (
           <button class="alm-locate" onClick={() => setSheet(true)}>
-            <span class="alm-locate-glyph" aria-hidden="true">◐</span>
+            <svg class="alm-locate-glyph" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path d="M5 16 a7 7 0 0 1 14 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path d="M2.5 19.5 H21.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+              <path d="M12 4.5 V6.5 M5.2 7.6 L6.6 9 M18.8 7.6 L17.4 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
             <span>{t('设置位置以显示日出日落', 'Set location for sunrise & sunset')}</span>
           </button>
         )}
@@ -122,6 +145,7 @@ function SunLine(props: { dayKey: DateKey; lat: number; lon: number; onEdit: () 
   const s = sunTimes(dayDate(props.dayKey), props.lat, props.lon);
   const loc = state.value.settings.location;
   const polar = !s.sunrise || !s.sunset;
+  const tz = presetZone(loc);
   return (
     <div class="alm-sunline">
       <dl class="alm-sun-times">
@@ -134,15 +158,15 @@ function SunLine(props: { dayKey: DateKey; lat: number; lon: number; onEdit: () 
           <>
             <div>
               <dt>{t('日出', 'Sunrise')}</dt>
-              <dd class="latin">{hhmm(s.sunrise!)}</dd>
+              <dd class="latin">{clock(s.sunrise!, tz)}</dd>
             </div>
             <div>
               <dt>{t('日落', 'Sunset')}</dt>
-              <dd class="latin">{hhmm(s.sunset!)}</dd>
+              <dd class="latin">{clock(s.sunset!, tz)}</dd>
             </div>
             <div>
               <dt>{t('昼长', 'Daylight')}</dt>
-              <dd class={en ? 'latin' : ''}>{dur(s.dayLength, en)}</dd>
+              <dd class="alm-dur"><Dur min={s.dayLength} en={en} /></dd>
             </div>
           </>
         )}

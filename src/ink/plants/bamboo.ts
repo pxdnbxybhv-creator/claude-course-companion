@@ -267,7 +267,7 @@ export function bamboo(spec: PlantSpec): Drawing {
     let p = o;
     let zs = rng.chance(0.5) ? 1 : -1;
     const behind = depth === 0 && !big && c.role !== 'far' && c.role !== 'sprout' && rng.chance(0.3);
-    const lt = behind ? rng.range(0.3, 0.4) : c.leafTone + rng.range(-0.06, 0.04);
+    const lt = behind ? rng.range(0.3, 0.4) : c.leafTone + rng.range(-0.14, 0.05);
     const bt = behind ? 0.35 : c.nodeTone * rng.range(0.88, 1);
     for (let k = 0; k < nj; k++) {
       const a = ang + zs * zig * 0.5;
@@ -356,8 +356,8 @@ export function bamboo(spec: PlantSpec): Drawing {
       const w = wAt(c, s);
       const nr = { x: Math.cos(p.a), y: Math.sin(p.a) };
       const o = { x: p.x + nr.x * side * w * 0.35, y: p.y + nr.y * side * w * 0.35 };
-      const ang = p.a + side * (lerp(60, 34, u) + rng.range(-8, 8)) * DEG;
-      const len = c.h * rng.range(lenFrac[0], lenFrac[1]) * (1 - 0.35 * u) * (big ? 1 : 0.6);
+      const ang = p.a + side * (lerp(62, 32, u) + rng.range(-15, 12)) * DEG;
+      const len = c.h * rng.range(lenFrac[0], lenFrac[1]) * (1 - 0.35 * u) * (big ? rng.range(0.8, 1.15) : rng.range(0.45, 0.7));
       units.push({ unit: branch(c, o, ang, len, minW(w * rng.range(0.26, 0.34), 1), side, u, big), big });
       // Bamboo often puts out a second, smaller branch at a leafy node.
       if (big && rng.chance(0.45)) {
@@ -418,9 +418,9 @@ export function bamboo(spec: PlantSpec): Drawing {
     const bigs = f.filter((u) => u.big).map((u) => u.unit);
     const small: Stroke[][] = [];
     for (const { unit, big } of f) if (!big) (rng.chance(lateFrac) ? late : small).push(unit);
-    const half = lerp(segEnd + 0.01, b1, 0.5);
-    schedule(bigs, segEnd + 0.008, half);
-    schedule(small, half + 0.01, b1);
+    const leafy = Math.min(segEnd + 0.05, lerp(segEnd, b1, 0.4));
+    schedule(bigs, segEnd + 0.008, leafy);
+    schedule(small, leafy + 0.01, b1);
   };
   if (mid) {
     place(mid, 0.08, 0.28, 0.5, 0.45, rng.int(1, 2), [0.18, 0.26]);

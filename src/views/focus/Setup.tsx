@@ -25,11 +25,10 @@ export function AmbientPicker(props: { compact?: boolean }) {
   const t = useT();
   const cur = state.value.settings.ambient;
   return (
-    <div class={'fx-amb' + (props.compact ? ' is-compact' : '')} role="radiogroup" aria-label={t('环境声', 'Ambient sound')}>
+    <div class={'fx-amb' + (props.compact ? ' is-compact' : '')} role="group" aria-label={t('环境声', 'Ambient sound')}>
       {AMBIENTS.map((a) => (
         <button
-          role="radio"
-          aria-checked={cur === a.kind}
+          aria-pressed={cur === a.kind}
           class="fx-amb-btn"
           onClick={() => chooseAmbient(a.kind)}
           aria-label={t(a.zh, a.en)}
@@ -65,24 +64,24 @@ export function Setup(props: { minutes: number; onMinutes: (m: number) => void }
     props.onMinutes(m);
     setDraft(String(m));
   };
-  const go = () => lightIncense(props.minutes, intent);
+  const go = (byKeyboard: boolean) => lightIncense(props.minutes, intent, byKeyboard);
 
   return (
     <div class="fx-setup">
-      <div class="fx-durs" role="radiogroup" aria-label={t('燃多久', 'How long')}>
+      <div class="fx-durs" role="group" aria-label={t('燃多久', 'How long')}>
         {PRESETS.map((p) => (
-          <button role="radio" aria-checked={!customActive && props.minutes === p.m} class="fx-dur" onClick={() => pick(p.m)}>
+          <button aria-pressed={!customActive && props.minutes === p.m} class="fx-dur" onClick={() => pick(p.m)} aria-label={t(`${p.zh}，${p.m} 分钟`, `${p.m} minutes`)}>
             <span class="fx-dur-n num">{p.m}</span>
             <span class="fx-dur-l">{t(p.zh, p.en)}</span>
           </button>
         ))}
         <button
-          role="radio"
-          aria-checked={customActive}
+          aria-pressed={customActive}
+          aria-label={t('自定时长', 'Custom length')}
           class="fx-dur"
           onClick={() => { setCustomOpen(true); setDraft(String(props.minutes)); }}
         >
-          <span class="fx-dur-n num">{customActive ? props.minutes : '·'}</span>
+          <span class="fx-dur-n num">{customActive ? props.minutes : '…'}</span>
           <span class="fx-dur-l">{t('自定', 'custom')}</span>
         </button>
       </div>
@@ -118,14 +117,13 @@ export function Setup(props: { minutes: number; onMinutes: (m: number) => void }
           placeholder={t('此香为何而燃', 'What is this incense for?')}
           value={intent}
           onInput={(e) => setIntent((e.target as HTMLInputElement).value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && !e.isComposing) go(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.isComposing) go(true); }}
         />
       </label>
 
       <AmbientPicker />
 
-      <button class="btn btn-primary fx-light" onClick={go}>
-        <span class="fx-light-glyph brush" aria-hidden="true">燃</span>
+      <button class="btn btn-primary fx-light" onClick={(e) => go(e.detail === 0)}>
         {t('燃香', 'Light the incense')}
       </button>
     </div>

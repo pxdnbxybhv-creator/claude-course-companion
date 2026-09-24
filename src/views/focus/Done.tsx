@@ -1,21 +1,22 @@
 // 香尽 — the stick has burned through: a poem, and what today has held.
-import { state, today } from '../../app/store';
+import { lang, state, today } from '../../app/store';
 import { useT } from '../../app/i18n';
 import { pickPoem } from '../../data/poems';
 import { Sheet } from '../../ui/kit';
 import { completion, dismissCompletion } from './session';
-import { recentDays } from './stats';
-import { clockOf } from './stats';
+import { clockOf, recentDays } from './stats';
 
 export function DoneSheet(props: { onAgain: () => void }) {
   const t = useT();
-  const zh = t('zh', 'en') === 'zh';
+  const zh = lang.value === 'zh';
   const c = completion.value;
   if (!c) return null;
   const s = c.session;
   const poem = pickPoem({ theme: 'focus', salt: s.start >>> 0 });
   const d = recentDays(state.value.focus, today.value, 1)[0];
-  const vertical = zh && poem.lines.length <= 2 && poem.lines.every((l) => l.length <= 16);
+  // Vertical columns read best one half-line (句) at a time.
+  const cols = poem.lines.flatMap((l) => l.split(/(?<=[，；、])/)).filter(Boolean);
+  const vertical = zh && cols.length <= 8 && cols.every((l) => l.length <= 12);
 
   return (
     <Sheet open onClose={dismissCompletion} label={t('一炷香已燃尽', 'The incense has burned out')}>
@@ -34,7 +35,7 @@ export function DoneSheet(props: { onAgain: () => void }) {
 
         <figure class={'fx-poem' + (vertical ? ' is-vertical' : '')}>
           <blockquote lang="zh">
-            {poem.lines.map((l) => <p>{l}</p>)}
+            {(vertical ? cols : poem.lines).map((l) => <p>{l}</p>)}
           </blockquote>
           <figcaption>
             <span lang="zh">{poem.dynasty} · {poem.author}《{poem.title}》</span>

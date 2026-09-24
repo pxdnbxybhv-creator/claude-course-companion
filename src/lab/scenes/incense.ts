@@ -15,13 +15,16 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const seed = Number(p.get('seed') ?? 1);
   const blow = p.get('blow') === '1';
   const live = p.get('live') === '1';
+  const zoom = Number(p.get('zoom') ?? 1); // >1: re-layout at zoom× and frame the censer
   const dpr = window.devicePixelRatio || 1;
   const ctx = canvas.getContext('2d')!;
   const W = canvas.width / dpr, H = canvas.height / dpr;
 
   const tr0 = performance.now();
   const scene = createIncenseScene(seed);
-  scene.resize(W, H, dpr);
+  scene.resize(W * zoom, H * zoom, dpr);
+  let tx = W / 2 - (W * zoom) / 2, ty = zoom > 1 ? H * 0.97 - H * zoom * 0.935 : 0;
+  const focusTip = p.get('focus') === 'tip';
   const resizeMs = performance.now() - tr0;
   scene.setLit(lit);
 
@@ -47,6 +50,7 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
 
   // timing: 120 frames of step + draw (paper blit measured separately)
   let tStep = 0, tDraw = 0, tPaper = 0;
+  const acc = { build: 0, mist: 0, blit: 0, core: 0 };
   const N = 120;
   for (let i = 0; i < N; i++) {
     const a = performance.now();
@@ -57,6 +61,8 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     scene.draw(ctx);
     const d = performance.now();
     tPaper += b - a; tStep += c - b; tDraw += d - c;
+    const ms = scene.stats().ms;
+    if (ms) { acc.build += ms.build; acc.mist += ms.mist; acc.blit += ms.blit; acc.core += ms.core; }
   }
   // make the canvas flush so draw timings include rasterisation
   ctx.getImageData(0, 0, 1, 1);
@@ -66,11 +72,15 @@ export default function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     ctx.font = '11px system-ui';
     ctx.fillStyle = 'rgba(0,0,0,.45)';
     ctx.fillText(`step ${(tStep / N).toFixed(2)} ms · draw ${(tDraw / N).toFixed(2)} ms · paper ${(tPaper / N).toFixed(2)} ms · resize ${resizeMs.toFixed(0)} ms`, 8, H - 22);
-    ctx.fillText(`particles ${st.particles} · strokes ${st.strokes} · t=${T}s progress=${progress}`, 8, H - 8);
+    const m = { build: acc.build / N, mist: acc.mist / N, blit: acc.blit / N, core: acc.core / N };
+    ctx.fillText(`particles ${st.particles} · strokes ${st.strokes} · t=${T}s p=${progress}` + (m ? ` · b${m.build.toFixed(2)} m${m.mist.toFixed(2)} u${m.blit.toFixed(2)} c${m.core.toFixed(2)}` : ''), 8, H - 8);
   };
 
   paper();
+  if (focusTip) { const tp = scene.tip(); tx = W / 2 - tp.x; ty = H * 0.62 - tp.y; }
+  ctx.translate(tx, ty);
   scene.draw(ctx);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   label();
 
   if (live) {

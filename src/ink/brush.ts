@@ -38,6 +38,18 @@ const INK = PIGMENTS.ink;
 /** Diluted ink spreads a touch cooler than the core. */
 const INK_THIN = '#252a2f';
 const NZ = makeNoise2(0x51ab);
+/** Fast 1D gradient noise (most stroke modulation only varies along the arc length). */
+const G1 = (() => {
+  const r = makeRng(0x1d1d);
+  const g = new Float64Array(4096);
+  for (let i = 0; i < 4096; i++) g[i] = r() * 2 - 1;
+  return g;
+})();
+function N1(x: number): number {
+  const i = Math.floor(x), f = x - i;
+  const a = G1[i & 4095] * f, b = G1[(i + 1) & 4095] * (f - 1);
+  return (a + (b - a) * f * f * (3 - 2 * f)) * 1.6;
+}
 
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.slice(1), 16);
@@ -156,6 +168,22 @@ function buildSpine(st: Stroke, xf: Xf): Spine {
   }
   let hmax = 0;
   for (const p of P) hmax = Math.max(hmax, p.w / 2);
+  if (P.length >= 2 && st.kind !== 'line') {
+    // Blunt ends get a rounded cap: a real brush never leaves a square-cut end.
+    const cap = (a: typeof P[0], b: typeof P[0], depth: number) => {
+      const r = a.w / 2;
+      if (r < 1 || r < hmax * 0.3) return [];
+      const dx = a.x - b.x, dy = a.y - b.y, len = Math.hypot(dx, dy) || 1;
+      return [0.9, 0.6, 0.3].map((q) => {
+        const d = r * depth * Math.sqrt(1 - q * q);
+        return { x: a.x + (dx / len) * d, y: a.y + (dy / len) * d, w: a.w * q };
+      });
+    };
+    const head = cap(P[0], P[1], 0.75).reverse();
+    const tail = cap(P[P.length - 1], P[P.length - 2], 0.55);
+    P.unshift(...head);
+    P.push(...tail);
+  }
   if (P.length < 2) {
     const p = P[0] ?? { x: 0, y: 0, w: 0 };
     const one = (v: number) => Float64Array.of(v);
@@ -182,7 +210,7 @@ function buildSpine(st: Stroke, xf: Xf): Spine {
   for (let i = 1; i < dx.length; i++) cum[i] = cum[i - 1] + Math.hypot(dx[i] - dx[i - 1], dy[i] - dy[i - 1]);
   const L = cum[cum.length - 1];
   // 3 · uniform resample; spacing follows brush size (fine strokes need fewer samples per px of width)
-  const spacing = st.kind === 'line' ? clamp(hmax * 1.2, 2, 4) : st.kind === 'dry' ? clamp(hmax * 0.3, 1.5, 4.5) : clamp(hmax * 0.5, 1.5, 6);
+  const spacing = st.kind === 'line' ? clamp(hmax * 1.2, 2, 4) : st.kind === 'dry' ? clamp(hmax * 0.3, 1.5, 4.5) : clamp(hmax * 0.6, 1.5, 7);
   const n = Math.max(2, Math.ceil(L / spacing) + 1);
   const x = new Float64Array(n), y = new Float64Array(n), h = new Float64Array(n), s = new Float64Array(n);
   let j = 0;
@@ -356,9 +384,9 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   for (let i = 0; i < n; i++) {
     const si = sp.s[i], h = sp.h[i];
     T[i] = si / L;
-    const w1 = NZ(ox + si / lam1, oy), w2 = NZ(ox + si / lam1, oy + 7.7);
-    const m1 = NZ(ox + si / lamM, oy + 21.5), m2 = NZ(ox + si / lamM, oy + 29.1);
-    const f1 = NZ(ox + si / lam2, oy + 3.1), f2 = NZ(ox + si / lam2, oy + 13.3);
+    const w1 = N1(ox + si / lam1), w2 = N1(ox + 611.3 + si / lam1);
+    const m1 = N1(ox + 1223.7 + si / lamM), m2 = N1(ox + 1835.1 + si / lamM);
+    const f1 = N1(ox + 2447.9 + si / lam2), f2 = N1(ox + 3059.3 + si / lam2);
     const rr = Math.min(r2, h * 0.6);
     ELs[i] = Math.max(0, h * (1 + A1 * w1 + AM * m1));
     ERs[i] = Math.max(0, h * (1 + A1 * w2 + AM * m2));
@@ -372,7 +400,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   // --- line: one band with small breaks + a faint halo -------------------------------------
   if (isLine) {
     for (let i = 0; i < n; i++) {
-      ink[i] = 0.75 + 0.7 * NZ(ox + 9.1, sp.s[i] / 28) - dry * 1.4 * T[i] ** 1.5;
+      ink[i] = 0.75 + 0.7 * N1(ox + 173.1 + sp.s[i] / 28) - dry * 1.4 * T[i] ** 1.5;
     }
     ink[0] = Math.max(ink[0], 0.3); // the fine tip always touches down
     setGrain(P, thin);
@@ -395,11 +423,13 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // body ink: stays until the brush runs dry, then ends raggedly and never comes back
-  const tEnd = isDry ? 0.12 + 0.55 * (1 - dry) : 1.02 - 0.6 * dry;
+  const tEnd = isDry ? 0.12 + 0.55 * (1 - dry) : 1.05 - 0.4 * dry;
   const body = new Float64Array(n);
+  // body width as the ink runs out: narrows only a little, then the run ends raggedly
+  const bodyW = (v: number) => 0.4 + 0.6 * smoothstep(0, 0.4, v);
   let run = 1e9;
   for (let i = 0; i < n; i++) {
-    const v = (tEnd - T[i]) * 7 + 0.55 * NZ(ox + 2.3, sp.s[i] / Math.max(hmax * 1.5, 6));
+    const v = (tEnd - T[i]) * (isDry ? 3.5 : 7) + 0.55 * N1(ox + 911.9 + sp.s[i] / Math.max(hmax * 1.5, 6));
     run = Math.min(run, v);
     body[i] = run;
   }
@@ -425,7 +455,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   if (isDry) {
     ctx.beginPath();
     for (let i = 0; i < n; i++) {
-      const g = smoothstep(0, 0.45, body[i]);
+      const g = bodyW(body[i]);
       lo[i] = EL[i] * g; ro[i] = -ER[i] * g;
       ink[i] = body[i];
     }
@@ -442,13 +472,13 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
     const G: Float64Array[] = U.map(() => new Float64Array(n));
     for (let k = 1; k < K; k++) {
       const lam = Math.max(hmax * 1.2, 6) * rng.range(0.7, 1.5), bias = rng.range(-0.35, 0.15);
-      for (let i = 0; i < n; i++) G[k][i] = gw * (NZ(ox + k * 3.7, oy + 40 + sp.s[i] / lam) + bias);
+      for (let i = 0; i < n; i++) G[k][i] = gw * (N1(ox + k * 397.3 + 57.1 + sp.s[i] / lam) + bias);
     }
     for (let parity = 0; parity < 2; parity++) {
       ctx.beginPath();
       for (let j = parity; j < K; j += 2) {
         for (let i = 0; i < n; i++) {
-          const g = smoothstep(0, 0.45, body[i]);
+          const g = bodyW(body[i]);
           let top = mapU(U[j + 1], i) - (j < K - 1 ? G[j + 1][i] / 2 : 0);
           let bot = mapU(U[j], i) + (j > 0 ? G[j][i] / 2 : 0);
           if (top < bot) top = bot = (top + bot) / 2;
@@ -460,12 +490,13 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
       fillWith(P, share(tone, 0.48));
     }
     // 側鋒: the brush held at a slant leaves its tip-side edge darker than the heel side
-    if (hmax > 1.5) {
+    ctx.fillStyle = color; // minor layers skip the grain pattern: it is the costly part of a fill
+    if (hmax > 2.5) {
       const side = rng() < 0.5 ? -1 : 1, depth = rng.range(0.35, 0.7);
       ctx.beginPath();
       for (let i = 0; i < n; i++) {
-        const g = smoothstep(0, 0.45, body[i]);
-        const inner = 1 - depth * (1 + 0.25 * NZ(ox + 8.8, sp.s[i] / lamM));
+        const g = bodyW(body[i]);
+        const inner = 1 - depth * (1 + 0.25 * N1(ox + 1511.5 + sp.s[i] / lamM));
         const a = mapU(side, i) * g, b = mapU(side * inner, i, true) * g;
         lo[i] = Math.max(a, b); ro[i] = Math.min(a, b);
         ink[i] = body[i];
@@ -476,13 +507,13 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // --- pooling: denser ink where the brush is pressed widest (brush only) -------------------
-  if (!isDry && hmax > 1.2) {
+  if (!isDry && hmax > 4) {
     ctx.beginPath();
     const off = rng.range(-0.25, 0.25);
     for (let i = 0; i < n; i++) {
       const q = sp.h[i] / hmax;
-      const g = smoothstep(0, 0.45, body[i]) * 0.6 * q * Math.sqrt(q);
-      const c = off * sp.h[i] + 0.15 * sp.h[i] * NZ(ox + 5.5, sp.s[i] / lam1);
+      const g = bodyW(body[i]) * 0.6 * q * Math.sqrt(q);
+      const c = off * sp.h[i] + 0.15 * sp.h[i] * N1(ox + 2111.7 + sp.s[i] / lam1);
       lo[i] = c + ELs[i] * g; ro[i] = c - ERs[i] * g;
       ink[i] = body[i];
     }
@@ -491,11 +522,12 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // --- bristles: streaks that outlast the body and break up as the brush runs dry (飞白) ---
+  setGrain(P, color);
   const nb = isDry ? clamp(Math.round(hmax / 1.25), 6, 30) : clamp(Math.round(hmax / 2), 3, 10);
   const lamF = Math.max(hmax * (isDry ? 2.4 : 2), 10);
   // bristles are grouped into a few fills (each group its own ink load) to keep the draw count low
   const groups = isDry ? 3 : 2;
-  const gShare = Array.from({ length: groups }, () => (isDry ? rng.range(0.3, 0.7) : rng.range(0.05, 0.17)));
+  const gShare = Array.from({ length: groups }, () => (isDry ? rng.range(0.3, 0.7) : rng.range(0.08, 0.22)));
   for (let gi = 0; gi < groups; gi++) {
     ctx.beginPath();
     let any = false;
@@ -504,17 +536,16 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
       const c0 = -1 + (2 * j + 1) / nb + (rj() - 0.5) * (0.5 / nb);
       const bw = (1 / nb) * (isDry ? rj.range(0.6, 1.3) : rj.range(0.35, 0.85));
       const inkLoad = 1 + 0.25 * rj.gauss() - (isDry ? 0.45 : 0.2) * c0 * c0;
-      const oj = ox + j * 7.37;
       for (let i = 0; i < n; i++) {
         const si = sp.s[i];
         // shared field across neighbouring bristles → gaps open as long pale slivers
         const F = NZ(ox + c0 * 1.7, oy + 60 + si / lamF);
-        const own = NZ(oj, si / (lamF * 0.4));
+        const own = N1(ox + j * 263.9 + 3301.1 + si / (lamF * 0.4));
         const v = inkLoad - dry * (isDry ? 2.0 : 1.6) * Math.pow(T[i], isDry ? 1.15 : 1.6)
           + (isDry ? 0.65 : 0.35) * F + (isDry ? 0.25 : 0.15) * own;
         ink[i] = v;
         const g = smoothstep(0, 0.25, v);
-        const c = c0 + 0.1 * NZ(oj + 1.7, si / lam1) / Math.sqrt(nb);
+        const c = c0 + 0.1 * N1(ox + j * 263.9 + 777.7 + si / lam1) / Math.sqrt(nb);
         const top = clamp(c + bw * g, -1, 1), bot = clamp(c - bw * g, -1, 1);
         lo[i] = mapU(top, i, true);
         ro[i] = mapU(bot, i, true);
@@ -533,9 +564,17 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
     const r = sp.h[i] * (isDry ? 0.9 : 1.02);
     if (r > 0.9) {
       const tx = sp.ny[i], ty = -sp.nx[i];
+      // diffuse: denser where the tip pressed (slightly back), fading out — no hard disc
+      const gx = sp.x[i] - tx * r * 0.2, gy = sp.y[i] - ty * r * 0.2;
+      const g = ctx.createRadialGradient(gx, gy, 0, gx, gy, r * 1.1);
+      const [cr, cg, cb] = hexToRgb(color);
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},1)`);
+      g.addColorStop(0.55, `rgba(${cr},${cg},${cb},0.6)`);
+      g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = g;
       ctx.beginPath();
       traceBlob(ctx, sp.x[i], sp.y[i], r, rng, isDry ? 0.12 : 0.06, 0.12, Math.atan2(ty, tx));
-      fillWith(P, share(tone, isDry ? 0.14 : 0.18));
+      fillWith(P, share(tone, isDry ? 0.2 : 0.3));
     }
   }
 }
@@ -579,7 +618,7 @@ function deform(poly: Pt[], vari: number[], depth: number, amp: number, rng: Rng
       const len = Math.hypot(b.x - a.x, b.y - a.y);
       const v = (va + vb) / 2;
       const sd = Math.min(len * 0.35, amp) * v;
-      nP.push({ x: (a.x + b.x) / 2 + rng.gauss() * sd * 0.5, y: (a.y + b.y) / 2 + rng.gauss() * sd * 0.5 });
+      nP.push({ x: (a.x + b.x) / 2 + clamp(rng.gauss(), -2, 2) * sd * 0.5, y: (a.y + b.y) / 2 + clamp(rng.gauss(), -2, 2) * sd * 0.5 });
       nV.push(v * rng.range(0.85, 1.15));
     }
     P = nP; V = nV;
@@ -610,6 +649,44 @@ function devicePoly(st: Stroke, xf: Xf, progress: number): { poly: Pt[]; cx: num
   return { poly, cx, cy, size: Math.max(1, Math.min(x1 - x0, y1 - y0)) };
 }
 
+/** Only the blurred shadow of `poly` (filled, or stroked when `lineWidth` is set): soft both sides. */
+function blurredOnly(P: Paint, poly: Pt[], color: string, alpha: number, blur: number, lineWidth = 0) {
+  const { ctx } = P;
+  const OFF = brushFlags.shadows ? 20000 : 0;
+  ctx.beginPath();
+  ctx.moveTo(poly[0].x - OFF, poly[0].y);
+  for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x - OFF, poly[i].y);
+  ctx.closePath();
+  if (OFF) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = Math.max(0.5, blur);
+    ctx.shadowOffsetX = OFF;
+  }
+  ctx.globalAlpha = P.A0 * clamp(alpha, 0, 1);
+  if (lineWidth > 0) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+  ctx.shadowOffsetX = 0;
+  noShadow(P);
+}
+
+/**
+ * The outline displaced along its normals by smooth noise: low-frequency lobes (the wash spreading
+ * unevenly) plus a little finer wandering. `bias` > 0 pushes outward.
+ */
+function displaced(base: Pt[], nrm: Pt[], arc: number[], vari: number[], soft: number, lam: number, o: number, amp: number, bias: number): Pt[] {
+  return base.map((p, i) => {
+    const d = bias + soft * amp * (vari[i] * N1(o + arc[i] / lam) + 0.3 * N1(o + 977.1 + arc[i] / (soft * 1.3 + 2)));
+    return { x: p.x + nrm[i].x * d, y: p.y + nrm[i].y * d };
+  });
+}
+
 function paintWash(P: Paint, st: Stroke, xf: Xf, progress: number, tone: number, vigor: number) {
   if (st.pts.length < 3) return;
   const { ctx } = P;
@@ -617,37 +694,48 @@ function paintWash(P: Paint, st: Stroke, xf: Xf, progress: number, tone: number,
   const wet = clamp(st.wet ?? 0.75, 0, 1) * (0.6 + 0.4 * vigor);
   const { poly, size } = devicePoly(st, xf, progress);
   const soft = Math.max(1, (st.pts[0].w || 4) * xf.k) * (0.6 + 0.8 * wet);
-  const base0 = smoothClosed(poly, Math.max(soft * 1.5, size / 24, 3));
-  const vari0 = base0.map(() => rng.range(0.4, 1.6));
-  const { poly: base, vari } = deform(base0, vari0, 1, soft * 1.2, rng);
+  let per = 0;
+  for (let i = 0; i < poly.length; i++) per += Math.hypot(poly[(i + 1) % poly.length].x - poly[i].x, poly[(i + 1) % poly.length].y - poly[i].y);
+  const base = smoothClosed(poly, Math.max(2, soft * 0.6, per / 360));
+  // outward normals and arc length along the smoothed outline
+  const n = base.length;
+  let area = 0;
+  for (let i = 0; i < n; i++) { const a = base[i], b = base[(i + 1) % n]; area += a.x * b.y - b.x * a.y; }
+  const sgn = area > 0 ? -1 : 1;
+  const nrm: Pt[] = [], arc: number[] = [];
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const a = base[(i - 1 + n) % n], b = base[(i + 1) % n];
+    const nx = -(b.y - a.y), ny = b.x - a.x, len = Math.hypot(nx, ny) || 1;
+    nrm.push({ x: (nx / len) * sgn, y: (ny / len) * sgn });
+    if (i) acc += Math.hypot(base[i].x - base[i - 1].x, base[i].y - base[i - 1].y);
+    arc.push(acc);
+  }
+  const vo = rng() * 1000;
+  const vari = arc.map((s) => 0.35 + 1.4 * clamp(0.5 + 0.9 * N1(vo + s / Math.max(size * 0.4, 10)), 0, 1));
+  const lam = Math.max(soft * 3, size / 7, 6);
   const color = st.color ?? INK_THIN;
-  const layers = size > 120 ? 12 : size > 40 ? 10 : 8;
-  const a = share(tone, 0.82 / layers) * progress;
+  const fade = progress;
+  // 1 · soft envelope: blurred-only layers, spreading a little beyond the drawn outline
+  for (let l = 0; l < 2; l++) {
+    const shape = displaced(base, nrm, arc, vari, soft, lam, rng() * 3000, 1.1, soft * (0.05 + 0.2 * l));
+    blurredOnly(P, shape, color, share(tone, 0.14) * fade, soft * (0.3 + 0.25 * l) * (0.5 + wet));
+  }
+  // 2 · body: grainy, mottled layers slightly inside the outline, each wandering differently
+  const layers = 5;
   const mox = rng() * 256, moy = rng() * 256;
   for (let l = 0; l < layers; l++) {
-    const { poly: shape } = deform(base, vari, 2, soft * (0.45 + (0.9 * l) / layers), rng);
+    const shape = displaced(base, nrm, arc, vari, soft, lam, rng() * 3000, 0.7, -soft * rng.range(0.05, 0.45));
     ctx.beginPath();
     tracePoly(ctx, shape);
-    // half the layers share the mottle offset (structure), half drift (softness)
     const drift = l % 2 ? rng() * 60 : 0;
     setGrain(P, color, 'wash', mox + drift, moy + drift * 0.7, 2.2);
-    fillWith(P, a);
+    fillWith(P, share(tone, 0.56 / layers) * fade);
   }
-  // 水渍: ink carried to the edge as the wash dries leaves a faintly darker, broken rim
+  // 3 · 水渍: pigment carried to the edge as the wash dries leaves a faint darker rim
   if (wet > 0.2) {
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = rgba(color, 1);
-    for (let r = 0; r < 2; r++) {
-      const { poly: rim } = deform(base, vari, 1, soft * 0.4, rng);
-      ctx.beginPath();
-      tracePoly(ctx, rim);
-      ctx.setLineDash([rng.range(size * 0.2, size * 0.7), rng.range(size * 0.05, size * 0.3)]);
-      ctx.lineDashOffset = rng() * size;
-      ctx.lineWidth = Math.max(0.6, soft * 0.18) * (r ? 0.6 : 1);
-      ctx.globalAlpha = P.A0 * share(tone, 0.07 * wet) * progress;
-      ctx.stroke();
-    }
-    ctx.setLineDash([]);
+    const rim = displaced(base, nrm, arc, vari, soft, lam, rng() * 3000, 0.9, -soft * 0.35);
+    blurredOnly(P, rim, color, share(tone, 0.16 * wet) * fade, clamp(soft * 0.25, 0.6, 4), clamp(soft * 0.3, 0.8, 4));
   }
 }
 
@@ -659,40 +747,38 @@ function paintFill(P: Paint, st: Stroke, xf: Xf, progress: number, tone: number,
   const soft = Math.max(0, (st.pts[0].w ?? 2) * xf.k);
   const wet = clamp(st.wet ?? 0.35, 0, 1) * (0.5 + 0.5 * vigor);
   const color = st.color ?? INK;
-  const base0 = smoothClosed(poly, Math.max(1.5, size / 10));
+  const base0 = smoothClosed(poly, Math.max(2, size / 7));
   const vari0 = base0.map(() => rng.range(0.5, 1.5));
-  const wob = Math.min(0.6 + soft * 0.15, size * 0.06);
-  const { poly: base, vari } = deform(base0, vari0, 1, wob, rng);
+  const wob = Math.min(0.35 + soft * 0.08, size * 0.035);
+  const { poly: base } = deform(base0, vari0, 1, wob, rng);
   const fade = progress;
-
-  // soft under-layer (the pigment wicks a little into the paper)
-  ctx.beginPath();
-  tracePoly(ctx, base);
-  setGrain(P, color);
-  shadow(P, color, 0.45 * wet + 0.1, Math.min(soft * 0.8 + 0.6 * wet, size * 0.35));
-  fillWith(P, share(tone, 0.3) * fade);
-  noShadow(P);
-  // body
-  ctx.beginPath();
-  tracePoly(ctx, deform(base, vari, 1, wob * 0.5, rng).poly);
-  fillWith(P, share(tone, 0.5) * fade);
-  // uneven density: a denser patch pulled toward one side
   let cx = 0, cy = 0;
   for (const p of base) { cx += p.x; cy += p.y; }
   cx /= base.length; cy /= base.length;
-  const ang = rng() * Math.PI * 2, off = size * rng.range(0.08, 0.2);
-  const px = cx + Math.cos(ang) * off, py = cy + Math.sin(ang) * off;
-  const k = rng.range(0.45, 0.7);
-  ctx.beginPath();
-  tracePoly(ctx, base.map((p) => ({ x: px + (p.x - px) * k, y: py + (p.y - py) * k })));
-  fillWith(P, share(tone, 0.22) * fade);
-  // rim — pigment pooled at the drying edge
+
+  // under-layer: solid, with a soft bleed into the paper (shadowBlur)
   ctx.beginPath();
   tracePoly(ctx, base);
+  shadow(P, color, 0.4 * wet + 0.12, Math.min(soft * 0.7 + 0.8 * wet, size * 0.3), color);
+  fillWith(P, share(tone, 0.28) * fade);
+  noShadow(P);
+  // body: grainy pigment on the same outline
+  setGrain(P, color);
+  fillWith(P, share(tone, 0.5) * fade);
+  // uneven density: a diffuse denser patch toward one side (where the brush pressed)
+  const ang = rng() * Math.PI * 2, off = size * rng.range(0.1, 0.3);
+  const px = cx + Math.cos(ang) * off, py = cy + Math.sin(ang) * off;
+  const g = ctx.createRadialGradient(px, py, 0, px, py, size * rng.range(0.45, 0.75));
+  const [r, gg, b] = hexToRgb(color);
+  g.addColorStop(0, `rgba(${r},${gg},${b},1)`);
+  g.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  ctx.fillStyle = g;
+  fillWith(P, share(tone, 0.3) * fade);
+  // rim — pigment pooled at the drying edge
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = mixHex(color, INK, st.color ? 0.28 : 0);
-  ctx.lineWidth = clamp(size * 0.05, 0.5, 1.6);
-  ctx.globalAlpha = P.A0 * share(tone, 0.22) * fade;
+  ctx.strokeStyle = mixHex(color, INK, st.color ? 0.3 : 0);
+  ctx.lineWidth = clamp(size * 0.04, 0.5, 1.4);
+  ctx.globalAlpha = P.A0 * share(tone, 0.2 * (0.5 + wet)) * fade;
   ctx.stroke();
 }
 
@@ -717,15 +803,21 @@ function paintDot(P: Paint, st: Stroke, xf: Xf, progress: number, tone: number, 
     return;
   }
   ctx.beginPath();
-  traceBlob(ctx, cx, cy, r, rng, 0.16, ecc, rot);
+  traceBlob(ctx, cx, cy, r, rng, 0.2, ecc, rot);
   shadow(P, st.color ?? INK_THIN, 0.5, (r * 0.3 + 0.6) * wet, color);
-  fillWith(P, share(tone, 0.72) * fade);
+  fillWith(P, share(tone, 0.6) * fade);
   noShadow(P);
-  // pooled core, off-centre
-  const oa = rng() * Math.PI * 2, od = r * rng.range(0.05, 0.25);
-  ctx.beginPath();
-  traceBlob(ctx, cx + Math.cos(oa) * od, cy + Math.sin(oa) * od, r * rng.range(0.5, 0.7), rng, 0.2, ecc, rot);
-  fillWith(P, share(tone, 0.3) * fade);
+  setGrain(P, color);
+  fillWith(P, share(tone, 0.2) * fade);
+  // pooled core, off-centre and diffuse (ink gathers where the brush lifted)
+  const oa = rng() * Math.PI * 2, od = r * rng.range(0.1, 0.35);
+  const px = cx + Math.cos(oa) * od, py = cy + Math.sin(oa) * od;
+  const g = ctx.createRadialGradient(px, py, 0, px, py, r * rng.range(0.8, 1.1));
+  const [cr, cg, cb] = hexToRgb(color);
+  g.addColorStop(0, `rgba(${cr},${cg},${cb},1)`);
+  g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+  ctx.fillStyle = g;
+  fillWith(P, share(tone, 0.35) * fade);
 }
 
 // ---------------------------------------------------------------------------

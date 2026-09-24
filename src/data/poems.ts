@@ -24,7 +24,6 @@ export interface Poem {
   themes?: PoemTheme[];
 }
 
-type P = Poem;
 const SPRING: Season[] = ['spring'];
 const SUMMER: Season[] = ['summer'];
 const AUTUMN: Season[] = ['autumn'];
@@ -104,8 +103,8 @@ export const POEMS: Poem[] = [
   { lines: ['独坐幽篁里，弹琴复长啸。', '深林人不知，明月来相照。'], author: '王维', dynasty: '唐', title: '竹里馆', authorEn: 'Wang Wei',
     en: 'Sitting alone in the dark bamboo, I play the qin and whistle long. Deep in the wood no one knows — only the bright moon comes to shine on me.',
     plants: ['bamboo'], themes: ['focus', 'moon', 'night'] },
-  { lines: ['宁可食无肉，不可居无竹。', '无肉令人瘦，无竹令人俗。'], author: '苏轼', dynasty: '宋', title: '於潜僧绿筠轩', authorEn: 'Su Shi',
-    en: 'Better a meal without meat than a home without bamboo. No meat makes one thin; no bamboo makes one coarse.',
+  { lines: ['可使食无肉，不可使居无竹。', '无肉令人瘦，无竹令人俗。'], author: '苏轼', dynasty: '宋', title: '於潜僧绿筠轩', authorEn: 'Su Shi',
+    en: 'One may dine without meat, but not dwell without bamboo. No meat makes one thin; no bamboo makes one coarse.',
     plants: ['bamboo'], themes: ['garden'] },
   { lines: ['竹外桃花三两枝，春江水暖鸭先知。'], author: '苏轼', dynasty: '宋', title: '惠崇春江晚景', authorEn: 'Su Shi',
     en: 'Beyond the bamboo, two or three sprays of peach blossom; the ducks are first to know the spring river has warmed.',
@@ -413,10 +412,10 @@ export const POEMS: Poem[] = [
   { lines: ['结庐在人境，而无车马喧。', '问君何能尔？心远地自偏。'], author: '陶渊明', dynasty: '东晋', title: '饮酒·其五', authorEn: 'Tao Yuanming',
     en: 'I built my hut among people, yet hear no noise of carts and horses. How can that be? When the heart is far, the place grows remote of itself.',
     themes: ['focus', 'garden'] },
-  { lines: ['明窗延静昼，默坐消尘缘。', '即将无限意，寓此一炷烟。'], author: '陈与义', dynasty: '宋', title: '焚香', authorEn: 'Chen Yuyi',
-    en: 'A bright window draws out the quiet day; sitting in silence, I let worldly ties dissolve. All that is boundless in me I lodge in this one thread of incense smoke.',
+  { lines: ['明窗延静昼，默坐息诸缘。', '聊将无穷意，寓此一炷烟。'], author: '陈与义', dynasty: '宋', title: '烧香', authorEn: 'Chen Yuyi',
+    en: 'A bright window draws out the quiet day; sitting in silence, I let every tie come to rest. All that is boundless in me I lodge in this one thread of incense smoke.',
     themes: ['focus'] },
-  { lines: ['兵卫森画戟，燕寝凝清香。'], author: '韦应物', dynasty: '唐', title: '郡斋雨中与诸文士燕集', authorEn: 'Wei Yingwu',
+  { lines: ['兵卫森画戟，宴寝凝清香。'], author: '韦应物', dynasty: '唐', title: '郡斋雨中与诸文士燕集', authorEn: 'Wei Yingwu',
     en: 'Guards stand in ranks with painted halberds; in the quiet hall a clear fragrance hangs.',
     themes: ['focus', 'rain'] },
   { lines: ['重帘不卷留香久，古砚微凹聚墨多。'], author: '陆游', dynasty: '宋', title: '书室明暖终日婆娑其间倦则扶杖至小园戏作长句', authorEn: 'Lu You',

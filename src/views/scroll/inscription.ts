@@ -95,6 +95,15 @@ export function packColumns(phrases: string[], max: number, gap = true): (string
       cur = [];
     }
     if (cur.length && gap) cur.push(null);
+    if (!cur.length && chars.length > max) {
+      // split an over-long phrase into even parts rather than leaving an orphan
+      const parts = Math.ceil(chars.length / max);
+      const per = Math.ceil(chars.length / parts);
+      while (chars.length > per) {
+        cols.push(chars.slice(0, per));
+        chars = chars.slice(per);
+      }
+    }
     while (cellsLen(cur) + chars.length > max) {
       const room = Math.max(1, Math.floor(max - cellsLen(cur)));
       cur.push(...chars.slice(0, room));
@@ -127,72 +136,77 @@ export function pressSeal(ctx: CanvasRenderingContext2D, s: SealPlacement): void
   ctx.restore();
 }
 
-export interface InscriptionBox {
-  /** Right edge of the text block (columns grow leftwards from here). */
-  right: number;
-  top: number;
-  /** Tallest a column may be. */
-  maxH: number;
-  /** Poem glyph size; colophon is ~0.6 of it. */
-  size: number;
-  /** Place the block on the left instead (columns still read right-to-left). */
-  align?: 'right' | 'left';
-  left?: number;
+export interface InscriptionPlan {
+  S: number;
+  s: number;
+  leadP: number;
+  leadS: number;
+  colW: number;
+  colWs: number;
+  poemCols: (string | null)[][];
+  colophon: (string | null)[][];
+  sealSize: number;
+  /** Block extent (seals included). */
+  width: number;
+  height: number;
 }
 
 /**
- * Set a full 题款: the poem in large running-script columns, then the colophon (date, record,
- * signature) in smaller kai, indented one character; the name seal under the signature and the
- * leisure seal (引首章) at the head of the first column. Returns the block's left edge.
+ * Lay out a 题款 for a column height limit: the poem in large running-script columns (one verse a
+ * column; two short verses may share), then the colophon — date, record, signature — in smaller kai,
+ * indented one character, with room for the name seal under the signature.
  */
-export function drawInscription(ctx: CanvasRenderingContext2D, ins: Inscription, box: InscriptionBox, fonts: Fonts, seed: number): { left: number; bottom: number } {
-  const rng = makeRng(seed);
-  const S = box.size;
+export function planInscription(ins: Inscription, maxH: number, S: number, allowBreak = false): InscriptionPlan {
   const s = Math.round(S * 0.58);
   const leadP = 1.08, leadS = 1.14;
-  const maxP = Math.max(4, Math.min(10, Math.floor(box.maxH / (S * leadP))));
-  const maxS = Math.max(6, Math.floor((box.maxH - S) / (s * leadS)));
+  // a verse is never broken (up to 9 characters); longer lines are split evenly
+  const longestVerse = Math.max(0, ...ins.verses.map((v) => Array.from(v).length));
+  const maxP = Math.max(4, Math.min(10, Math.max(Math.floor(maxH / (S * leadP)), Math.min(9, longestVerse))));
+  // colophon phrases are never broken mid-phrase if they can be kept whole (up to 13 characters)
+  const longest = Math.max(0, ...[...ins.date, ...ins.record].map((p) => Array.from(p).length));
+  const maxS = Math.max(allowBreak ? 8 : 6, Math.floor((maxH - S * 1.05) / (s * leadS)), allowBreak ? 0 : Math.min(13, longest));
   const poemCols = packColumns(ins.verses, maxP, false);
-  // one verse per column reads best; two short (5-char) verses may share one
   const colW = S * 1.34;
   const colWs = s * 1.62;
   const colophon = packColumns([...ins.date, ...ins.record], maxS);
-  // signature goes at the foot of the last column if it fits (with seal room), else its own column
   const signCells = Array.from(ins.sign);
   const sealSize = Math.round(s * 1.9);
   const last = colophon[colophon.length - 1] ?? [];
   const sealCells = sealSize / (s * leadS) + 0.4;
   if (last.length && cellsLen(last) + 1 + signCells.length + sealCells <= maxS) last.push(null, null, ...signCells);
   else colophon.push(signCells);
+  const width = poemCols.length * colW + S * 0.2 + colophon.length * colWs + S * 0.5;
+  const poemH = Math.max(...poemCols.map(cellsLen), 0) * S * leadP;
+  const colH = Math.max(...colophon.map(cellsLen), 0) * s * leadS + S * 1.05;
+  const lastH = cellsLen(colophon[colophon.length - 1] ?? []) * s * leadS + S * 1.05 + s * 0.35 + sealSize;
+  return { S, s, leadP, leadS, colW, colWs, poemCols, colophon, sealSize, width, height: Math.max(poemH, colH, lastH) };
+}
 
-  const width = poemCols.length * colW + S * 0.2 + colophon.length * colWs;
-  const right = box.align === 'left' ? (box.left ?? 0) + width : box.right;
-
+/**
+ * Paint a planned inscription with its right edge at `right`; the name seal (白文) goes under the
+ * signature and the leisure seal (朱文, oval 引首章) at the head of the first column.
+ */
+export function drawInscription(ctx: CanvasRenderingContext2D, ins: Inscription, plan: InscriptionPlan, right: number, top: number, fonts: Fonts, seed: number): void {
+  const rng = makeRng(seed);
+  const { S, s, leadP, leadS, colW, colWs, sealSize } = plan;
   let x = right - colW / 2;
-  const poemFont = fonts.brush;
-  for (const col of poemCols) {
-    drawColumn(ctx, col, x, box.top, S, leadP, poemFont, rng);
+  for (const col of plan.poemCols) {
+    drawColumn(ctx, col, x, top, S, leadP, fonts.brush, rng);
     x -= colW;
   }
   x += colW / 2 - S * 0.2 - colWs / 2;
-  let signBottom = box.top;
+  let signBottom = top;
   let signX = x;
-  colophon.forEach((col, i) => {
-    const y = box.top + S * 1.05;
-    const end = drawColumn(ctx, col, x, y, s, leadS, fonts.text, rng, INK, 0.86);
-    if (i === colophon.length - 1) { signBottom = end; signX = x; }
+  plan.colophon.forEach((col, i) => {
+    const end = drawColumn(ctx, col, x, top + S * 1.05, s, leadS, fonts.text, rng, INK, 0.86);
+    if (i === plan.colophon.length - 1) { signBottom = end; signX = x; }
     x -= colWs;
   });
-  const left = x + colWs / 2 - s * 0.6;
-
-  // name seal (白文) just under the signature
   const nameSeal = makeSeal(ins.seal, { size: sealSize, dpr: 1, style: 'bai', seed: seed + 1 });
   pressSeal(ctx, { canvas: nameSeal, x: signX, y: signBottom + s * 0.35 + sealSize / 2, size: sealSize, rot: rng.gauss() * 0.02 });
-  // leisure seal (朱文, oval) at the head of the first column, in the margin to its right
-  const lz = Math.round(S * 1.05);
+  const lz = Math.round(S * 1.25);
   const leisure = makeSeal(ins.leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: seed + 2 });
-  pressSeal(ctx, { canvas: leisure, x: right + lz * 0.34, y: box.top + lz * 0.3, size: lz, rot: rng.gauss() * 0.02 });
-  return { left, bottom: Math.max(signBottom + sealSize, box.top + maxP * S * leadP) };
+  pressSeal(ctx, { canvas: leisure, x: right + lz * 0.26, y: top + lz * 0.22, size: lz, rot: rng.gauss() * 0.02 });
 }
 
 /** Plain horizontal text with brushed ink (used for titles and small labels on posters). */

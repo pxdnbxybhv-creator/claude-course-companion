@@ -1,7 +1,7 @@
 // One day, opened from the calendar: its full lunar date, term & pentad, festivals, moon,
 // 宜/忌 — and what the user did that day.
 import type { DateKey } from '../../core/types';
-import { diffDays } from '../../core/date';
+import { cnNumber, diffDays } from '../../core/date';
 import { termContext } from '../../core/solarterms';
 import { moonInfo } from '../../core/astro';
 import { TERMS } from '../../data/terms';
@@ -33,7 +33,7 @@ export function DaySheet(props: { dayKey: DateKey | null; todayKey: DateKey; onC
   const note = s.notes[key];
   const rel = diffDays(props.todayKey, key);
   const relText = rel === 0 ? t('今天', 'Today') : rel === 1 ? t('明天', 'Tomorrow') : rel === -1 ? t('昨天', 'Yesterday') : rel > 0 ? t(`${rel} 天后`, `in ${rel} days`) : t(`${-rel} 天前`, `${-rel} days ago`);
-  const title = en ? `${WEEK_EN[info.weekday]}, ${MONTH_EN[info.m]} ${info.d}` : `${info.m + 1}月${info.d}日 · 星期${WEEK_ZH[info.weekday]}`;
+  const title = en ? `${WEEK_EN[info.weekday]}, ${MONTH_EN[info.m]} ${info.d}` : `${cnNumber(info.m + 1)}月${cnNumber(info.d)}日 · 星期${WEEK_ZH[info.weekday]}`;
 
   return (
     <Sheet open onClose={props.onClose} title={<span class={en ? 'latin alm-sheet-title-en' : ''}>{title}</span>} label={title}>

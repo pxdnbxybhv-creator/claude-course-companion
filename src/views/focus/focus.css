@@ -61,8 +61,8 @@
 .fx-dur:active { transform: scale(0.96); }
 .fx-dur-n { font-size: 23px; line-height: 1; }
 .fx-dur-l { font-size: 11px; line-height: 1.2; color: var(--ink-3); letter-spacing: 0.04em; white-space: nowrap; }
-.fx-dur[aria-checked='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
-.fx-dur[aria-checked='true'] .fx-dur-l { color: color-mix(in srgb, var(--paper) 72%, transparent); }
+.fx-dur[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+.fx-dur[aria-pressed='true'] .fx-dur-l { color: color-mix(in srgb, var(--paper) 72%, transparent); }
 
 .fx-custom { display: flex; align-items: center; justify-content: center; gap: 10px; animation: fx-rise 0.3s var(--ease); }
 .fx-step { font-size: 20px; font-family: var(--font-latin); }
@@ -86,23 +86,23 @@
   transition: background 0.25s, color 0.25s, border-color 0.25s, transform 0.3s var(--ease);
 }
 .fx-amb-cap { font-size: 11px; color: var(--ink-3); letter-spacing: 0.06em; white-space: nowrap; }
-.fx-amb-btn[aria-checked='true'] .fx-amb-glyph { background: var(--ink); color: var(--paper); border-color: var(--ink); transform: rotate(-4deg); }
-.fx-amb-btn[aria-checked='true'] .fx-amb-cap { color: var(--ink); }
+.fx-amb-btn[aria-pressed='true'] .fx-amb-glyph { background: var(--ink); color: var(--paper); border-color: var(--ink); transform: rotate(-4deg); }
+.fx-amb-btn[aria-pressed='true'] .fx-amb-cap { color: var(--ink); }
 .fx-amb.is-compact { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
 .fx-amb.is-compact .fx-amb-btn { min-width: 44px; min-height: 44px; }
 .fx-amb.is-compact .fx-amb-glyph { width: 32px; height: 32px; font-size: 17px; }
 .fx-amb.is-compact .fx-amb-cap { display: none; }
-.fx-amb.is-compact .fx-amb-btn:not([aria-checked='true']) .fx-amb-glyph { border-color: transparent; color: var(--ink-3); }
+.fx-amb.is-compact .fx-amb-btn:not([aria-pressed='true']) .fx-amb-glyph { border-color: transparent; color: var(--ink-3); }
 
 .fx-light { width: 100%; min-height: 52px; font-size: 17px; letter-spacing: 0.24em; }
 .fx-light-glyph { font-size: 22px; line-height: 1; letter-spacing: 0; opacity: 0.9; }
 
 /* ------------------------------------------------------------ burning */
 
-.fx-burning { display: grid; gap: 10px; justify-items: center; text-align: center; animation: fx-rise 0.5s var(--ease); }
+.fx-burning { display: grid; gap: 8px; justify-items: center; text-align: center; animation: fx-rise 0.5s var(--ease); }
 .fx-clock { display: grid; justify-items: center; gap: 2px; padding-top: 2px; }
 .fx-time {
-  font-size: clamp(50px, 15vw, 68px); line-height: 1; font-weight: 400; color: var(--ink);
+  font-size: clamp(46px, 13vw, 66px); line-height: 1; font-weight: 400; color: var(--ink);
   font-variant-numeric: oldstyle-nums tabular-nums; letter-spacing: 0.02em;
   transition: opacity 0.6s var(--ease);
 }
@@ -114,13 +114,14 @@
 .fx-out { color: var(--ink-2); }
 
 .fx-ask {
-  width: 100%; max-width: 420px; margin-top: 4px; padding: 12px 14px; border-radius: var(--radius);
-  background: var(--paper-2); border: 1px solid var(--line); text-align: left; animation: fx-rise 0.5s var(--ease);
+  display: flex; align-items: center; gap: 4px; max-width: 100%;
+  padding: 2px 4px 2px 14px; border-radius: 999px; border: 1px dashed var(--line-strong);
+  animation: fx-rise 0.5s var(--ease);
 }
-.fx-ask p { margin: 0 0 8px; font-size: 14px; color: var(--ink-2); }
-.fx-ask-btns { display: flex; gap: 8px; justify-content: flex-end; }
-.fx-ask-btns .btn { min-height: 40px; }
+.fx-ask p { margin: 0 6px 0 0; font-size: 13.5px; color: var(--ink-2); min-width: 0; }
+.fx-ask .btn { min-height: 38px; padding: 0 12px; }
 
+.fx-burning .sheet { text-align: left; }
 .fx-confirm-body { margin: 6px 0 18px; color: var(--ink-2); font-size: 15px; }
 .fx-confirm-btns { display: flex; gap: 10px; flex-wrap: wrap; }
 .fx-confirm-btns .btn { flex: 1 1 140px; }
@@ -152,6 +153,9 @@
 .fx-row.is-out .fx-row-mark { opacity: 0.3; }
 
 /* ------------------------------------------------------------ completion */
+
+/* The kit focuses the dialog itself; no ring around the whole sheet. */
+.sheet:has(.fx-done):focus-visible, .sheet:has(.fx-confirm-body):focus-visible { outline: none; }
 
 .fx-done { display: grid; gap: 14px; padding: 4px 0 2px; text-align: center; }
 .fx-done-head { display: grid; justify-items: center; gap: 2px; }
@@ -204,6 +208,11 @@
   .fx-amb.is-compact { justify-content: flex-start; margin-left: -6px; }
 }
 
+@media (min-width: 900px) {
+  /* The tab bar floats as a pill here (bottom 18px); keep the painting clear of it. */
+  .fx-stage { height: clamp(500px, calc(100dvh - 148px), 940px); }
+}
+
 @media (min-width: 1180px) {
   .fx {
     grid-template-columns: minmax(260px, 320px) auto minmax(260px, 320px);
@@ -220,3 +229,11 @@
   .fx-dur-l { font-size: 10px; letter-spacing: 0; }
   .fx-dur-n { font-size: 21px; }
 }
+
+/* Latin text wants far less tracking than Chinese. */
+:root:lang(en) .fx-light { letter-spacing: 0.06em; }
+:root:lang(en) .fx-reading { letter-spacing: 0.08em; font-family: var(--font-latin); font-size: 15px; font-style: italic; }
+:root:lang(en) .fx-done-title { letter-spacing: 0.02em; font-size: 21px; }
+:root:lang(en) .fx-done-today { letter-spacing: 0.02em; }
+:root:lang(en) .fx-intent .input::placeholder { letter-spacing: 0.01em; font-style: italic; }
+:root:lang(en) .fx-intro-text { font-size: 16px; line-height: 1.6; }

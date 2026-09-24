@@ -1,5 +1,5 @@
 // 今日 · 本周 — a row of painted incense sticks for the last seven days, and today's sessions.
-import { state, today } from '../../app/store';
+import { lang, state, today } from '../../app/store';
 import { useT } from '../../app/i18n';
 import { weekday } from '../../core/date';
 import { hashString, makeRng } from '../../core/rng';
@@ -17,7 +17,7 @@ function stickPath(x: number, h: number, lean: number, seed: number, base = BASE
   const BASE_ = base;
   const topX = x + lean, topY = BASE_ - h;
   const bow = rng.range(-1.1, 1.1);
-  const w0 = rng.range(1.25, 1.55), w1 = rng.range(0.7, 0.9);
+  const w0 = rng.range(1.5, 1.8), w1 = rng.range(0.8, 1.0);
   const mx = (x + topX) / 2 + bow, my = (BASE_ + topY) / 2;
   const f = (n: number) => n.toFixed(2);
   return [
@@ -65,7 +65,7 @@ function DaySticks(props: { d: DaySummary; i: number; scale: number; isToday: bo
 
 export function History() {
   const t = useT();
-  const zh = t('zh', 'en') === 'zh';
+  const zh = lang.value === 'zh';
   const td = today.value;
   const focus = state.value.focus;
   const days = recentDays(focus, td, 7);

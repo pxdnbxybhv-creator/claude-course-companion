@@ -106,18 +106,27 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+/**
+ * This worker's cache for runtime writes — or null once a newer worker has activated and deleted
+ * it (a superseded worker may still be finishing a request; it must not resurrect its cache).
+ */
+async function liveCache() {
+  return (await caches.has(CACHE)) ? caches.open(CACHE) : null;
+}
+
 /** Fetch a fresh index.html; store it only after all of its assets are cached. */
 async function revalidateShell() {
-  const cache = await caches.open(CACHE);
   const res = await fetch(INDEX, { cache: 'no-cache' });
-  if (!res.ok) return res;
+  const cache = await liveCache();
+  if (!res.ok || !cache) return clean(res);
   const [fresh, cached] = await Promise.all([res.clone().text(), cache.match(INDEX).then((r) => r && r.text())]);
   if (fresh !== cached) await cacheShell(cache, res.clone());
   return clean(res);
 }
 
 async function serveShell(event) {
-  const cached = await caches.match(INDEX);
+  const own = await liveCache();
+  const cached = (own && (await own.match(INDEX))) || (await caches.match(INDEX));
   const update = revalidateShell();
   if (cached) {
     event.waitUntil(update.catch(() => {}));
@@ -131,19 +140,20 @@ async function serveShell(event) {
 }
 
 async function cacheFirst(request) {
-  const hit = await caches.match(request);
+  const own = await liveCache();
+  const hit = (own && (await own.match(request))) || (await caches.match(request));
   if (hit) return hit;
   const res = await fetch(request);
   if (res.ok && res.type === 'basic') {
-    const cache = await caches.open(CACHE);
-    await cache.put(request, res.clone());
+    const cache = await liveCache();
+    if (cache) await cache.put(request, res.clone());
   }
   return res;
 }
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || !inScope(request.url)) return;
+  if (request.method !== 'GET' || !inScope(request.url) || request.headers.has('range')) return;
   const url = new URL(request.url);
   if (request.mode === 'navigate') {
     // The app is a single page with a hash router: any navigation to it gets the shell.
@@ -152,4 +162,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   event.respondWith(cacheFirst(request));
+});
+
+// Focus-timer notifications shown through the worker (Android needs this): a tap brings the app
+// back — the open window if there is one, otherwise a new one on the focus view.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      const win = wins.find((c) => inScope(c.url));
+      if (win) return win.focus();
+      const target = event.notification.data && event.notification.data.url;
+      return self.clients.openWindow(new URL(target || './#focus', SCOPE).href);
+    })(),
+  );
 });

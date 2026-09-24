@@ -156,10 +156,23 @@ export function sunLongitude(now: Date, current: TermInstant, next: TermInstant)
   return (315 + 15 * current.index + 15 * f) % 360;
 }
 
-/** Fraction 0..1 of the way through the current term. */
-export function termProgress(now: Date, current: TermInstant, next: TermInstant): number {
-  const span = next.at.getTime() - current.at.getTime();
-  return span > 0 ? Math.min(1, Math.max(0, (now.getTime() - current.at.getTime()) / span)) : 0;
+const DAY_MS = 86_400_000;
+/** Day number of an instant's China (UTC+8) calendar day. */
+export function chinaDay(at: Date): number {
+  return Math.floor((at.getTime() + 8 * 3600_000) / DAY_MS);
+}
+/** Day number of a Date's local calendar day (same scale as chinaDay). */
+export function localDay(d: Date): number {
+  return Math.round(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS);
+}
+
+/**
+ * How far through the current term (0..1) the middle of `day` is, counting in whole China-time
+ * days as the almanac (and termContext's pentads) do.
+ */
+export function termProgress(day: Date, current: TermInstant, next: TermInstant): number {
+  const a = chinaDay(current.at), b = chinaDay(next.at);
+  return b > a ? Math.min(1, Math.max(0, (localDay(day) - a + 0.5) / (b - a))) : 0;
 }
 
 export const SEASON_ZH = { spring: '春', summer: '夏', autumn: '秋', winter: '冬' } as const;

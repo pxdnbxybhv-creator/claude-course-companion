@@ -234,9 +234,13 @@ function resumeAmbientOnGesture(): void {
 
 // --------------------------------------------------------------------------- actions
 
+/** Set when lit from the keyboard, so the view can move focus to the new controls. */
+export let litByKeyboard = false;
+
 /** Light a stick. Call from the click handler (user gesture) so audio can start. */
-export function lightIncense(minutes: number, intent?: string): void {
+export function lightIncense(minutes: number, intent?: string, byKeyboard = false): void {
   if (active.value) return;
+  litByKeyboard = byKeyboard;
   const s = light(minutes, intent, Date.now());
   completion.value = null;
   restProgress.value = 0;

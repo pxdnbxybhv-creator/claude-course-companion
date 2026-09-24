@@ -10,17 +10,33 @@ import { YiJi } from './almanac/YiJi';
 import { Poem } from './almanac/Poem';
 import { MonthCalendar } from './almanac/MonthCalendar';
 import { YearWheel } from './almanac/YearWheel';
-import { dayInfo } from './almanac/model';
+import { dayDate, dayInfo } from './almanac/model';
+import { useMedia } from './almanac/hooks';
 import './almanac/almanac.css';
+import { replaceState } from '../app/store';
+import { demoState } from '../app/demo';
+
+// DEV-only: `?demo` seeds the demo garden so the calendar's ink dots and notes can be seen.
+if (import.meta.env.DEV && typeof location !== 'undefined' && /[?&]demo\b/.test(location.search)) {
+  replaceState(demoState(today.value, lang.value));
+}
 
 export function AlmanacView() {
   const t = useT();
   const en = lang.value === 'en';
   const key = today.value;
   const now = new Date();
-  const ctx = termContext(now);
+  const ctx = termContext(dayDate(key));
   const info = dayInfo(key);
   const L = info.lunar;
+  const wide = useMedia('(min-width: 960px)');
+
+  const hero = <Hero day={dayDate(key)} ctx={ctx} />;
+  const todayCard = <Today dayKey={key} now={now} />;
+  const yiji = <YiJi dayKey={key} term={ctx.current.index} />;
+  const poem = <Poem dayKey={key} term={ctx.current.index} />;
+  const cal = <MonthCalendar todayKey={key} key={key} />;
+  const wheel = <YearWheel now={now} ctx={ctx} yearGanZhi={L.yearGanZhi} zodiac={L.zodiac} zodiacEn={L.zodiacEn} />;
 
   return (
     <div class="alm">
@@ -32,26 +48,29 @@ export function AlmanacView() {
           </span>
         </div>
       </header>
-      <div class="alm-grid page-wide">
-        <div class="alm-a-hero">
-          <Hero now={now} ctx={ctx} />
+      {wide ? (
+        <div class="alm-cols page-wide">
+          <div class="alm-col">
+            {hero}
+            {yiji}
+            {cal}
+          </div>
+          <div class="alm-col">
+            {todayCard}
+            {poem}
+            {wheel}
+          </div>
         </div>
-        <div class="alm-a-today">
-          <Today dayKey={key} now={now} />
+      ) : (
+        <div class="alm-stack page-wide">
+          {hero}
+          {todayCard}
+          {yiji}
+          {poem}
+          {cal}
+          {wheel}
         </div>
-        <div class="alm-a-yiji">
-          <YiJi dayKey={key} term={ctx.current.index} />
-        </div>
-        <div class="alm-a-poem">
-          <Poem dayKey={key} term={ctx.current.index} />
-        </div>
-        <div class="alm-a-cal">
-          <MonthCalendar todayKey={key} key={key} />
-        </div>
-        <div class="alm-a-wheel">
-          <YearWheel now={now} ctx={ctx} yearGanZhi={L.yearGanZhi} zodiac={L.zodiac} zodiacEn={L.zodiacEn} />
-        </div>
-      </div>
+      )}
       <p class="alm-foot">
         {t('农历与节气按北京时间推算', 'Lunar dates and solar terms follow China Standard Time (UTC+8)')}
       </p>

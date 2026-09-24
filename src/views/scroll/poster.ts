@@ -1,7 +1,7 @@
 // Poster composition: the garden as a mounted hanging scroll (立轴) or square panel (斗方),
 // and the year-in-ink (岁时记). Output is a canvas 1080 px wide, independent of the screen.
 import type { AppState, DateKey } from '../../core/types';
-import { hashString, makeRng } from '../../core/rng';
+import { hashString } from '../../core/rng';
 import { seasonOfTerm } from '../../core/solarterms';
 import { moonInfo } from '../../core/astro';
 import { pickPoem } from '../../data/poems';
@@ -9,8 +9,8 @@ import { fillPaper } from '../../ink/paper';
 import type { SceneEnv } from '../../ink/scene-types';
 import { renderGardenStill } from '../garden/scene';
 import { drawHangingScroll, drawPanel, drawWall, mountPalette, type MountPalette, type Rect } from './mount';
-import { drawInscription, ensureFonts, fontStacks, type Fonts } from './inscription';
-import { composeInscription, englishCaption, posterData, type PosterData } from './text';
+import { drawInscription, ensureFonts, fontStacks, planInscription, type Fonts, type InscriptionPlan } from './inscription';
+import { composeInscription, englishCaption, posterData, type Inscription, type PosterData } from './text';
 import { drawYear } from './year';
 
 export type PosterKind = 'garden' | 'year';
@@ -79,7 +79,7 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
 
 /** The garden still in a portrait/square composition (logical width ≈ a phone screen). */
 async function gardenCanvas(d: PosterData, P: Rect, o: PosterOptions): Promise<HTMLCanvasElement | null> {
-  const logicalW = o.format === 'tall' ? 400 : 460;
+  const logicalW = o.format === 'tall' ? 410 : 540;
   const dpr = P.w / logicalW;
   const env: SceneEnv = {
     season: seasonOfTerm(d.termIndex),
@@ -102,12 +102,110 @@ function safe<T>(f: () => T, fallback: T): T {
   try { return f(); } catch { return fallback; }
 }
 
-function paintPainting(ctx: CanvasRenderingContext2D, P: Rect, garden: HTMLCanvasElement | null, ins: ReturnType<typeof composeInscription>, fonts: Fonts, o: PosterOptions, d: PosterData) {
+function paintPainting(ctx: CanvasRenderingContext2D, P: Rect, garden: HTMLCanvasElement | null, ins: Inscription, fonts: Fonts, o: PosterOptions, d: PosterData) {
   fillPaper(ctx, P.w, P.h, 11);
   if (garden && garden.width > 0) ctx.drawImage(garden, 0, 0, P.w, P.h);
-  const size = Math.round(P.w * (o.format === 'tall' ? 0.05 : 0.046));
+  const S0 = Math.round(P.w * (o.format === 'tall' ? 0.05 : 0.044));
   const margin = Math.round(P.w * 0.075);
-  drawInscription(ctx, ins, { right: P.w - margin, top: margin * 0.95, maxH: P.h * (o.format === 'tall' ? 0.42 : 0.5), size }, fonts, hashString(o.today) ^ (o.salt * 131) ^ d.year);
+  const top = Math.round(margin * 0.95);
+  const map = inkMap(garden, P.w, P.h);
+  // try the full size first, then smaller hands until the inscription finds clear paper
+  let place = placeInscription(map, ins, P, S0, margin, top);
+  for (const [k, br] of [[1, true], [0.9, true], [0.84, true]] as const) {
+    if (!place.crowded) break;
+    const next = placeInscription(map, ins, P, Math.round(S0 * k), margin, top, br);
+    if (!next.crowded || next.busy < place.busy) place = next;
+  }
+  drawInscription(ctx, ins, place.plan, place.right, top, fonts, hashString(o.today) ^ (o.salt * 131) ^ d.year);
+}
+
+interface InkMap { gw: number; gh: number; cw: number; ch: number; ink: Float32Array }
+
+/** A coarse map of where the garden has put ink (or colour), so the inscription can keep clear of it. */
+function inkMap(garden: HTMLCanvasElement | null, w: number, h: number): InkMap | null {
+  if (!garden || !garden.width || !garden.height) return null;
+  try {
+    const gw = 72, gh = Math.max(8, Math.round((72 * h) / w));
+    const c = document.createElement('canvas');
+    c.width = gw;
+    c.height = gh;
+    const x = c.getContext('2d', { willReadFrequently: true })!;
+    x.drawImage(garden, 0, 0, gw, gh);
+    const px = x.getImageData(0, 0, gw, gh).data;
+    // reference paper tone from the top rows (mostly empty sky)
+    const lums: number[] = [], sats: number[] = [];
+    for (let i = 0; i < gw * Math.round(gh * 0.12); i++) {
+      if (px[i * 4 + 3] < 200) continue;
+      const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2];
+      lums.push(0.299 * r + 0.587 * g + 0.114 * b);
+      sats.push((Math.max(r, g, b) - Math.min(r, g, b)) / 255);
+    }
+    lums.sort((a, b) => a - b);
+    sats.sort((a, b) => a - b);
+    const ref = lums.length ? lums[Math.floor(lums.length * 0.85)] : 236;
+    const refSat = sats.length ? sats[Math.floor(sats.length * 0.5)] : 0.1; // xuan paper is a warm off-white
+    const ink = new Float32Array(gw * gh);
+    for (let i = 0; i < gw * gh; i++) {
+      const r = px[i * 4], g = px[i * 4 + 1], b = px[i * 4 + 2], a = px[i * 4 + 3] / 255;
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+      ink[i] = a * Math.max(Math.max(0, (ref - lum) / Math.max(1, ref)), Math.max(0, sat - refSat - 0.02) * 3.5);
+    }
+    return { gw, gh, cw: w / gw, ch: h / gh, ink };
+  } catch {
+    return null; // tainted or unsupported — fall back to the default corner
+  }
+}
+
+/** Cells with real ink in a rectangle, and the summed ink (for ranking crowded options). */
+function busyCells(m: InkMap, x0: number, y0: number, x1: number, y1: number): { n: number; sum: number } {
+  const i0 = Math.max(0, Math.floor(x0 / m.cw)), i1 = Math.min(m.gw - 1, Math.ceil(x1 / m.cw));
+  const j0 = Math.max(0, Math.floor(y0 / m.ch)), j1 = Math.min(m.gh - 1, Math.ceil(y1 / m.ch));
+  let n = 0, sum = 0;
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      const v = m.ink[j * m.gw + i];
+      if (v > 0.16) n++;
+      sum += v * v;
+    }
+  }
+  return { n, sum };
+}
+
+/**
+ * Find clear paper for the inscription (留白): sweep the block from the right edge to the left, with
+ * the tallest columns that stay clear of the painting; prefer the corners. If nothing is clear, take
+ * the option that covers the least (and faintest) ink.
+ */
+function placeInscription(m: InkMap | null, ins: Inscription, P: Rect, S: number, margin: number, top: number, allowBreak = false): { plan: InscriptionPlan; right: number; crowded: boolean; busy: number } {
+  const tall = P.h / P.w > 1.2;
+  const fMax = tall ? 0.44 : 0.52, fMin = tall ? 0.2 : 0.22;
+  if (!m) {
+    const plan = planInscription(ins, P.h * (tall ? 0.34 : 0.42), S);
+    return { plan, right: P.w - margin, crowded: false, busy: 0 };
+  }
+  let best: { plan: InscriptionPlan; right: number; score: number } | null = null;
+  let fallback: { plan: InscriptionPlan; right: number; busy: number } | null = null;
+  for (let f = fMax; f >= fMin - 1e-6; f -= 0.02) {
+    const plan = planInscription(ins, P.h * f, S, allowBreak);
+    const hi = P.w - margin, lo = margin + plan.width - S * 0.5;
+    const steps = 10;
+    for (let k = 0; k <= steps; k++) {
+      // alternate from both corners toward the middle
+      const t = k % 2 === 0 ? k / 2 / steps : 1 - (k + 1) / 2 / steps;
+      const right = hi + (lo - hi) * t;
+      if (right < lo - 1) continue;
+      const b = busyCells(m, right - plan.width + S * 0.5 - S * 0.3, top - S * 0.4, right + S * 0.8, top + plan.height + S * 0.4);
+      const edge = Math.min(t, 1 - t); // 0 at a corner, 0.5 in the middle
+      if (b.n <= 1) {
+        const score = f - edge * 0.5 + (t < 0.5 ? 0.02 : 0);
+        if (!best || score > best.score) best = { plan, right, score };
+      } else if (!fallback || b.sum < fallback.busy) fallback = { plan, right, busy: b.sum };
+    }
+    if (best && best.score > f - 0.02) break; // a corner at this height — can't do better
+  }
+  if (best) return { plan: best.plan, right: best.right, crowded: false, busy: 0 };
+  return { ...fallback!, crowded: true };
 }
 
 function drawCaption(ctx: CanvasRenderingContext2D, W: number, y: number, text: string, sub: string, fonts: Fonts, pal: MountPalette) {
@@ -155,4 +253,4 @@ function wrapCentered(ctx: CanvasRenderingContext2D, text: string, x: number, y:
   lines.forEach((l, i) => ctx.fillText(l, x, y + i * lh));
 }
 
-export { makeRng };
+

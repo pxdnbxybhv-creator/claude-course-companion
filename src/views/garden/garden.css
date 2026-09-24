@@ -1,0 +1,213 @@
+/* 园圃 — the garden view. The painting is the star; the chrome is quiet paper and ink. */
+
+.garden { padding-bottom: 8px; }
+
+/* ------------------------------------------------------------------ header */
+.garden-top {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: calc(8px + env(safe-area-inset-top)) var(--gutter) 8px; max-width: 1180px; margin: 0 auto;
+}
+.garden-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.garden-title h1 { margin: 0; font-size: 34px; line-height: 1; letter-spacing: 0.02em; flex: none; }
+.garden-date { margin: 0; font-size: 13px; line-height: 1.4; color: var(--ink-3); letter-spacing: 0.04em; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+:lang(en) .garden-date { font-size: 14px; letter-spacing: 0.01em; }
+.garden-fest { color: var(--cinnabar); margin-right: 0.6em; }
+.garden-settings { flex: none; color: var(--ink-2); }
+
+/* ------------------------------------------------------------------ the painting */
+.garden-stage { position: relative; }
+.garden-mount { position: relative; }
+.garden-canvas {
+  display: block; width: 100%;
+  height: clamp(300px, 55vh, 540px);
+  height: clamp(300px, 55svh, 540px);
+  background: #f1e9d8; /* paper before the first paint, in either theme */
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  outline-offset: -3px;
+}
+@media (min-width: 900px) {
+  .garden-stage { max-width: 1180px; margin: 4px auto 0; padding: 0 var(--gutter); }
+  .garden-mount {
+    padding: 9px; background: var(--mount); border-radius: 3px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 18px 40px -26px rgba(40, 30, 10, 0.55);
+  }
+  .garden-mount::after { /* the fine silk edge (隔水) between mount and painting */
+    content: ''; position: absolute; inset: 8px; border: 1px solid rgba(80, 60, 30, 0.14); pointer-events: none;
+  }
+  .garden-canvas { height: clamp(420px, 62vh, 560px); }
+}
+
+/* 题款 — poems written into the sky */
+.inscription {
+  position: absolute; top: 6%; right: 6%; pointer-events: none; z-index: 2;
+  color: rgba(38, 33, 27, 0.86); font-family: var(--font-text); font-size: 17px;
+  text-shadow: 0 0 2px rgba(241, 233, 216, 0.95), 0 0 6px rgba(241, 233, 216, 0.8);
+}
+.inscription.is-left { right: auto; left: 6%; }
+@media (min-width: 900px) {
+  .inscription { font-size: 19px; top: 8%; right: 7%; }
+  .inscription.is-left { left: 7%; }
+}
+.inscription-cols { display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 5px; }
+.inscription-col { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.16em; line-height: 1.25; }
+.inscription-by-zh { font-size: 11px; letter-spacing: 0.1em; opacity: 0.72; margin-top: 2.6em; }
+.inscription .ch { display: inline-block; animation: ink-in 1s var(--ease) both; }
+.inscription.is-en { max-width: min(60%, 360px); font-family: var(--font-latin); font-style: italic; font-size: 18px; line-height: 1.32; text-align: right; }
+.inscription.is-en.is-left { text-align: left; }
+.inscription-en { margin: 0; animation: ink-in 1.3s var(--ease) both; }
+.inscription-by { margin: 0.35em 0 0; font-size: 14px; font-style: normal; letter-spacing: 0.06em; opacity: 0.7; animation: ink-in 1.3s var(--ease) 0.5s both; }
+.inscription.is-transient { animation: insc-out 0.9s ease 3.7s both; }
+@keyframes ink-in { from { opacity: 0; filter: blur(3px); transform: translateY(-2px); } to { opacity: 1; filter: none; transform: none; } }
+@keyframes insc-out { to { opacity: 0; filter: blur(2px); } }
+
+/* ------------------------------------------------------------------ today */
+.garden-page { padding-top: 2px; }
+.garden-page .section-title { margin-top: 22px; }
+.garden-count { font-size: 15px; color: var(--ink-2); letter-spacing: 0.04em; text-transform: none; }
+.garden-subtitle { margin: 22px 0 2px; font-size: 13px; font-weight: 400; letter-spacing: 0.18em; color: var(--ink-3); }
+.garden-rest-all { font-size: 15px; margin: 6px 0; }
+
+.hlist { list-style: none; margin: 0; padding: 0; }
+.hrow { display: flex; align-items: center; gap: 6px; min-height: 68px; border-bottom: 1px solid var(--line); }
+.hrow:last-child { border-bottom: 0; }
+.hrow-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 10px 2px; min-height: 64px; text-align: left; border-radius: 12px; transition: background 0.2s; }
+.hrow-main:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.hrow-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.hrow-name { font-size: 17px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
+.hrow-sub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
+.hrow-streak { overflow: hidden; text-overflow: ellipsis; }
+.hrow .plant-glyph { transition: background 0.35s, color 0.35s, border-color 0.35s; }
+.hrow.is-done .plant-glyph { border-color: var(--ink-2); }
+.hlist.is-resting .hrow-main { opacity: 0.72; }
+
+.wdots { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.wdots i { display: block; width: 6px; height: 6px; border-radius: 50%; }
+.wdots i.is-done { background: var(--ink); opacity: 0.82; }
+.wdots i.is-missed { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.wdots i.is-today { box-shadow: inset 0 0 0 1px var(--ink-3); }
+.wdots i.is-rest { width: 3px; height: 3px; margin: 0 1.5px; background: var(--line-strong); }
+
+/* 圆相 — the check button */
+.enso { position: relative; flex: none; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 50%; color: var(--ink); }
+.enso svg { width: 46px; height: 46px; overflow: visible; transition: transform 0.2s var(--ease); }
+.enso:active svg { transform: scale(0.88) rotate(-4deg); }
+.enso-ring { fill: transparent; transition: fill 0.2s; }
+.enso:hover .enso-ring { fill: color-mix(in srgb, var(--ink) 5%, transparent); }
+.enso-faint { fill: currentColor; opacity: 0.24; transition: opacity 0.3s; }
+.enso:hover .enso-faint { opacity: 0.38; }
+.enso.is-quiet .enso-faint { opacity: 0.16; }
+.enso-ink { fill: currentColor; }
+.enso-reveal { fill: none; stroke: #fff; stroke-width: 11; stroke-dasharray: 1 1; stroke-dashoffset: 1; transition: stroke-dashoffset 0.3s ease-in; }
+.enso.is-done .enso-reveal { stroke-dashoffset: 0; transition: stroke-dashoffset 0.62s cubic-bezier(0.4, 0.1, 0.25, 1); }
+.enso-heart { transform-box: fill-box; transform-origin: center; transform: scale(0.2); opacity: 0; transition: transform 0.25s ease-in, opacity 0.2s ease-in; }
+.enso.is-done .enso-heart { transform: scale(1); opacity: 1; transition: transform 0.5s var(--ease) 0.22s, opacity 0.3s ease 0.22s; }
+.enso-blot { fill: currentColor; opacity: 0.9; }
+.enso-tick { fill: var(--paper); }
+.enso::after { content: ''; position: absolute; inset: 6px; border-radius: 50%; border: 2px solid currentColor; opacity: 0; pointer-events: none; }
+.enso.is-fresh::after { animation: enso-ripple 0.95s var(--ease) 0.2s; }
+@keyframes enso-ripple { from { transform: scale(0.75); opacity: 0.32; } to { transform: scale(1.55); opacity: 0; } }
+
+.garden-add { margin: 10px 0 0 -6px; color: var(--ink-2); padding: 0 12px; }
+.garden-add-plus { font-size: 18px; line-height: 1; }
+
+/* empty */
+.garden-empty { text-align: center; padding: 26px 0 6px; }
+.garden-empty-lead { color: var(--ink-2); font-size: 16px; max-width: 24em; margin: 0 auto 20px; }
+.garden-empty-actions { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.garden-empty-actions .btn { min-width: 232px; }
+
+/* 今日一句 */
+.daynote { margin: 34px 0 6px; }
+.daynote-label { display: block; font-size: 13px; letter-spacing: 0.18em; color: var(--ink-3); }
+.daynote-input { font-size: 18px; padding: 10px 2px; }
+.daynote-input::placeholder { color: var(--ink-3); opacity: 0.7; }
+.daynote-recent { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.daynote-recent span { margin-right: 0.7em; opacity: 0.75; }
+
+/* pond clarity */
+.pondline { margin: 36px 0 10px; text-align: center; font-size: 13px; letter-spacing: 0.08em; color: var(--ink-3); }
+.pondline-sep { margin: 0 0.6em; }
+
+/* archived */
+.archived { margin: 8px 0 12px; }
+.archived summary { list-style: none; cursor: pointer; min-height: 44px; display: grid; place-items: center; font-size: 13px; letter-spacing: 0.1em; color: var(--ink-3); }
+.archived summary::-webkit-details-marker { display: none; }
+.archived ul { list-style: none; margin: 0; padding: 0; }
+.btn.is-danger { color: var(--cinnabar); border-color: var(--cinnabar); }
+
+/* ------------------------------------------------------------------ editor */
+.editor .field { margin: 16px 0; }
+.plant-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.plant-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 10px; min-width: 0;
+  border: 1px solid var(--line); border-radius: 14px; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+.plant-card:hover { border-color: var(--line-strong); }
+.plant-card.is-on { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.plant-card.is-on .plant-card-name { color: var(--ink); }
+.plant-thumb { display: block; max-width: 100%; border-radius: 9px; background: transparent; opacity: 0.35; transition: opacity 0.5s var(--ease); }
+/* Ink paintings stay on paper in dark mode. */
+:root[data-theme='dark'] .plant-thumb { background: #f1e9d8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .plant-thumb { background: #f1e9d8; } }
+.plant-thumb.is-ready { opacity: 1; }
+.plant-card-name { font-size: 13px; line-height: 1.3; margin-top: 4px; white-space: nowrap; }
+.plant-card-name .brush { font-size: 20px; }
+.plant-card-virtue { font-size: 11.5px; line-height: 1.3; color: var(--ink-3); text-align: center; }
+.weekday-chips { margin-top: 12px; gap: 6px; }
+.weekday-chips .chip { min-height: 44px; min-width: 44px; padding: 0 10px; }
+.editor-actions { display: flex; margin-top: 22px; }
+.editor-go { flex: 1; font-size: 16px; }
+.editor-danger { display: flex; justify-content: space-between; gap: 8px; margin-top: 14px; padding-top: 8px; border-top: 1px solid var(--line); }
+.editor-danger .btn { min-height: 44px; }
+
+/* ------------------------------------------------------------------ detail */
+.detail { padding-bottom: 4px; }
+.detail-art { position: relative; width: fit-content; max-width: 100%; margin: 4px auto 0; padding: 7px; background: var(--mount); border-radius: 3px; box-shadow: 0 10px 24px -18px rgba(40, 30, 10, 0.6); }
+.plant-painting { display: block; max-width: 100%; background: #f1e9d8; opacity: 0.4; transition: opacity 0.5s var(--ease); }
+.plant-painting.is-ready { opacity: 1; }
+.detail-colophon { position: absolute; top: 18px; right: 18px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: rgba(38, 33, 27, 0.72); font-size: 13px; }
+.detail-colophon .vertical { letter-spacing: 0.2em; }
+.seal-mark { display: block; }
+.detail-kind { text-align: center; font-size: 13px; margin: 10px 0 0; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 16px 0 10px; }
+.stats > div { text-align: center; }
+.stats dt { font-size: 12px; letter-spacing: 0.14em; color: var(--ink-3); }
+.stats dd { margin: 0; font-size: 28px; line-height: 1.15; }
+.stats dd .num { font-variant-numeric: lining-nums; }
+.stats dd small { font-size: 12px; color: var(--ink-3); margin-left: 3px; }
+.bloom { margin: 6px 0 0; }
+.bloom-bar { height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.bloom-bar span { display: block; height: 100%; border-radius: 3px; background: var(--ink); opacity: 0.8; transition: width 0.8s var(--ease); }
+.bloom-text { margin: 6px 0 0; text-align: center; font-size: 13px; color: var(--ink-3); }
+
+.inkcal { margin: 24px 0 8px; }
+.inkcal-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 8px; font-size: 13px; letter-spacing: 0.08em; }
+.inkcal-head .muted { font-size: 12px; letter-spacing: 0.02em; }
+.inkcal-grid { display: grid; gap: 1px; align-items: center; }
+.inkcal-month { font-size: 10px; line-height: 14px; height: 14px; color: var(--ink-3); white-space: nowrap; overflow: visible; }
+.inkcal-wd { font-size: 10px; color: var(--ink-3); line-height: 1; }
+.inkcal-cell { aspect-ratio: 1; min-width: 0; display: grid; place-items: center; border-radius: 50%; }
+.inkcal-cell i { display: block; width: 26%; height: 26%; border-radius: 50%; background: var(--line-strong); transition: transform 0.2s var(--ease); }
+.inkcal-cell.is-missed i { width: 42%; height: 42%; background: transparent; box-shadow: inset 0 0 0 1px var(--line-strong); }
+.inkcal-cell.is-done i { background: var(--ink); }
+.inkcal-cell.is-today { box-shadow: inset 0 0 0 1px var(--ink-3); }
+.inkcal-cell:hover i { transform: scale(1.25); }
+.detail-actions { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+
+/* ------------------------------------------------------------------ welcome */
+.welcome { padding: 4px 2px 2px; }
+.welcome-poem { display: flex; flex-direction: row-reverse; justify-content: center; align-items: flex-start; gap: 30px; margin: 14px 0 16px; }
+.welcome-cols { display: flex; flex-direction: row-reverse; gap: 7px; font-size: 18px; }
+.welcome-cols .vertical { letter-spacing: 0.18em; line-height: 1.25; }
+.welcome-cols .welcome-by { font-size: 12px; color: var(--ink-3); margin-top: 2.4em; letter-spacing: 0.12em; }
+.welcome-title { margin: 0; font-size: 60px; line-height: 1; writing-mode: vertical-rl; letter-spacing: 0.08em; }
+.welcome-title .latin { display: none; }
+.welcome-en { margin: 0 0 16px; font-style: italic; font-size: 16px; line-height: 1.45; color: var(--ink-2); text-align: center; }
+.welcome-steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 12px; }
+.welcome-steps li { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.55; color: var(--ink-2); }
+.welcome-steps b { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 21px; font-weight: 400; color: var(--ink); line-height: 1; }
+.welcome-actions { display: flex; flex-direction: column; gap: 10px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .inscription .ch, .inscription-en, .inscription-by { filter: none !important; transform: none !important; }
+}

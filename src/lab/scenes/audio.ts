@@ -14,13 +14,30 @@ import { audio } from '../../audio/engine';
 
 const PAPER = '#f1e9d8', INK = '#1d1a16', RED = '#b93a2b', MUTED = 'rgba(29,26,22,.55)';
 
-interface Case { name: string; dur: number; play: (m: Mixer) => void; pitch?: number; ambient?: AmbientKind }
+interface Case { name: string; dur: number; play: (m: Mixer) => void; pitch?: number; ambient?: AmbientKind; notes?: () => string }
 
 function cases(): Case[] {
-  const bedCase = (kind: AmbientKind, dur: number, name: string): Case => ({
-    name, dur, ambient: kind,
-    play: (m) => { const b = createBed(kind, m, 0.05, 1234); b?.tick(dur); },
-  });
+  const bedCase = (kind: AmbientKind, dur: number, name: string): Case => {
+    let bed: ReturnType<typeof createBed> = null;
+    const seed = Number(new URLSearchParams(location.search).get('seed') ?? 1234);
+    return {
+      name, dur, ambient: kind,
+      play: (m) => { bed = createBed(kind, m, 0.05, seed); bed?.tick(dur); },
+      notes: () => {
+        const h = (bed as unknown as { history?: { t: number; deg: number; tex: string; slide?: number; glide?: number; dyad?: number }[] })?.history;
+        if (!h) return '';
+        const names = ['宫', '商', '角', '徵', '羽'];
+        let prev = -9, line = '';
+        for (const e of h) {
+          if (e.t - prev > 1.9) line += ` ‖${e.t.toFixed(0)}s ${e.tex}:`;
+          prev = e.t;
+          const o = Math.floor(e.deg / 5);
+          line += ` ${names[e.deg - 5 * o]}${o >= 0 ? "'".repeat(o) : ','.repeat(-o)}${e.slide ? (e.slide > 0 ? '↗' : '↘') : ''}${e.glide ? '~' : ''}${e.dyad !== undefined ? '+8' : ''}`;
+        }
+        return line;
+      },
+    };
+  };
   return [
     { name: 'pluck 宫 F3 (degree 0)', dur: 6, pitch: degreeFreq(0), play: (m) => playPluck(m, 0.05, 0, 0.7) },
     { name: 'pluck 徵 C2 (degree −7, lowest string)', dur: 7, pitch: degreeFreq(-7), play: (m) => playPluck(m, 0.05, -7, 0.85) },
@@ -130,7 +147,8 @@ function fft(re: Float64Array, im: Float64Array) {
 // ---------------------------------------------------------------------------
 // drawing
 
-function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, name: string, chs: Float32Array[], sr: number, m: Measure, extra: string, ok: boolean) {
+function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, name: string, chs: Float32Array[], sr: number, m: Measure, extra: string, ok: boolean, win = 0) {
+  if (win > 0) chs = chs.map((c) => c.subarray(0, Math.min(c.length, Math.round(win * sr))));
   const mono = new Float32Array(chs[0].length);
   for (const c of chs) for (let i = 0; i < mono.length; i++) mono[i] += c[i] / chs.length;
   const n = mono.length, dur = n / sr;
@@ -160,6 +178,7 @@ function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.strokeStyle = RED;
   ctx.beginPath();
   m.env.forEach((v, k) => {
+    if (k * m.envHop >= n) return;
     const px = x + (k * m.envHop / n) * w;
     const d = Math.max(-80, 20 * Math.log10(Math.max(v, 1e-9)));
     const py = wy + (-d / 80) * wh;
@@ -175,11 +194,13 @@ function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   const fLo = 50, fHi = 16000;
   const cols: Float64Array[] = [];
   let gmax = -Infinity;
+  const ltas = new Float64Array(N / 2);
   for (let px = 0; px < img.width; px++) {
     const s = Math.floor((px / img.width) * Math.max(0, n - N));
     const re = new Float64Array(N), im = new Float64Array(N);
     for (let i = 0; i < N; i++) re[i] = (mono[s + i] ?? 0) * hann[i];
     fft(re, im);
+    for (let b = 1; b < N / 2; b++) ltas[b] += re[b] * re[b] + im[b] * im[b];
     const col = new Float64Array(img.height);
     for (let py = 0; py < img.height; py++) {
       const f0 = fLo * Math.pow(fHi / fLo, 1 - (py + 1) / img.height), f1 = fLo * Math.pow(fHi / fLo, 1 - py / img.height);
@@ -200,6 +221,11 @@ function drawPanel(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
     img.data[o + 3] = 255;
   }
   ctx.putImageData(img, x * (ctx.getTransform().a), sy * (ctx.getTransform().d));
+  let num = 0, den = 0;
+  for (let b = 1; b < N / 2; b++) { num += ((b * sr) / N) * ltas[b]; den += ltas[b]; }
+  ctx.fillStyle = INK;
+  ctx.font = '10px ui-monospace, monospace';
+  ctx.fillText(`centroid ${(num / (den || 1)).toFixed(0)} Hz`, x + w - 110, sy + 11);
   ctx.fillStyle = MUTED;
   ctx.font = '9px ui-monospace, monospace';
   for (const f of [100, 1000, 10000]) {
@@ -304,6 +330,9 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     }
     const ms = performance.now() - t0;
     extra += `  ${ms.toFixed(0)} ms`;
+    const score = c.notes?.();
+    if (score) console.log('[audio-lab] score', c.name, score);
+    if (score && p.get('report')) console.warn('[audio-lab] score', score);
     results.push({ c, chs, m, extra, ok, ms });
   }
 
@@ -324,7 +353,7 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const pw = (W - 16 * 2 - gap * (cols - 1)) / cols;
   results.forEach((r, i) => {
     const cx = 16 + (i % cols) * (pw + gap), cy = header - 30 + Math.floor(i / cols) * (panelH + gap);
-    drawPanel(ctx, cx, cy, pw, panelH, r.c.name, r.chs, sr, r.m, r.extra, r.ok);
+    drawPanel(ctx, cx, cy, pw, panelH, r.c.name, r.chs, sr, r.m, r.extra, r.ok, Number(p.get('win') ?? 0));
   });
   (p.get('report') ? console.warn : console.log)('[audio-lab]', JSON.stringify({ allOk, worstCents: worst, worstPeak, results: results.map((r) => ({ name: r.c.name, peak: +r.m.peak.toFixed(4), rmsDb: +(20 * Math.log10(r.m.rms)).toFixed(1), dc: r.m.dc, nans: r.m.nans, t60: r.m.t60, extra: r.extra.trim(), ok: r.ok })) }));
 }

@@ -8,18 +8,24 @@ import { lang, setSettings, state } from '../../app/store';
 
 type Loc = NonNullable<Settings['location']>;
 
-export const PRESETS: { zh: string; en: string; lat: number; lon: number }[] = [
-  { zh: '北京', en: 'Beijing', lat: 39.9, lon: 116.4 },
-  { zh: '上海', en: 'Shanghai', lat: 31.23, lon: 121.47 },
-  { zh: '广州', en: 'Guangzhou', lat: 23.13, lon: 113.26 },
-  { zh: '成都', en: 'Chengdu', lat: 30.57, lon: 104.07 },
-  { zh: '哈尔滨', en: 'Harbin', lat: 45.8, lon: 126.53 },
-  { zh: '香港', en: 'Hong Kong', lat: 22.32, lon: 114.17 },
-  { zh: '台北', en: 'Taipei', lat: 25.03, lon: 121.56 },
-  { zh: '新加坡', en: 'Singapore', lat: 1.35, lon: 103.82 },
-  { zh: '伦敦', en: 'London', lat: 51.51, lon: -0.13 },
-  { zh: '纽约', en: 'New York', lat: 40.71, lon: -74.01 },
+export const PRESETS: { zh: string; en: string; lat: number; lon: number; tz: string }[] = [
+  { zh: '北京', en: 'Beijing', lat: 39.9, lon: 116.4, tz: 'Asia/Shanghai' },
+  { zh: '上海', en: 'Shanghai', lat: 31.23, lon: 121.47, tz: 'Asia/Shanghai' },
+  { zh: '广州', en: 'Guangzhou', lat: 23.13, lon: 113.26, tz: 'Asia/Shanghai' },
+  { zh: '成都', en: 'Chengdu', lat: 30.57, lon: 104.07, tz: 'Asia/Shanghai' },
+  { zh: '哈尔滨', en: 'Harbin', lat: 45.8, lon: 126.53, tz: 'Asia/Shanghai' },
+  { zh: '香港', en: 'Hong Kong', lat: 22.32, lon: 114.17, tz: 'Asia/Hong_Kong' },
+  { zh: '台北', en: 'Taipei', lat: 25.03, lon: 121.56, tz: 'Asia/Taipei' },
+  { zh: '新加坡', en: 'Singapore', lat: 1.35, lon: 103.82, tz: 'Asia/Singapore' },
+  { zh: '伦敦', en: 'London', lat: 51.51, lon: -0.13, tz: 'Europe/London' },
+  { zh: '纽约', en: 'New York', lat: 40.71, lon: -74.01, tz: 'America/New_York' },
 ];
+
+/** The IANA time zone of a saved preset city, if it is one (else the device's own zone is used). */
+export function presetZone(l: Settings['location']): string | undefined {
+  if (!l) return undefined;
+  return PRESETS.find((c) => (c.zh === l.label || c.en === l.label) && Math.abs(c.lat - l.lat) < 0.01 && Math.abs(c.lon - l.lon) < 0.01)?.tz;
+}
 
 function coords(l: { lat: number; lon: number }): string {
   const ns = l.lat >= 0 ? 'N' : 'S', ew = l.lon >= 0 ? 'E' : 'W';

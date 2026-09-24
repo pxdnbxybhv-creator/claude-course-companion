@@ -32,6 +32,7 @@ export function MonthCalendar(props: { todayKey: DateKey }) {
   const [focusKey, setFocusKey] = useState<DateKey>(props.todayKey);
   const [open, setOpen] = useState<DateKey | null>(null);
   const done = useDoneCounts();
+  const habitCount = Math.max(1, state.value.habits.filter((h) => !h.archived).length);
   const grid = monthGrid(ym.y, ym.m, weekStart);
   const tableRef = useRef<HTMLTableElement>(null);
   const wantFocus = useRef(false);
@@ -181,7 +182,13 @@ export function MonthCalendar(props: { todayKey: DateKey }) {
                         )}
                         <span class="alm-cell-n latin">{day.d}</span>
                         <span class="alm-cell-l" lang="zh-CN">{lab.zh}</span>
-                        {(n > 0 || note) && <span class={`alm-cell-dot${n >= 3 ? ' is-full' : ''}${!n ? ' is-note' : ''}`} aria-hidden="true" />}
+                        {(n > 0 || note) && !isToday && (
+                          <span
+                            class={`alm-cell-dot${!n ? ' is-note' : ''}`}
+                            style={n ? { '--r': Math.min(1, n / habitCount).toFixed(2) } : undefined}
+                            aria-hidden="true"
+                          />
+                        )}
                       </button>
                     </td>
                   );

@@ -14,18 +14,18 @@ import { chinaMD, termProgress, SEASON_ZH } from './model';
 const MENG = ['孟', '仲', '季'];
 const MENG_EN = ['Early', 'Mid', 'Late'];
 const PENTAD_ZH = ['初候', '二候', '三候'];
-const PENTAD_EN = ['First pentad', 'Second pentad', 'Third pentad'];
+const PENTAD_EN = ['Pentad i', 'Pentad ii', 'Pentad iii'];
 
-export function Hero(props: { now: Date; ctx: TermContext }) {
+export function Hero(props: { day: Date; ctx: TermContext }) {
   const t = useT();
   const en = lang.value === 'en';
-  const { ctx, now } = props;
+  const { ctx, day } = props;
   const i = ctx.current.index;
   const term = TERMS[i];
   const next = TERMS[ctx.next.index];
   const season = seasonOfTerm(i);
   const sub = Math.floor((i % 6) / 2);
-  const p = termProgress(now, ctx.current, ctx.next);
+  const p = termProgress(day, ctx.current, ctx.next);
   const start = chinaMD(ctx.current.at);
 
   const box = useRef<HTMLElement>(null);

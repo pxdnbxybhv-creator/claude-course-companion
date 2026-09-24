@@ -387,16 +387,16 @@ function hourAngle(lat: number, decl: number): number {
 }
 
 /**
- * Sunrise, sunset (upper limb at −0.833°: refraction + semidiameter) and solar noon for the local
- * calendar day of `date` at latitude `lat` (°N) and longitude `lon` (°E). Polar night / midnight
- * sun give null sunrise & sunset with dayLength 0 / 1440.
+ * Sunrise, sunset (upper limb on the horizon: centre at −0.833° for refraction + semidiameter) and
+ * solar noon on the calendar day of `date` (its local Y/M/D) at latitude `lat` (°N) and longitude
+ * `lon` (°E, −180..180). The day is that date at the place itself, so the result does not depend
+ * on the viewer's time zone. Polar night / midnight sun: null sunrise & sunset, dayLength 0 / 1440.
  */
 export function sunTimes(date: Date, lat: number, lon: number): SunTimes {
-  // On UTC day n, the Sun transits `lon` at n + (720 − 4·lon − EoT) minutes; take the transit
-  // nearest to local noon of `date`'s calendar day.
-  const localNoon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12).getTime();
+  // The Sun transits `lon` at (720 − 4·lon − EoT) minutes after 0h UTC of the date: that is the
+  // noon of this calendar date in the place's own (solar) time, whatever the viewer's time zone.
+  const dayMs = Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
   const lonMinutes = 720 - 4 * lon;
-  const dayMs = Math.round(localNoon / DAY_MS - lonMinutes / 1440) * DAY_MS;
   const at = (minutes: number) => dayMs + minutes * 60000;
   const sunAt = (ms: number) => noaaSun(ms / DAY_MS + 2440587.5);
 

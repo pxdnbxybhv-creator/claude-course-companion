@@ -21,7 +21,11 @@ them as data: URLs in the single-file build):
   src/assets/fonts/wenkai-common.woff2 LXGW WenKai — the most frequent Chinese characters not in
                                        the file above (for habit names the user types). Declared
                                        with a unicode-range, so browsers fetch it only on demand.
-  src/assets/fonts/mashanzheng.woff2   Ma Shan Zheng — display calligraphy (used chars)
+  src/assets/fonts/mashanzheng.woff2   Ma Shan Zheng — the display set (scripts/brush_chars.txt:
+                                       tab glyphs, titles, plants, solar terms, dates, seals)
+  src/assets/fonts/mashanzheng-ext.woff2
+                                       Ma Shan Zheng — every other hanzi in the source (the poems the
+                                       scroll poster brushes); unicode-range, so fetched on demand
   src/assets/fonts/cormorant.woff2     Cormorant Garamond, variable 300–700, Latin
   src/assets/fonts/cormorant-italic.woff2
   src/styles/fonts.css                 the @font-face rules (generated)
@@ -338,33 +342,36 @@ def main() -> int:
     used = collect_used() | read_brush_chars()
     base = set(BASE_CJK) | set(BASE_PUNCT)
     text_chars = used | base | ascii_chars()
-    brush_chars = read_brush_chars() | {c for c in used if is_han(ord(c))} | set(BASE_CJK) | ascii_chars()
+    brush_display = read_brush_chars() | set(BASE_CJK) | ascii_chars()
+    used_han = {c for c in used if is_han(ord(c))}
 
     if args.check:
-        missing = []
-        for name, want in (('wenkai.woff2', text_chars), ('mashanzheng.woff2', read_brush_chars())):
-            path = OUT / name
-            if not path.exists():
-                print(f'✗ {path.relative_to(ROOT)} is missing — run `npm run fonts`')
-                return 1
-            have = cmap_of(path)
-            if name == 'wenkai.woff2':
-                have |= cmap_of(OUT / 'wenkai-common.woff2') if (OUT / 'wenkai-common.woff2').exists() else set()
-            miss = sorted(c for c in want if ord(c) not in have and is_cjkish(ord(c)))
-            # Characters WenKai itself lacks are recorded at build time and are fine.
-            known_absent = set((OUT / '.absent.txt').read_text(encoding='utf-8')) if (OUT / '.absent.txt').exists() else set()
-            miss = [c for c in miss if c not in known_absent]
+        absent_file = OUT / 'absent.txt'
+        known_absent = set(absent_file.read_text(encoding='utf-8')) if absent_file.exists() else set()
+        problems = []
+        for files, want in (
+            (['wenkai.woff2'], text_chars),
+            (['mashanzheng.woff2'], read_brush_chars()),
+            (['mashanzheng.woff2', 'mashanzheng-ext.woff2'], used_han),
+        ):
+            have: set[int] = set()
+            for name in files:
+                if not (OUT / name).exists():
+                    print(f'✗ src/assets/fonts/{name} is missing — run `npm run fonts`')
+                    return 1
+                have |= cmap_of(OUT / name)
+            miss = sorted(c for c in want if is_cjkish(ord(c)) and ord(c) not in have and c not in known_absent)
             if miss:
-                missing.append(f'{name}: {"".join(miss)}')
-        if missing:
-            print('✗ fonts are out of date; run `npm run fonts`\n  ' + '\n  '.join(missing))
+                problems.append(f'{" + ".join(files)} lacks: {"".join(miss)}')
+        if problems:
+            print('✗ fonts are out of date — run `npm run fonts`\n  ' + '\n  '.join(problems))
             return 1
-        print(f'✓ fonts cover all {len([c for c in text_chars if is_cjkish(ord(c))])} CJK characters in the source')
+        print(f'✓ fonts cover all {sum(is_cjkish(ord(c)) for c in text_chars)} CJK characters in the source')
         return 0
 
     CACHE.mkdir(parents=True, exist_ok=True)
     OUT.mkdir(parents=True, exist_ok=True)
-    print(f'characters: {len(text_chars)} text ({sum(is_han(ord(c)) for c in text_chars)} hanzi), {len(brush_chars)} brush')
+    print(f'characters: {len(text_chars)} text ({len(used_han)} hanzi), {len(brush_display)} brush display')
 
     sizes: dict[str, int] = {}
     absent: set[str] = set()
@@ -385,14 +392,17 @@ def main() -> int:
         wkc, common_cov = build_wenkai(common, OUT / 'wenkai-common.woff2', tmp, 'common')
         sizes['wenkai-common.woff2'] = save_woff2(wkc, OUT / 'wenkai-common.woff2')
 
-        # --- Ma Shan Zheng -------------------------------------------------------------------
+        # --- Ma Shan Zheng: display set (eager) + the rest of the source's hanzi (lazy) ----------
         msz_src = fetch(f'{GFONTS}/mashanzheng/MaShanZheng-Regular.ttf', CACHE / 'MaShanZheng-Regular.ttf')
-        msz = TTFont(msz_src)
-        msz_cps = {ord(c) for c in brush_chars} & cmap_of(msz)
-        absent_brush = {c for c in read_brush_chars() if ord(c) not in msz_cps}
-        do_subset(msz, msz_cps)
+        msz_all = cmap_of(TTFont(msz_src))
+        msz_cov = {ord(c) for c in brush_display} & msz_all
+        absent |= {c for c in brush_display | used_han if is_cjkish(ord(c)) and ord(c) not in msz_all}
+        msz = do_subset(TTFont(msz_src), msz_cov)
         sizes['mashanzheng.woff2'] = save_woff2(msz, OUT / 'mashanzheng.woff2')
         copyright_msz = msz['name'].getDebugName(0)
+        msz_ext_cov = ({ord(c) for c in used_han} & msz_all) - msz_cov
+        if msz_ext_cov:
+            sizes['mashanzheng-ext.woff2'] = save_woff2(do_subset(TTFont(msz_src), msz_ext_cov), OUT / 'mashanzheng-ext.woff2')
 
         # --- Cormorant Garamond (variable wght 300–700) -------------------------------------
         latin = latin_chars()
@@ -409,7 +419,12 @@ def main() -> int:
             sizes[out] = save_woff2(cg, OUT / out)
             copyright_cg = cg['name'].getDebugName(0)
 
-    (OUT / '.absent.txt').write_text(''.join(sorted(absent)), encoding='utf-8')
+    # Characters the source fonts lack (they use the system fallback); --check tolerates these.
+    absent_file = OUT / 'absent.txt'
+    if absent:
+        absent_file.write_text(''.join(sorted(absent)) + '\n', encoding='utf-8')
+    elif absent_file.exists():
+        absent_file.unlink()
 
     # --- licences ----------------------------------------------------------------------------
     write_license(fetch(f'{WENKAI_PKG}/OFL.txt', CACHE / 'OFL-LXGWWenKai.txt'), 'LXGWWenKai', copyright_wk)
@@ -417,38 +432,45 @@ def main() -> int:
     write_license(fetch(f'{GFONTS}/cormorantgaramond/OFL.txt', CACHE / 'OFL-CormorantGaramond.txt'), 'CormorantGaramond', copyright_cg)
 
     # --- CSS -----------------------------------------------------------------------------------
-    latin_range = to_unicode_range(latin)
-    # The lazy face claims every Han / CJK-punctuation code point that the core font does not have.
-    # (An exact list of its 3000+ characters would cost ~25 KB of render-blocking CSS; the
-    # complement of the small core set is ~6 KB. Rare characters outside the common set simply
-    # fall back to the system font after the lazy file has been checked.)
-    common_range = {cp for a, b in HAN_BLOCKS for cp in range(a, b + 1)} - core_cov
-    css = '\n\n'.join([
+    # Lazy faces claim every Han / CJK-punctuation code point that their eager sibling lacks.
+    # (Listing the lazy file's own characters exactly would cost ~25 KB of render-blocking CSS;
+    # the complement of the small eager set is a few KB. A character in neither file costs one
+    # on-demand download, then falls back to the next family in the stack.)
+    han = {cp for a, b in HAN_BLOCKS for cp in range(a, b + 1)}
+    faces = [
         '/* Generated by scripts/build_fonts.py (`npm run fonts`) — do not edit by hand.\n'
         ' * Self-hosted, subsetted fonts (SIL Open Font License 1.1; see public/fonts/*-OFL.txt).\n'
-        ' * Paths are relative so Vite fingerprints the files (and inlines them in the single-file build).\n'
-        ' * wenkai-common.woff2 carries frequent characters for user-typed text; its unicode-range makes\n'
-        ' * browsers download it only when such a character is actually on screen. */',
+        ' * Relative URLs, so Vite fingerprints the files (and inlines them in the single-file build).\n'
+        ' * The faces with a unicode-range are downloaded only when one of their characters is shown:\n'
+        ' * wenkai-common = frequent hanzi for text the user types; mashanzheng-ext = the poems. */',
         font_face('LXGW WenKai', 'wenkai.woff2'),
-        font_face('LXGW WenKai', 'wenkai-common.woff2', urange=to_unicode_range(common_range)),
+        font_face('LXGW WenKai', 'wenkai-common.woff2', urange=to_unicode_range(han - core_cov)),
         font_face('Ma Shan Zheng', 'mashanzheng.woff2'),
+    ]
+    if msz_ext_cov:
+        faces.append(font_face('Ma Shan Zheng', 'mashanzheng-ext.woff2', urange=to_unicode_range(han - msz_cov)))
+    latin_range = to_unicode_range(latin)
+    faces += [
         font_face('Cormorant Garamond', 'cormorant.woff2', weight='300 700', urange=latin_range),
         font_face('Cormorant Garamond', 'cormorant-italic.woff2', weight='300 700', style='italic', urange=latin_range),
-    ]) + '\n'
+    ]
+    css = '\n\n'.join(faces) + '\n'
+    stale = OUT / 'mashanzheng-ext.woff2'
+    if not msz_ext_cov and stale.exists():
+        stale.unlink()
     if not CSS_OUT.exists() or CSS_OUT.read_text(encoding='utf-8') != css:
         CSS_OUT.write_text(css, encoding='utf-8')
 
     # --- report ------------------------------------------------------------------------------
+    lazy = {'wenkai-common.woff2', 'mashanzheng-ext.woff2'}
     print()
     for name, n in sizes.items():
-        print(f'  {name:<24} {n / 1024:8.1f} KB')
-    eager = sum(n for k, n in sizes.items() if k != 'wenkai-common.woff2')
-    print(f'  {"total":<24} {sum(sizes.values()) / 1024:8.1f} KB  ({eager / 1024:.1f} KB without the lazy common set)')
-    print(f'  WenKai: {len(core_cov)} code points in core, {len(common_cov)} in common')
+        print(f'  {name:<24} {n / 1024:8.1f} KB{"  (on demand)" if name in lazy else ""}')
+    eager = sum(n for k, n in sizes.items() if k not in lazy)
+    print(f'  {"total":<24} {sum(sizes.values()) / 1024:8.1f} KB  ({eager / 1024:.1f} KB eager)')
+    print(f'  WenKai {len(core_cov)} + {len(common_cov)} code points; Ma Shan Zheng {len(msz_cov)} + {len(msz_ext_cov)}')
     if absent:
-        print(f'  not in WenKai (system fallback): {"".join(sorted(absent))}')
-    if absent_brush:
-        print(f'  not in Ma Shan Zheng: {"".join(sorted(absent_brush))}')
+        print(f'  not in the source fonts (system fallback): {"".join(sorted(absent))}')
     return 0
 
 

@@ -115,7 +115,7 @@ function spriteSet(kind: Kind | 'burst', res: number, color?: string): Sprite[] 
         const r = U * 0.3;
         // faint grey rim so the flake reads on paper, soft white body
         const g1 = c.createRadialGradient(U / 2, U / 2 + 0.6, r * 0.6, U / 2, U / 2 + 0.6, r * 1.15);
-        g1.addColorStop(0, 'rgba(70,78,92,0.22)');
+        g1.addColorStop(0, 'rgba(60,68,82,0.32)');
         g1.addColorStop(1, 'rgba(70,78,92,0)');
         c.fillStyle = g1;
         c.fillRect(0, 0, U, U);
@@ -233,7 +233,7 @@ export class Weather {
     else if (Math.abs(wind) > 0.35 && r() < 0.5) { p.x = wind > 0 ? -20 : w + 20; p.y = r() * h * 0.7; }
     else { p.x = r.range(-0.1, 1.1) * w; p.y = -20 - r() * 40; }
     if (kind === 'snow') {
-      p.size = lerp(2.2, 6.5, z * z) ;
+      p.size = lerp(3, 8.5, z * z);
       p.vy = lerp(12, 34, z);
     } else if (kind === 'petal') {
       p.size = lerp(6, 11, z);

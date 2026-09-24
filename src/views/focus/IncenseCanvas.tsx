@@ -62,6 +62,15 @@ export function IncenseCanvas(props: { label: string }) {
       scene.setProgress(currentProgress());
     };
 
+    /** Let the plume establish itself off-screen (opening the view on a stick that is already lit). */
+    let warmed = false;
+    const prewarm = () => {
+      if (warmed || W === 0) return;
+      warmed = true;
+      scene.setProgress(currentProgress());
+      for (let i = 0; i < 60; i++) scene.step(1 / 12);
+    };
+
     const resize = () => {
       const r = wrap.getBoundingClientRect();
       const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
@@ -77,6 +86,7 @@ export function IncenseCanvas(props: { label: string }) {
       scene.resize(W, H, dpr);
       keyA = keyB = null;
       keyAt = -Infinity;
+      if (lit && !reduce) prewarm();
       draw(performance.now());
     };
 
@@ -104,6 +114,7 @@ export function IncenseCanvas(props: { label: string }) {
       if (!keyB || t - keyAt >= KEY_MS) {
         // Advance the smoke off-screen, then reveal the new still slowly.
         if (keyB && (lit || t - lastActivity < SETTLE_MS)) for (let i = 0; i < 16; i++) scene.step(KEY_MS / 16 / 1000);
+        else if (!keyB && lit) prewarm();
         keyA = keyB;
         keyB = makeKey();
         keyAt = t;

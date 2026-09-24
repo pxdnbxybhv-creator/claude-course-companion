@@ -194,7 +194,7 @@ function leaf(c: Ctx, o: LeafOpts) {
     const W = L * lb.wid * lerp(0.75, 1, wsc);
     const sp: StrokePoint[] = pts.map((p, i) => {
       const t = i / 4;
-      const w = W * (t < 0.3 ? lerp(0.6, 1, t / 0.3) : t < 0.7 ? 1 : lerp(1, 0.55, (t - 0.7) / 0.3));
+      const w = W * (t < 0.3 ? lerp(0.6, 1, t / 0.3) : t < 0.6 ? 1 : lerp(1, 0.22, (t - 0.6) / 0.4));
       return { ...p, w };
     });
     add(c, 'brush', sp, tones(k === 0 ? 0.05 : rng.range(-0.24, 0.04)), b + 0.006 + k * 0.002, { wet: 0.85, dryness: 0.15 });
@@ -247,7 +247,7 @@ function project(p: V3, face: number, roll: number): V3 {
   return [x2, y2, z1];
 }
 
-function makePetal(o: HeadOpts, phi: number, r0: number, len: number, a0: number, curl: number, wmax: number, ring: number, jitter: number, rng: Rng): Petal {
+function makePetal(o: HeadOpts, phi: number, r0: number, len: number, a0: number, curl: number, wmax: number, ring: number, jitter: number, rng: Rng, swirl = 0): Petal {
   const N = 7;
   let pos: V3 = [Math.cos(phi) * r0, Math.sin(phi) * r0, [0.12, 0.08, 0.03, 0][ring] * o.R];
   const spine3: V3[] = [pos];
@@ -256,7 +256,7 @@ function makePetal(o: HeadOpts, phi: number, r0: number, len: number, a0: number
   for (let i = 1; i < N; i++) {
     const t = i / (N - 1);
     const a = a0 + curl * t * t + wob * t;
-    const ph = phi + wob * 0.25 * t;
+    const ph = phi + wob * 0.25 * t + swirl * Math.pow(t, 1.5);
     pos = [pos[0] + Math.cos(a) * Math.cos(ph) * ds, pos[1] + Math.cos(a) * Math.sin(ph) * ds, pos[2] + Math.sin(a) * ds];
     spine3.push(pos);
   }
@@ -329,6 +329,7 @@ function head(c: Ctx, o: HeadOpts) {
 
   const allPetals: { p: Petal; birth: number; ringIdx: number }[] = [];
   const envSeed = rng.range(0, 50);
+  const headSwirl = rng.range(-0.5, 0.5);
   const env = (phi: number) => 1 + 0.22 * c.noise(Math.cos(phi) * 0.9 + envSeed, Math.sin(phi) * 0.9 + envSeed);
   rings.forEach((rg, ri) => {
     const off = rng.range(0, TAU);
@@ -339,7 +340,7 @@ function head(c: Ctx, o: HeadOpts) {
       const len = R * rng.range(rg.len[0], rg.len[1]) * (ri >= 1 ? env(phi) : 1);
       const a0 = rad(rng.range(rg.a0[0], rg.a0[1]));
       const curl = rad(rng.range(rg.curl[0], rg.curl[1]));
-      const p = makePetal(o, phi, R * rg.r0, len, a0, curl, R * rg.w * rng.range(0.8, 1.15), ri, 0.25, rng);
+      const p = makePetal(o, phi, R * rg.r0, len, a0, curl, R * rg.w * rng.range(0.8, 1.15), ri, 0.25, rng, (headSwirl + rng.range(-0.25, 0.25)) * (ri / 3));
       allPetals.push({ p, birth: rg.birth, ringIdx: ri });
     }
   });
@@ -411,6 +412,21 @@ function head(c: Ctx, o: HeadOpts) {
       const p3 = project([rng.range(-1, 1) * R * 0.08, rng.range(-1, 1) * R * 0.08, R * 0.2], o.face, o.roll);
       add(c, 'dot', [{ x: o.c.x + p3[0], y: o.c.y - p3[1], w: R * rng.range(0.05, 0.09) }], rng.range(0.55, 0.8), o.birth + 0.012, { color: o.palette === 'white' ? undefined : PIGMENTS.ochre });
     }
+    // 点心: once open, a few short curled strokes re-state the heart over the cupped petals.
+    const nh = rng.int(4, 6);
+    const hcol = o.palette === 'rouge' ? PIGMENTS.rouge : PIGMENTS.ochre;
+    for (let i = 0; i < nh; i++) {
+      const phi = (i / nh) * TAU + rng.range(-0.3, 0.3);
+      const pts: StrokePoint[] = [];
+      for (let k = 0; k <= 3; k++) {
+        const t = k / 3;
+        const r = R * lerp(0.13, 0.03, t);
+        const a = phi + t * 1.2;
+        const p3 = project([Math.cos(a) * r, Math.sin(a) * r, R * (0.22 + 0.1 * t)], o.face, o.roll);
+        pts.push({ x: o.c.x + p3[0], y: o.c.y - p3[1], w: R * lerp(0.075, 0.03, t) });
+      }
+      add(c, 'brush', pts, o.palette === 'white' ? 0.35 : rng.range(0.6, 0.8), o.open + 0.001, { color: hcol, wet: 0.4 });
+    }
   }
 }
 
@@ -460,7 +476,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
   }
 
   // --- Stems, jointed ------------------------------------------------------------------------
-  const stemTone = rng.range(0.42, 0.55);
+  const stemTone = rng.range(0.5, 0.62);
   stems.forEach((st, si) => {
     const cuts = [0, ...st.nodes, 1];
     for (let k = 0; k < cuts.length - 1; k++) {

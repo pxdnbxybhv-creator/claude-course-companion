@@ -113,6 +113,18 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     ctx.fillText(msg, 8, H - 8);
   }
 
+  // zoom=2&zx=0&zy=150 — magnify a region (css px) for close inspection
+  const zoom = Number(p.get('zoom') ?? 0);
+  if (zoom > 1) {
+    const snap = document.createElement('canvas');
+    snap.width = canvas.width; snap.height = canvas.height;
+    snap.getContext('2d')!.drawImage(canvas, 0, 0);
+    const zx = Number(p.get('zx') ?? 0) * dpr, zy = Number(p.get('zy') ?? 0) * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(snap, zx, zy, canvas.width / zoom, canvas.height / zoom, 0, 0, canvas.width, canvas.height);
+  }
+
   if (p.get('anim') === '1') {
     let last = performance.now();
     const loop = (now: number) => {

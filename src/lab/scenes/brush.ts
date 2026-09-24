@@ -55,7 +55,7 @@ function grid(ctx: CanvasRenderingContext2D, W: number, H: number, vigor: number
       const seed = r * 101 + c * 7 + 1;
       const strokes: Stroke[] = [];
       if (kind === 'wash') {
-        strokes.push({ kind, tone, color, birth: 0, seed, pts: blob(cx, cy, rowH * 0.34, 9, seed, 0.62, 0.2).map((p) => ({ ...p, x: cx + (p.x - cx) * 1.45 })) });
+        strokes.push({ kind, tone, color, birth: 0, seed, pts: blob(cx, cy, rowH * 0.34, 9, seed, 0.62, 0.2).map((p) => ({ ...p, x: cx + (p.x - cx) * 1.45, w: 2 + c * 1.5 })) });
       } else if (kind === 'fill') {
         // five petals of a plum blossom plus one larger petal
         for (let k = 0; k < 5; k++) {

@@ -136,7 +136,7 @@ function paintStem(c: Ctx, st: StemPlan, tone: number, thorns = true) {
     const t0 = cuts[k] + (k ? 0.012 : 0), t1 = cuts[k + 1];
     const seg = subPath(st.path, st.L, t0, t1, 10);
     const b = lerp(st.birth0, st.birth1, t0);
-    add(c, 'brush', brushPts(seg, st.w * lerp(1.1, 0.85, t0), st.w * lerp(1.1, 0.85, t1), 1.2, 0.75), tone + rng.range(-0.04, 0.04), b, { wet: 0.45, dryness: 0.3 });
+    add(c, 'brush', brushPts(seg, st.w * lerp(1.1, 0.85, t0), st.w * lerp(1.1, 0.85, t1), 1.2, 0.75), tone + rng.range(-0.04, 0.04), b, { wet: 0.45, dryness: 0.12 });
     // the darker side of the stem: a thin line hugging one edge, part of the way
     if (rng.chance(0.75)) {
       const a0 = rng.range(0.05, 0.3), a1 = rng.range(0.6, 0.95);
@@ -185,84 +185,115 @@ interface LeafOpts {
 
 function leaf(c: Ctx, o: LeafOpts) {
   const { rng, noise, u } = c;
-  const ns = rng.range(0, 99);
-  const wav = rng.range(5, 8), wph = rng.range(0, TAU);
+  const ns = rng.range(0, 99), ns2 = rng.range(0, 99);
   const rim = (th: number, k = 1): V => {
-    const r = 1 + 0.07 * noise(Math.cos(th) * 1.6 + ns, Math.sin(th) * 1.6 + ns) * 2 + 0.025 * Math.sin(th * wav + wph);
+    const r = 1 + 0.2 * noise(Math.cos(th) * 1.1 + ns, Math.sin(th) * 1.1 + ns) + 0.05 * noise(Math.cos(th) * 4 + ns2, Math.sin(th) * 4 + ns2);
     const cth = Math.cos(th);
     const lx = cth * o.rx * r * k;
     const ly = Math.sin(th) * o.ry * r * k - o.lift * k + o.droop * o.rx * cth * cth * k;
     const q = rot({ x: lx, y: ly }, o.ang);
     return { x: o.navel.x + q.x, y: o.navel.y + q.y };
   };
-  const N = 44;
+  const N = 48;
   const outlineV: V[] = [];
   for (let i = 0; i < N; i++) outlineV.push(rim((i / N) * TAU));
   const b = o.birth;
   const col = o.color;
 
   // 1. a pale wash of the whole leaf
-  add(c, 'wash', poly(outlineV, 4 * u), o.tone * 0.55, b, { wet: 0.85, color: col });
-  if (col) add(c, 'wash', poly(outlineV.map((p) => ({ x: lerp(o.navel.x, p.x, 0.96), y: lerp(o.navel.y, p.y, 0.96) })), 4 * u), o.tone * 0.3, b + 0.001, { wet: 0.85 });
+  add(c, 'wash', poly(outlineV, 4 * u), o.tone * 0.58, b, { wet: 0.9, color: col });
 
-  // 2. layered sectors, darker toward the far rim, with pale gaps left between them
-  const nsec = rng.int(3, 5);
-  let th = rng.range(0, TAU);
-  const gaps = Array.from({ length: nsec }, () => rng.range(0.1, 0.3));
-  const spanTotal = TAU - gaps.reduce((s, g) => s + g, 0);
-  const spans = Array.from({ length: nsec }, () => rng.range(0.7, 1.3));
-  const sSum = spans.reduce((s, v) => s + v, 0);
-  for (let k = 0; k < nsec; k++) {
-    const span = (spans[k] / sSum) * spanTotal;
-    const a0 = th, a1 = th + span;
-    th = a1 + gaps[k];
-    const r0 = rng.range(0.08, 0.25);
+  // 2. two big wet masses laid over it, overlapping, each leaving part of the leaf pale —
+  //    darker toward the far rim, as the leaf tips its face away from us.
+  const masses = 2;
+  let a = rng.range(0, TAU);
+  for (let k = 0; k < masses; k++) {
+    const span = rng.range(2.0, 3.2);
+    const a0 = a, a1 = a + span;
+    a = a1 + rng.range(-0.4, 0.3);
+    const r0 = rng.range(0.05, 0.3);
+    const kOut = rng.range(0.84, 0.98);
     const pts: V[] = [];
-    const m = 10;
-    // inner edge (near the navel)
-    pts.push(rim(a0, r0));
-    for (let i = 0; i <= m; i++) {
-      const a = lerp(a0, a1, i / m);
-      pts.push(rim(a, rng.range(0.9, 0.99)));
+    for (let i = 0; i <= 3; i++) pts.push(rim(a0 + rng.range(-0.1, 0.1), lerp(r0, kOut, i / 3)));
+    for (let i = 1; i < 16; i++) pts.push(rim(lerp(a0, a1, i / 16), kOut * rng.range(0.95, 1.02)));
+    for (let i = 0; i <= 3; i++) pts.push(rim(a1 + rng.range(-0.1, 0.1), lerp(kOut, r0, i / 3)));
+    for (let i = 1; i < 4; i++) pts.push(rim(lerp(a1, a0, i / 4), r0));
+    const far = -Math.sin((a0 + a1) / 2 + o.ang);
+    const tone = clamp(o.tone * (0.62 + 0.25 * far) + rng.range(-0.05, 0.05), 0.22, 0.88);
+    add(c, 'wash', poly(pts, 3 * u), tone, b + 0.001 + k * 0.001, { wet: 0.9, color: k === 1 && col ? col : undefined });
+  }
+  // a darker band along part of the far rim, where the leaf turns away from us
+  {
+    const mid = -Math.PI / 2 - o.ang + rng.range(-0.9, 0.9);
+    const a0 = mid - rng.range(0.6, 1.1), a1 = mid + rng.range(0.6, 1.1);
+    const pts: V[] = [];
+    for (let i = 0; i <= 12; i++) pts.push(rim(lerp(a0, a1, i / 12), rng.range(0.95, 1.0)));
+    for (let i = 0; i <= 8; i++) pts.push(rim(lerp(a1, a0, i / 8), rng.range(0.45, 0.7)));
+    add(c, 'wash', poly(pts, 2 * u), clamp(o.tone * 1.08, 0.3, 0.9), b + 0.003, { wet: 0.8 });
+  }
+  // 3. a few broad side-brush strokes swept out to the rim along the veins, running dry at
+  //    the edge (飞白), where the far side of the leaf is darkest.
+  const nS = rng.int(0, 2);
+  const dA = TAU / 11;
+  const sBase = -Math.PI / 2 - o.ang + rng.range(-0.8, 0.8); // the far side
+  for (let i = 0; i < nS; i++) {
+    const th = sBase + (i - (nS - 1) / 2) * dA * rng.range(0.9, 1.3);
+    const kIn = rng.range(0.25, 0.45), kOut = rng.range(0.88, 1.0);
+    const wf = rng.range(0.7, 1.0);
+    const pts: StrokePoint[] = [];
+    for (let k = 0; k <= 6; k++) {
+      const t = k / 6;
+      const kk = lerp(kIn, kOut, t);
+      const p0 = rim(th - dA * 0.5, kk), p1 = rim(th + dA * 0.5, kk);
+      const mid = rim(th, kk);
+      const w = Math.hypot(p1.x - p0.x, p1.y - p0.y) * wf * (t < 0.25 ? lerp(0.4, 1, t / 0.25) : 1);
+      pts.push({ x: mid.x, y: mid.y, w: Math.max(w, 2 * u) });
     }
-    pts.push(rim(a1, r0 * 1.2));
-    const mid = (a0 + a1) / 2;
-    const far = -Math.sin(mid + o.ang); // 1 at the far (upper) rim
-    const tone = clamp(o.tone * (0.7 + 0.35 * far) + rng.range(-0.06, 0.06), 0.18, 0.92);
-    add(c, 'wash', poly(pts, 3 * u), tone, b + 0.002 + k * 0.001, { wet: 0.8, color: k % 2 && col ? col : undefined });
+    add(c, 'brush', pts, clamp(o.tone * rng.range(0.85, 1.1), 0.3, 0.92), b + 0.004 + i * 0.0004, { wet: 0.8, dryness: rng.range(0.5, 0.8) });
   }
 
-  // 3. veins radiating from the navel — curved by the cup of the leaf
-  const nv = rng.int(9, 13);
+  // 4. veins radiating from the navel — curved by the cup of the leaf, some left out
+  const nv = rng.int(8, 11);
   const v0 = rng.range(0, TAU);
   for (let i = 0; i < nv; i++) {
-    const a = v0 + (i / nv) * TAU + rng.range(-0.12, 0.12);
-    const end = rim(a, rng.range(0.78, 0.92));
-    const mid = rim(a, 0.5);
-    // bow the vein so it follows the leaf's surface
-    const bow = { x: (mid.x - lerp(o.navel.x, end.x, 0.5)) * 0.6, y: (mid.y - lerp(o.navel.y, end.y, 0.5)) * 0.6 + o.lift * 0.08 };
+    if (rng.chance(0.15)) continue;
+    const va = v0 + (i / nv) * TAU + rng.range(-0.15, 0.15);
+    const end = rim(va, rng.range(0.68, 0.9));
+    const mid = rim(va, 0.5);
+    const bow = { x: (mid.x - lerp(o.navel.x, end.x, 0.5)) * 0.6, y: (mid.y - lerp(o.navel.y, end.y, 0.5)) * 0.6 };
     const pts: StrokePoint[] = [];
     for (let k = 0; k <= 5; k++) {
-      const t = k / 5;
-      const bx = lerp(o.navel.x, end.x, t) + bow.x * Math.sin(Math.PI * t);
-      const by = lerp(o.navel.y, end.y, t) + bow.y * Math.sin(Math.PI * t);
-      pts.push({ x: bx, y: by, w: lerp(1.3, 0.45, t) * u });
+      const t = lerp(0.1, 1, k / 5);
+      pts.push({ x: lerp(o.navel.x, end.x, t) + bow.x * Math.sin(Math.PI * t), y: lerp(o.navel.y, end.y, t) + bow.y * Math.sin(Math.PI * t), w: lerp(1.3, 0.4, k / 5) * u });
     }
-    // start a little away from the navel
-    pts[0] = { x: lerp(pts[0].x, pts[1].x, 0.4), y: lerp(pts[0].y, pts[1].y, 0.4), w: pts[0].w };
-    add(c, 'line', pts, clamp(o.tone + 0.3, 0.6, 0.9), b + 0.02 + i * 0.0005, { wet: 0.5 });
+    add(c, 'line', pts, clamp(o.tone + rng.range(0.1, 0.28), 0.55, 0.9), b + 0.006 + i * 0.0003, { wet: 0.55 });
   }
-  // navel
-  add(c, 'dot', [{ x: o.navel.x, y: o.navel.y, w: 3.6 * u }], 0.85, b + 0.021, { wet: 0.4 });
+  add(c, 'dot', [{ x: o.navel.x, y: o.navel.y, w: 3.4 * u }], 0.85, b + 0.009, { wet: 0.4 });
 
-  // 4. burnt-ink rims in places
-  const nr = rng.int(2, 3);
+  // 5. burnt-ink rim, in one or two places only
+  const nr = rng.int(1, 2);
   for (let k = 0; k < nr; k++) {
-    const a0 = rng.range(0, TAU), span = rng.range(0.5, 1.2);
+    const a0 = rng.range(0, TAU), span = rng.range(0.5, 1.1);
     const pts: V[] = [];
-    for (let i = 0; i <= 7; i++) pts.push(rim(a0 + (span * i) / 7, 1.0));
-    add(c, 'brush', brushPts(pts, rng.range(2.4, 3.8) * u, rng.range(1.2, 2.2) * u, 1.3, 0.2), rng.range(0.82, 0.95), b + 0.024 + k * 0.001, { wet: 0.55, dryness: 0.5 });
+    for (let i = 0; i <= 8; i++) pts.push(rim(a0 + (span * i) / 8, 0.94));
+    add(c, 'brush', brushPts(pts, rng.range(1.6, 2.6) * u, rng.range(1.2, 2) * u, 1.0, 0.3), rng.range(0.78, 0.9), b + 0.01 + k * 0.0005, { wet: 0.5, dryness: 0.6 });
   }
+}
+
+/** 荷钱: a young leaf floating flat on the water — a lens of wash, a dark far rim. */
+function floatingLeaf(c: Ctx, at: V, rx: number, color: string | undefined, birth: number) {
+  const { rng, u } = c;
+  const ry = rx * rng.range(0.18, 0.26);
+  const pts: V[] = [];
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * TAU;
+    const notch = Math.abs(((a - 1.9 + TAU) % TAU) - 0) < 0.25 ? 0.7 : 1;
+    pts.push({ x: at.x + Math.cos(a) * rx * notch * rng.range(0.96, 1.04), y: at.y + Math.sin(a) * ry * notch });
+  }
+  add(c, 'wash', poly(pts, 2 * u), 0.45, birth, { wet: 0.8, color });
+  const rim: V[] = [];
+  for (let i = 0; i <= 8; i++) { const a = Math.PI * (1.08 + (0.8 * i) / 8); rim.push({ x: at.x + Math.cos(a) * rx * 0.97, y: at.y + Math.sin(a) * ry * 0.97 }); }
+  add(c, 'brush', brushPts(rim, 2 * u, 1.4 * u, 1.1, 0.3), 0.75, birth + 0.003, { wet: 0.5 });
 }
 
 /** 卷荷: a young leaf still rolled into a horn. */
@@ -334,7 +365,7 @@ function makePetal(o: FlowerOpts, phi: number, elev: number, len: number, wid: n
   for (let i = 0; i < N; i++) {
     const t = i / (N - 1);
     // broad ovate petal with a pointed tip
-    const hw = (wid / 2) * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.85) * (t < 0.08 ? 0.6 + 5 * t : 1);
+    const hw = (wid / 2) * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.68)), 0.55) * (t < 0.08 ? 0.6 + 5 * t : 1);
     const cz = cup * hw; // edges curl forward
     const s = spine[i], n = inward[i];
     Lp.push([s[0] + side[0] * hw + n[0] * cz, s[1] + side[1] * hw + n[1] * cz, s[2] + side[2] * hw + n[2] * cz]);
@@ -347,11 +378,9 @@ function makePetal(o: FlowerOpts, phi: number, elev: number, len: number, wid: n
   const tipL = Lp.slice(5).map(P), tipR = Rp.slice(5, -1).reverse().map(P);
   const tip = [...tipL, ...tipR];
   // two fine veins
-  const veins: V[][] = [-0.35, 0.3].map((k) => spine.slice(1, -1).map((s, i) => {
-    const t = (i + 1) / (N - 1);
-    const hw = (wid / 2) * Math.pow(Math.sin(Math.PI * Math.pow(t, 0.72)), 0.85) * k;
-    const n = inward[i + 1];
-    return P([s[0] + side[0] * hw + n[0] * cup * Math.abs(hw) * 0.5, s[1] + side[1] * hw + n[1] * cup * Math.abs(hw) * 0.5, s[2] + side[2] * hw + n[2] * cup * Math.abs(hw) * 0.5]);
+  const veins: V[][] = [[Lp, 0.42], [Rp, 0.38]].map(([E, k]) => spine.slice(1, -2).map((q, i) => {
+    const e = (E as V3[])[i + 1], f = k as number;
+    return P([lerp(q[0], e[0], f), lerp(q[1], e[1], f), lerp(q[2], e[2], f)]);
   }));
   return { poly: polyV, z, tip, veins, inner };
 }
@@ -364,13 +393,13 @@ function flower(c: Ctx, o: FlowerOpts) {
   const off = rng.range(0, TAU);
   for (let i = 0; i < nIn; i++) {
     const phi = off + (i / nIn) * TAU + rng.range(-0.25, 0.25);
-    petals.push(makePetal(o, phi, rad(rng.range(58, 72)), R * rng.range(0.78, 0.9), R * rng.range(0.52, 0.62), 0.55, rad(rng.range(8, 22)), true));
+    petals.push(makePetal(o, phi, rad(rng.range(60, 74)), R * rng.range(0.78, 0.9), R * rng.range(0.66, 0.76), 0.75, rad(rng.range(6, 18)), true));
   }
   const off2 = off + Math.PI / nOut;
   for (let i = 0; i < nOut; i++) {
     if (i > 3 && rng.chance(0.25)) continue;
     const phi = off2 + (i / nOut) * TAU + rng.range(-0.3, 0.3);
-    petals.push(makePetal(o, phi, rad(rng.range(18, 42)), R * rng.range(0.9, 1.05), R * rng.range(0.55, 0.66), 0.45, rad(rng.range(-5, 20)), false));
+    petals.push(makePetal(o, phi, rad(rng.range(24, 46)), R * rng.range(0.9, 1.05), R * rng.range(0.66, 0.78), 0.6, rad(rng.range(0, 22)), false));
   }
 
   // Pod and stamens (3-D): a flat-topped inverted cone above the receptacle.
@@ -390,8 +419,8 @@ function flower(c: Ctx, o: FlowerOpts) {
 
   const paintPetal = (p: Petal, b: number, ground: boolean) => {
     if (ground) add(c, 'fill', poly(p.poly, 0.8 * u), 0.88, b, { color: PIGMENTS.white, wet: 0.1 });
-    add(c, 'fill', poly(p.poly, 1.2 * u), o.tone * rng.range(0.85, 1.1), b + 0.0002, { color: rouge, wet: 0.45 });
-    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 2 * u), clamp(o.tone * 2.1, 0.3, 0.7), b + 0.0003, { color: rouge, wet: 0.6 });
+    add(c, 'fill', poly(p.poly, 1.2 * u), o.tone * rng.range(0.6, 0.85), b + 0.0002, { color: rouge, wet: 0.45 });
+    if (p.tip.length > 3) add(c, 'fill', poly(p.tip, 2.5 * u), clamp(o.tone * 1.5, 0.28, 0.45), b + 0.0003, { color: rouge, wet: 0.7 });
   };
   const nearerOf = (p: Petal) => petals.filter((q) => q !== p && q.z > p.z);
   const outlinePetal = (p: Petal, b: number) => {
@@ -399,20 +428,25 @@ function flower(c: Ctx, o: FlowerOpts) {
     const pl = p.poly;
     const n = pl.length;
     let run: StrokePoint[] = [];
-    const flush = () => { if (run.length >= 3) add(c, 'line', run, 0.62, b, { color: rouge === undefined ? undefined : '#6a2a2e', wet: 0.2 }); run = []; };
+    const flush = () => { if (run.length >= 3) add(c, 'line', run, 0.58, b, { color: rouge, wet: 0.2 }); run = []; };
     for (let i = 0; i < n; i++) {
       const a = pl[i], bp = pl[(i + 1) % n];
       for (const t of [0, 0.5]) {
         const x = lerp(a.x, bp.x, t), y = lerp(a.y, bp.y, t);
         if (nearer.some((q) => pointInPoly(x, y, q.poly))) flush();
-        else run.push({ x, y, w: 0.8 * u });
+        else run.push({ x, y, w: 0.7 * u });
       }
     }
     flush();
     for (const v of p.veins) {
-      if (p.z < 0 && rng.chance(0.5)) continue;
-      const vis = v.filter((q) => !nearer.some((r) => pointInPoly(q.x, q.y, r.poly)));
-      if (vis.length >= 4) add(c, 'line', vis.map((q) => ({ ...q, w: 0.5 * u })), 0.35, b + 0.0001, { color: rouge, wet: 0.3 });
+      if (p.z < 0 || rng.chance(0.4)) continue;
+      let vr: StrokePoint[] = [];
+      const vflush = () => { if (vr.length >= 3) add(c, 'line', vr, 0.3, b + 0.0001, { color: rouge, wet: 0.3 }); vr = []; };
+      for (const q of v) {
+        if (nearer.some((r) => pointInPoly(q.x, q.y, r.poly))) vflush();
+        else vr.push({ ...q, w: 0.5 * u });
+      }
+      vflush();
     }
   };
 
@@ -437,7 +471,7 @@ function flower(c: Ctx, o: FlowerOpts) {
   for (let i = 0; i < nSt; i++) {
     const a = (i / nSt) * TAU + rng.range(-0.15, 0.15);
     const s0: V3 = [Math.cos(a) * podBot * 1.3, Math.sin(a) * podBot * 1.3, podH * 0.1];
-    const el = rad(rng.range(35, 65)), ln = R * rng.range(0.24, 0.34);
+    const el = rad(rng.range(55, 80)), ln = R * rng.range(0.2, 0.28);
     const s1: V3 = [s0[0] + Math.cos(a) * Math.cos(el) * ln, s0[1] + Math.sin(a) * Math.cos(el) * ln, s0[2] + Math.sin(el) * ln];
     const pa = P3(s0), pb = P3(s1);
     add(c, 'line', [{ ...pa, w: 0.7 * u }, { x: lerp(pa.x, pb.x, 0.5) + rng.range(-0.6, 0.6) * u, y: lerp(pa.y, pb.y, 0.5), w: 0.7 * u }, { ...pb, w: 0.6 * u }], 0.75, b + 0.002, { color: PIGMENTS.gamboge, wet: 0.2 });
@@ -483,8 +517,8 @@ function bud(c: Ctx, base: V, dir: number, h: number, birth: number) {
     add(c, 'fill', poly(p, 1.2 * u), tone, b + 0.0002, { color: rouge, wet: 0.45 });
     // dark tip
     const tip = p.filter((_, i) => i >= 6 && i <= 14);
-    add(c, 'fill', poly(tip, 1.5 * u), 0.55, b + 0.0003, { color: rouge, wet: 0.6 });
-    add(c, 'line', p.map((q) => ({ ...q, w: 0.8 * u })), 0.6, b + 0.0004, { color: '#6a2a2e', wet: 0.2 });
+    add(c, 'fill', poly(tip, 2 * u), 0.38, b + 0.0003, { color: rouge, wet: 0.7 });
+    add(c, 'line', p.map((q) => ({ ...q, w: 0.7 * u })), 0.58, b + 0.0004, { color: rouge, wet: 0.2 });
     b += 0.003;
   }
 }
@@ -499,6 +533,8 @@ export function lotus(spec: PlantSpec): Drawing {
   const c: Ctx = { rng, noise, u, strokes: [] };
 
   const side = rng.chance(0.5) ? 1 : -1; // which side the big leaf leans to
+  // tall: flower high above the leaves · low: a leaf canopy above the flower · pair: two flowers
+  const layout = rng.pick(['tall', 'tall', 'low', 'pair'] as const);
   const tint = rng.pick([undefined, undefined, PIGMENTS.malachite, PIGMENTS.indigo] as const);
   const stemTone = rng.range(0.4, 0.5);
   const baseX = () => rng.range(-0.02, 0.02) * H;
@@ -513,7 +549,7 @@ export function lotus(spec: PlantSpec): Drawing {
     rolledLeaf(c, { x: q.p.x - q.d.x * 2 * u, y: q.p.y - q.d.y * 2 * u }, Math.atan2(q.d.y, q.d.x) + rng.range(-0.25, 0.25), H * rng.range(0.1, 0.13), 0.022);
     if (rng.chance(0.7)) {
       const fx = side * rng.range(0.08, 0.14) * H;
-      leaf(c, { navel: { x: fx, y: -0.012 * H }, rx: H * rng.range(0.06, 0.08), ry: H * 0.016, ang: rng.range(-0.05, 0.05), lift: 0, droop: 0, tone: 0.55, color: tint, birth: 0.05 });
+      floatingLeaf(c, { x: fx, y: -0.01 * H }, H * rng.range(0.06, 0.08), tint, 0.05);
     }
   }
 
@@ -523,8 +559,8 @@ export function lotus(spec: PlantSpec): Drawing {
   const plans: LeafPlan[] = [];
   // leaf 1: the great open leaf, tilted towards us
   plans.push({
-    navel: { x: side * rng.range(0.1, 0.18) * H, y: -rng.range(0.42, 0.56) * H },
-    rx: H * rng.range(0.27, 0.32), ry: 0, lift: 0, droop: 0, ang: side * rng.range(-0.05, 0.18), tone: rng.range(0.62, 0.78), birth: 0.2,
+    navel: { x: side * rng.range(0.1, 0.18) * H, y: -(layout === 'low' ? rng.range(0.56, 0.66) : rng.range(0.42, 0.56)) * H },
+    rx: H * rng.range(0.27, 0.32), ry: 0, lift: 0, droop: 0, ang: side * rng.range(-0.05, 0.18), tone: rng.range(0.62, 0.78), birth: 0.185,
   });
   plans[0].ry = plans[0].rx * rng.range(0.3, 0.45);
   plans[0].lift = plans[0].ry * rng.range(0.1, 0.5);
@@ -534,7 +570,7 @@ export function lotus(spec: PlantSpec): Drawing {
     const rx = H * rng.range(0.19, 0.24);
     plans.push({
       navel: { x: -side * rng.range(0.1, 0.17) * H, y: -rng.range(0.3, 0.42) * H },
-      rx, ry: rx * rng.range(0.14, 0.22), lift: -rx * rng.range(0.1, 0.22), droop: rng.range(0.25, 0.4), ang: -side * rng.range(0.05, 0.3), tone: rng.range(0.55, 0.72), birth: 0.3,
+      rx, ry: rx * rng.range(0.14, 0.22), lift: -rx * rng.range(0.1, 0.22), droop: rng.range(0.25, 0.4), ang: -side * rng.range(0.05, 0.3), tone: rng.range(0.55, 0.72), birth: 0.285,
     });
   }
   if (nLeaves >= 3) {
@@ -554,9 +590,13 @@ export function lotus(spec: PlantSpec): Drawing {
     leaf(c, { navel: lp.navel, rx: lp.rx, ry: lp.ry, ang: lp.ang, lift: lp.lift, droop: lp.droop, tone: lp.tone, color: tint, birth: lp.birth });
   });
 
+  const mainTop = layout === 'low'
+    ? { x: -side * rng.range(0.12, 0.2) * H, y: -rng.range(0.64, 0.74) * H }
+    : { x: side * rng.range(-0.1, 0.04) * H, y: -rng.range(0.8, 0.88) * H };
+
   // --- bud on its own stem ------------------------------------------------------------------
   {
-    const top = { x: -side * rng.range(0.0, 0.12) * H, y: -rng.range(0.6, 0.72) * H };
+    const top = layout === 'low' ? { x: mainTop.x + side * rng.range(0.12, 0.2) * H, y: -rng.range(0.76, 0.84) * H } : layout === 'pair' ? { x: mainTop.x + side * rng.range(0.1, 0.16) * H, y: -rng.range(0.68, 0.75) * H } : { x: mainTop.x - side * rng.range(0.09, 0.16) * H, y: -rng.range(0.62, 0.72) * H };
     const b0 = { x: baseX(), y: 0 };
     const st = makeStem(b0, top, rng.range(-0.05, 0.05), rng);
     paintStem(c, { ...st, w: 2.4 * u, birth0: 0.36, birth1: 0.46 }, stemTone, true);
@@ -564,17 +604,20 @@ export function lotus(spec: PlantSpec): Drawing {
     bud(c, { x: q.p.x - q.d.x * 1 * u, y: q.p.y - q.d.y * 1 * u }, Math.atan2(q.d.y, q.d.x) + rng.range(-0.15, 0.15), H * rng.range(0.1, 0.12), 0.47);
   }
 
-  // --- the flower -------------------------------------------------------------------------------
-  {
-    const top = { x: side * rng.range(-0.1, 0.04) * H, y: -rng.range(0.8, 0.88) * H };
+  // --- the flower(s) ------------------------------------------------------------------------
+  const flowerAt = (top: V, R: number, birth0: number, birthA: number, birthB: number) => {
     const b0 = { x: baseX(), y: 0 };
     const st = makeStem(b0, top, rng.range(-0.05, 0.05), rng);
-    paintStem(c, { ...st, w: 2.6 * u, birth0: 0.44, birth1: 0.56 }, stemTone, true);
+    paintStem(c, { ...st, w: 2.6 * u, birth0, birth1: birthA - 0.01 }, stemTone, true);
     const q = along(st.path, st.L, 1);
     flower(c, {
-      c: { x: q.p.x, y: q.p.y }, R: H * rng.range(0.13, 0.155), face: rad(rng.range(62, 78)),
-      roll: clamp(Math.atan2(q.d.x, -q.d.y) * 0.8 + rng.range(-0.15, 0.15), -0.4, 0.4), birthA: 0.57, birthB: 0.72, tone: rng.range(0.2, 0.27),
+      c: { x: q.p.x, y: q.p.y }, R, face: rad(rng.range(58, 80)),
+      roll: clamp(Math.atan2(q.d.x, -q.d.y) * 0.8 + rng.range(-0.15, 0.15), -0.4, 0.4), birthA, birthB, tone: rng.range(0.2, 0.27),
     });
+  };
+  flowerAt(mainTop, H * rng.range(0.15, 0.18), 0.44, 0.57, 0.72);
+  {
+    if (layout === 'pair') flowerAt({ x: -side * rng.range(0.16, 0.24) * H, y: -rng.range(0.52, 0.6) * H }, H * rng.range(0.12, 0.14), 0.5, 0.66, 0.82);
   }
 
   // --- reeds at the water line (some seeds) ---------------------------------------------------

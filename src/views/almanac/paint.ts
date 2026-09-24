@@ -36,59 +36,70 @@ export function paintMoon(c: HTMLCanvasElement, o: MoonPaint): void {
   const N = c.width;
   const img = ctx.createImageData(N, N);
   const d = img.data;
-  const R = N * 0.34, cx = N / 2, cy = N / 2;
+  const R = N * 0.33, cx = N / 2, cy = N / 2;
   const th = o.phase * Math.PI * 2;
   // light direction: phase 0 → behind the moon, 0.25 → from the right (waxing, north), 0.5 → front
   const lx = Math.sin(th) * (o.south ? -1 : 1), lz = -Math.cos(th);
   const noise = makeNoise2(29, 0);
-  const lit = o.dark ? [236, 228, 208] : [251, 247, 238];
-  const ink = o.dark ? [236, 228, 210] : [27, 25, 22];
+  const paper = o.dark ? [236, 228, 208] : [252, 249, 241];
+  const ink = o.dark ? [236, 228, 210] : [38, 34, 28];
+  const haloA = o.dark ? 0.11 : 0.2;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
       const nx = (x + 0.5 - cx) / R, ny = (y + 0.5 - cy) / R;
-      const rr = nx * nx + ny * ny;
+      const r = Math.sqrt(nx * nx + ny * ny);
       const k = (y * N + x) * 4;
-      const r = Math.sqrt(rr);
-      if (r > 1.02) {
-        // halo: a wash around the moon (light) / a faint glow (dark)
-        const t = clamp((r - 1) / 0.45, 0, 1);
-        const a = (1 - smoothstep(0, 1, t)) * (o.dark ? 0.1 : 0.13) * (0.85 + 0.15 * noise(nx * 3, ny * 3));
-        const col = o.dark ? lit : ink;
-        d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = a * 255;
+      // the wash around the moon (light) / a faint glow (dark), feathered and a little uneven
+      let h = 0;
+      if (r > 0.95) {
+        const t = clamp((r - 1) / 0.62, 0, 1);
+        const un = o.dark ? 1 : 0.62 + 0.38 * (0.5 + 0.5 * noise(nx * 1.4 + 7, ny * 1.4));
+        h = haloA * Math.pow(1 - smoothstep(0, 1, t), 1.5) * un;
+        if (o.dark) {
+          // moonlight glows only where the limb is lit
+          const ux = nx / (r || 1);
+          h *= 0.12 + 0.88 * smoothstep(-0.12, 0.14, 0.87 * ux * lx + 0.5 * lz);
+        }
+      }
+      const cov = 1 - smoothstep(0.982, 1.012, r);
+      if (cov <= 0) {
+        const col = o.dark ? paper : ink;
+        d[k] = col[0]; d[k + 1] = col[1]; d[k + 2] = col[2]; d[k + 3] = h * 255;
         continue;
       }
-      const nz = Math.sqrt(Math.max(0, 1 - rr));
-      const dot = nx * lx + nz * lz;
-      const light = smoothstep(-0.1, 0.16, dot);
-      // maria: a few soft darker seas, only faintly
-      const sea = clamp(noise(nx * 2.2 + 3, ny * 2.2 - 1) * 1.4 + noise(nx * 5, ny * 5) * 0.35 - 0.1, 0, 1);
-      const limb = 1 - Math.pow(r, 6) * 0.25;
-      const edge = 1 - smoothstep(0.985, 1.02, r); // anti-aliased rim
+      const rr = Math.min(1, r * r);
+      const nz = Math.sqrt(1 - rr);
+      const light = smoothstep(-0.12, 0.14, nx * lx + nz * lz);
+      // maria: a few broad, faint seas
+      const sea = clamp(noise(nx * 1.5 + 3.2, ny * 1.5 - 1.1) * 1.3 + noise(nx * 3.4, ny * 3.4) * 0.25 - 0.08, 0, 1);
       if (o.dark) {
-        const litA = (0.93 - sea * 0.16) * limb;
-        const a = light * litA + (1 - light) * 0.1;
-        d[k] = lit[0]; d[k + 1] = lit[1] - sea * 6; d[k + 2] = lit[2] - sea * 12;
-        d[k + 3] = a * edge * 255;
+        const a = cov * (light * (0.94 - sea * 0.1) * (1 - Math.pow(r, 8) * 0.15) + (1 - light) * 0.075);
+        const A = a + h * (1 - a);
+        d[k] = paper[0]; d[k + 1] = paper[1] - sea * 8 * light; d[k + 2] = paper[2] - sea * 16 * light;
+        d[k + 3] = A * 255;
       } else {
-        // bare paper where lit (with faint seas), a pale ink veil where dark
-        const shade = (1 - light) * 0.2 + light * sea * 0.07 + (1 - limb) * 0.2 * light;
-        d[k] = lit[0] * (1 - shade) + ink[0] * shade;
-        d[k + 1] = lit[1] * (1 - shade) + ink[1] * shade;
-        d[k + 2] = lit[2] * (1 - shade) + ink[2] * shade;
-        // the rim blends into the halo wash
-        d[k + 3] = edge * 255 + (1 - edge) * 0.13 * 255;
+        // bare paper where lit (faint seas), a pale ink veil where dark, a hint of limb shading
+        const shade = (1 - light) * (0.17 + 0.04 * noise(nx * 4, ny * 4)) + light * (sea * 0.05 + Math.pow(r, 6) * 0.05);
+        const dr = paper[0] * (1 - shade) + ink[0] * shade;
+        const dg = paper[1] * (1 - shade) + ink[1] * shade;
+        const db = paper[2] * (1 - shade) + ink[2] * shade;
+        const A = cov + h * (1 - cov);
+        const hw = (h * (1 - cov)) / A;
+        d[k] = dr * (1 - hw) + ink[0] * hw;
+        d[k + 1] = dg * (1 - hw) + ink[1] * hw;
+        d[k + 2] = db * (1 - hw) + ink[2] * hw;
+        d[k + 3] = A * 255;
       }
     }
   }
   ctx.putImageData(img, 0, 0);
   if (!o.dark) {
-    // ink sits in the paper: punch a little grain out of the wash
-    const g = inkGrainTile('wash');
-    const pat = ctx.createPattern(g, 'repeat');
+    // ink sits in the paper: punch a little grain out of the wash around the moon
+    const pat = ctx.createPattern(inkGrainTile('wash'), 'repeat');
     if (pat) {
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.globalAlpha = 0.35;
+      ctx.globalAlpha = 0.45;
       ctx.beginPath();
       ctx.rect(0, 0, N, N);
       ctx.arc(cx, cy, R * 1.01, 0, Math.PI * 2, true);

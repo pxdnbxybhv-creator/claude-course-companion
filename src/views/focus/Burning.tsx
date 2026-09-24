@@ -1,7 +1,8 @@
 // While the stick burns: the remaining time, the intention, pause / put out.
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../app/i18n';
-import { Sheet } from '../../ui/kit';
+import { Sheet, toast } from '../../ui/kit';
+import * as session from './session';
 import { active, answerNotify, extinguish, notifyAsk, now, togglePause } from './session';
 import { cnRemaining, elapsedMs, enRemaining, formatClock, remainingMs } from './timer';
 import { AmbientPicker } from './Setup';
@@ -11,6 +12,11 @@ export function Burning() {
   const s = active.value;
   const n = now.value;
   const [confirm, setConfirm] = useState(false);
+  const pauseRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    // Keyboard users who lit the stick land on its controls, not on <body>.
+    if (session.litByKeyboard) pauseRef.current?.focus({ preventScroll: true });
+  }, []);
   if (!s) return null;
   const rem = remainingMs(s, n);
   const paused = s.pausedAt !== null;
@@ -30,8 +36,16 @@ export function Burning() {
         )}
       </div>
 
+      {notifyAsk.value && (
+        <div class="fx-ask" role="note">
+          <p>{t('香尽时，轻声提醒你？', 'Let you know when it burns out?')}</p>
+          <button class="btn btn-small" onClick={() => answerNotify(true)}>{t('好', 'Yes')}</button>
+          <button class="btn btn-small btn-ghost" onClick={() => answerNotify(false)}>{t('不必', 'No')}</button>
+        </div>
+      )}
+
       <div class="fx-actions">
-        <button class={'btn ' + (paused ? 'btn-primary' : '')} onClick={togglePause} aria-pressed={paused}>
+        <button ref={pauseRef} class={'btn ' + (paused ? 'btn-primary' : '')} onClick={togglePause}>
           {paused ? t('继续', 'Resume') : t('暂停', 'Pause')}
         </button>
         <button class="btn btn-ghost fx-out" onClick={() => setConfirm(true)}>{t('熄灭', 'Put out')}</button>
@@ -39,15 +53,6 @@ export function Burning() {
 
       <AmbientPicker compact />
 
-      {notifyAsk.value && (
-        <div class="fx-ask" role="note">
-          <p>{t('香燃尽时，要轻声提醒你吗？', 'Shall I let you know when the incense burns out?')}</p>
-          <div class="fx-ask-btns">
-            <button class="btn btn-small" onClick={() => answerNotify(true)}>{t('好', 'Yes, please')}</button>
-            <button class="btn btn-small btn-ghost" onClick={() => answerNotify(false)}>{t('不必', 'No thanks')}</button>
-          </div>
-        </div>
-      )}
 
       <Sheet open={confirm} onClose={() => setConfirm(false)} label={t('熄灭这炷香？', 'Put out this incense?')} title={t('熄灭这炷香？', 'Put out this incense?')}>
         <p class="fx-confirm-body">
@@ -58,7 +63,7 @@ export function Burning() {
         </p>
         <div class="fx-confirm-btns">
           <button class="btn btn-primary" onClick={() => setConfirm(false)} autoFocus>{t('继续燃', 'Keep burning')}</button>
-          <button class="btn fx-out" onClick={() => { setConfirm(false); extinguish(); }}>{t('熄灭', 'Put it out')}</button>
+          <button class="btn fx-out" onClick={() => { setConfirm(false); extinguish(); toast(t('香已熄灭，记为未燃尽', 'Put out — logged as unfinished')); }}>{t('熄灭', 'Put it out')}</button>
         </div>
       </Sheet>
     </div>

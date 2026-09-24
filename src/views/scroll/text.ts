@@ -112,7 +112,7 @@ export function dayShare(habits: readonly Habit[], sets: ReadonlyMap<string, Rea
   return Math.min(1, done / due);
 }
 
-const isHan = (s: string) => /^[㐀-鿿豈-﫿]+$/.test(s);
+const isHan = (s: string) => /^[\u3007\u3400-\u9fff\uf900-\ufaff]+$/.test(s);
 
 export interface Inscription {
   /** Verses of the poem, punctuation removed. */
@@ -149,7 +149,7 @@ export function composeInscription(d: PosterData, poemLines: readonly string[], 
     if (d.daysTended > 0) record.push(`计功${cnCount(d.daysTended)}日`);
   }
   if (d.incense > 0) record.push(`焚香${cnCount(d.incense)}炷`);
-  const date = [`${cnYearDigits(d.year)}年`, d.termZh, `${d.lunar.yearGanZhi}年${d.lunar.monthName}`].filter(Boolean);
+  const date = [`${cnYearDigits(d.year)}年`, d.termZh, `${d.lunar.yearGanZhi}年${d.lunar.monthName}`].filter((p) => p && isHan(p));
   const sign = name && isHan(name) && name !== '半亩' ? `${name}记` : '半亩主人记';
   const leisure = LEISURE_SEALS[Math.abs(salt + d.termIndex) % LEISURE_SEALS.length];
   return { verses: versesOf(poemLines), date, record, sign, seal, leisure };

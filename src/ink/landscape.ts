@@ -133,7 +133,7 @@ export function groundLine(w: number, h: number): { groundY: number; pondTop: nu
   const aspect = w / h;
   const g = clamp(0.63 + (aspect - 1) * 0.022, 0.62, 0.7);
   const groundY = Math.round(h * g);
-  const pondTop = groundY + Math.round(clamp(h * 0.028, 8, 20));
+  const pondTop = groundY + Math.round(clamp(h * 0.02, 7, 14));
   return { groundY, pondTop };
 }
 
@@ -209,7 +209,7 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
   const nearBase = hz + (groundY - hz) * 0.6;
 
   const ridges = [
-    makeRidge(w, farBase, far, noise, 0, 0.35, Hz * 0.05, 11),
+    makeRidge(w, farBase, far, noise, 0, 0.35, 0, 11),
     makeRidge(w, midBase, mid, noise, 1, 0.6, 0, 23),
     makeRidge(w, nearBase, near, noise, 2, 1, 0, 37),
   ];
@@ -262,7 +262,7 @@ interface Palette {
 function palette(season: Season, tod: TimeOfDay): Palette {
   const inkIndigo = (t: number) => mixRgb(INK, INDIGO, t);
   let hills: [RGB, RGB, RGB];
-  let tones: [number, number, number] = [0.13, 0.22, 0.3];
+  let tones: [number, number, number] = [0.13, 0.26, 0.34];
   let ground: RGB = mixRgb(INK, OCHRE, 0.35);
   let grass: RGB = INK;
   switch (season) {
@@ -273,7 +273,7 @@ function palette(season: Season, tod: TimeOfDay): Palette {
     case 'summer':
       hills = [inkIndigo(0.9), mixRgb(inkIndigo(0.5), MALACHITE, 0.45), mixRgb(INK, MALACHITE, 0.4)];
       grass = mixRgb(INK, MALACHITE, 0.45);
-      tones = [0.14, 0.24, 0.32];
+      tones = [0.14, 0.28, 0.36];
       break;
     case 'autumn': // 浅绛: indigo distance, ochre near slopes
       hills = [inkIndigo(0.7), mixRgb(INK, OCHRE, 0.45), mixRgb(INK, OCHRE, 0.6)];
@@ -379,9 +379,10 @@ function paintBody(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, nois
     const col = env.tod === 'dawn' ? mixRgb(CINNABAR, ROUGE, 0.3) : env.tod === 'dusk' ? mixRgb(CINNABAR, [214, 85, 58], 0.5) : CINNABAR;
     const R = b.r * 1.6;
     paintField(ctx, b.x - R, b.y - R, R * 2, R * 2, clamp(3 / b.r * 4, 0.6, 2), (x, y, out) => {
-      const dd = Math.hypot(x - b.x, y - b.y) / b.r;
-      const mott = 0.88 + 0.14 * noise(x / 6, y / 6);
-      const core = (1 - smoothstep(0.9, 1.04, dd)) * mott;
+      const ang = Math.atan2(y - b.y, x - b.x);
+      const dd = Math.hypot(x - b.x, y - b.y) / (b.r * (1 + 0.025 * noise(Math.cos(ang) * 2, Math.sin(ang) * 2 + 9)));
+      const mott = 0.82 + 0.18 * noise(x / 5, y / 5) + 0.12 * smoothstep(0.7, 0.98, dd);
+      const core = (1 - smoothstep(0.95, 1.02, dd)) * mott;
       const glow = Math.exp(-(((dd - 1) * 2.6) ** 2)) * 0.12 * (dd > 1 ? 1 : 0);
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2];
       out[3] = a * core + a * glow;
@@ -429,14 +430,17 @@ function hillDensity(L: Layout, R: Ridge, x: number, y: number, noise: Noise2): 
   const fade = 1 - smoothstep(r + H * (R.depth === 2 ? 0.3 : 0.18), R.base + H * 0.1, y + warp);
   if (fade <= 0) return 0;
   // ridge darker (墨色 at the crest), body lighter
-  const crest = 0.55 + 0.45 * Math.exp(-d / (2.5 + H * 0.05));
+  const crest = R.depth === 1
+    ? 0.45 + 0.55 * Math.exp(-d / (3 + H * 0.16))
+    : 0.55 + 0.45 * Math.exp(-d / (2.5 + H * 0.05));
   let a = edge * fade * crest;
   if (R.depth === 1) {
     // a belt of cloud crossing the cloudy peaks, in patches (米氏云山)
-    const yb = r + H * 0.52 + noise(x / 90, 4.4) * H * 0.12;
-    const band = Math.exp(-(((y - yb) / (H * 0.11 + 4)) ** 2));
-    const patch = smoothstep(-0.15, 0.35, noise(x / 160 + 3, 1.7));
-    a *= 1 - 0.92 * band * patch;
+    const yb = r + H * 0.5 + noise(x / 70, 4.4) * H * 0.2 + noise(x / 23, 8.1) * H * 0.05;
+    const dy = y - yb;
+    const band = Math.exp(-((dy / ((dy < 0 ? 0.06 : 0.16) * H + 3)) ** 2));
+    const patch = smoothstep(-0.2, 0.3, noise(x / 140 + 3, 1.7));
+    a *= 1 - 0.95 * band * patch;
   }
   void L;
   return a;
@@ -446,18 +450,25 @@ function paintHillWash(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, col: 
   let top = Infinity;
   for (let i = 0; i < R.ys.length; i++) top = Math.min(top, R.ys[i]);
   if (!isFinite(top) || top >= R.base - 2) return;
-  const y0 = Math.max(0, top - 4), y1 = Math.min(L.h, R.base + (R.base - top) * 0.2);
+  const y0 = Math.max(0, top - 4), y1 = Math.min(L.h, R.base + (R.base - top) * 0.45);
   const snow = env.season === 'winter';
   const washed = snow || env.tod === 'night' || env.tod === 'dusk' || env.tod === 'dawn';
   paintField(ctx, 0, y0, L.w, y1 - y0, res, (x, y, out) => {
-    const dens = hillDensity(L, R, x, y, noise);
+    const dens = hillDensity(L, R, x, y, noise) * (1 - smoothstep(y1 - (y1 - y0) * 0.12, y1, y));
     if (dens <= 0) return;
     const r = ridgeAt(R, x);
     const d = y - r;
     const H = R.base - r;
-    // brush-streaked mottling, horizontal for far hills, slanting for near ones
-    const mott = 0.72 + 0.4 * noise(x / (28 + R.depth * 4) - y / 90, y / 11) + 0.12 * noise(x / 7, y / 5);
-    let ink = dens * tone * mott;
+    // light from the upper left: slopes rising to the right face the light, the others turn away
+    const sl = (ridgeAt(R, x + 4) - ridgeAt(R, x - 4)) / 8;
+    const shade = clamp(0.5 + sl * 1.6, 0, 1);
+    // gullies flow down the slope (sheared streaks), plus a fine wet mottle
+    const gully = noise(x / (7 + R.depth * 3) - (d * sl) / 9, y / 55 + R.depth * 5);
+    const mott = 0.8 + 0.3 * noise(x / 40 - y / 90, y / 13) + 0.1 * noise(x / 6, y / 5);
+    const struct = R.depth === 0 ? 1
+      : R.depth === 1 ? (0.75 + 0.4 * shade) * (0.85 + 0.3 * noise(x / 50, y / 9))
+      : (0.62 + 0.55 * shade) * (0.8 + 0.4 * Math.max(0, gully) * Math.min(1, d / 8));
+    let ink = dens * tone * mott * struct;
     let white = 0;
     if (snow) {
       // 雪景: ridges keep the paper, gullies and the lower flanks take the ink
@@ -484,27 +495,46 @@ const P = (x: number, y: number, w: number): StrokePoint => ({ x, y, w });
 function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Palette, env: SceneEnv, rng: Rng, noise: Noise2) {
   const col = rgbHex(mixRgb(pal.hills[1], INK, 0.35));
   const snow = env.season === 'winter';
-  const scale = clamp(L.h / 520, 0.7, 1.3);
-  const budget = Math.round(clamp(L.w * 0.35, 90, 320));
-  let placed = 0;
-  for (let tries = 0; tries < budget * 4 && placed < budget; tries++) {
-    const x = rng() * L.w;
-    const r = ridgeAt(R, x);
-    const H = R.base - r;
-    if (H < 12) continue;
-    const y = r + Math.abs(rng.gauss()) * H * 0.22 + 1.5;
-    const dens = hillDensity(L, R, x, y, noise);
-    if (dens < 0.3 || rng() > dens) continue;
-    if (snow && y - r < H * 0.12) continue;
-    const len = rng.range(4, 9) * scale;
-    const wd = rng.range(2.2, 4.2) * scale;
-    const tone = clamp(pal.tones[1] * rng.range(1.1, 2.2) * dens, 0.1, 0.55);
-    const tilt = rng.range(-0.12, 0.08) * len;
-    paintStroke(ctx, {
-      kind: 'brush', tone, color: col, birth: 0, seed: rng.int(1, 1e9), wet: 0.7,
-      pts: [P(x - len / 2, y + tilt, wd * 0.7), P(x, y, wd), P(x + len / 2, y - tilt, wd * 0.5)],
-    });
-    placed++;
+  const scale = clamp(Math.sqrt(L.w * L.h) / 820, 0.6, 1.3);
+  // 积墨: clusters of wet horizontal dabs — pale, broad ones first, then smaller, darker ones
+  // crowding the crests and the shadowed flanks. Clusters fuse into masses and leave gaps.
+  const limit = Math.round(clamp(L.w * 0.9, 220, 1100));
+  const clusters = Math.round(limit / 9);
+  let count = 0;
+  const xs: number[] = [];
+  for (let x = 0; x < L.w; x += 4) if (R.base - ridgeAt(R, x) > 16) xs.push(x);
+  if (xs.length) {
+    for (let pass = 0; pass < 3 && count < limit; pass++) {
+      const nc = Math.round(clusters * [0.35, 0.4, 0.25][pass]);
+      for (let c = 0; c < nc; c++) {
+        const cx = rng.pick(xs) + rng.range(-4, 4);
+        const r = ridgeAt(R, cx);
+        const H = R.base - r;
+        const sl = (ridgeAt(R, cx + 4) - ridgeAt(R, cx - 4)) / 8;
+        // darker passes hug the crest; shadowed (right-facing) flanks collect more
+        const depthK = [0.34, 0.2, 0.08][pass] * (sl > 0 ? 1.2 : 0.8);
+        const cy = r + 2 + Math.abs(rng.gauss()) * H * depthK;
+        const dens = hillDensity(L, R, cx, cy, noise);
+        if (dens < 0.3) continue;
+        if (snow && cy - r < H * 0.1) continue;
+        const nd = rng.int(4, 10);
+        const spread = [16, 12, 8][pass] * scale;
+        for (let k = 0; k < nd; k++) {
+          const x = cx + rng.gauss() * spread;
+          const rr = ridgeAt(R, x);
+          const y = Math.max(rr + 1.5, cy + rng.gauss() * spread * 0.35 + (rr - r) * 0.8);
+          const len = [12, 9, 6.5][pass] * scale * rng.range(0.7, 1.3);
+          const wd = [5.5, 4.2, 3.2][pass] * scale * rng.range(0.8, 1.2);
+          const tone = clamp(pal.tones[1] * [0.7, 1.25, 2][pass] * rng.range(0.8, 1.2) * (0.5 + 0.5 * dens), 0.08, 0.6);
+          const tilt = rng.range(-0.12, 0.08) * len;
+          paintStroke(ctx, {
+            kind: 'brush', tone, color: col, birth: 0, seed: rng.int(1, 1e9), wet: 0.85,
+            pts: [P(x - len / 2, y - tilt / 2 + 0.3, wd * 0.75), P(x - len * 0.08, y, wd), P(x + len / 2, y + tilt / 2 - 0.2, wd * 0.3)],
+          });
+          count++;
+        }
+      }
+    }
   }
   // an optional pagoda on a secondary crest — a tiny sign of people in the hills
   if (rng.chance(0.45)) {
@@ -536,7 +566,7 @@ function paintHempStrokes(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pa
   const col = rgbHex(mixRgb(pal.hills[2], INK, 0.4));
   const dark = rgbHex(INK);
   const snow = env.season === 'winter';
-  const scale = clamp(L.h / 520, 0.7, 1.3);
+  const scale = clamp(Math.sqrt(L.w * L.h) / 820, 0.6, 1.3);
   // where is this layer tall enough to texture?
   const xs: number[] = [];
   for (let x = 0; x < L.w; x += 3) if (R.base - ridgeAt(R, x) > 14) xs.push(x);
@@ -553,40 +583,42 @@ function paintHempStrokes(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pa
     for (let i = 0; i <= n; i++) {
       const xx = Math.min(xEnd, x + (len * i) / n);
       const t = i / n;
-      pts.push(P(xx, ridgeAt(R, xx) + 0.6, (0.6 + 1.4 * Math.sin(Math.PI * (0.1 + 0.8 * t))) * scale * (snow ? 0.8 : 1)));
+      pts.push(P(xx, ridgeAt(R, xx) + 0.8, (0.8 + 2 * Math.sin(Math.PI * (0.1 + 0.8 * t))) * scale * (snow ? 0.8 : 1)));
     }
-    if (R.base - ridgeAt(R, x + len / 2) > 18) paintStroke(ctx, { kind: rng.chance(0.5) ? 'dry' : 'brush', tone: pal.tones[2] * 1.3, color: col, birth: 0, seed: rng.int(1, 1e9), dryness: 0.6, pts });
+    if (R.base - ridgeAt(R, x + len / 2) > 18) paintStroke(ctx, { kind: rng.chance(0.4) ? 'dry' : 'brush', tone: pal.tones[2] * 1.7, color: col, birth: 0, seed: rng.int(1, 1e9), dryness: 0.5, pts });
     x += len + rng.range(8, 40) * scale;
   }
 
-  // hemp-fibre strokes running down the slopes, in loose bundles
-  const bundles = Math.round(clamp(xs.length / 9, 6, 26));
+  // 披麻皴: bundles of long, gently S-curved, roughly parallel strokes running down the slopes
+  const bundles = Math.round(clamp(xs.length / 10, 6, 24));
   for (let b = 0; b < bundles; b++) {
     const bx = rng.pick(xs);
     const r0 = ridgeAt(R, bx);
     const H = R.base - r0;
-    const n = rng.int(2, 4);
+    const sl = slope(bx);
+    const lean = clamp(sl * 0.8, -1.1, 1.1);
+    const bend = rng.range(0.12, 0.35) * (rng.chance(0.5) ? 1 : -1);
+    const len0 = rng.range(0.22, 0.5) * H;
+    const n = rng.int(3, 5);
+    const gap = rng.range(3, 5.5) * scale;
+    const start = rng.range(0.03, 0.2);
     for (let k = 0; k < n; k++) {
-      const sx = bx + rng.range(-8, 8) * scale;
+      const sx = bx + (k - (n - 1) / 2) * gap + rng.range(-1, 1);
       const r = ridgeAt(R, sx);
-      let y = r + rng.range(0.04, 0.3) * H;
-      if (snow && y - r < H * 0.14) y = r + H * rng.range(0.14, 0.3);
-      const len = rng.range(0.25, 0.55) * H;
-      const sl = slope(sx);
-      const dirx = clamp(sl * 0.9, -1.2, 1.2) + rng.range(-0.15, 0.15);
+      let y = r + (start + rng.range(-0.02, 0.05)) * H;
+      if (snow && y - r < H * 0.14) y = r + H * rng.range(0.14, 0.25);
+      const len = len0 * rng.range(0.7, 1.1);
       const pts: StrokePoint[] = [];
-      const m = 6;
-      let px = sx, py = y;
-      const wd = rng.range(0.7, 1.4) * scale;
+      const m = 8;
+      const wd = rng.range(1.1, 2) * scale;
       for (let i = 0; i <= m; i++) {
         const t = i / m;
-        pts.push(P(px, py, wd * (i === 0 ? 0.6 : 1 - 0.7 * t)));
-        py += len / m;
-        px += (dirx * len) / m * (0.6 + 0.4 * noise(px / 20, py / 20)) + 0.4 * Math.sin(t * 5 + k);
+        const px = sx + lean * len * t * 0.8 + Math.sin(t * Math.PI) * bend * len * 0.3;
+        pts.push(P(px, y + len * t, wd * (i === 0 ? 0.7 : 1 - 0.75 * t)));
       }
-      const dens = hillDensity(L, R, pts[0].x, pts[0].y, noise);
-      if (dens < 0.25) continue;
-      paintStroke(ctx, { kind: 'dry', tone: clamp(pal.tones[2] * rng.range(0.8, 1.3) * dens, 0.08, 0.45), color: col, birth: 0, seed: rng.int(1, 1e9), dryness: 0.7, pts });
+      const dens = hillDensity(L, R, pts[1].x, pts[1].y, noise);
+      if (dens < 0.2) continue;
+      paintStroke(ctx, { kind: rng.chance(0.5) ? 'dry' : 'brush', tone: clamp(pal.tones[2] * rng.range(0.9, 1.4) * (0.4 + 0.6 * dens), 0.1, 0.5), color: col, birth: 0, seed: rng.int(1, 1e9), dryness: 0.75, pts });
     }
   }
 
@@ -634,7 +666,7 @@ function paintGround(ctx: CanvasRenderingContext2D, L: Layout, pal: Palette, env
       let a: number;
       if (d < 0) a = 0.55 * Math.exp(-((d / (2.2 * scale)) ** 2)) * (0.5 + 0.5 * noise(x / 9, 5.5));
       else a = 0.55 * (0.5 + 0.5 * Math.exp(-d / (4 * scale))) * (0.75 + 0.35 * noise(x / 26, y / 6));
-      let t = pal.tones[2] * 0.75;
+      let t = pal.tones[2] * (env.tod === 'night' ? 1.1 : 0.75);
       if (snow) t *= d < 0 ? 0.5 : 0.35 + 0.65 * smoothstep(0, pt - gy, d); // snow lies on the ground
       a *= t * (1 - 0.8 * smoothstep(pt - 3, pt + 1, y));
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = a;
@@ -701,136 +733,210 @@ function paintGround(ctx: CanvasRenderingContext2D, L: Layout, pal: Palette, env
 export function rockDrawing(seed: number, size: number): Drawing {
   const rng = makeRng(mixSeed(seed, 0x70c4));
   const nz = makeNoise2(mixSeed(seed, 0x5eed));
-  const taihu = rng.chance(0.45);
+  const taihu = rng.chance(0.42);
   const W = size;
-  const H = taihu ? size * rng.range(1.05, 1.35) : size * rng.range(0.42, 0.6);
+  const H = taihu ? size * rng.range(1.0, 1.3) : size * rng.range(0.42, 0.6);
   const s = size / 100; // stroke scale
-  const baseY = H * 0.97;
-  const cx = W / 2 + rng.range(-0.04, 0.04) * W;
-  const rx = taihu ? W * rng.range(0.26, 0.32) : W * rng.range(0.4, 0.46);
-  const ry = taihu ? H * 0.47 : H * 0.62;
-  const cy = baseY - ry * (taihu ? 1 : 0.82);
-  const lean = taihu ? rng.range(-0.2, 0.2) : rng.range(-0.08, 0.08);
-  const N = 56;
-  const pts: { x: number; y: number }[] = [];
-  const o = rng.range(0, 100);
-  for (let i = 0; i < N; i++) {
-    const a = (i / N) * Math.PI * 2 - Math.PI / 2; // start at the top, clockwise
-    const ca = Math.cos(a), sa = Math.sin(a);
-    const lump = 1 + (taihu ? 0.26 : 0.14) * nz.fbm(ca * 1.4 + o, sa * 1.4 + o, 3) + (taihu ? 0.08 * nz(ca * 4 + o, sa * 4) : 0);
-    let x = cx + ca * rx * lump;
-    let y = cy + sa * ry * lump * (!taihu && sa < 0 ? 1.0 : 1);
-    if (taihu) {
-      // pinched waist, top-heavy, leaning (瘦 · 皱)
-      const v = (y - (cy - ry)) / (2 * ry);
-      const waist = 1 - 0.28 * Math.exp(-(((v - 0.62) / 0.16) ** 2)) + 0.1 * (1 - v);
-      x = cx + (x - cx) * waist + lean * (baseY - y) * 0.5;
-    } else {
-      // flattened dome
-      if (sa < 0) y = cy + sa * ry * lump * Math.pow(Math.abs(sa), -0.25) * 0.9;
-      x += lean * (baseY - y);
-    }
-    if (y > baseY) y = baseY + nz(x / 10, 3) * 0.8 * s;
-    pts.push({ x, y });
+  const baseY = H * 0.96;
+  type V = { x: number; y: number };
+
+  // --- silhouette: a few key vertices joined by gently bulging edges (angular turns, 转折)
+  const keys: V[] = [];
+  if (!taihu) {
+    const lx = W * rng.range(0.05, 0.12), rx = W * rng.range(0.88, 0.96);
+    const peakX = W * rng.range(0.36, 0.62);
+    keys.push({ x: lx + W * rng.range(0.02, 0.06), y: baseY });
+    keys.push({ x: lx, y: baseY - H * rng.range(0.3, 0.5) });
+    keys.push({ x: W * rng.range(0.14, 0.28), y: H * rng.range(0.12, 0.26) });
+    keys.push({ x: peakX, y: H * rng.range(0.02, 0.08) });
+    if (rng.chance(0.6)) keys.push({ x: lerp(peakX, rx, rng.range(0.4, 0.6)), y: H * rng.range(0.1, 0.22) });
+    keys.push({ x: rx, y: baseY - H * rng.range(0.25, 0.5) });
+    keys.push({ x: rx - W * rng.range(0.02, 0.06), y: baseY });
+  } else {
+    // lean, top-heavy, pinched: a wandering spine with a varying half-width
+    const lean = rng.range(-0.16, 0.16) * W;
+    const levels = 7;
+    const spine = (v: number) => W / 2 + lean * v + Math.sin(v * Math.PI * rng.range(1.2, 1.8) + seed) * W * 0.05;
+    // independent, lumpy left and right profiles; the waist wanders, the crown overhangs
+    const waist = rng.range(0.25, 0.6);
+    const prof = () => {
+      const out: number[] = [];
+      for (let i = 0; i <= levels; i++) {
+        const v = i / levels;
+        const pinch = 0.07 * Math.exp(-(((v - waist) / 0.16) ** 2));
+        out.push(W * (0.15 + 0.1 * v - pinch + rng.range(-0.045, 0.05)));
+      }
+      return out;
+    };
+    const hl = prof(), hr = prof();
+    const yAt = (v: number) => baseY - v * (baseY - H * 0.04);
+    keys.push({ x: spine(0) - hl[0] * 0.9, y: baseY });
+    for (let i = 1; i < levels; i++) keys.push({ x: spine(i / levels) - hl[i], y: yAt(i / levels) + rng.range(-0.03, 0.03) * H });
+    keys.push({ x: spine(1) - hl[levels] * rng.range(0.3, 0.7), y: yAt(1) + rng.range(0, 0.06) * H });
+    keys.push({ x: spine(1) + hr[levels] * rng.range(0.3, 0.7), y: yAt(1) + rng.range(0.02, 0.1) * H });
+    for (let i = levels - 1; i >= 1; i--) keys.push({ x: spine(i / levels) + hr[i], y: yAt(i / levels) + rng.range(-0.03, 0.03) * H });
+    keys.push({ x: spine(0) + hr[0] * 0.9, y: baseY });
   }
+  const cx = keys.reduce((a, k) => a + k.x, 0) / keys.length;
+  const cy = keys.reduce((a, k) => a + k.y, 0) / keys.length;
+  const pts: V[] = [];
+  const keyIdx: number[] = [];
+  const nk = keys.length;
+  for (let i = 0; i < nk; i++) {
+    const a = keys[i], b = keys[(i + 1) % nk];
+    const closing = i === nk - 1; // the base: straight, it sits in the ground
+    const seg = Math.max(3, Math.round(Math.hypot(b.x - a.x, b.y - a.y) / (4 * s)));
+    // bulge outward from the centroid
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    let ox = mx - cx, oy = my - cy;
+    const ol = Math.hypot(ox, oy) || 1;
+    ox /= ol; oy /= ol;
+    const bulge = closing ? 0 : Math.hypot(b.x - a.x, b.y - a.y) * rng.range(0.04, taihu ? 0.2 : 0.14) * (rng.chance(taihu ? 0.25 : 0.1) ? -1 : 1);
+    keyIdx.push(pts.length);
+    for (let k = 0; k < seg; k++) {
+      const t = k / seg;
+      const bb = Math.sin(Math.PI * t) * bulge;
+      const j = closing ? 0 : nz(i * 3.1 + t * 2, 0.5) * 1.2 * s;
+      pts.push({ x: lerp(a.x, b.x, t) + ox * (bb + j), y: Math.min(baseY + 0.5, lerp(a.y, b.y, t) + oy * (bb + j)) });
+    }
+  }
+  const N = pts.length;
   const strokes: Stroke[] = [];
   const add = (st: Omit<Stroke, 'birth' | 'seed'>) => strokes.push({ ...st, birth: 0, seed: rng.int(1, 1e9) });
   const tint = rng.pick([PIGMENTS.ink, PIGMENTS.ink, PIGMENTS.ochre, PIGMENTS.indigo]);
-  const ink = PIGMENTS.ink;
 
-  // 1 · body wash, lit side left paler
-  add({ kind: 'wash', tone: tint === ink ? 0.12 : 0.2, color: tint, wet: 0.6, pts: pts.map((p) => P(p.x, p.y, 3 * s)) });
-  // 2 · shadow wash hugging the right/lower side
-  const shade: StrokePoint[] = [];
-  const inner: StrokePoint[] = [];
-  for (let i = Math.round(N * 0.08); i <= Math.round(N * 0.55); i++) {
-    const p = pts[i];
-    shade.push(P(p.x, p.y, 4 * s));
-    const k = 0.3 + 0.12 * nz(i * 0.3, 5);
-    inner.push(P(lerp(p.x, cx - rx * 0.1, k), lerp(p.y, cy, k * 0.7), 4 * s));
+  // 1 · a pale body wash
+  add({ kind: 'wash', tone: tint === PIGMENTS.ink ? 0.09 : 0.14, color: tint, wet: 0.6, pts: pts.map((p) => P(p.x, p.y, 3 * s)) });
+
+  // 2 · 石分三面: a facet line from the top turning down divides the lit face from the shadow side
+  const topI = pts.reduce((bi, p, i) => (p.y < pts[bi].y ? i : bi), 0);
+  const top = pts[topI];
+  const facet: StrokePoint[] = [];
+  {
+    const endX = lerp(top.x, Math.max(...pts.map((p) => p.x)), rng.range(0.35, 0.6));
+    const endY = lerp(top.y, baseY, rng.range(taihu ? 0.45 : 0.7, taihu ? 0.7 : 0.95));
+    const m = 7;
+    const bow = rng.range(-0.15, 0.1) * (endY - top.y);
+    for (let i = 0; i <= m; i++) {
+      const t = i / m;
+      const e = t * t * (3 - 2 * t);
+      facet.push(P(lerp(top.x, endX, e) - Math.sin(Math.PI * t) * bow + (i === 0 ? 0 : nz(t * 3, 7) * 1.5 * s), lerp(top.y, endY, t), (0.4 + 2.2 * Math.sin(Math.PI * (0.15 + 0.7 * t))) * s));
+    }
+    // shadow face: the facet line, then the contour from its foot back up to the top
+    const shade: StrokePoint[] = facet.map((p) => P(p.x, p.y, 4 * s));
+    let footI = topI;
+    let best = Infinity;
+    for (let i = 0; i < N; i++) {
+      const p = pts[i];
+      if (p.x < facet[facet.length - 1].x) continue;
+      const d = Math.hypot(p.x - facet[facet.length - 1].x, p.y - facet[facet.length - 1].y);
+      if (d < best) { best = d; footI = i; }
+    }
+    for (let i = footI; i !== topI; i = (i - 1 + N) % N) {
+      shade.push(P(pts[i].x, pts[i].y, 4 * s));
+      if (shade.length > N) break;
+    }
+    add({ kind: 'wash', tone: 0.17, wet: 0.7, pts: shade });
   }
-  add({ kind: 'wash', tone: 0.16, wet: 0.7, pts: [...shade, ...inner.reverse()] });
 
-  // 3 · holes (透 · 漏) for the scholar's rock
+  // 3 · holes (透 · 漏) for the scholar's rock — at clearly different heights, never a pair
   const holes: { x: number; y: number; rx: number; ry: number }[] = [];
   if (taihu) {
-    const nh = rng.int(2, 4);
-    for (let tries = 0; tries < 30 && holes.length < nh; tries++) {
-      const hx = cx + rng.range(-0.5, 0.5) * rx;
-      const hy = cy + rng.range(-0.7, 0.55) * ry;
-      const hrx = rx * rng.range(0.12, 0.26), hry = ry * rng.range(0.07, 0.15);
-      if (!inside(pts, hx - hrx * 1.6, hy) || !inside(pts, hx + hrx * 1.6, hy) || !inside(pts, hx, hy - hry * 2) || !inside(pts, hx, hy + hry * 2)) continue;
-      if (holes.some((q) => Math.hypot(q.x - hx, (q.y - hy) * 1.5) < (q.rx + hrx) * 1.3)) continue;
-      holes.push({ x: hx, y: hy, rx: hrx, ry: hry });
+    const nh = rng.pick([1, 2, 2, 3]);
+    const bands = [0.2, 0.45, 0.7].sort(() => rng() - 0.5);
+    for (let hi = 0; hi < nh; hi++) {
+      for (let tries = 0; tries < 20; tries++) {
+        const hy = lerp(H * 0.08, baseY, bands[hi] + rng.range(-0.08, 0.08));
+        const hx = cx + rng.range(-0.24, 0.24) * W;
+        const big = hi === 0;
+        const hrx = W * (big ? rng.range(0.07, 0.11) : rng.range(0.035, 0.06));
+        const hry = hrx * rng.range(0.6, 1.2);
+        if (![[-1.7, 0], [1.7, 0], [0, -1.8], [0, 1.8], [1.2, 1.2], [-1.2, -1.2]].every(([a, b]) => inside(pts, hx + a * hrx, hy + b * hry))) continue;
+        if (holes.some((q) => Math.abs(q.x - hx) < W * 0.08)) continue;
+        holes.push({ x: hx, y: hy, rx: hrx, ry: hry });
+        break;
+      }
     }
     for (const q of holes) {
-      const rot = rng.range(-0.4, 0.4);
+      const rot = rng.range(-0.6, 0.6);
       const ring = (sc: number, n: number, a0 = 0, a1 = Math.PI * 2): StrokePoint[] => {
         const out: StrokePoint[] = [];
         for (let i = 0; i <= n; i++) {
           const a = a0 + ((a1 - a0) * i) / n;
-          const wob = 1 + 0.15 * nz(Math.cos(a) * 2 + q.x, Math.sin(a) * 2 + q.y);
+          const wob = 1 + 0.22 * nz(Math.cos(a) * 1.5 + q.x * 0.1, Math.sin(a) * 1.5 + q.y * 0.1);
           const ex = Math.cos(a) * q.rx * sc * wob, ey = Math.sin(a) * q.ry * sc * wob;
           out.push(P(q.x + ex * Math.cos(rot) - ey * Math.sin(rot), q.y + ex * Math.sin(rot) + ey * Math.cos(rot), 1));
         }
         return out;
       };
-      add({ kind: 'wash', tone: 0.42, wet: 0.5, pts: ring(1, 20).slice(0, 20).map((p) => ({ ...p, w: 1.5 * s })) });
-      add({ kind: 'wash', tone: 0.5, wet: 0.4, pts: ring(0.6, 14).slice(0, 14).map((p) => ({ ...p, x: p.x + q.rx * 0.2, y: p.y + q.ry * 0.25, w: 1 * s })) });
-      // lip: a brush arc over the upper-left rim, thick in the middle
-      const a0 = Math.PI * rng.range(0.75, 0.95), a1 = Math.PI * rng.range(1.9, 2.2);
-      const lip = ring(1.08, 12, a0, a1);
-      lip.forEach((p, i) => (p.w = (0.6 + 2.2 * Math.sin((Math.PI * i) / 12)) * s));
-      add({ kind: 'brush', tone: 0.72, pts: lip, dryness: 0.4 });
+      add({ kind: 'wash', tone: 0.22, wet: 0.5, pts: ring(1, 18).slice(0, 18).map((p) => ({ ...p, w: 1.2 * s })) });
+      // depth pools at the lower right of the opening
+      add({ kind: 'wash', tone: 0.5, wet: 0.4, pts: ring(0.62, 12).slice(0, 12).map((p) => ({ ...p, x: p.x + q.rx * 0.38, y: p.y + q.ry * 0.28, w: 1 * s })) });
+      const a0 = Math.PI * rng.range(0.7, 0.9), a1 = Math.PI * rng.range(1.9, 2.15);
+      const lip = ring(1.05, 12, a0, a1);
+      lip.forEach((p, i) => (p.w = (0.5 + 2 * Math.sin((Math.PI * i) / 12)) * s));
+      add({ kind: 'brush', tone: 0.7, pts: lip, dryness: 0.35 });
     }
   }
 
-  // 4 · contour in broken brush segments, heavier on the shadow side, dry toward the ground
-  let i = rng.int(0, 4);
+  // 4 · contour: broken brush segments, pressed at the turns (提按), dry along the ground
+  const isKey = new Set(keyIdx);
+  let i = rng.int(0, 3);
   while (i < N) {
-    const len = rng.int(9, 18);
+    const len = rng.int(8, 16);
     const seg: StrokePoint[] = [];
     for (let k = 0; k <= len && i + k <= N; k++) {
-      const p = pts[(i + k) % N];
+      const idx = (i + k) % N;
+      const p = pts[idx];
       const t = k / len;
-      const shadow = p.x > cx ? 1.25 : 0.85;
-      const ground = p.y > baseY - 2 ? 0.4 : 1;
-      seg.push(P(p.x, p.y, (0.8 + 2.4 * Math.sin(Math.PI * (0.08 + 0.84 * t)) ** 0.8) * s * shadow * ground));
+      const turn = isKey.has(idx) || isKey.has((idx + 1) % N) || isKey.has((idx - 1 + N) % N) ? 1.5 : 1;
+      const shadow = p.x > cx ? 1.15 : 0.6;
+      seg.push(P(p.x, p.y, (0.7 + 1.9 * Math.sin(Math.PI * (0.08 + 0.84 * t)) ** 0.8) * s * shadow * turn));
     }
-    const onGround = seg.every((p) => p.y > baseY - 3);
-    if (seg.length > 2) add({ kind: onGround || rng.chance(0.35) ? 'dry' : 'brush', tone: onGround ? 0.35 : rng.range(0.62, 0.82), pts: seg, dryness: rng.range(0.35, 0.7) });
-    i += len + rng.int(1, 3);
+    const onGround = seg.every((p) => p.y > baseY - 2);
+    if (seg.length > 2) {
+      if (onGround) add({ kind: 'dry', tone: 0.3, pts: seg.map((p) => ({ ...p, w: p.w * 0.6 })), dryness: 0.8 });
+      else {
+        const lit = seg.reduce((a, q) => a + q.x, 0) / seg.length < cx;
+        add({ kind: lit || rng.chance(0.3) ? 'dry' : 'brush', tone: lit ? rng.range(0.5, 0.65) : rng.range(0.66, 0.85), pts: seg, dryness: rng.range(0.3, 0.6) });
+      }
+    }
+    i += len + (rng.chance(0.35) ? rng.int(1, 3) : 0);
   }
+  add({ kind: taihu ? 'dry' : 'brush', tone: taihu ? rng.range(0.35, 0.5) : rng.range(0.5, 0.7), pts: taihu ? facet.slice(0, 6) : facet, dryness: 0.55 });
 
-  // 5 · folds and 皴: curved dry strokes echoing the contour, mostly on the shadow side
-  const folds = taihu ? rng.int(3, 5) : rng.int(2, 4);
+  // 5 · 皴: dry strokes echoing the facet on the shadow side, and a fold or two on the lit face
+  const nTex = taihu ? rng.int(3, 5) : rng.int(4, 7);
+  for (let t = 0; t < nTex; t++) {
+    const off = rng.range(0.15, 0.85);
+    const k0 = rng.int(1, 3), k1 = Math.min(facet.length - 1, k0 + rng.int(2, 4));
+    const dx = off * W * 0.28;
+    const seg: StrokePoint[] = [];
+    for (let k = k0; k <= k1; k++) {
+      const q = facet[k];
+      seg.push(P(q.x + dx + nz(k, t) * 2 * s, q.y + dx * 0.25, (0.5 + 1.1 * Math.sin((Math.PI * (k - k0)) / (k1 - k0 || 1))) * s));
+    }
+    if (seg.every((q) => inside(pts, q.x, q.y) && !holes.some((h) => Math.hypot(h.x - q.x, h.y - q.y) < h.rx * 1.4))) add({ kind: 'dry', tone: rng.range(0.28, 0.45), dryness: 0.8, pts: seg });
+  }
+  const folds = taihu ? rng.int(2, 4) : rng.int(1, 2);
   for (let f = 0; f < folds; f++) {
-    const start = rng.int(Math.round(N * 0.85), Math.round(N * 1.25)) % N;
-    const len = rng.int(6, 12);
-    const k = rng.range(0.18, 0.45);
+    const start = taihu ? rng.int(0, Math.round(N * 0.45)) : (topI + rng.int(-6, -2) + N) % N;
+    const len = rng.int(5, 10);
+    const k = rng.range(0.18, 0.4);
     const seg: StrokePoint[] = [];
     for (let j = 0; j <= len; j++) {
       const p = pts[(start + j) % N];
-      const t = j / len;
-      seg.push(P(lerp(p.x, cx + rx * 0.15, k), lerp(p.y, cy + ry * 0.2, k), (0.5 + 1.4 * Math.sin(Math.PI * t)) * s));
+      seg.push(P(lerp(p.x, cx, k), lerp(p.y, cy, k * 0.5), (0.4 + 1.3 * Math.sin((Math.PI * j) / len)) * s));
     }
-    add({ kind: 'dry', tone: rng.range(0.3, 0.48), pts: seg, dryness: 0.75 });
-  }
-  const nTex = Math.round(rng.range(6, 12));
-  for (let t = 0; t < nTex; t++) {
-    const tx = cx + rng.range(0.05, 0.75) * rx, ty = cy + rng.range(-0.5, 0.75) * ry;
-    if (!inside(pts, tx, ty) || holes.some((q) => Math.hypot(q.x - tx, q.y - ty) < q.rx * 1.3)) continue;
-    const len = rng.range(5, 12) * s;
-    add({ kind: 'dry', tone: rng.range(0.22, 0.4), dryness: 0.8, pts: [P(tx, ty, 1.2 * s), P(tx + len * 0.4, ty + len * 0.5, 1 * s), P(tx + len * 0.5, ty + len, 0.2 * s)] });
+    if (seg.every((q) => inside(pts, q.x, q.y))) add({ kind: 'dry', tone: rng.range(0.3, 0.5), pts: seg, dryness: 0.7 });
   }
 
-  // 6 · moss dots 苔点 along the crest and at the foot; a touch of malachite under some
-  const nMoss = rng.int(5, 11);
-  for (let m = 0; m < nMoss; m++) {
-    const onTop = m < nMoss * 0.7;
-    const idx = onTop ? (rng.int(-Math.round(N * 0.18), Math.round(N * 0.18)) + N) % N : rng.int(Math.round(N * 0.4), Math.round(N * 0.6));
-    const p = pts[idx];
-    const dx = rng.range(-2, 2) * s, dy = (onTop ? rng.range(-1, 2) : rng.range(-3, 0)) * s;
+  // 6 · moss dots 苔点 on the crest and shoulders; a touch of malachite under some
+  const nMoss = rng.int(4, 9);
+  const crest = pts.map((p, idx) => ({ p, idx })).filter(({ p }) => p.y < lerp(top.y, baseY, taihu ? 0.35 : 0.3));
+  for (let m = 0; m < nMoss && crest.length; m++) {
+    const { p } = rng.pick(crest);
+    const dx = rng.range(-1.5, 1.5) * s, dy = rng.range(-0.8, 1.5) * s;
     if (rng.chance(0.3)) add({ kind: 'dot', tone: 0.35, color: PIGMENTS.malachite, pts: [P(p.x + dx, p.y + dy, rng.range(3, 5) * s)] });
     const wd = rng.range(1.8, 3.4) * s;
     if (rng.chance(0.5)) add({ kind: 'dot', tone: rng.range(0.75, 0.95), pts: [P(p.x + dx, p.y + dy, wd)] });
@@ -838,13 +944,12 @@ export function rockDrawing(seed: number, size: number): Drawing {
   }
 
   // 7 · a clump of grass at the foot
-  const gx = rng.chance(0.5) ? pts[Math.round(N * 0.62)].x : pts[Math.round(N * 0.4)].x;
+  const gx = rng.chance(0.5) ? keys[0].x : keys[nk - 1].x;
   for (let g = 0; g < rng.pick([3, 5]); g++) {
     const bx = gx + rng.gauss() * 2 * s, len = rng.range(6, 13) * s, lean = rng.range(-0.7, 0.7);
     add({ kind: 'brush', tone: rng.range(0.5, 0.8), pts: [P(bx, baseY, 1.2 * s), P(bx + lean * len * 0.4, baseY - len * 0.55, 0.8 * s), P(bx + lean * len, baseY - len, 0.1)] });
   }
-  void ink;
-  return { width: W, height: H, anchor: { x: cx, y: baseY }, strokes };
+  return { width: W, height: H, anchor: { x: (keys[0].x + keys[nk - 1].x) / 2, y: baseY }, strokes };
 }
 
 function inside(poly: { x: number; y: number }[], x: number, y: number): boolean {
@@ -879,7 +984,7 @@ export interface PondOptions {
 interface PondCache {
   key: string;
   pond: HTMLCanvasElement; pctx: CanvasRenderingContext2D;
-  refl: HTMLCanvasElement; rctx: CanvasRenderingContext2D; rs: number;
+  refl: HTMLCanvasElement; rctx: CanvasRenderingContext2D; rs: number; pr: number;
   tint: HTMLCanvasElement;
   silt: HTMLCanvasElement;
   mask: HTMLCanvasElement;
@@ -892,7 +997,8 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
   const { w, h, dpr } = o;
   const seed = o.seed ?? 1;
   const cl = Math.round(clamp(o.clarity, 0, 1) * 10) / 10;
-  const pond = makeCanvas(w * dpr, h * dpr);
+  const pr = Math.min(dpr, 2);
+  const pond = makeCanvas(w * pr, h * pr);
   const pctx = pond.getContext('2d')!;
   // reflections are softer than the thing reflected; murky water blurs them further
   const rs = Math.min(dpr, 2) * lerp(0.35, 0.8, cl);
@@ -923,8 +1029,18 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = clamp(a, 0, 1);
     });
   }
+  // bake the murk into the water tone: one blit per frame instead of two
+  {
+    const murk = (1 - cl) ** 1.3;
+    if (murk > 0.02) {
+      const tc = tint.getContext('2d')!;
+      tc.globalAlpha = murk * 0.42;
+      tc.drawImage(silt, 0, 0);
+      tc.globalAlpha = 1;
+    }
+  }
   // mask: fade the side ends so the water sits in the paper, not in a box
-  const mask = makeCanvas(w * dpr, 4);
+  const mask = makeCanvas(w * pr, 4);
   {
     const mc = mask.getContext('2d')!;
     const g = mc.createLinearGradient(0, 0, mask.width, 0);
@@ -972,7 +1088,7 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
       out[0] = 255; out[1] = 253; out[2] = 246; out[3] = a;
     });
   }
-  return { key, pond, pctx, refl, rctx, rs, tint, silt, mask, ripples, glint };
+  return { key, pond, pctx, refl, rctx, rs, pr, tint, silt, mask, ripples, glint };
 }
 
 const hash01 = (a: number, b: number) => mixSeed(a, b) / 4294967296;
@@ -985,6 +1101,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   if (!pondCache || pondCache.key !== key) pondCache = buildPondCache(o, key);
   const C = pondCache;
   const { w, h, t, dpr } = o;
+  const pr = C.pr;
   const seed = o.seed ?? 1;
   const night = o.tod === 'night';
 
@@ -1001,15 +1118,30 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   }
 
   // 2 · draw it in strips, displaced sideways by waves that grow toward the viewer
-  const p = C.pctx;
-  p.setTransform(1, 0, 0, 1, 0, 0);
-  p.globalAlpha = 1;
-  p.globalCompositeOperation = 'source-over';
-  p.clearRect(0, 0, C.pond.width, C.pond.height);
-  p.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // A pond spanning the whole width is painted straight onto the scene (clipped); a narrower
+  // one goes through its own layer so its ends can be feathered into the paper.
+  const full = o.x <= 0.5 && o.x + w >= ctx.canvas.width / dpr - 0.5;
+  let p: CanvasRenderingContext2D;
+  if (full) {
+    p = ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(o.x, o.y, w, h);
+    ctx.clip();
+    ctx.translate(o.x, o.y);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  } else {
+    p = C.pctx;
+    p.setTransform(1, 0, 0, 1, 0, 0);
+    p.globalAlpha = 1;
+    p.globalCompositeOperation = 'source-over';
+    p.clearRect(0, 0, C.pond.width, C.pond.height);
+    p.setTransform(pr, 0, 0, pr, 0, 0);
+  }
   p.drawImage(C.tint, 0, 0, C.tint.width - 2, C.tint.height - 2, 0, 0, w, h);
   const ampK = lerp(1.35, 0.8, clarity);
-  const a0 = lerp(0.2, 0.72, clarity);
+  const a0 = lerp(0.12, 0.5, clarity);
   let y = 0;
   while (y < h) {
     const dn = y / h;
@@ -1018,20 +1150,14 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     const dx = ampK * (0.3 + 4.2 * dn) * (Math.sin(ph + t * 1.15) + 0.45 * Math.sin(ph * 2.3 - t * 0.8 + 1.7));
     // brief breaks in the reflection where a wave crest catches the sky
     const crest = Math.max(0, Math.sin(ph * 0.5 + t * 0.6 + 0.4)) ** 6;
-    p.globalAlpha = a0 * (1 - 0.62 * dn) * (1 - 0.55 * crest);
+    p.globalAlpha = a0 * (1 - 0.75 * dn ** 0.8) * (1 - 0.6 * crest);
     const syR = y * C.rs, shR = Math.min(sh, h - y) * C.rs;
     if (syR < C.refl.height && shR > 0) p.drawImage(C.refl, 0, syR, C.refl.width, Math.min(shR, C.refl.height - syR), dx, y, w, Math.min(sh, h - y));
     y += sh;
   }
   p.globalAlpha = 1;
 
-  // 3 · murk: silt clouds and a greyer, heavier surface when habits are neglected
-  const murk = (1 - clarity) ** 1.3;
-  if (murk > 0.02) {
-    p.globalAlpha = murk * 0.42;
-    p.drawImage(C.silt, 0, 0, C.silt.width - 2, C.silt.height - 2, 0, 0, w, h);
-    p.globalAlpha = 1;
-  }
+  // 3 · murk (silt clouds, a greyer surface) is baked into the water tone drawn first
 
   // 4 · 天光: sky-light glints near the far bank, breathing
   const gA = (night ? 0.35 : 0.8) * clarity ** 1.5;
@@ -1114,6 +1240,10 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   }
 
   // 8 · soften the ends, then lay the water onto the scene
+  if (full) {
+    ctx.restore();
+    return;
+  }
   p.setTransform(1, 0, 0, 1, 0, 0);
   p.globalCompositeOperation = 'destination-in';
   p.drawImage(C.mask, 0, 0, C.pond.width, C.pond.height);
@@ -1158,15 +1288,18 @@ function buildLight(w: number, h: number, env: SceneEnv): HTMLCanvasElement {
     let r = 255, g = 255, bl = 255;
     if (tod === 'night') {
       // indigo veil, lifted around the moon, slightly deeper at the top and in the water
-      let v = 0.72 + 0.04 * mott + 0.05 * smoothstep(0, h * 0.5, y) - 0.04 * smoothstep(L.pondTop, h, y);
-      if (b.r > 0) v += 0.2 * Math.exp(-((Math.hypot(x - b.x, (y - b.y) * 1.2) / (b.r * 9)) ** 2));
+      let v = 0.8 + 0.04 * mott + 0.03 * smoothstep(0, h * 0.5, y) - 0.03 * smoothstep(L.pondTop, h, y);
+      if (b.r > 0) {
+        const dd = Math.hypot(x - b.x, y - b.y);
+        v += 0.1 * Math.exp(-((dd / (b.r * 7)) ** 2)) + 0.25 * Math.exp(-((dd / (b.r * 1.6)) ** 2));
+      }
       v = clamp(v, 0, 1);
-      r = 255 * (v - 0.07); g = 255 * (v - 0.02); bl = 255 * Math.min(1, v + 0.06);
+      r = 255 * (v - 0.045 * (1 - v) * 4); g = 255 * (v - 0.02 * (1 - v) * 4); bl = 255 * Math.min(1, v + 0.03);
     } else {
       const warm: RGB = tod === 'dawn' ? [250, 218, 210] : [249, 214, 166];
       const band = Math.exp(-(((y - hzY) / (h * 0.28)) ** 2));
       const near = b.r > 0 ? Math.exp(-(((x - b.x) / (w * 0.4)) ** 2) - (((y - b.y) / (h * 0.35)) ** 2)) : 0.3;
-      const s = clamp((0.35 * band + 0.55 * near) * (1 + mott) + 0.18, 0, 1) * (tod === 'dawn' ? 0.8 : 1);
+      const s = clamp((0.32 * band + 0.5 * near) * (1 + mott) + 0.04, 0, 1) * (tod === 'dawn' ? 0.55 : 0.6);
       r = lerp(255, warm[0], s); g = lerp(255, warm[1], s); bl = lerp(255, warm[2], s);
     }
     out[0] = r; out[1] = g; out[2] = bl; out[3] = 1;

@@ -3,6 +3,11 @@ import { pickPoem } from '../../data/poems';
 import { hashString } from '../../core/rng';
 import { useT } from '../../app/i18n';
 
+/** Break each line after its inner punctuation, keeping the marks: one phrase per line on phones. */
+function halves(line: string): string[] {
+  return line.split(/(?<=[，；：、,;:])/).map((s) => s.trim()).filter(Boolean);
+}
+
 /** Split a line at its punctuation into the phrases a calligrapher would write as columns. */
 function phrases(lines: string[]): string[] {
   return lines.flatMap((l) => l.split(/[，。？！；：、,.?!;:]/).map((s) => s.trim()).filter(Boolean));
@@ -22,7 +27,11 @@ export function Poem(props: { dayKey: string; term: number }) {
         {/* horizontal (phones) */}
         <blockquote class="alm-poem-h" lang="zh-CN">
           {poem.lines.map((l) => (
-            <p>{l}</p>
+            <p>
+              {halves(l).map((h) => (
+                <span class="alm-poem-half">{h}</span>
+              ))}
+            </p>
           ))}
         </blockquote>
         {/* vertical (wide) — the same text, phrase per column, no punctuation, as it would be brushed */}

@@ -13,7 +13,7 @@
 // so a frame is ~100 stroke() calls; within one stroke() overlapping joints do not double up.
 // A crisp core line is drawn at full resolution; a soft "mist" pass is drawn to a canvas at
 // 1/3 css resolution and upscaled with smoothing (cheap blur, Safari-safe).
-import { makeNoise2, makeRng, mixSeed, clamp, smoothstep, type Noise2 } from '../core/rng';
+import { makeNoise2, mixSeed, clamp, smoothstep, type Noise2 } from '../core/rng';
 
 interface Particle {
   x: number; y: number;
@@ -36,11 +36,11 @@ interface Strand {
 
 interface Impulse { x: number; y: number; vx: number; vy: number; age: number }
 
-export interface SmokeStats { particles: number; strokes: number }
+export interface SmokeStats { particles: number; strokes: number; ms?: { build: number; mist: number; blit: number; core: number } }
 
 const ALPHA_LEVELS = (() => {
   const a: number[] = [];
-  for (let v = 0.004; v < 0.6; v *= 1.18) a.push(v);
+  for (let v = 0.004; v < 0.6; v *= 1.22) a.push(v);
   return a;
 })();
 const CORE_W = [0.7, 0.85, 1.0, 1.2, 1.45, 1.75, 2.1, 2.55, 3.1, 3.8, 4.6];
@@ -74,11 +74,11 @@ export class SmokePlume {
   private nFlow: Noise2;
   private nFlow2: Noise2;
   private nSlow: Noise2;
-  private rng;
   private mist: HTMLCanvasElement | null = null;
   private mctx: CanvasRenderingContext2D | null = null;
   private mistScale = 3;
   private buckets = new Map<number, number[]>();
+  private lastMist: [number, number, number, number] | null = null;
   private styleCache = new Map<number, string>();
 
   constructor(seed = 1, o: SmokeOptions = {}) {
@@ -86,7 +86,6 @@ export class SmokePlume {
     this.nFlow = makeNoise2(mixSeed(seed, 101));
     this.nFlow2 = makeNoise2(mixSeed(seed, 102));
     this.nSlow = makeNoise2(mixSeed(seed, 103));
-    this.rng = makeRng(mixSeed(seed, 104));
     const defs = [
       { gain: 1, off: 0 },
       { gain: 0.5, off: 0.45 },
@@ -224,7 +223,10 @@ export class SmokePlume {
   /** Keep the ribbon smooth where it stretches, and thin where it bunches up. */
   private refine(pts: Particle[]) {
     const u = this.u;
-    let inserts = 0;
+    const MAX = 650;
+    // over budget (e.g. after a violent gust): drop the faintest, oldest end first
+    if (pts.length > MAX) pts.splice(0, pts.length - MAX);
+    let inserts = pts.length > MAX * 0.85 ? 60 : 0;
     for (let i = pts.length - 1; i > 0; i--) {
       const a = pts[i - 1], b = pts[i];
       const d = Math.hypot(b.x - a.x, b.y - a.y);
@@ -236,7 +238,7 @@ export class SmokePlume {
           te: (a.te + b.te) / 2, age: (a.age + b.age) / 2,
         });
         inserts++;
-      } else if (d < 1.6 * u && a.age > 0.6 && i > 1 && i < pts.length - 1) {
+      } else if (d < (inserts >= 60 ? 3 : 1.6) * u && a.age > 0.6 && i > 1 && i < pts.length - 1) {
         pts.splice(i, 1);
       }
     }
@@ -261,19 +263,20 @@ export class SmokePlume {
       this.mist = document.createElement('canvas');
       this.mctx = this.mist.getContext('2d')!;
     }
-    if (this.mist.width !== mw || this.mist.height !== mh) { this.mist.width = mw; this.mist.height = mh; }
+    if (this.mist.width !== mw || this.mist.height !== mh) { this.mist.width = mw; this.mist.height = mh; this.lastMist = null; }
     const mctx = this.mctx!;
 
+    const t0 = performance.now();
     const buckets = this.buckets;
     for (const arr of buckets.values()) arr.length = 0;
     // run continuity: last particle id pushed into each bucket
     const lastEnd = new Map<number, number>();
 
-    const U0 = 44 * u;
-    const w0 = 0.95 * u;
-    const NA = ALPHA_LEVELS.length;
+    const U0 = 40 * u;
+    const w0 = 0.9 * u;
     let particles = 0;
 
+    let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity, bw = 0;
     const push = (key: number, x0: number, y0: number, x1: number, y1: number, startId: number, endId: number) => {
       let arr = buckets.get(key);
       if (!arr) { arr = []; buckets.set(key, arr); }
@@ -285,39 +288,55 @@ export class SmokePlume {
     for (const s of this.strands) {
       const pts = s.pts;
       particles += pts.length;
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1], b = pts[i];
+      let rhoS = 1;
+      for (let i = pts.length - 1; i > 0; i--) {
+        // walk from the source outward so the running density smoothing starts on the fresh thread
+        const a = pts[i], b = pts[i - 1];
         const L = Math.hypot(b.x - a.x, b.y - a.y) + 1e-3;
         const age = (a.age + b.age) * 0.5;
         const dte = Math.abs(a.te - b.te);
         // line density relative to the fresh laminar thread (mass conservation along the ribbon)
-        const rho = clamp((U0 * 0.75 * dte) / L, 0.08, 2.2);
-        const T = smoothstep(1.2, 4, age);
-        const w = w0 + (1.3 + 2.6 * T) * age * u;
-        const puff = 0.72 + 0.28 * this.nSlow(a.te * 0.55, 3.7 + s.salt);
-        const fadeIn = smoothstep(0, 0.14, age);
-        const life = Math.exp(-age / 3.4) * smoothstep(11, 7, age);
-        const base = s.gain * puff * fadeIn * life * Math.pow(rho, 0.75) * Math.pow(w0 / w, 0.45);
-        const id0 = s.id * 1e6 + i - 1, id1 = s.id * 1e6 + i;
-        // core: crisp thread, fades out as the smoke diffuses
-        const ca = 0.5 * base * (1 - 0.85 * T);
-        if (ca > ALPHA_LEVELS[0] * 0.7 && w < 6 * u) {
+        const rho = clamp((U0 * 0.8 * dte) / L, 0.06, 2.5);
+        rhoS += (rho - rhoS) * 0.35;
+        const T = smoothstep(1.0, 4.5, age);
+        const w = w0 + (0.22 + 0.55 * T) * age * u;
+        const puff = 0.7 + 0.3 * this.nSlow(a.te * 0.5, 3.7 + s.salt);
+        const fadeIn = smoothstep(0, 0.18, age);
+        const life = Math.exp(-age / 7.5) * smoothstep(14, 9.5, age);
+        const base = s.gain * puff * fadeIn * life * Math.pow(rhoS, 0.7) * Math.pow(w0 / w, 0.35);
+        const id0 = s.id * 1e6 + i, id1 = s.id * 1e6 + i - 1;
+        // core: crisp thread, thins out as the smoke diffuses
+        const ca = 0.38 * base * (1 - 0.45 * T);
+        if (ca > ALPHA_LEVELS[0] * 0.7) {
           const ai = levelOf(ALPHA_LEVELS, ca), wi = levelOf(CORE_W, Math.min(w, 4.6));
           push(ai * 64 + wi, a.x, a.y, b.x, b.y, id0, id1);
         }
         // mist: wider, softer, lingers
-        const ma = 0.3 * base * (0.35 + 0.65 * T);
+        const ma = 0.2 * base * smoothstep(0.6, 3, age);
         if (ma > ALPHA_LEVELS[0] * 0.7) {
-          const mwid = (w * 1.9 + 2.5 * u) / ms;
+          const mwid = (w * 2.6 + 3 * u) / ms;
           const ai = levelOf(ALPHA_LEVELS, ma), wi = levelOf(MIST_W, mwid);
-          push(100000 + ai * 64 + wi, a.x / ms, a.y / ms, b.x / ms, b.y / ms, id0, id1);
+          const mx0 = a.x / ms, my0 = a.y / ms, mx1 = b.x / ms, my1 = b.y / ms;
+          push(100000 + ai * 64 + wi, mx0, my0, mx1, my1, id0, id1);
+          if (mx0 < bx0) bx0 = mx0; if (mx0 > bx1) bx1 = mx0;
+          if (my0 < by0) by0 = my0; if (my0 > by1) by1 = my0;
+          if (mx1 < bx0) bx0 = mx1; if (mx1 > bx1) bx1 = mx1;
+          if (my1 < by0) by0 = my1; if (my1 > by1) by1 = my1;
+          if (MIST_W[wi] > bw) bw = MIST_W[wi];
         }
       }
     }
 
+    const t1 = performance.now();
     // mist pass (low-res, then upscaled with smoothing)
+    // only the region that holds mist is cleared and blitted
+    const pad = bw / 2 + 2;
+    const rx0 = Math.max(0, Math.floor(bx0 - pad)), ry0 = Math.max(0, Math.floor(by0 - pad));
+    const rx1 = Math.min(mw, Math.ceil(bx1 + pad)), ry1 = Math.min(mh, Math.ceil(by1 + pad));
+    const hasMist = rx1 > rx0 && ry1 > ry0;
     mctx.setTransform(1, 0, 0, 1, 0, 0);
-    mctx.clearRect(0, 0, mw, mh);
+    if (this.lastMist) mctx.clearRect(this.lastMist[0], this.lastMist[1], this.lastMist[2], this.lastMist[3]);
+    this.lastMist = hasMist ? [rx0, ry0, rx1 - rx0, ry1 - ry0] : null;
     mctx.lineCap = 'round';
     mctx.lineJoin = 'round';
     let strokes = 0;
@@ -335,12 +354,14 @@ export class SmokePlume {
       mctx.stroke();
       strokes++;
     }
+    const t2 = performance.now();
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(this.mist, 0, 0, mw * ms, mh * ms);
-    // core pass
-    ctx.lineCap = 'round';
+    ctx.imageSmoothingQuality = 'low';
+    if (hasMist) ctx.drawImage(this.mist, rx0, ry0, rx1 - rx0, ry1 - ry0, rx0 * ms, ry0 * ms, (rx1 - rx0) * ms, (ry1 - ry0) * ms);
+    const t3 = performance.now();
+    // core pass (butt caps: bucket changes along the thread must not leave beads)
+    ctx.lineCap = 'butt';
     ctx.lineJoin = 'round';
     const minW = 0.75 / Math.max(1, dpr);
     for (const [key, arr] of buckets) {
@@ -359,7 +380,7 @@ export class SmokePlume {
       strokes++;
     }
     ctx.restore();
-    void NA;
-    this.stats = { particles, strokes };
+    const t4 = performance.now();
+    this.stats = { particles, strokes, ms: { build: t1 - t0, mist: t2 - t1, blit: t3 - t2, core: t4 - t3 } };
   }
 }

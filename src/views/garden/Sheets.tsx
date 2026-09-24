@@ -295,7 +295,7 @@ function InkCalendar(props: { habit: Habit; days: DateKey[]; today: DateKey }) {
               const sched = isScheduled(h, k);
               const before = k < h.createdAt;
               const hv = hashString(k);
-              const size = 62 + (hv % 23);
+              const size = 46 + (hv % 17);
               const cls = 'inkcal-cell' + (done ? ' is-done' : sched && !before ? ' is-missed' : ' is-rest') + (k === props.today ? ' is-today' : '');
               const d = fromKey(k);
               const label = t(`${d.getMonth() + 1}月${d.getDate()}日 ${done ? '已完成' : '未完成'}`, `${d.toLocaleDateString('en', { month: 'short', day: 'numeric' })} ${done ? 'done' : 'not done'}`);
