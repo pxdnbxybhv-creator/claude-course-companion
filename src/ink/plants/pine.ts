@@ -471,17 +471,17 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
   let cnt = 0;
   let f = 0.04;
   let row = 0;
-  const R = rng.int(12, 14);
+  const R = rng.int(10, 12);
   for (; row < R && cnt < 44; row++) {
     f = 0.035 + (0.85 * (row + rng.range(0, 0.6))) / R;
     const i = clampN(Math.round(f * N), 0, N);
     const s = S[i];
-    const stepU = 0.55;
+    const stepU = 0.6;
     for (let u = -0.85 + (row % 2) * stepU * 0.5 + rng.range(-0.08, 0.08); u < 0.9; u += stepU * rng.range(0.85, 1.15)) {
-      if (!rng.chance(u < -0.3 ? 0.4 : 0.72)) continue;
+      if (!rng.chance(u < -0.3 ? 0.5 : 0.85)) continue;
       const fore = Math.sqrt(Math.max(0.05, 1 - u * u));
-      const sw = s.hw * 0.28 * fore * rng.range(0.8, 1.2);
-      const sh = s.hw * 0.2 * rng.range(0.8, 1.2);
+      const sw = s.hw * 0.36 * fore * rng.range(0.8, 1.2);
+      const sh = s.hw * 0.24 * rng.range(0.8, 1.2);
       const c = off(s, u);
       const ax = -s.n.y, ay = s.n.x; // along the trunk (downward-ish for our normal)
       const pts: StrokePoint[] = [];
@@ -489,7 +489,7 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
       for (let j = 0; j <= 5; j++) {
         const t = Math.PI * (a0 + (a1 - a0) * (j / 5));
         const lx = Math.cos(t) * sw, ly = Math.sin(t) * sh; // a ∪, convex toward the ground
-        pts.push({ x: c.x + s.n.x * lx + ax * ly, y: c.y + s.n.y * lx + ay * ly, w: 1.3 * (0.4 + 0.6 * Math.sin(Math.PI * (j / 5))) });
+        pts.push({ x: c.x + s.n.x * lx + ax * ly, y: c.y + s.n.y * lx + ay * ly, w: 1.6 * (0.4 + 0.6 * Math.sin(Math.PI * (j / 5))) });
       }
       push('line', pts, u > 0.2 ? rng.range(0.7, 0.85) : rng.range(0.5, 0.65), 0.55 + 0.25 * f + cnt * 0.0005);
       cnt++;

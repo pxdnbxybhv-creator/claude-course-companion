@@ -142,28 +142,41 @@ function blob(cx, cy, r, rand, pts = 7) {
   return out;
 }
 
+const r1 = (v) => Math.round(v * 10) / 10;
 const fmt = (v) => {
-  const s = v.toFixed(1);
-  return s.endsWith('.0') ? s.slice(0, -2) : s;
+  const s = r1(v).toFixed(1);
+  return (s.endsWith('.0') ? s.slice(0, -2) : s).replace(/^(-?)0\./, '$1.');
 };
+/** Join numbers the way SVG path data allows: a minus sign or a leading dot needs no space. */
+const nums = (arr) => arr.map((v, i) => (i && !/^[-.]/.test(v) && !/\./.test(arr[i - 1]) ? ' ' : i && !/^-/.test(v) && /^\./.test(v) && !/\./.test(arr[i - 1]) ? ' ' : i && !/^-/.test(v) ? ' ' : '') + v).join('');
+
+/** Polygon path in relative coordinates (deltas between rounded points, so nothing drifts). */
 function pathD(polys) {
   return polys
-    // After M, further coordinate pairs are implicit line-tos.
-    .map((poly) => 'M' + poly.map(([x, y]) => `${fmt(x)} ${fmt(y)}`).join(' ') + 'Z')
+    .map((poly) => {
+      const pts = poly.map(([x, y]) => [r1(x), r1(y)]);
+      const out = [];
+      for (let i = 1; i < pts.length; i++) out.push(fmt(pts[i][0] - pts[i - 1][0]), fmt(pts[i][1] - pts[i - 1][1]));
+      return `M${nums([fmt(pts[0][0]), fmt(pts[0][1])])}l${nums(out)}z`;
+    })
     .join('');
 }
-/** Smooth closed path through the points (quadratic midpoints) — used for blobs. */
+/** Smooth closed path through the points (quadratic midpoints), relative — used for blobs. */
 function smoothD(polys) {
   return polys
     .map((p) => {
       const n = p.length;
-      const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      let d = `M${fmt(mid(p[n - 1], p[0])[0])} ${fmt(mid(p[n - 1], p[0])[1])}`;
+      const mid = (a, b) => [r1((a[0] + b[0]) / 2), r1((a[1] + b[1]) / 2)];
+      let cur = mid(p[n - 1], p[0]);
+      const out = [];
       for (let i = 0; i < n; i++) {
+        const c = [r1(p[i][0]), r1(p[i][1])];
         const m = mid(p[i], p[(i + 1) % n]);
-        d += `Q${fmt(p[i][0])} ${fmt(p[i][1])} ${fmt(m[0])} ${fmt(m[1])}`;
+        out.push(fmt(c[0] - cur[0]), fmt(c[1] - cur[1]), fmt(m[0] - cur[0]), fmt(m[1] - cur[1]));
+        cur = m;
       }
-      return d + 'Z';
+      const s0 = mid(p[n - 1], p[0]);
+      return `M${nums([fmt(s0[0]), fmt(s0[1])])}q${nums(out)}z`;
     })
     .join('');
 }
@@ -263,8 +276,8 @@ function buildSeal() {
   ];
 
   return [
-    `<clipPath id="b"><path d="${pathD([body])}"/></clipPath>`,
-    `<path fill="${CINNABAR}" d="${pathD([body])}"/>`,
+    `<defs><path id="s" d="${pathD([body])}"/><clipPath id="b"><use href="#s"/></clipPath></defs>`,
+    `<use href="#s" fill="${CINNABAR}"/>`,
     `<path fill="${DEEP}" opacity=".06" clip-path="url(#b)" d="${smoothD(mottles)}"/>`,
     `<path fill="${CARVED}" d="${pathD(strokes)}"/>`,
     `<path fill="${CINNABAR}" d="${smoothD(flecks)}"/>`,

@@ -1191,9 +1191,6 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   if (full) {
     p = ctx;
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(o.x, o.y, w, h);
-    ctx.clip();
     ctx.translate(o.x, o.y);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';

@@ -57,7 +57,7 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
   if (o.format === 'tall') {
     const sw = 820;
     const x = (W - sw) / 2;
-    const top = 176, head = 296, gapT = 44, gapB = 34, foot = 150, rollerD = 46;
+    const top = 176, head = 272, gapT = 44, gapB = 34, foot = 140, rollerD = 46;
     const pw = sw - 2 * 50;
     const py = top + head + gapT;
     const bottomRoom = caption ? 150 : 118;
