@@ -18,15 +18,45 @@ export interface MountPalette {
   caption: string;
 }
 
-export function mountPalette(dark: boolean): MountPalette {
+/** Parse any CSS colour to RGB (via the canvas colour parser); null if unparseable. */
+export function parseColor(css: string): RGB | null {
+  try {
+    const x = document.createElement('canvas').getContext('2d')!;
+    x.fillStyle = '#010203';
+    x.fillStyle = css.trim();
+    const v = String(x.fillStyle);
+    if (v === '#010203' && css.trim().toLowerCase() !== '#010203') return null;
+    if (v.startsWith('#')) return [parseInt(v.slice(1, 3), 16), parseInt(v.slice(3, 5), 16), parseInt(v.slice(5, 7), 16)];
+    const m = v.match(/\d+(\.\d+)?/g);
+    return m && m.length >= 3 ? [Number(m[0]), Number(m[1]), Number(m[2])] : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Mount colours. The wall is the page's own paper colour (`wall`), so in the preview the scroll
+ * simply hangs on the page; a faint pool of light sits behind the scroll.
+ */
+export function mountPalette(dark: boolean, wall?: RGB | null): MountPalette {
+  const base = dark
+    ? { wallHi: '#2d2e31', wallLo: '#121315' }
+    : { wallHi: '#e9e3d6', wallLo: '#c8bfae' };
+  const walls = wall
+    ? { wallHi: rgb(wall, dark ? 1.18 : 1.022), wallLo: rgb(wall) }
+    : base;
+  return { ...paletteFor(dark), ...walls };
+}
+
+function paletteFor(dark: boolean): Omit<MountPalette, 'wallHi' | 'wallLo'> {
   return dark
     ? {
         body: [206, 194, 167], head: [70, 82, 84], line: '#a6946d',
-        wallHi: '#2d2e31', wallLo: '#121315', shadow: 'rgba(0,0,0,0.62)', cord: '#8a7962', caption: 'rgba(236,228,210,0.62)',
+        shadow: 'rgba(0,0,0,0.62)', cord: '#8a7962', caption: 'rgba(236,228,210,0.62)',
       }
     : {
         body: [219, 207, 180], head: [88, 101, 101], line: '#b39f78',
-        wallHi: '#e9e3d6', wallLo: '#c8bfae', shadow: 'rgba(40,30,15,0.34)', cord: '#6d5c45', caption: 'rgba(40,34,26,0.66)',
+        shadow: 'rgba(40,30,15,0.3)', cord: '#6d5c45', caption: 'rgba(40,34,26,0.66)',
       };
 }
 
@@ -126,7 +156,9 @@ function plaster(): HTMLCanvasElement {
 
 /** A quiet lime-plaster wall lit from above. */
 export function drawWall(ctx: CanvasRenderingContext2D, W: number, H: number, p: MountPalette): void {
-  const g = ctx.createRadialGradient(W / 2, H * 0.22, 0, W / 2, H * 0.3, Math.hypot(W, H) * 0.72);
+  ctx.fillStyle = p.wallLo;
+  ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, H * 0.36, 0, W / 2, H * 0.36, Math.min(W, H) * 0.62);
   g.addColorStop(0, p.wallHi);
   g.addColorStop(1, p.wallLo);
   ctx.fillStyle = g;
@@ -134,7 +166,7 @@ export function drawWall(ctx: CanvasRenderingContext2D, W: number, H: number, p:
   const pat = ctx.createPattern(plaster(), 'repeat');
   if (pat) {
     ctx.save();
-    ctx.globalAlpha = 0.55;
+    ctx.globalAlpha = 0.22;
     ctx.fillStyle = pat;
     ctx.fillRect(0, 0, W, H);
     ctx.restore();

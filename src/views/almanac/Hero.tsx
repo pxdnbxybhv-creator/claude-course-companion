@@ -33,7 +33,8 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
   // pentad k begins on day a + ⌈k·n/3⌉ (the same thirds termContext uses)
   const a = chinaDay(ctx.current.at), n = chinaDay(ctx.next.at) - a;
   const pentadStart = (k: number) => {
-    const d = new Date((a + Math.ceil((k * n) / 3)) * 86_400_000);
+    // Same boundary rule as termContext: pentad k starts on the first day with floor((day + 0.5) * 3 / n) = k.
+    const d = new Date((a + Math.ceil((k * n) / 3 - 0.5)) * 86_400_000);
     return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
   };
 
@@ -73,8 +74,17 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
             </span>
           </div>
           <div class="alm-term-meta">
-            <p class="alm-pinyin latin">{term.pinyin}</p>
-            <p class="alm-term-en latin">{term.en}</p>
+            {en ? (
+              <>
+                <p class="alm-pinyin latin">{term.pinyin}</p>
+                <p class="alm-term-en latin">{term.en}</p>
+              </>
+            ) : (
+              <p class="alm-pinyin latin">
+                {term.pinyin}
+                <span class="alm-pinyin-en" lang="en"> · {term.en}</span>
+              </p>
+            )}
             <p class="alm-term-season">{t(`${MENG[sub]}${SEASON_ZH[season]}之节`, `${MENG_EN[sub]} ${season}`)}</p>
             {(term.blurbZh || term.blurbEn) && (
               <div class="alm-blurb">
@@ -84,10 +94,7 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
                     <p class="alm-blurb-b" lang="zh-CN">{term.blurbZh}</p>
                   </>
                 ) : (
-                  <>
-                    <p class="alm-blurb-a">{term.blurbZh}</p>
-                    <p class="alm-blurb-b latin" lang="en">{term.blurbEn}</p>
-                  </>
+                  <p class="alm-blurb-a">{term.blurbZh}</p>
                 )}
               </div>
             )}
@@ -114,10 +121,7 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
                     <span class="alm-pentad-b" lang="zh-CN">{pt.zh}</span>
                   </>
                 ) : (
-                  <>
-                    <span class="alm-pentad-a">{pt.zh}</span>
-                    <span class="alm-pentad-b latin" lang="en">{pt.en}</span>
-                  </>
+                  <span class="alm-pentad-a">{pt.zh}</span>
                 )}
               </li>
             );
@@ -136,7 +140,6 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
               距<span class="alm-next-term">{next.zh}</span>还有 <b class="num">{days}</b> 天
             </span>
           )}
-          {!en && !nextLine && <span class="alm-next-b latin" lang="en">{days} days to {next.en}</span>}
         </p>
       </div>
     </section>

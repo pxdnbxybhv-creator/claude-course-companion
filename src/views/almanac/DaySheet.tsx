@@ -50,7 +50,6 @@ export function DaySheet(props: { dayKey: DateKey | null; todayKey: DateKey; onC
             ) : (
               <>
                 <p class="alm-day-a">农历 {L.yearGanZhi}年 · {L.zodiac} · {L.monthName}{L.dayName}</p>
-                <p class="alm-day-b latin" lang="en">{lunarEn(L)}</p>
               </>
             )}
             <p class="alm-day-term">

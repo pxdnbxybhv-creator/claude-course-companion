@@ -75,7 +75,29 @@
 .fx-custom-field input::-webkit-outer-spin-button, .fx-custom-field input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .fx-custom-field input:focus { border-bottom-color: var(--cinnabar); }
 
+.fx-intent-row { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
+.fx-intent { flex: 1; min-width: 0; }
 .fx-intent .input { font-size: 17px; min-height: 44px; }
+.fx-habit-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px 0 8px;
+  border-radius: 999px; border: 1px dashed var(--line-strong); color: var(--ink-2); font-size: 13px;
+  transition: border-color 0.2s, background 0.2s;
+}
+.fx-habit-btn.is-set { border-style: solid; border-color: var(--ink-2); color: var(--ink); }
+.fx-habit-btn .plant-glyph { width: 28px; height: 28px; font-size: 17px; }
+.fx-habit-glyph { width: 28px; height: 28px; display: grid; place-items: center; font-size: 18px; line-height: 1; color: var(--ink-3); }
+.fx-habit-cap { white-space: nowrap; letter-spacing: 0.04em; }
+.fx-habit-note { margin: 0 0 8px; font-size: 14px; color: var(--ink-3); }
+.fx-habit-list { list-style: none; margin: 0; padding: 0; }
+.fx-habit-row {
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 8px; border-radius: 12px;
+  text-align: left; transition: background 0.2s;
+}
+.fx-habit-row:hover { background: var(--paper-2); }
+.fx-habit-row[aria-pressed='true'] { background: var(--paper-3); }
+.fx-habit-name { flex: 1; min-width: 0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-habit-state { flex: none; font-size: 12.5px; color: var(--ink-3); }
+.fx-habit-none { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px dashed var(--line-strong); color: var(--ink-3); font-size: 20px; line-height: 1; }
 .fx-intent .input::placeholder { color: var(--ink-3); opacity: 0.8; letter-spacing: 0.06em; }
 
 .fx-amb { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
@@ -94,7 +116,7 @@
 .fx-amb.is-compact .fx-amb-cap { display: none; }
 .fx-amb.is-compact .fx-amb-btn:not([aria-pressed='true']) .fx-amb-glyph { border-color: transparent; color: var(--ink-3); }
 
-.fx-light { width: 100%; min-height: 52px; font-size: 17px; letter-spacing: 0.24em; }
+.fx-light { justify-self: center; width: auto; min-width: 168px; min-height: 52px; padding: 0 30px; font-size: 17px; letter-spacing: 0.24em; }
 .fx-light-glyph { font-size: 22px; line-height: 1; letter-spacing: 0; opacity: 0.9; }
 
 /* ------------------------------------------------------------ burning */
@@ -103,11 +125,12 @@
 .fx-clock { display: grid; justify-items: center; gap: 2px; padding-top: 2px; }
 .fx-time {
   font-size: clamp(46px, 13vw, 66px); line-height: 1; font-weight: 400; color: var(--ink);
-  font-variant-numeric: oldstyle-nums tabular-nums; letter-spacing: 0.02em;
+  font-variant-numeric: lining-nums tabular-nums; letter-spacing: 0.02em;
   transition: opacity 0.6s var(--ease);
 }
-.fx-reading { font-size: 14px; letter-spacing: 0.22em; color: var(--ink-3); }
-.fx-for { max-width: 100%; margin-top: 2px; font-size: 15px; color: var(--ink-2); overflow-wrap: anywhere; }
+.fx-reading { margin-top: 6px; font-size: 14px; letter-spacing: 0.22em; color: var(--ink-3); }
+.fx-for { display: flex; align-items: center; justify-content: center; gap: 8px; max-width: 100%; margin-top: 2px; font-size: 15px; color: var(--ink-2); overflow-wrap: anywhere; }
+.fx-for .plant-glyph { width: 24px; height: 24px; font-size: 14px; }
 .fx-burning.is-paused .fx-time { opacity: 0.42; animation: fx-breathe 4s ease-in-out infinite; }
 .fx-actions { display: flex; justify-content: center; gap: 10px; margin-top: 4px; }
 .fx-actions .btn { min-width: 116px; }
@@ -120,7 +143,7 @@
 }
 .fx-ask p { margin: 0 4px 0 0; font-size: 13.5px; color: var(--ink-2); min-width: 0; }
 .fx-ask .btn { min-height: 44px; padding: 0 12px; border-color: transparent; }
-.fx-ask .btn:first-of-type { color: var(--cinnabar); }
+.fx-ask .fx-ask-yes { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--line-strong); }
 
 .fx-burning .sheet { text-align: left; }
 .fx-confirm-body { margin: 6px 0 18px; color: var(--ink-2); font-size: 15px; }
@@ -139,7 +162,9 @@
 .fx-ash-tip { fill: #a39c92; }
 .fx-ash { fill: currentColor; }
 .fx-wd { font-size: 11px; fill: var(--ink-3); font-family: var(--font-text); }
-.fx-wd.is-today { fill: var(--cinnabar); }
+.fx-wd.is-today { fill: var(--ink); }
+.fx-stick.is-ghost { fill: currentColor; opacity: 0.16; }
+.fx-week.is-empty figcaption { margin-top: 4px; text-align: center; font-size: 13.5px; color: var(--ink-3); letter-spacing: 0.06em; }
 .fx-today-dot { fill: var(--cinnabar); }
 .fx-more { font-size: 9px; fill: var(--ink-3); font-family: var(--font-latin); }
 
@@ -173,6 +198,9 @@
 .fx-poem figcaption { font-size: 13px; color: var(--ink-3); margin-top: 6px; }
 .fx-poem-en { margin: 10px 0 0; font-family: var(--font-latin); font-size: 16px; font-style: italic; line-height: 1.55; color: var(--ink-2); }
 .fx-poem-by { font-style: normal; color: var(--ink-3); white-space: nowrap; }
+.fx-done-habit { margin: 0 auto; display: inline-flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; border-radius: 999px; background: var(--paper-2); color: var(--ink-2); font-size: 15px; max-width: 100%; }
+.fx-done-habit.is-marked { color: var(--ink); }
+.fx-done-habit .plant-glyph { width: 32px; height: 32px; font-size: 19px; flex: none; }
 .fx-done-today { margin: 0; font-size: 15px; color: var(--ink-2); letter-spacing: 0.06em; }
 .fx-done-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .fx-done-btns .btn { min-width: 128px; }
@@ -211,6 +239,8 @@
   .fx-actions { justify-content: flex-start; }
   .fx-amb.is-compact { justify-content: flex-start; margin-left: -6px; }
   .fx-ask { justify-self: start; }
+  .fx-light { justify-self: start; }
+  .fx-for { justify-content: flex-start; }
 }
 
 @media (min-width: 900px) {

@@ -6,9 +6,11 @@
 // Every browser API that a sandboxed/embedded host may refuse (localStorage, Notification,
 // wakeLock) is feature-detected and wrapped — the timer works fully without them.
 import { signal } from '@preact/signals';
-import type { AmbientKind } from '../../core/types';
+import type { AmbientKind, PlantKind } from '../../core/types';
+import { toKey } from '../../core/date';
+import { statsFor } from '../../core/habits';
 import { audio } from '../../audio/engine';
-import { logFocus, setSettings, state } from '../../app/store';
+import { logFocus, setSettings, state, toggleCheckin } from '../../app/store';
 import { route } from '../../app/router';
 import { tr } from '../../app/i18n';
 import { toast } from '../../ui/kit';
@@ -22,6 +24,8 @@ export interface Completion {
   finishedAt: number;
   /** False when it burned out while the app was closed. */
   live: boolean;
+  /** The habit it was burned for: `marked` = checked off by this stick, false = it was already done. */
+  habit?: { id: string; name: string; plant: PlantKind; marked: boolean };
 }
 
 /** The lit (or paused) stick, or null. */
@@ -243,10 +247,10 @@ function resumeAmbientOnGesture(): void {
 export let litByKeyboard = false;
 
 /** Light a stick. Call from the click handler (user gesture) so audio can start. */
-export function lightIncense(minutes: number, intent?: string, byKeyboard = false): void {
+export function lightIncense(minutes: number, intent?: string, byKeyboard = false, habitId?: string): void {
   if (active.value) return;
   litByKeyboard = byKeyboard;
-  const s = light(minutes, intent, Date.now());
+  const s = light(minutes, intent, Date.now(), habitId);
   completion.value = null;
   restProgress.value = 0;
   set(s);
@@ -310,15 +314,35 @@ function finish(finishedAt: number, live: boolean): void {
   if (mine) writeStored(null);
   schedule();
   syncWakeLock();
-  completion.value = { session: s, finishedAt, live };
-  if (!mine) return;
+  if (!mine) {
+    completion.value = { session: s, finishedAt, live };
+    return;
+  }
   logFocus(toSession(s, true));
+  const habit = checkOffHabit(s.habitId, finishedAt);
+  completion.value = { session: s, finishedAt, live, ...(habit ? { habit } : {}) };
+  if (live && habit?.marked) {
+    // Let the bell ring first; the harmonics answer it.
+    setTimeout(() => audio.chime(habit.streak), 1400);
+  }
   if (live) {
     audio.bell();
     audio.setAmbient('none');
     notifyDone(s);
     if (route.value !== 'focus') toast(tr('一炷香已燃尽', 'Your incense has burned out'), 4000);
   }
+}
+
+/** A stick burned through for a habit checks that habit off for the day it burned out on. */
+function checkOffHabit(id: string | undefined, finishedAt: number): (Completion['habit'] & { streak: number }) | undefined {
+  if (!id) return undefined;
+  const h = state.value.habits.find((x) => x.id === id && !x.archived);
+  if (!h) return undefined;
+  const day = toKey(new Date(finishedAt));
+  const already = (state.value.checkins[id] ?? []).includes(day);
+  if (!already) toggleCheckin(id, day);
+  const streak = statsFor(h, state.value.checkins[id] ?? [], day).streak;
+  return { id, name: h.name, plant: h.plant, marked: !already, streak };
 }
 
 // --------------------------------------------------------------------------- start-up

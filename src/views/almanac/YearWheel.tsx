@@ -8,6 +8,7 @@ import { Sheet } from '../../ui/kit';
 import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
 import { Nums } from './Nums';
+import { makeRng, smoothstep } from '../../core/rng';
 import { chinaMD, sunLongitude, termsIn, SEASON_ZH, SEASON_EN, MONTH_EN } from './model';
 
 const R = 150;
@@ -20,16 +21,23 @@ const pt = (lon: number, r: number) => {
 };
 const f = (n: number) => n.toFixed(2);
 
-function sector(l1: number, l2: number, r1: number, r2: number): string {
-  const [ax, ay] = pt(l1, r2), [bx, by] = pt(l2, r2), [cx, cy] = pt(l2, r1), [dx, dy] = pt(l1, r1);
-  const large = (((l2 - l1) % 360) + 360) % 360 > 180 ? 1 : 0;
-  return `M${f(ax)} ${f(ay)}A${r2} ${r2} 0 ${large} 1 ${f(bx)} ${f(by)}L${f(cx)} ${f(cy)}A${r1} ${r1} 0 ${large} 0 ${f(dx)} ${f(dy)}Z`;
-}
-
-function arc(l1: number, l2: number, r: number): string {
-  const [ax, ay] = pt(l1, r), [bx, by] = pt(l2, r);
-  const span = (((l2 - l1) % 360) + 360) % 360;
-  return `M${f(ax)} ${f(ay)}A${r} ${r} 0 ${span > 180 ? 1 : 0} 1 ${f(bx)} ${f(by)}`;
+/** One tapered brush stroke along the ring from l1 to l2 (degrees, l2 > l1): 起笔 blot, 收笔 taper. */
+function brushArc(l1: number, l2: number, r: number, w: number, seed: number): string {
+  const rng = makeRng(seed);
+  const n = 48;
+  const outer: string[] = [], inner: string[] = [];
+  let wob = 0;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    wob = (wob + rng.gauss() * 0.18) * 0.82;
+    const width = w * (t < 0.06 ? 0.55 + (t / 0.06) * 0.45 : 1) * (1 - smoothstep(0.62, 1, t) * 0.82) * (1 + wob * 0.12);
+    const rr = r + wob * 0.7;
+    const lon = l1 + (l2 - l1) * t;
+    const [ox, oy] = pt(lon, rr + width / 2), [ix, iy] = pt(lon, rr - width / 2);
+    outer.push(`${f(ox)} ${f(oy)}`);
+    inner.push(`${f(ix)} ${f(iy)}`);
+  }
+  return `M${outer.join('L')}L${inner.reverse().join('L')}Z`;
 }
 
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'] as const;
@@ -54,28 +62,26 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
         <span class="alm-h-sub">{t('太阳每行十五度，为一节气', 'a term for every 15° of the sun’s path')}</span>
       </h2>
       <svg class="alm-wheel-svg" viewBox="-200 -200 400 400" role="group" aria-label={t('二十四节气圆图', 'Wheel of the 24 solar terms')}>
-        {SEASONS.map((s, k) => {
-          const l1 = 315 + 90 * k + 0.8, l2 = 315 + 90 * (k + 1) - 0.8;
-          return <path class={`alm-wh-season is-${s}${s === curSeason ? ' is-current' : ''}`} d={sector(l1, l2, R - 22, R - 3)} />;
-        })}
         <circle class="alm-wh-ring" r={R} />
         <circle class="alm-wh-ring-in" r={R - 60} />
+        {SEASONS.map((s, k) => (
+          <path class={`alm-wh-season${s === curSeason ? ' is-current' : ''}`} d={brushArc(315 + 90 * k + 3, 315 + 90 * (k + 1) - 3, R - 11, 7, 17 + k * 7)} />
+        ))}
         {SEASONS.map((s, k) => {
           const [x, y] = pt(315 + 90 * k + 45, R - 84);
           return (
-            <text class={`alm-wh-season-name brush${s === curSeason ? ' is-current' : ''}`} x={f(x)} y={f(y)} text-anchor="middle" dominant-baseline="central" aria-hidden="true">
-              {SEASON_ZH[s]}
-            </text>
+            <g class={`alm-wh-season-name${s === curSeason ? ' is-current' : ''}`} aria-hidden="true">
+              <text class="brush" x={f(x)} y={f(en ? y - 5 : y)} text-anchor="middle" dominant-baseline="central">{SEASON_ZH[s]}</text>
+              {en && <text class="alm-wh-season-en" x={f(x)} y={f(y + 15)} text-anchor="middle" dominant-baseline="central">{SEASON_EN[s]}</text>}
+            </g>
           );
         })}
-        {/* the year so far, from 立春 to the sun */}
-        <path class="alm-wh-progress" d={arc(315, sunLon <= 315 ? sunLon + 360 : sunLon, R)} />
         {TERMS.map((term, i) => {
           const lon = (315 + 15 * i) % 360;
           const [t1x, t1y] = pt(lon, R - (MAJOR.has(i) ? 9 : 5));
           const [t2x, t2y] = pt(lon, R + (MAJOR.has(i) ? 9 : 5));
           // side labels sit a little further out, clear of the sun dot
-          const [lx, ly] = pt(lon, R + 24 + 9 * Math.abs(Math.sin(rad(screen(lon)))));
+          const [lx, ly] = pt(lon, R + (en ? 27 : 24) + (en ? 14 : 9) * Math.abs(Math.sin(rad(screen(lon)))));
           const [dx, dy] = pt(lon, R - 34);
           const at = dates.get(i);
           const md = at ? chinaMD(at) : null;
@@ -91,8 +97,12 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setOpen(i))}
             >
               <line class="alm-wh-tick" x1={f(t1x)} y1={f(t1y)} x2={f(t2x)} y2={f(t2y)} />
+              <title>{en ? `${term.en} · ${term.pinyin}` : `${term.zh} · ${term.en}`}</title>
               <circle class="alm-wh-hit" cx={f(lx)} cy={f(ly)} r="23.5" />
-              <text class="alm-wh-label" x={f(lx)} y={f(ly)} text-anchor="middle" dominant-baseline="central">{term.zh}</text>
+              <text class="alm-wh-label" x={f(lx)} y={f(en ? ly - 5 : ly)} text-anchor="middle" dominant-baseline="central">{term.zh}</text>
+              {en && (
+                <text class="alm-wh-py" x={f(lx)} y={f(ly + 10)} text-anchor="middle" dominant-baseline="central">{term.pinyin}</text>
+              )}
               {md && (
                 <text class="alm-wh-date" x={f(dx)} y={f(dy)} text-anchor="middle" dominant-baseline="central">
                   {md.m}/{md.d}
@@ -101,7 +111,7 @@ export function YearWheel(props: { now: Date; ctx: TermContext; yearGanZhi: stri
             </g>
           );
         })}
-        <circle class="alm-wh-sun-halo" cx={f(sx)} cy={f(sy)} r="11" />
+        <circle class="alm-wh-sun-halo" cx={f(sx)} cy={f(sy)} r="10" />
         <circle class="alm-wh-sun" cx={f(sx)} cy={f(sy)} r="6" />
         <text class="alm-wh-year brush" x="0" y="-8" text-anchor="middle" dominant-baseline="central">{props.yearGanZhi}</text>
         <text class="alm-wh-year-sub" x="0" y="26" text-anchor="middle" dominant-baseline="central">
@@ -138,15 +148,15 @@ function TermSheet(props: { index: number | null; at?: Date; onClose: () => void
         {(term.blurbZh || term.blurbEn) && (
           <div class="alm-ts-blurb">
             <p>{en ? <span class="latin">{term.blurbEn}</span> : term.blurbZh}</p>
-            <p class="alm-ts-blurb-b">{en ? <span lang="zh-CN">{term.blurbZh}</span> : <span class="latin">{term.blurbEn}</span>}</p>
+            {en && <p class="alm-ts-blurb-b"><span lang="zh-CN">{term.blurbZh}</span></p>}
           </div>
         )}
         <ol class="alm-ts-pentads">
           {term.pentads.map((p, k) => (
             <li>
               <span class="alm-ts-ord">{t(['初候', '二候', '三候'][k] ?? '', ['First', 'Second', 'Third'][k] ?? '')}</span>
-              <span class="alm-ts-zh">{p.zh}</span>
-              <span class="alm-ts-pen latin">{p.en}</span>
+              <span class="alm-ts-zh">{en ? <span class="latin">{p.en}</span> : p.zh}</span>
+              {en && <span class="alm-ts-pen" lang="zh-CN">{p.zh}</span>}
             </li>
           ))}
         </ol>

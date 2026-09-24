@@ -29,7 +29,7 @@ export function FocusView() {
 
   const again = () => {
     const el = rootRef.current?.querySelector<HTMLInputElement>('.fx-intent input');
-    el?.focus();
+    el?.focus({ preventScroll: true });
   };
 
   const sceneLabel = s

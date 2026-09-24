@@ -87,115 +87,150 @@ export function censerDrawing(seed = 1): CenserLayout {
   /** A brush line along `pts` with width profile w(t), t ∈ 0..1. */
   const line = (pts: P2[], w: (t: number) => number): StrokePoint[] =>
     pts.map(([x, y], i) => sp(x, y, w(i / Math.max(1, pts.length - 1))));
-  const taper = (wMax: number, a = 0.12, b = 0.2) => (t: number) =>
-    wMax * Math.min(1, smoothstep(0, a, t) * 0.7 + 0.3) * (1 - 0.75 * smoothstep(1 - b, 1, t));
+  /** Calligraphic weight: a firm 起笔, a swelling body, a tapering 收笔. */
+  const swell = (wMax: number, head = 0.45, tail = 0.12, peak = 0.35) => (t: number) => {
+    const rise = smoothstep(0, peak, t), fall = 1 - smoothstep(peak, 1, t) * (1 - tail);
+    return wMax * Math.max(tail, (head + (1 - head) * rise) * fall);
+  };
+  /** Cut a polyline at fractions `cuts`, leaving small gaps (the brush lifts: 笔断意连). */
+  const broken = (pts: P2[], cuts: number[], gap = 2): P2[][] => {
+    const out: P2[][] = [];
+    let from = 0;
+    for (const c of [...cuts, 1]) {
+      const to = Math.round(c * (pts.length - 1));
+      const seg = pts.slice(from, c === 1 ? pts.length : Math.max(from + 2, to - gap));
+      if (seg.length >= 2) out.push(seg);
+      from = to + (c === 1 ? 0 : gap);
+    }
+    return out;
+  };
+  const jit = (pts: P2[], a: number) => pts.map(([x, y]) => [x + rng.range(-a, a), y + rng.range(-a, a) * 0.5] as P2);
 
   const cx = 100;
-  const { ink, ochre, malachite, white } = PIGMENTS;
+  const { ochre } = PIGMENTS;
 
-  // --- ground shadow & stand (红木座) ---
-  add({ kind: 'wash', pts: poly(ellipsePts(cx + 5, 180.5, 94, 6.5, 0, Math.PI * 2, 40), 8), tone: 0.13 });
-  const slabTop = ellipsePts(cx, 161, 80, 7.5, 0, Math.PI * 2, 48);
-  const front: P2[] = [
-    ...ellipsePts(cx, 161, 80, 7.5, 0, Math.PI, 30),
-    ...ellipsePts(cx, 166.5, 79, 7.5, Math.PI, 0, 30),
-  ];
-  const waist: P2[] = [
-    ...ellipsePts(cx, 166, 73, 7, 0.1, Math.PI - 0.1, 26),
-    ...ellipsePts(cx, 169, 72, 7, Math.PI - 0.1, 0.1, 26),
-  ];
-  add({ kind: 'wash', pts: poly(waist, 1), tone: 0.7, color: ink });
-  add({ kind: 'wash', pts: poly(front, 1.2), tone: 0.6, color: ochre });
-  add({ kind: 'wash', pts: poly(front, 1.2), tone: 0.82, color: ink });
-  add({ kind: 'wash', pts: poly(slabTop, 1.5), tone: 0.7, color: ochre });
-  add({ kind: 'wash', pts: poly(slabTop, 1.5), tone: 0.55, color: ink });
-  // the censer's own shadow on the stand top
-  add({ kind: 'wash', pts: poly(ellipsePts(cx + 6, 160, 58, 4.5, 0, Math.PI * 2, 30), 4), tone: 0.35, color: ink });
-  // bracket feet at both ends, hooking inward (卷足)
-  for (const dir of [-1, 1]) {
-    const fx = cx + dir * 68;
-    const pts: P2[] = [[fx + dir * 3, 170], [fx + dir * 3.5, 174], [fx + dir * 1.5, 177.5], [fx - dir * 3, 178.6], [fx - dir * 6, 177.4]];
-    add({ kind: 'brush', pts: line(spline(pts, 5), taper(5.2, 0.05, 0.45)), tone: 0.88, dryness: 0.25 });
+  // --- soft ink shadow on the ground ---
+  add({ kind: 'wash', pts: poly(ellipsePts(cx + 7, 180.5, 92, 5.5, 0, Math.PI * 2, 40), 10), tone: 0.1, wet: 0.8 });
+
+  // --- stand (座): a pale top, one 焦墨 stroke for the front edge, two hooked feet ---
+  add({ kind: 'wash', pts: poly(ellipsePts(cx, 160.5, 80, 7, 0, Math.PI * 2, 36), 3), tone: 0.1, wet: 0.6 });
+  add({ kind: 'wash', pts: poly(ellipsePts(cx + 8, 160, 56, 4, 0, Math.PI * 2, 24), 5), tone: 0.14, wet: 0.7 });
+  add({ kind: 'brush', pts: line(ellipsePts(cx, 163.5, 81, 7.5, Math.PI - 0.04, 0.04, 34), swell(5.2, 0.8, 0.25, 0.2)), tone: 0.93, dryness: 0.45 });
+  for (const part of broken(ellipsePts(cx, 160.5, 80, 7, Math.PI + 0.12, 2 * Math.PI - 0.1, 30), [0.62], 2)) {
+    add({ kind: 'brush', pts: line(part, swell(1.1, 0.6, 0.2)), tone: 0.55 });
   }
-  add({ kind: 'line', pts: line(ellipsePts(cx, 161.3, 80, 7.5, 0.06, Math.PI - 0.06, 30), () => 1), tone: 0.45 });
+  for (const d of [-1, 1]) {
+    const fx = cx + d * 69;
+    const pts = spline([[fx + d * 2, 168.5], [fx + d * 3, 173.5], [fx + d * 0.5, 177.5], [fx - d * 4, 178.5]], 5);
+    add({ kind: 'brush', pts: line(pts, swell(4.2, 0.9, 0.15, 0.15)), tone: 0.92, dryness: 0.35 });
+  }
 
-  // --- legs (乳足): back pair first (behind the belly), the front one later ---
-  const leg = (x: number, top: number, foot: number, lean: number, w: number) => {
-    const h = foot - top;
-    const o: P2[] = [
-      [x - w * 0.5, top], [x - w * 0.47, top + h * 0.42], [x - w * 0.3 + lean, top + h * 0.8], [x - w * 0.13 + lean, foot],
-      [x + w * 0.13 + lean, foot], [x + w * 0.3 + lean, top + h * 0.8], [x + w * 0.47, top + h * 0.42], [x + w * 0.5, top],
-    ];
-    add({ kind: 'wash', pts: poly(spline(o, 4), 1), tone: 0.7, color: ochre });
-    add({ kind: 'wash', pts: poly(spline(o, 4), 1), tone: 0.22, color: ink });
-    const half: P2[] = [[x + lean * 0.3, top], [x + lean * 0.6, top + h * 0.5], ...o.slice(4, 7)];
-    add({ kind: 'wash', pts: poly(half.concat([[x + w * 0.5, top]]), 1.2), tone: 0.45, color: ink });
-    add({ kind: 'brush', pts: line(spline(o.slice(3, 8).reverse(), 4).reverse(), taper(2.4, 0.1, 0.35)), tone: 0.85 });
-    add({ kind: 'line', pts: line(spline(o.slice(0, 5), 4), () => 1), tone: 0.65 });
-  };
-  leg(cx - 50, 136, 157.5, -2.5, 19);
-  leg(cx + 50, 136, 157.5, 2.5, 19);
-  leg(cx + 3, 141, 164.5, 0.5, 21);
-
-  // --- belly ---
+  // --- belly geometry ---
   const prof: P2[] = [[67, 73], [66.5, 78], [70, 85], [78, 94], [84, 104], [85.5, 112], [82.5, 121], [74, 130], [61, 137], [41, 141.5], [20, 143.4], [0, 144]];
   const right = spline(prof, 6).map(([hw, y]) => [cx + hw, y] as P2);
   const left = right.slice().reverse().map(([x, y]) => [2 * cx - x, y] as P2);
   const belly: P2[] = [...right, ...left.slice(1)];
-  add({ kind: 'wash', pts: poly(belly, 1.2), tone: 0.72, color: ochre });
-  // form shadow: crescents that hug the contour — the right flank, then the underside
-  const crescent = (side: P2[], depth: (t: number) => number, dirX: number, dirY: number): P2[] => {
+  const half = (y: number) => {
+    for (let i = 1; i < prof.length; i++) if (y <= prof[i][1]) {
+      const [h0, y0] = prof[i - 1], [h1, y1] = prof[i];
+      return h0 + ((h1 - h0) * (y - y0)) / Math.max(1e-6, y1 - y0);
+    }
+    return 0;
+  };
+  const inset = (pts: P2[], k: number) => pts.map(([x, y]) => [cx + (x - cx) * k, 108 + (y - 108) * k] as P2);
+
+  // --- legs (乳足): pale ochre, one weighted stroke on the shadow side, a light one on the lit side ---
+  const leg = (x: number, top: number, foot: number, lean: number, w: number, shadeRight: boolean) => {
+    const h = foot - top;
+    const L: P2[] = spline([[x - w * 0.5, top], [x - w * 0.45, top + h * 0.45], [x - w * 0.26 + lean, top + h * 0.82], [x - w * 0.08 + lean, foot]], 4);
+    const R: P2[] = spline([[x + w * 0.5, top], [x + w * 0.45, top + h * 0.45], [x + w * 0.26 + lean, top + h * 0.82], [x + w * 0.08 + lean, foot]], 4);
+    add({ kind: 'wash', pts: poly([...L, ...R.slice().reverse()], 2), tone: 0.34, color: ochre, wet: 0.6 });
+    const [dark, lit] = shadeRight ? [R, L] : [L, R];
+    add({ kind: 'wash', pts: poly([...dark, [x + lean * 0.6, foot - 1], [x, top]], 2.5), tone: 0.2, wet: 0.6 });
+    add({ kind: 'brush', pts: line(dark, swell(2.8, 0.7, 0.3, 0.25)), tone: 0.88, dryness: 0.4 });
+    add({ kind: 'brush', pts: line(lit.slice(1, -1), swell(1.2, 0.5, 0.2)), tone: 0.6, dryness: 0.3 });
+  };
+  leg(cx - 50, 136, 157.5, -2.5, 18, false);
+  leg(cx + 50, 136, 157.5, 2.5, 18, true);
+  leg(cx + 3, 141, 164, 0.5, 20, true);
+
+  // --- belly washes: loose ochre that leaves the lit shoulder as bare paper ---
+  const lit: P2[] = spline([[cx + 14, 76], [cx - 20, 86], [cx - 50, 101], [cx - 72, 117]], 5);
+  const warm: P2[] = [
+    ...lit,
+    ...left.filter(([x, y]) => x < cx && y > 118).reverse().map(([x, y]) => [x + 3, y - 1.5] as P2),
+    ...right.filter(([, y]) => y > 78).reverse().map(([x, y]) => [x - 2.5, y - 1] as P2),
+  ];
+  add({ kind: 'wash', pts: poly(jit(warm, 0.8), 5), tone: 0.36, color: ochre, wet: 0.6 });
+  add({ kind: 'wash', pts: poly(inset(belly, 0.9).filter(([x, y]) => y > 80 || x > cx), 6), tone: 0.1, color: ochre, wet: 0.7 });
+  // one side-brush ink wash down the shadowed flank, and a thinner one under the belly
+  const crescent = (side: P2[], depth: (t: number) => number, dx: number, dy: number): P2[] => {
     const inner = side.map(([x, y], i) => {
       const t = i / (side.length - 1);
-      return [x + dirX * depth(t), y + dirY * depth(t)] as P2;
+      return [x + dx * depth(t), y + dy * depth(t)] as P2;
     });
     return [...side, ...inner.reverse()];
   };
-  const flank = right.filter(([, y]) => y > 77 && y < 142);
-  add({ kind: 'wash', pts: poly(belly.filter(([x, y]) => y > 76 || x > cx), 2), tone: 0.16, color: ink });
-  add({ kind: 'wash', pts: poly(crescent(flank, (t) => 52 * Math.sin(Math.PI * t) ** 0.8, -1, 0.2), 6), tone: 0.34, color: ink });
-  add({ kind: 'wash', pts: poly(crescent(flank, (t) => 22 * Math.sin(Math.PI * t) ** 0.7, -1, 0.1), 3), tone: 0.36, color: ink });
-  const under = belly.filter(([, y]) => y > 118);
-  add({ kind: 'wash', pts: poly(crescent(under, (t) => 14 * Math.sin(Math.PI * t) ** 0.6, 0, -1), 1.2), tone: 0.36, color: ink });
-  add({ kind: 'wash', pts: poly(crescent(left.slice().reverse().filter(([, y]) => y > 92 && y < 136), (t) => 6 * Math.sin(Math.PI * t), 1, 0), 3), tone: 0.14, color: ink });
-  // metallic sheen: a pale glint on the lit shoulder
-  add({ kind: 'wash', pts: poly(ellipsePts(cx - 46, 99, 15, 4.6, -0.35, Math.PI * 2 - 0.35, 18), 7), tone: 0.34, color: white });
-  // a warm glow on the lit shoulder (宝光)
-  add({ kind: 'wash', pts: poly(ellipsePts(cx - 40, 101, 22, 8, -0.3, Math.PI * 2 - 0.3, 18), 8), tone: 0.14, color: PIGMENTS.gamboge });
-  // patina: a few malachite blooms and dark pits
-  for (let i = 0; i < 4; i++) {
-    const px = cx + rng.range(-40, 66), py = rng.range(106, 134);
-    if (Math.abs(px - cx) > 70 - (py - 106) * 0.8) continue;
-    add({ kind: 'wash', pts: poly(ellipsePts(px, py, rng.range(4, 8), rng.range(1.8, 3.5), 0, Math.PI * 2, 12), 2.5), tone: 0.22, color: malachite });
+  const flank = right.filter(([, y]) => y > 80 && y < 141).map(([x, y]) => [x - 1.5, y] as P2);
+  add({ kind: 'wash', pts: poly(crescent(flank, (t) => 30 * Math.sin(Math.PI * t) ** 0.8, -1, 0.25), 5), tone: 0.25, wet: 0.6 });
+  const under = belly.filter(([, y]) => y > 124).map(([x, y]) => [x, y - 1.5] as P2);
+  add({ kind: 'wash', pts: poly(crescent(under, (t) => 9 * Math.sin(Math.PI * t) ** 0.6, 0, -1), 3), tone: 0.16, wet: 0.6 });
+
+  // --- 皴: a few dry side-brush strokes following the swell of the belly, on the shadow side ---
+  const clip = (pts: P2[]) => pts.filter(([x, y]) => Math.abs(x - cx) < half(y) - 3.5);
+  for (let i = 0; i < 5; i++) {
+    const y0 = rng.range(96, 128);
+    const a0 = rng.range(0.05, 0.35), a1 = a0 + rng.range(0.35, 0.6);
+    const arc = clip(ellipsePts(cx - rng.range(0, 10), y0 - 24, rng.range(60, 80), 24 + rng.range(-3, 4), a0, a1, 12));
+    if (arc.length < 3) continue;
+    add({ kind: 'dry', pts: line(arc, swell(rng.range(3, 5.5), 0.8, 0.3, 0.3)), tone: rng.range(0.3, 0.45), dryness: 0.7 });
   }
+  for (let i = 0; i < 2; i++) {
+    const y0 = rng.range(112, 132);
+    const arc = clip(ellipsePts(cx, y0 - 22, 76, 22, Math.PI * rng.range(0.62, 0.7), Math.PI * rng.range(0.8, 0.9), 8));
+    if (arc.length >= 3) add({ kind: 'dry', pts: line(arc, swell(3, 0.7, 0.3)), tone: 0.25, dryness: 0.75 });
+  }
+
+  // --- shoulder band: two broken fine strokes, a pale ink band between, a few cloud-thunder ticks ---
+  const band = (y0: number, rx: number, a0 = 0.14, a1 = Math.PI - 0.14) => ellipsePts(cx, y0, rx, 8, a0, a1, 26);
+  add({ kind: 'wash', pts: poly([...band(81.5, 70), ...band(88.5, 76).reverse()], 1.5), tone: 0.1, wet: 0.5 });
+  for (const part of broken(band(81, 70), [0.3, 0.72], 1)) add({ kind: 'brush', pts: line(part, swell(1.3, 0.6, 0.2)), tone: 0.72 });
+  for (const part of broken(band(88.5, 76), [0.55], 1)) add({ kind: 'brush', pts: line(part, swell(1.2, 0.6, 0.2)), tone: 0.62 });
+  for (let i = 0; i < 9; i++) {
+    const t = 0.3 + (i / 8) * (Math.PI - 0.6);
+    const x = cx + 73 * Math.cos(t), y = 85 + 8 * Math.sin(t);
+    const s = 1.7 * (0.55 + 0.45 * Math.sin(t));
+    add({ kind: 'brush', pts: [sp(x - s, y - s * 0.3, 0.9), sp(x + s * 0.5, y - s * 0.45, 1.0), sp(x + s * 0.6, y + s * 0.4, 0.8), sp(x - s * 0.2, y + s * 0.5, 0.4)], tone: 0.5 });
+  }
+
+  // --- dark patina accents (a few 苔点-like touches where bronze pits and oxidises) ---
   for (let i = 0; i < 7; i++) {
-    const px = cx + rng.range(-50, 70), py = rng.range(102, 136);
-    if (Math.abs(px - cx) > 78 - (py - 102) * 0.9) continue;
-    add({ kind: 'dot', pts: [sp(px, py, rng.range(1, 2.2))], tone: 0.6 });
+    const y = rng.range(100, 138);
+    const x = cx + rng.range(0.1, 0.92) * (half(y) - 5) * (rng() < 0.75 ? 1 : -1);
+    add({ kind: 'dot', pts: [sp(x, y, rng.range(1.1, 2.6))], tone: rng.range(0.6, 0.85) });
   }
-  // shoulder band: two fine lines round the front, with a row of cloud-thunder (雷纹) ticks between
-  const band = (y0: number, rx: number) => ellipsePts(cx, y0, rx, 8, 0.12, Math.PI - 0.12, 26);
-  add({ kind: 'line', pts: line(band(81, 70), () => 0.9), tone: 0.7 });
-  add({ kind: 'line', pts: line(band(88.5, 76), () => 0.9), tone: 0.6 });
-  for (let i = 0; i < 13; i++) {
-    const t = 0.2 + (i / 12) * (Math.PI - 0.4);
-    const x = cx + 73 * Math.cos(t), y = 84.8 + 8 * Math.sin(t);
-    const s = 1.8 * (0.6 + 0.4 * Math.sin(t));
-    add({ kind: 'line', pts: [sp(x - s, y - s * 0.4, 0.8), sp(x + s * 0.6, y - s * 0.4, 0.8), sp(x + s * 0.6, y + s * 0.5, 0.8), sp(x - s * 0.3, y + s * 0.5, 0.7)], tone: 0.55 });
+  for (let i = 0; i < 2; i++) {
+    const y = rng.range(118, 134), x = cx + rng.range(20, 55);
+    add({ kind: 'wash', pts: poly(ellipsePts(x, y, rng.range(4, 7), rng.range(1.6, 2.6), 0, Math.PI * 2, 10), 2), tone: 0.28, wet: 0.5 });
   }
-  // contour: the shadow side heavier; the left edge broken once where the light hits it
-  const rightC = right.filter(([, y]) => y > 76);
+
+  // --- belly contour: weighted on the shadow side, broken and light on the lit side ---
+  const rightC = right.filter(([, y]) => y > 78);
   const rc = Math.floor(rightC.length * 0.42);
-  // two strokes that overlap at the widest point: shoulder → belly, belly → foot
-  add({ kind: 'brush', pts: line(rightC.slice(0, rc + 2), (t) => 0.9 + 2.2 * Math.sin(Math.PI * (0.15 + 0.7 * t))), tone: 0.84, dryness: 0.3 });
-  add({ kind: 'brush', pts: line(rightC.slice(rc - 1).map(([x, y]) => [x + 0.4, y] as P2), (t) => 3.2 * Math.sin(Math.PI * (0.12 + 0.8 * t)) + 0.4), tone: 0.88, dryness: 0.45 });
-  const leftC = left.slice().reverse().filter(([, y]) => y > 76);
-  const cut = Math.floor(leftC.length * 0.28);
-  add({ kind: 'brush', pts: line(leftC.slice(0, cut), taper(1.6, 0.2, 0.5)), tone: 0.7 });
-  add({ kind: 'brush', pts: line(leftC.slice(cut + 3), (t) => 0.8 + 2.0 * Math.sin(Math.PI * t)), tone: 0.8, dryness: 0.3 });
+  add({ kind: 'brush', pts: line(rightC.slice(0, rc + 2), swell(2.6, 0.5, 0.35, 0.55)), tone: 0.86, dryness: 0.35 });
+  add({ kind: 'brush', pts: line(rightC.slice(rc - 1).map(([x, y]) => [x + 0.5, y] as P2), swell(3.6, 0.9, 0.12, 0.25)), tone: 0.9, dryness: 0.45 });
+  const leftC = left.slice().reverse().filter(([, y]) => y > 78);
+  const [lTop, lMid, lLow] = broken(leftC, [0.2, 0.55], 3);
+  if (lTop) add({ kind: 'brush', pts: line(lTop, swell(1.5, 0.7, 0.2)), tone: 0.72, dryness: 0.3 });
+  if (lMid) add({ kind: 'brush', pts: line(lMid, swell(1.2, 0.3, 0.1)), tone: 0.6, dryness: 0.5 });
+  if (lLow) add({ kind: 'brush', pts: line(lLow, swell(2.4, 0.4, 0.15, 0.6)), tone: 0.84, dryness: 0.4 });
+  // neck: short strokes from under the lip to the shoulder
+  for (const d of [-1, 1]) {
+    const pts = spline([[cx + d * 67, 74], [cx + d * 66.3, 78.5], [cx + d * 69.5, 84.5]], 4);
+    add({ kind: 'brush', pts: line(pts, swell(d > 0 ? 2 : 1.4, 0.8, 0.3)), tone: 0.8 });
+  }
 
-
-  // --- ears (冲天耳): upright loops standing on the rim ---
+  // --- ears (冲天耳): a pale ochre band, one turning stroke with a 折 at the top, a light inner line ---
   const ear = (d: number) => {
     const x0 = cx + d * 57, x1 = cx + d * 70;
     const path: P2[] = [
@@ -203,9 +238,6 @@ export function censerDrawing(seed = 1): CenserLayout {
       [x1 + d * 1, 39.8], [x1 + d * 4, 43], [x1 + d * 5, 52], [x1 + d * 3, 70],
     ];
     const pts = spline(path, 4);
-    add({ kind: 'brush', pts: line(pts, () => 7.5), tone: 0.7, color: ochre, dryness: 0 });
-    add({ kind: 'brush', pts: line(pts.slice(pts.length * 0.5 | 0), (t) => 3.4 * (1 - 0.4 * t)), tone: 0.5 });
-    // outer and inner outlines, offset from the centre line
     const off = (k: number) => pts.map(([x, y], i) => {
       const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
       let nx = -(b[1] - a[1]), ny = b[0] - a[0];
@@ -213,38 +245,45 @@ export function censerDrawing(seed = 1): CenserLayout {
       nx /= l; ny /= l;
       return [x + nx * k * d, y + ny * k * d] as P2;
     });
-    add({ kind: 'brush', pts: line(off(-3.9), (t) => 0.7 + 1.1 * Math.sin(Math.PI * t) * (d > 0 ? 1 : 0.7)), tone: 0.78 });
-    add({ kind: 'line', pts: line(off(3.8).slice(2, -2), () => 0.9), tone: 0.5 });
-    // glint along the lit side of the loop
-    add({ kind: 'line', pts: line(off(-1.4).slice(2, pts.length * 0.45 | 0), () => 1.2), tone: 0.7, color: white });
+    add({ kind: 'brush', pts: line(pts, () => 6.5), tone: 0.3, color: ochre, wet: 0.5 });
+    if (d > 0) add({ kind: 'brush', pts: line(pts.slice(pts.length * 0.55 | 0), swell(3.4, 0.4, 0.4)), tone: 0.22 });
+    const outer = off(-3.8);
+    const cut = Math.floor(outer.length * 0.52);
+    // rising post + the turn over the top, then the far post pressed down hard
+    add({ kind: 'brush', pts: line(outer.slice(0, cut), swell(1.8, 0.9, 0.5, 0.75)), tone: 0.84, dryness: 0.3 });
+    add({ kind: 'brush', pts: line(outer.slice(cut + 1), swell(d > 0 ? 3 : 2.4, 1, 0.2, 0.15)), tone: 0.9, dryness: 0.45 });
+    add({ kind: 'brush', pts: line(off(3.6).slice(3, -3), swell(1, 0.6, 0.3)), tone: 0.55 });
   };
   ear(-1);
   ear(1);
 
   // --- rim, mouth, ash ---
   const mouthY = 68;
-  add({ kind: 'wash', pts: poly(ellipsePts(cx, mouthY, 71.5, 12.5, 0, Math.PI * 2, 48), 1), tone: 0.7, color: ochre });
-  add({ kind: 'wash', pts: poly(ellipsePts(cx + 20, mouthY + 4, 52, 8.5, 0, Math.PI * 2, 30), 3), tone: 0.2, color: ink });
-  add({ kind: 'wash', pts: poly(ellipsePts(cx, mouthY + 0.5, 62, 9, 0, Math.PI * 2, 44), 1), tone: 0.82, color: ink });
-  // ash bed: fills the near part of the opening, a dark crescent of inner wall shows behind
-  const ash: P2[] = [
-    ...ellipsePts(cx, mouthY + 0.5, 60.5, 8.2, -0.05, Math.PI + 0.05, 30),
-    ...spline([[cx - 60, mouthY - 0.2], [cx - 30, mouthY - 4.2], [cx, mouthY - 5], [cx + 32, mouthY - 4], [cx + 60, mouthY - 0.2]], 5),
-  ];
-  add({ kind: 'fill', pts: poly(ash, 1.2), tone: 0.86, color: white });
-  add({ kind: 'wash', pts: poly(ellipsePts(cx + 18, mouthY + 2.5, 40, 4, 0, Math.PI * 2, 20), 2), tone: 0.14, color: ink });
-  add({ kind: 'wash', pts: poly(ellipsePts(cx, mouthY - 2.5, 52, 2.2, 0, Math.PI * 2, 20), 1.5), tone: 0.1, color: ink });
-  for (let i = 0; i < 9; i++) {
+  const outerF = ellipsePts(cx, mouthY, 71.5, 12.5, 0, Math.PI, 30);
+  const innerF = ellipsePts(cx, mouthY + 0.5, 62, 9, 0, Math.PI, 30);
+  const outerB = ellipsePts(cx, mouthY, 71.5, 12.5, Math.PI, 2 * Math.PI, 30);
+  const innerB = ellipsePts(cx, mouthY + 0.5, 62, 9, Math.PI, 2 * Math.PI, 30);
+  // the lip's flat top: pale ochre, a touch of paper left on the lit front-left
+  add({ kind: 'wash', pts: poly([...outerF.filter(([x]) => x > cx - 40), ...innerF.slice().reverse().filter(([x]) => x > cx - 36)], 1.5), tone: 0.3, color: ochre, wet: 0.5 });
+  add({ kind: 'wash', pts: poly([...outerB, ...innerB.slice().reverse()], 1.5), tone: 0.22, color: ochre, wet: 0.5 });
+  // dark inner wall behind the ash
+  const ashBack = spline([[cx - 60, mouthY - 0.2], [cx - 30, mouthY - 4.2], [cx, mouthY - 5], [cx + 32, mouthY - 4], [cx + 60, mouthY - 0.2]], 5);
+  add({ kind: 'wash', pts: poly([...innerB, ...ashBack.slice().reverse()], 1), tone: 0.62, wet: 0.4 });
+  // the ash bed: paper with a breath of grey and a few specks
+  add({ kind: 'wash', pts: poly([...ellipsePts(cx, mouthY + 0.5, 60, 8, 0, Math.PI, 20), ...ashBack.slice().reverse()], 2), tone: 0.06, wet: 0.5 });
+  add({ kind: 'wash', pts: poly(ellipsePts(cx + 20, mouthY + 2.5, 34, 3.4, 0, Math.PI * 2, 18), 2.5), tone: 0.08, wet: 0.6 });
+  for (let i = 0; i < 8; i++) {
     const a = rng.range(0.2, Math.PI - 0.2), r = rng.range(0.2, 0.85);
-    add({ kind: 'dot', pts: [sp(cx + 58 * r * Math.cos(a), mouthY + 1 + 7 * r * Math.sin(a) - 2, rng.range(0.8, 1.6))], tone: 0.28 });
+    add({ kind: 'dot', pts: [sp(cx + 56 * r * Math.cos(a), mouthY - 1 + 6 * r * Math.sin(a), rng.range(0.7, 1.4))], tone: 0.3 });
   }
-  // rim edges: front lip heavy (it has thickness), back lip and inner lip fine
-  add({ kind: 'brush', pts: line(ellipsePts(cx, mouthY + 0.6, 71.5, 12.5, 0.02, Math.PI - 0.02, 40), (t) => 1.6 + 1.8 * Math.sin(Math.PI * t) * (0.6 + 0.4 * t)), tone: 0.86, dryness: 0.25 });
-  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY, 71.5, 12.5, Math.PI + 0.03, 2 * Math.PI - 0.03, 40), () => 1.1), tone: 0.7 });
-  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.5, 62, 9, 0.1, Math.PI - 0.1, 34), () => 0.9), tone: 0.6 });
-  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.5, 62, 9, Math.PI, 2 * Math.PI, 34), () => 0.8), tone: 0.8 });
-  // light catching the top of the front lip
-  add({ kind: 'line', pts: line(ellipsePts(cx, mouthY + 0.8, 67, 10.8, 0.45, Math.PI - 0.25, 30), () => 1.3), tone: 0.75, color: white });
+  // rim strokes: a confident front lip, a lighter broken back lip, a fine inner edge
+  const [fl1, fl2] = broken(ellipsePts(cx, mouthY + 0.6, 71.5, 12.5, 0.03, Math.PI - 0.03, 40), [0.66], 2);
+  add({ kind: 'brush', pts: line(fl1, swell(3.2, 0.9, 0.25, 0.3)), tone: 0.9, dryness: 0.35 });
+  if (fl2) add({ kind: 'brush', pts: line(fl2, swell(1.8, 0.5, 0.15, 0.5)), tone: 0.78, dryness: 0.4 });
+  add({ kind: 'brush', pts: line(ellipsePts(cx, mouthY + 3.4, 70, 12, 0.08, 1.3, 16), swell(1.4, 0.8, 0.1)), tone: 0.6, dryness: 0.5 });
+  for (const part of broken(outerB.slice(1, -1), [0.4], 2)) add({ kind: 'brush', pts: line(part, swell(1.2, 0.6, 0.25)), tone: 0.66 });
+  for (const part of broken(innerF.slice(2, -2), [0.3, 0.75], 1)) add({ kind: 'brush', pts: line(part, swell(1, 0.6, 0.3)), tone: 0.55 });
+  add({ kind: 'brush', pts: line(innerB.slice(1, -1), swell(1, 0.7, 0.4)), tone: 0.75 });
 
   return {
     drawing: { width: 200, height: 190, anchor: { x: 100, y: 182 }, strokes: S },

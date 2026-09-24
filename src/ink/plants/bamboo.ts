@@ -24,6 +24,7 @@
 import type { Drawing, PlantSpec, Stroke, StrokePoint } from '../types';
 import { PIGMENTS } from '../types';
 import { makeRng, mixSeed } from '../../core/rng';
+import { growthFor } from '../../core/habits';
 
 type V = { x: number; y: number };
 const DEG = Math.PI / 180;
@@ -52,13 +53,6 @@ interface Culm {
   nodes: number[]; // arc-length positions of the internode boundaries, 0 … h
 }
 
-/** A group of strokes that appear together (a culm's segments, a branch with its leaves…). */
-interface Unit {
-  strokes: Stroke[];
-  birth: number;
-  /** birth spacing between consecutive strokes of the unit */
-  step?: number;
-}
 
 export function bamboo(spec: PlantSpec): Drawing {
   const H = spec.height;
@@ -319,7 +313,7 @@ export function bamboo(spec: PlantSpec): Drawing {
   function crown(c: Culm): Stroke[] {
     const out: Stroke[] = [];
     const tip = at(c, c.h);
-    const n = rng.pick([2, 3, 3, 3, 4]);
+    const n = c.role === 'sprout' ? rng.pick([2, 3, 3]) : rng.pick([2, 3, 3, 3, 4]);
     const windy = mood === 'wind' ? c.side * rng.range(25, 45) : 0;
     const s1 = rng.chance(0.5) ? 1 : -1;
     const spec: [number, number][] = [
@@ -383,10 +377,6 @@ export function bamboo(spec: PlantSpec): Drawing {
 
   // ---------------------------------------------------------------- compose
 
-  const units: Unit[] = [];
-  const schedule = (list: Stroke[][], b0: number, b1: number) => {
-    list.forEach((st, i) => units.push({ strokes: st, birth: lerp(b0, b1, list.length > 1 ? i / (list.length - 1) : 0) }));
-  };
   const windBend = mood === 'wind' ? 1.9 : 1;
 
   // The young shoot at the foot.
@@ -395,15 +385,14 @@ export function bamboo(spec: PlantSpec): Drawing {
     { x: sproutSide * H * rng.range(0.05, 0.1), y: 0 }, H * rng.range(0.2, 0.27), mainW * rng.range(0.42, 0.5), rng.int(3, 4),
     sproutSide * rng.range(3, 10) * DEG, (mood === 'wind' ? dir * 12 : sproutSide * rng.range(2, 10)) * DEG, 0.5, 0.82, 0.84, 0.58);
 
-  // Medium culm (usually): opposite side, leaning away from the main culm — or crossing it.
-  const hasMid = rng.chance(0.78);
+  // Medium culm: opposite side, leaning away from the main culm — or crossing it.
   const cross = rng.chance(0.3);
   const midSide = cross || mood === 'wind' ? dir : -dir;
-  const mid = hasMid ? makeCulm('mid',
-    { x: (cross ? -dir : midSide) * H * rng.range(0.02, 0.05), y: 0 }, H * rng.range(0.56, 0.7), mainW * rng.range(0.6, 0.72), rng.int(6, 7),
-    midSide * rng.range(3, 10) * DEG, midSide * rng.range(4, 14) * windBend * DEG, 0.4, 0.72, 0.62, 0.86) : null;
+  const mid = makeCulm('mid',
+    { x: (cross ? -dir : midSide) * H * rng.range(0.02, 0.05), y: 0 }, H * rng.range(0.52, 0.7), mainW * rng.range(0.6, 0.72), rng.int(6, 7),
+    midSide * rng.range(3, 10) * DEG, midSide * rng.range(4, 14) * windBend * DEG, 0.4, 0.72, 0.62, 0.86);
 
-  // The main culm.
+  // The main culm — the tall one arrives only after a streak of check-ins.
   const main = makeCulm('main',
     { x: (cross ? dir : -dir) * H * rng.range(0, 0.02), y: 0 }, H * rng.range(0.84, 0.9), mainW, rng.int(7, 9),
     dir * rng.range(1, 6) * DEG, dir * rng.range(4, 14) * windBend * DEG, 0.56, 0.9, 0.9, 1);
@@ -415,45 +404,39 @@ export function bamboo(spec: PlantSpec): Drawing {
     { x: (rng.chance(0.5) ? 1 : -1) * H * rng.range(0.06, 0.12), y: 0 }, H * rng.range(0.64, 0.78), mainW * rng.range(0.5, 0.6), rng.int(6, 7),
     farSide * rng.range(4, 12) * DEG, farSide * rng.range(3, 10) * windBend * DEG, 0.18, 0.3, 0.28, 0.82) : null;
 
-  // 0.00–0.08: the shoot, then its crown and a little branch.
-  units.push({ strokes: culmStrokes(sprout), birth: 0, step: 0.004 });
-  const spF = foliage(sprout, 0.5, 1, [0.35, 0.45]);
-  schedule(spF.slice(0, 2).map((f) => f.unit), 0.03, 0.055);
+  // Growth is choreographed per check-in (see `choreograph`): day one is the shoot with its
+  // crown; each later check-in adds the next group of the story, or a filler while it waits.
+  const seq: Group[] = [];
+  const fillers: Stroke[][] = [];
+  const add = (strokes: Stroke[], minN = 0) => seq.push({ strokes, minN });
 
-  const late: Stroke[][] = spF.slice(2).map((f) => f.unit);
-  const place = (c: Culm, b0: number, b1: number, lateFrac: number, firstFrac: number, masses: number, lenFrac: [number, number]) => {
-    const segEnd = b0 + 0.045;
-    units.push({ strokes: culmStrokes(c), birth: b0, step: (segEnd - b0) / (c.nodes.length * 2.2) });
+  const spF = foliage(sprout, 0.5, 1, [0.35, 0.45]);
+  const first = [...culmStrokes(sprout), ...spF[0].unit];
+  spF.slice(1).forEach((f) => add(f.unit));
+
+  const tell = (c: Culm, minN: number, firstFrac: number, masses: number, lenFrac: [number, number]) => {
+    add(culmStrokes(c), minN);
     const f = foliage(c, firstFrac, masses, lenFrac);
-    // the crown and the leafy masses come first (top-down); then the small branches, some of
-    // which wait for the late phase
-    const bigs = f.filter((u) => u.big).map((u) => u.unit);
-    const small: Stroke[][] = [];
-    for (const { unit, big } of f) if (!big) (rng.chance(lateFrac) ? late : small).push(unit);
-    const leafy = Math.min(segEnd + 0.05, lerp(segEnd, b1, 0.4));
-    schedule(bigs, segEnd + 0.008, leafy);
-    schedule(small, leafy + 0.01, b1);
+    // the crown and the leafy masses first (top-down), then the small branches
+    for (const u of f) if (u.big) add(u.unit, minN + 1);
+    for (const u of f) if (!u.big) add(u.unit, minN + 2);
   };
-  if (mid) {
-    place(mid, 0.08, 0.28, 0.5, 0.45, rng.int(1, 2), [0.18, 0.26]);
-    place(main, 0.3, 0.56, 0.6, 0.36, rng.int(2, 3), [0.18, 0.27]);
-  } else {
-    place(main, 0.08, 0.5, 0.5, 0.33, 3, [0.18, 0.28]);
-  }
-  // Pale leaves behind the leafy masses fill the plant out late in its growth.
-  for (const b of backs) if (b.big ? rng.chance(0.8) : rng.chance(0.3)) late.push(backCluster(b));
-  // Late foliage in a shuffled but deterministic order.
-  for (let i = late.length - 1; i > 0; i--) {
-    const j = rng.int(0, i);
-    [late[i], late[j]] = [late[j], late[i]];
-  }
-  schedule(late, 0.6, 0.88);
+  tell(mid, 2, 0.45, rng.int(1, 2), [0.18, 0.26]);
+  const midBacks = backs.length;
+  tell(main, 11, 0.36, rng.int(2, 3), [0.18, 0.27]);
+  // Pale leaves behind the leafy masses (淡墨 layering): the medium culm's keep the story
+  // moving while the main culm is awaited; the main culm's fill the long tail.
+  backs.forEach((b, i) => {
+    if (!(b.big ? rng.chance(0.85) : rng.chance(0.4))) return;
+    if (i < midBacks) fillers.push(backCluster(b));
+    else add(backCluster(b), 22);
+  });
   if (far) {
-    units.push({ strokes: culmStrokes(far), birth: 0.585, step: 0.002 });
+    add(culmStrokes(far), 24);
     const fol = foliage(far, 0.45, 2, [0.14, 0.22]).map((f) => f.unit);
     // at most a whisper of indigo (花青) in the far leaves
     if (rng.chance(0.4)) for (const u of fol) for (const st of u) { st.color = PIGMENTS.indigo; st.tone *= 0.75; }
-    schedule(fol, 0.615, 0.84);
+    fol.forEach((u) => add(u, 25));
   }
 
   // 苔点 moss dots and a blade or two of grass at the foot.
@@ -474,20 +457,53 @@ export function bamboo(spec: PlantSpec): Drawing {
     const d = dirOf(a);
     moss.push(brush([{ x, y: 0, w: minW(H * 0.006, 1) }, { x: x + d.x * l * 0.5, y: d.y * l * 0.5, w: minW(H * 0.005, 0.9) }, { x: x + d.x * l, y: d.y * l, w: 0 }], 0.75));
   }
-  units.push({ strokes: moss.slice(0, 2), birth: 0.07, step: 0.001 });
-  units.push({ strokes: moss.slice(2), birth: 0.93, step: 0.01 });
+  // moss and grass: in pairs, as fillers
+  for (let i = 0; i < moss.length; i += 2) fillers.push(moss.slice(i, i + 2));
 
-  // Flatten, give each stroke its birth, sort.
-  const strokes: Stroke[] = [];
-  for (const u of units) {
-    const step = u.step ?? 0.0006;
-    u.strokes.forEach((s, i) => {
-      s.birth = clamp(u.birth + i * step, 0, 1);
-      strokes.push(s);
-    });
+  return normalise(choreograph(first, seq, fillers), H);
+}
+
+interface Group {
+  strokes: Stroke[];
+  /** the earliest check-in at which the group may appear */
+  minN: number;
+}
+
+/** Check-ins whose growth must each add something visible (growthFor(21) ≈ 0.65). */
+const STORY_CHECKINS = 21;
+
+/**
+ * Assign births so that the plant changes visibly at every check-in 1…21 (growth from
+ * `growthFor`), then spread whatever is left over the long tail up to full growth.
+ * Each check-in n takes the next story group that may appear (minN ≤ n), else a filler, else
+ * pulls the next story group early. A group's strokes land just below growthFor(n).
+ */
+function choreograph(first: Stroke[], seq: Group[], fillers: Stroke[][]): Stroke[] {
+  const out: Stroke[] = [];
+  const put = (strokes: Stroke[], b0: number, step: number) =>
+    strokes.forEach((st, i) => { st.birth = clamp(b0 + i * step, 0, 1); out.push(st); });
+  put(first, 0, Math.min(0.004, 0.05 / Math.max(1, first.length)));
+  const q = [...seq];
+  const f = [...fillers];
+  for (let n = 1; n <= STORY_CHECKINS; n++) {
+    const i = q.findIndex((g) => g.minN <= n);
+    const st = i >= 0 ? q.splice(i, 1)[0].strokes : f.length ? f.shift()! : q.shift()?.strokes;
+    if (!st) break;
+    const step = Math.min(0.0003, 0.006 / st.length);
+    put(st, growthFor(n) - 0.002 - step * (st.length - 1), step);
   }
-  strokes.sort((a, b) => a.birth - b.birth);
-  return normalise(strokes, H);
+  // The long tail: the remaining story (the last flowers) interleaved with fillers.
+  const rest: Stroke[][] = [];
+  while (q.length || f.length) {
+    if (q.length) rest.push(q.shift()!.strokes);
+    if (f.length) rest.push(f.shift()!);
+  }
+  const g0 = growthFor(STORY_CHECKINS) + 0.02;
+  rest.forEach((st, k) => {
+    const b = lerp(g0, 0.95, rest.length > 1 ? k / (rest.length - 1) : 0);
+    put(st, b, Math.min(0.0005, 0.01 / st.length));
+  });
+  return out.sort((a, b) => a.birth - b.birth);
 }
 
 /** Fit to the target height with a small margin; the anchor is the foot of the clump. */

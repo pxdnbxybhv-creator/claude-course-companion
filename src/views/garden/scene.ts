@@ -28,7 +28,7 @@ export interface GardenPlant {
 /** Plants are generated at one reference height (a stable memo key) and scaled to the canvas. */
 const REF_H = 300;
 /** Full-grown height as a fraction of the scene height, per kind (bamboo and pine stand tallest). */
-const KIND_H: Record<PlantKind, number> = { bamboo: 0.59, pine: 0.57, plum: 0.55, lotus: 0.47, chrysanthemum: 0.45, orchid: 0.4 };
+const KIND_H: Record<PlantKind, number> = { pine: 0.64, bamboo: 0.6, plum: 0.56, lotus: 0.34, chrysanthemum: 0.3, orchid: 0.26 };
 /** Sway amplitude in degrees: bamboo and orchid leaves move, the old pine barely does. */
 const KIND_SWAY: Record<PlantKind, number> = { bamboo: 1.35, orchid: 1.15, lotus: 1.0, chrysanthemum: 0.9, plum: 0.65, pine: 0.45 };
 const BURST: Record<PlantKind, string | undefined> = {
@@ -104,158 +104,391 @@ function extentOf(d: Drawing, g: number): Extent {
   return e;
 }
 
+type Plane = 'back' | 'mid' | 'front' | 'water';
+
+/** Three depth planes on land (远淡: further back is smaller and paler) and the water for lotus. */
+const PLANES: Record<Exclude<Plane, 'water'>, { dy: number; k: number; alpha: number }> = {
+  back: { dy: -0.06, k: 0.82, alpha: 0.8 },
+  mid: { dy: -0.02, k: 0.92, alpha: 0.93 },
+  front: { dy: 0.012, k: 1, alpha: 1 },
+};
+const TALL: ReadonlySet<PlantKind> = new Set<PlantKind>(['pine', 'plum', 'bamboo']);
+
 interface Placed {
   key: string;
   plant?: GardenPlant;
   drawing: Drawing;
   /** css px per drawing unit */
   s: number;
-  /** world css x / y of the anchor (where it meets the ground) */
+  /** world css x / y of the anchor (where it meets the ground or water) */
   x: number;
   y: number;
   seed: number;
-  /** world css x of the name inscription's centre line */
+  kind: 'plant' | 'rock' | 'mound';
+  plane: Plane;
+  /** blit opacity (depth recession) */
+  alpha: number;
+  /** name inscription: world centre x, and bottom (vertical) or top (horizontal) y */
   labelX?: number;
+  labelY?: number;
+  /** draw order among items with the same y */
+  order: number;
 }
 
-interface Layout { items: Placed[]; worldW: number }
+interface Layout {
+  items: Placed[];
+  worldW: number;
+  /** World x of the empty-sky lead (for the first view of a hand scroll). */
+  openSide: 'left' | 'right';
+  /** World x of pauses between clusters (where a view edge may fall). */
+  gaps: number[];
+}
 
 const rockMemo = new Map<number, Drawing>();
+const moundMemo = new Map<number, Drawing>();
 
-/** Minimum distance between two plant anchors: room for the name inscription. */
-const MIN_GAP = 62;
-
-/**
- * Place plants along the ground with a rhythm (clusters and pauses, never a grid), a few rocks,
- * slightly different depths. `side` is where the mountains lean (the other side is open sky).
- */
-function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: number, pondTop: number, fit: boolean, side: -1 | 1 = -1): Layout {
-  const margin = Math.max(24, W * 0.055);
-  const yBack = groundY - H * 0.03;
-  const yFront = Math.min(groundY + H * 0.014, pondTop - 3);
-  const portrait = W < H * 0.95 ? 0.9 : 1;
-  const items: Placed[] = [];
-  const L: number[] = [], R: number[] = [], gaps: number[] = [0];
-  plants.forEach((p, i) => {
-    const r = makeRng(p.habit.seed ^ 0x5bd1e995);
-    const frac = clamp(KIND_H[p.habit.plant] + r.range(-0.025, 0.025), 0.36, 0.6) * portrait;
-    const d = plantDrawing({ kind: p.habit.plant, seed: p.habit.seed, height: REF_H });
-    const e = extentOf(d, 1);
-    // Wide plants (an orchid's leaves can span 2× its height) are held to a width, so no one plant dominates.
-    const maxW = Math.min(H * 0.62, W * (portrait < 1 ? 0.7 : 0.4));
-    const s = Math.min((frac * H) / REF_H, maxW / Math.max(1, e.maxX - e.minX));
-    L.push(Math.max(10, (d.anchor.x - e.minX) * s));
-    R.push(Math.max(10, (e.maxX - d.anchor.x) * s));
-    if (i > 0) {
-      // Some plants lean into their neighbour, some stand apart.
-      const k = r.chance(0.32) ? r.range(0.4, 0.52) : r.range(0.6, 0.8);
-      gaps.push(Math.max(MIN_GAP, (R[i - 1] + L[i]) * k));
-    }
-    const depth = r();
-    items.push({ key: p.habit.id, plant: p, drawing: d, s, x: 0, y: lerp(yBack, yFront, depth), seed: p.habit.seed });
-  });
-  const n = items.length;
-  if (n) {
-    // When the painting has room, let the gaps breathe (each by what it can take) up to the width.
-    const spanOf = () => gaps.reduce((a, g) => a + g, 0) + L[0] + R[n - 1];
-    const target = W - margin * 2;
-    if (n >= 2 && spanOf() < target) {
-      const room = gaps.map((g, i) => (i === 0 ? 0 : Math.max(0, (R[i - 1] + L[i]) * 1.05 + 24 - g)));
-      const total = room.reduce((a, b) => a + b, 0);
-      const extra = Math.min(target - spanOf(), total);
-      if (total > 0) gaps.forEach((_, i) => (gaps[i] += (extra * room[i]) / total));
-    }
-    let x = margin + L[0];
-    items.forEach((it, i) => { x += gaps[i]; it.x = x; });
+/** A low slope of pale ink with a few moss dots (苔点), so raised plants stand on ground, not mist. */
+function moundDrawing(seed: number): Drawing {
+  let d = moundMemo.get(seed);
+  if (d) return d;
+  const r = makeRng(seed ^ 0x6d2b79f5);
+  const pts: { x: number; y: number; w: number }[] = [];
+  const N = 14;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const hump = Math.pow(Math.sin(Math.PI * t), 0.7) * (13 + r.range(-2, 3)) * (1 + 0.18 * Math.sin(t * 9 + seed));
+    pts.push({ x: t * 100, y: 24 - hump, w: 7 });
   }
-
-  // Rocks for composition: one beside every third plant (on the left, away from the inscription).
-  const rocks: Placed[] = [];
-  const addRock = (cx: number, size: number, seed: number, y: number) => {
-    let d = rockMemo.get(seed);
-    if (!d) rockMemo.set(seed, (d = rockDrawing(seed, 100)));
-    const s = size / d.width;
-    rocks.push({ key: `rock:${seed}`, drawing: d, s, x: cx, y, seed });
-  };
-  if (n === 0) {
-    addRock(W * (0.5 + 0.2 * side), H * 0.16, 11, yFront);
-  } else {
-    items.forEach((it, i) => {
-      if (i % 3 !== (n <= 2 ? 0 : 1)) return;
-      const r = makeRng(it.seed ^ 0x2545f491);
-      const size = H * r.range(0.1, 0.14) * portrait;
-      const cx = Math.max(size * 0.35, it.x - L[i] * 0.35 - size * 0.3);
-      addRock(cx, size, (it.seed % 1000) + 3, Math.min(yFront + 2, it.y + H * 0.012));
-    });
+  pts.push({ x: 96, y: 27, w: 7 }, { x: 50, y: 28.5, w: 7 }, { x: 4, y: 27, w: 7 });
+  const strokes: Drawing['strokes'] = [
+    { kind: 'wash', tone: 0.1, birth: 0, seed: r.int(0, 1e9), pts },
+    { kind: 'wash', tone: 0.07, birth: 0, seed: r.int(0, 1e9), pts: pts.slice(3, N - 2).map((p) => ({ ...p, y: p.y + 4 })).concat([{ x: 70, y: 27, w: 6 }, { x: 30, y: 27, w: 6 }]) },
+  ];
+  const dots = r.int(3, 6);
+  for (let i = 0; i < dots; i++) {
+    const t = r.range(0.12, 0.88);
+    const hump = Math.pow(Math.sin(Math.PI * t), 0.7) * 13;
+    strokes.push({ kind: 'dot', tone: r.range(0.6, 0.85), birth: 0, seed: r.int(0, 1e9), pts: [{ x: t * 100, y: 24 - hump + r.range(-1, 2), w: r.range(2.2, 4.2) }] });
   }
-
-  const last = n ? items[n - 1].x + R[n - 1] : 0;
-  let worldW = Math.max(W, last + margin);
-  const all = [...items, ...rocks];
-  if (n && last + margin <= W + 0.5) {
-    // Fits: centre the group; a lone plant stands toward the mountains, leaving open sky (留白).
-    const x0 = items[0].x - L[0];
-    const want = n === 1 ? W * (0.5 + 0.13 * side) - items[0].x : (W - (last - x0)) / 2 - x0;
-    for (const it of all) it.x += want;
-    worldW = W;
-  } else if (fit && worldW > W) {
-    const f = W / worldW;
-    for (const it of all) { it.x *= f; it.s *= f; }
-    worldW = W;
-  }
-  all.sort((a, b) => a.y - b.y);
-  return { items: all, worldW };
+  d = { width: 100, height: 32, anchor: { x: 50, y: 25 }, strokes };
+  moundMemo.set(seed, d);
+  return d;
 }
 
-const reachCache = new WeakMap<Drawing, Map<string, { left: number; right: number }>>();
-
-/** How far the plant reaches left/right of its stem below `bandTop` (drawing units). */
-function baseReach(d: Drawing, g: number, bandTop: number): { left: number; right: number } {
-  const n = bornCount(d, g);
-  const key = `${n}:${Math.round(bandTop)}`;
-  let m = reachCache.get(d);
-  if (!m) reachCache.set(d, (m = new Map()));
-  const hit = m.get(key);
-  if (hit) return hit;
-  let left = 0, right = 0;
-  for (let i = 0; i < n; i++) {
-    const st = d.strokes[i];
-    const r = st.kind === 'wash' || st.kind === 'fill' ? 0 : 0.5;
-    for (const p of st.pts) {
-      if (p.y < bandTop) continue;
-      left = Math.max(left, d.anchor.x - (p.x - p.w * r));
-      right = Math.max(right, p.x + p.w * r - d.anchor.x);
-    }
+/** 3 + 2 + 1 …: odd groups with pauses between them, never an even row. */
+function clusterSizes(n: number): number[] {
+  const pat = [3, 2, 1];
+  const out: number[] = [];
+  let left = n, i = 0;
+  while (left > 0) {
+    const k = Math.min(pat[i % 3], left);
+    out.push(k);
+    left -= k;
+    i++;
   }
-  const out = { left, right };
-  m.set(key, out);
+  if (out.length >= 2 && out[out.length - 1] === 1 && out[out.length - 2] === 1) { out.pop(); out[out.length - 1] = 2; }
   return out;
 }
 
-/** Height (css px) of a plant's vertical name inscription. */
-function labelHeight(name: string, size: number): number {
-  const n = [...name.trim()].length;
-  return isCJK(name) ? Math.min(n, 9) * size * 1.18 : Math.min(n, 18) * size * 0.5;
+export type Framing = 'scene' | 'poster' | 'fit';
+
+/**
+ * Compose the garden. Tall plants (pine, plum, bamboo) stand on the back and middle planes, short
+ * ones (orchid, chrysanthemum) in front, lotus in the water. Plants gather in odd clusters with
+ * pauses between, and at least 30 % of the width is left as open sky on the side away from the
+ * mountains (`side`). When the garden is wider than the view it becomes a hand scroll.
+ */
+function layoutGarden(plants: GardenPlant[], W: number, H: number, groundY: number, pondTop: number, framing: Framing, side: -1 | 1 = -1): Layout {
+  const margin = Math.max(18, W * 0.045);
+  const openSide: 'left' | 'right' = side === 1 ? 'left' : 'right';
+  const poster = framing === 'poster';
+  const heightK = poster ? 0.7 : W < H * 0.95 ? 0.94 : 1;
+  const items: Placed[] = [];
+  let order = 0;
+
+  const land = plants.filter((p) => p.habit.plant !== 'lotus');
+  const water = plants.filter((p) => p.habit.plant === 'lotus');
+
+  // --- land plants: sizes, planes
+  type P = { p: GardenPlant; d: Drawing; s: number; L: number; R: number; plane: Exclude<Plane, 'water'>; r: ReturnType<typeof makeRng> };
+  const sizes = clusterSizes(land.length);
+  const ps: P[] = [];
+  let ci = 0, inCluster = 0, tallInCluster = 0;
+  for (const p of land) {
+    if (inCluster >= sizes[ci]) { ci++; inCluster = 0; tallInCluster = 0; }
+    const r = makeRng(p.habit.seed ^ 0x5bd1e995);
+    const kind = p.habit.plant;
+    const plane: P['plane'] = poster
+      ? (TALL.has(kind) ? 'back' : 'front')
+      : TALL.has(kind) ? (tallInCluster++ % 2 === 0 ? (r.chance(0.7) ? 'back' : 'mid') : 'mid') : 'front';
+    const d = plantDrawing({ kind, seed: p.habit.seed, height: REF_H });
+    const e = extentOf(d, 1);
+    const frac = (KIND_H[kind] + r.range(-0.02, 0.02)) * heightK * PLANES[plane].k;
+    const maxW = Math.min(H * 0.62, W * (W < H ? 0.66 : 0.36));
+    const s = Math.min((frac * H) / REF_H, maxW / Math.max(1, e.maxX - e.minX));
+    ps.push({ p, d, s, L: Math.max(8, (d.anchor.x - e.minX) * s), R: Math.max(8, (e.maxX - d.anchor.x) * s), plane, r });
+    inCluster++;
+  }
+
+  // --- x positions: tight within a cluster (planes may overlap), a pause between clusters
+  const xs: number[] = [];
+  const pauses: number[] = [];
+  const pauseW = clamp(W * 0.06, 26, 90);
+  let x = 0;
+  ci = 0; inCluster = 0;
+  ps.forEach((q, i) => {
+    if (i > 0) {
+      const prev = ps[i - 1];
+      if (inCluster >= sizes[ci]) {
+        ci++; inCluster = 0;
+        const g = (prev.R + q.L) * (poster ? 0.3 : 0.72) + (poster ? 0 : pauseW * q.r.range(0.8, 1.3));
+        pauses.push(x + g / 2);
+        x += g;
+      } else if (prev.plane === q.plane) x += Math.max(H * (poster ? 0.05 : 0.1), (prev.R + q.L) * (poster ? 0.3 : q.r.range(0.45, 0.6)));
+      else x += Math.max(H * 0.05, (prev.R + q.L) * (poster ? 0.25 : q.r.range(0.25, 0.4)));
+    }
+    xs.push(x);
+    inCluster++;
+  });
+  const n = ps.length;
+  let span = n ? xs[n - 1] + ps[n - 1].R + ps[0].L : 0;
+  let x0 = n ? -ps[0].L : 0; // world x of the group's left edge relative to xs
+
+  // --- lotus: in the water, beyond the group's open-sky end
+  const lot: { p: GardenPlant; d: Drawing; s: number; L: number; R: number; y: number }[] = water.map((p) => {
+    const r = makeRng(p.habit.seed ^ 0x5bd1e995);
+    const d = plantDrawing({ kind: 'lotus', seed: p.habit.seed, height: REF_H });
+    const e = extentOf(d, 1);
+    const sc = Math.min(((KIND_H.lotus + r.range(-0.02, 0.02)) * heightK * H) / REF_H, Math.min(H * 0.55, W * 0.5) / Math.max(1, e.maxX - e.minX));
+    const depth = poster ? 0.3 : r.range(0.22, 0.35);
+    return { p, d, s: sc, L: (d.anchor.x - e.minX) * sc, R: (e.maxX - d.anchor.x) * sc, y: pondTop + (H - pondTop) * depth };
+  });
+  const lotusSpan = lot.reduce((a, l) => a + (l.L + l.R) * 0.7, 0);
+
+  // --- fit the view: prefer 30 % open sky; else shrink a little; else a hand scroll
+  const lead = poster ? 0 : W * 0.3;
+  const allowed = W - margin * 2 - lead;
+  let f = 1;
+  let pannable = false;
+  if (poster || framing === 'fit') {
+    const room = W - margin * 2;
+    const need = span + lotusSpan * 0.6;
+    if (need > room) f = room / need;
+  } else if (span + lotusSpan * 0.4 > allowed) {
+    if ((span + lotusSpan * 0.4) * 0.86 <= allowed) f = allowed / (span + lotusSpan * 0.4);
+    else pannable = true;
+  } else if (pauses.length) {
+    // A little breathing room, never spread edge to edge.
+    const extra = Math.min(allowed - span - lotusSpan * 0.4, span * 0.15) / pauses.length;
+    let add = 0, pi = 0;
+    for (let i = 1; i < n; i++) {
+      if (pi < pauses.length && xs[i] > pauses[pi]) { add += extra; pauses[pi] += add - extra / 2; pi++; }
+      xs[i] += add;
+    }
+    span += extra * pauses.length;
+  }
+  if (f !== 1) {
+    for (let i = 0; i < n; i++) { xs[i] *= f; ps[i].s *= f; ps[i].L *= f; ps[i].R *= f; }
+    for (let i = 0; i < pauses.length; i++) pauses[i] *= f;
+    for (const l of lot) { l.s *= f; l.L *= f; l.R *= f; }
+    span *= f;
+    x0 *= f;
+  }
+
+  // Where the group starts in world x.
+  let worldW = W;
+  let startX: number;
+  if (pannable) {
+    // The open sky becomes the scroll's lead; the group follows it.
+    worldW = margin + span + margin + lead + lotusSpan * 0.4;
+    startX = openSide === 'left' ? lead + margin : margin;
+  } else if (poster || framing === 'fit') {
+    startX = (W - span) / 2;
+  } else {
+    // Lean toward the mountains, leaving the open side empty.
+    const slack = allowed - span - lotusSpan * 0.4;
+    startX = openSide === 'left' ? margin + lead + lotusSpan * 0.4 + slack * 0.65 : margin + slack * 0.35;
+  }
+  const off = startX - x0;
+  const baseY = (pl: Exclude<Plane, 'water'>) => Math.min(groundY + H * PLANES[pl].dy * (poster ? 0.85 : 1), pondTop - 3);
+  ps.forEach((q, i) => {
+    const y = baseY(q.plane);
+    const alpha = PLANES[q.plane].alpha;
+    if (q.plane !== 'front') {
+      // ground under a raised plant
+      const bw = clamp((q.L + q.R) * 0.55, H * 0.08, H * 0.3);
+      const md = moundDrawing(q.p.habit.seed);
+      items.push({ key: `mound:${q.p.habit.id}`, drawing: md, s: bw / md.width, x: xs[i] + off, y: y + 1, seed: q.p.habit.seed, kind: 'mound', plane: q.plane, alpha, order: order++ });
+    }
+    items.push({ key: q.p.habit.id, plant: q.p, drawing: q.d, s: q.s, x: xs[i] + off, y, seed: q.p.habit.seed, kind: 'plant', plane: q.plane, alpha, order: order++ });
+  });
+  const gaps = pauses.map((g) => g + off);
+
+  // Lotus beyond the open-sky end of the group, in the water.
+  const groupL = startX, groupR = startX + span;
+  let lx = openSide === 'left' ? groupL - margin * 0.3 : groupR + margin * 0.3;
+  for (const l of lot) {
+    const cx = openSide === 'left' ? lx - l.R * 0.75 : lx + l.L * 0.75;
+    items.push({ key: l.p.habit.id, plant: l.p, drawing: l.d, s: l.s, x: clamp(cx, l.L * 0.4, worldW - l.R * 0.4), y: l.y, seed: l.p.habit.seed, kind: 'plant', plane: 'water', alpha: 1, order: order++ });
+    lx = openSide === 'left' ? cx - l.L * 0.5 : cx + l.R * 0.5;
+  }
+
+  // Rocks: one at the foot of each cluster of two or more, on its mountain side; one in an empty garden.
+  const addRock = (cx: number, size: number, seed: number, y: number) => {
+    let d = rockMemo.get(seed);
+    if (!d) rockMemo.set(seed, (d = rockDrawing(seed, 100)));
+    items.push({ key: `rock:${seed}`, drawing: d, s: size / d.width, x: cx, y, seed, kind: 'rock', plane: 'front', alpha: 1, order: order++ });
+  };
+  const yFront = baseY('front');
+  if (plants.length === 0) addRock(W * (0.5 + 0.2 * side), H * 0.16, 11, yFront);
+  else if (!poster) {
+    let k = 0;
+    sizes.forEach((sz) => {
+      if (sz >= 2) {
+        const q = ps[k];
+        const size = H * q.r.range(0.07, 0.11);
+        const cx = xs[k] + off + (openSide === 'left' ? q.R * 0.5 + size * 0.2 : -q.L * 0.5 - size * 0.2);
+        addRock(clamp(cx, size * 0.4, worldW - size * 0.4), size, (q.p.habit.seed % 1000) + 3, yFront + 2);
+      }
+      k += sz;
+    });
+  }
+
+  items.sort((a, b) => (a.plane === 'water' ? 1 : 0) - (b.plane === 'water' ? 1 : 0) || a.y - b.y || a.order - b.order);
+  return { items, worldW, openSide, gaps };
 }
 
-/** Stand each name in the clearest gap beside its plant: right of the stem if free, else left. */
-function placeLabels(items: Placed[], growthOf: (key: string) => number, size: number): void {
-  const plants = items.filter((i) => i.plant).sort((a, b) => a.x - b.x);
-  const reach = plants.map((it) => {
-    const band = (labelHeight(it.plant!.habit.name, size) + 10) / it.s;
-    const r = baseReach(it.drawing, growthOf(it.key), it.drawing.anchor.y - band);
-    return { left: r.left * it.s, right: r.right * it.s };
-  });
-  const half = size * 0.6;
-  let prevEdge = -Infinity;
-  plants.forEach((it, i) => {
-    const rx = it.x + Math.max(11, reach[i].right + 7);
-    const nextEdge = i + 1 < plants.length ? plants[i + 1].x - reach[i + 1].left : Infinity;
-    const lx = it.x - Math.max(11, reach[i].left + 7);
-    if (rx + half < nextEdge - 2 || lx - half <= prevEdge + 2) it.labelX = rx;
-    else it.labelX = lx;
-    prevEdge = Math.max(it.x + reach[i].right, it.labelX + half);
-  });
+// ---------------------------------------------------------------------------------------------- labels
+
+/** A coarse map of where ink lies (css px cells), for placing name inscriptions in clear paper. */
+interface InkGrid { g: Float32Array; cols: number; rows: number; cell: number }
+
+function inkGrid(items: Placed[], growthOf: (key: string) => number, worldW: number, H: number): InkGrid {
+  const cell = 6;
+  const cols = Math.ceil(worldW / cell) + 1, rows = Math.ceil(H / cell) + 1;
+  const g = new Float32Array(cols * rows);
+  const add = (X: number, Y: number, v: number) => {
+    const c = Math.floor(X / cell), r = Math.floor(Y / cell);
+    if (c >= 0 && c < cols && r >= 0 && r < rows) g[r * cols + c] += v;
+  };
+  for (const it of items) {
+    if (it.kind === 'mound') continue;
+    const d = it.drawing;
+    const n = bornCount(d, it.plant ? growthOf(it.key) : 1);
+    const tx = (px: number) => it.x + (px - d.anchor.x) * it.s, ty = (py: number) => it.y + (py - d.anchor.y) * it.s;
+    for (let i = 0; i < n; i++) {
+      const st = d.strokes[i];
+      if (st.kind === 'wash' || st.kind === 'fill') {
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (const p of st.pts) { x0 = Math.min(x0, tx(p.x)); x1 = Math.max(x1, tx(p.x)); y0 = Math.min(y0, ty(p.y)); y1 = Math.max(y1, ty(p.y)); }
+        for (let Y = y0; Y <= y1; Y += cell) for (let X = x0; X <= x1; X += cell) add(X, Y, st.tone * 0.8);
+        continue;
+      }
+      const pts = st.pts;
+      if (pts.length === 1) { add(tx(pts[0].x), ty(pts[0].y), st.tone * 2); continue; }
+      for (let j = 1; j < pts.length; j++) {
+        const ax = tx(pts[j - 1].x), ay = ty(pts[j - 1].y), bx = tx(pts[j].x), by = ty(pts[j].y);
+        const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / (cell * 0.7)));
+        const wv = st.tone * Math.max(1, pts[j].w * it.s * 0.4);
+        for (let k = 0; k <= steps; k++) add(ax + ((bx - ax) * k) / steps, ay + ((by - ay) * k) / steps, wv);
+      }
+    }
+  }
+  return { g, cols, rows, cell };
+}
+
+function inkIn(grid: InkGrid, x0: number, y0: number, x1: number, y1: number): number {
+  const { g, cols, rows, cell } = grid;
+  let sum = 0;
+  const c0 = Math.max(0, Math.floor(x0 / cell)), c1 = Math.min(cols - 1, Math.floor(x1 / cell));
+  const r0 = Math.max(0, Math.floor(y0 / cell)), r1 = Math.min(rows - 1, Math.floor(y1 / cell));
+  for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) sum += g[r * cols + c];
+  return sum;
+}
+
+const LATIN_MAX = 14;
+const LABEL_LATIN = "'Cormorant Garamond', 'EB Garamond', Georgia, serif";
+
+/** Break a Latin name into at most two short lines at word boundaries (never mid-word). */
+export function wrapLatin(name: string, max = LATIN_MAX): string[] {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let cur = '';
+  for (const w of words) {
+    const word = w.length > max ? w.slice(0, max - 1) + '…' : w;
+    if (!cur) cur = word;
+    else if ((cur + ' ' + word).length <= max) cur += ' ' + word;
+    else {
+      lines.push(cur);
+      cur = word;
+      if (lines.length === 2) break;
+    }
+  }
+  if (lines.length < 2 && cur) lines.push(cur);
+  if (lines.length === 2 && words.join(' ').length > lines.join(' ').length) {
+    let last = lines[1];
+    if (last.length > max - 1) last = last.slice(0, max - 1).replace(/\s+\S*$/, '') || last.slice(0, max - 1);
+    if (!last.endsWith('…')) last += '…';
+    lines[1] = last;
+  }
+  return lines.slice(0, 2);
+}
+
+interface LabelBox { mode: 'v' | 'h'; lines: string[]; w: number; h: number }
+
+let measureCtx: CanvasRenderingContext2D | null = null;
+function labelBox(name: string, size: number, latinFont: string): LabelBox {
+  const trimmed = name.trim();
+  if (isCJK(trimmed)) {
+    const chars = [...trimmed].slice(0, 9);
+    if ([...trimmed].length > 9) chars[8] = '…';
+    return { mode: 'v', lines: chars, w: size + 10, h: chars.length * size * 1.18 + 10 };
+  }
+  const lines = wrapLatin(trimmed);
+  if (!measureCtx) measureCtx = document.createElement('canvas').getContext('2d')!;
+  measureCtx.font = `italic ${size + 2}px ${latinFont}`;
+  const w = Math.max(...lines.map((l) => measureCtx!.measureText(l).width), 10) + 12;
+  return { mode: 'h', lines, w, h: lines.length * (size + 2) * 1.12 + 8 };
+}
+
+/**
+ * Stand each name where the paper is clearest beside its own plant: never over foliage if it can be
+ * helped, never nearer another plant's stem than its own, never on another name.
+ */
+function placeLabels(items: Placed[], growthOf: (key: string) => number, worldW: number, H: number, groundY: number, pondTop: number, size: number, latinFont: string): void {
+  const plants = items.filter((i) => i.kind === 'plant' && i.plant);
+  if (!plants.length) return;
+  const grid = inkGrid(items, growthOf, worldW, H);
+  const taken: { x0: number; y0: number; x1: number; y1: number }[] = [];
+  const stems = plants.map((p) => p.x);
+  const order = [...plants].sort((a, b) => a.x - b.x);
+  for (const it of order) {
+    const box = labelBox(it.plant!.habit.name, size, latinFont);
+    let best = Infinity, bx = it.x, by = it.y;
+    const tryAt = (cx: number, yEdge: number) => {
+      const x0 = cx - box.w / 2, x1 = cx + box.w / 2;
+      const y0 = box.mode === 'v' ? yEdge - box.h : yEdge, y1 = box.mode === 'v' ? yEdge : yEdge + box.h;
+      if (x0 < 2 || x1 > worldW - 2 || y1 > H - 2) return;
+      let cost = inkIn(grid, x0 + 3, y0 + 3, x1 - 3, y1 - 3) * 10;
+      cost += Math.abs(cx - it.x) * 0.08 + Math.abs(yEdge - it.y) * 0.05;
+      for (const sx of stems) if (sx !== it.x && Math.abs(cx - sx) < Math.abs(cx - it.x) - 2) cost += 400;
+      for (const t of taken) if (x0 < t.x1 + 4 && x1 > t.x0 - 4 && y0 < t.y1 + 4 && y1 > t.y0 - 4) cost += 1000;
+      if (cost < best) { best = cost; bx = cx; by = yEdge; }
+    };
+    if (box.mode === 'v') {
+      for (let k = 0; k < 9; k++) {
+        const dx = box.w / 2 + 4 + k * size * 0.8;
+        for (const lift of [0, box.h * 0.35]) { tryAt(it.x + dx, it.y - 4 - lift); tryAt(it.x - dx, it.y - 4 - lift); }
+      }
+    } else {
+      // A small caption on the bank or the water just below the plant's foot.
+      const tops = it.plane === 'water' ? [it.y + 4, it.y - box.h - 6] : [Math.max(it.y, groundY) + 2, pondTop + 4, it.y - box.h - 4];
+      for (const top of tops) for (const dx of [0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05]) tryAt(it.x + dx * box.w, top);
+    }
+    it.labelX = bx;
+    it.labelY = by;
+    taken.push(box.mode === 'v' ? { x0: bx - box.w / 2, y0: by - box.h, x1: bx + box.w / 2, y1: by } : { x0: bx - box.w / 2, y0: by, x1: bx + box.w / 2, y1: by + box.h });
+  }
 }
 
 function vigorFor(freshness: number): number {
@@ -640,7 +873,7 @@ export class GardenScene {
 
   private relayout(): void {
     if (!this.W) return;
-    const L = layoutGarden(this.plants, this.W, this.H, this.groundY, this.pondTop, false, this.backdrop?.side ?? -1);
+    const L = layoutGarden(this.plants, this.W, this.H, this.groundY, this.pondTop, 'scene', this.backdrop?.side ?? -1);
     this.items = L.items;
     this.worldW = L.worldW;
     this.pan = clamp(this.pan, 0, this.maxPan);
@@ -688,7 +921,7 @@ export class GardenScene {
       }
     }
     for (const k of [...this.slots.keys()]) if (!seen.has(k)) this.slots.delete(k);
-    placeLabels(this.items, (k) => this.slots.get(k)?.want.growth ?? 0, this.labelSize);
+    placeLabels(this.items, (k) => this.slots.get(k)?.want.growth ?? 0, this.worldW, this.H, this.groundY, this.pondTop, this.labelSize, LABEL_LATIN);
     this.queue = this.queue.filter((k) => this.slots.has(k));
     this.kick();
   }
@@ -982,28 +1215,19 @@ export class GardenScene {
     }
   }
 
-  private labelCache = new Map<string, { c: HTMLCanvasElement; w: number; h: number }>();
+  private labelCache = new Map<string, { c: HTMLCanvasElement; w: number; h: number; mode: 'v' | 'h' }>();
 
-  /** A habit name as a small vertical inscription, rasterised once (text with a soft paper halo). */
-  private labelBitmap(name: string, size: number): { c: HTMLCanvasElement; w: number; h: number } {
+  /** A habit name as a small inscription (vertical for Chinese, a short horizontal caption for Latin), rasterised once. */
+  private labelBitmap(name: string, size: number): { c: HTMLCanvasElement; w: number; h: number; mode: 'v' | 'h' } {
     const key = `${name}|${size}|${this.dpr}|${this.labelFont}`;
     const hit = this.labelCache.get(key);
     if (hit) return hit;
     if (this.labelCache.size > 64) this.labelCache.clear();
     const dpr = this.dpr;
-    const lh = size * 1.18;
-    const cjk = isCJK(name);
-    const chars = [...name].slice(0, 9);
-    if ([...name].length > 9) chars[8] = '…';
-    const latin = name.length > 18 ? name.slice(0, 17) + '…' : name;
-    const pad = 4;
-    const m = document.createElement('canvas').getContext('2d')!;
-    m.font = `italic ${size + 1}px ${this.labelFont}`;
-    const w = cjk ? size + pad * 2 : size + 3 + pad * 2;
-    const h = (cjk ? chars.length * lh : m.measureText(latin).width) + pad * 2;
+    const box = labelBox(name, size, LABEL_LATIN);
     const c = document.createElement('canvas');
-    c.width = Math.ceil(w * dpr);
-    c.height = Math.ceil(h * dpr);
+    c.width = Math.ceil(box.w * dpr);
+    c.height = Math.ceil(box.h * dpr);
     const ctx = c.getContext('2d')!;
     ctx.scale(dpr, dpr);
     ctx.fillStyle = 'rgb(52,46,38)';
@@ -1011,17 +1235,16 @@ export class GardenScene {
     ctx.shadowBlur = 3 * dpr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    if (cjk) {
+    if (box.mode === 'v') {
+      const lh = size * 1.18;
       ctx.font = `${size}px ${this.labelFont}`;
-      chars.forEach((ch, i) => ctx.fillText(ch, w / 2, pad + lh * (i + 0.5)));
+      box.lines.forEach((ch, i) => ctx.fillText(ch, box.w / 2, 5 + lh * (i + 0.5)));
     } else {
-      ctx.translate(w / 2, h - pad);
-      ctx.rotate(-Math.PI / 2);
-      ctx.textAlign = 'left';
-      ctx.font = `italic ${size + 1}px ${this.labelFont}`;
-      ctx.fillText(latin, 0, 0);
+      const lh = (size + 2) * 1.12;
+      ctx.font = `italic ${size + 2}px ${LABEL_LATIN}`;
+      box.lines.forEach((line, i) => ctx.fillText(line, box.w / 2, 4 + lh * (i + 0.5)));
     }
-    const out = { c, w, h };
+    const out = { c, w: box.w, h: box.h, mode: box.mode };
     this.labelCache.set(key, out);
     return out;
   }
@@ -1041,12 +1264,14 @@ export class GardenScene {
       const name = it.plant.habit.name.trim();
       if (!name) continue;
       const x = (it.labelX ?? it.x + 13) - this.pan;
-      if (x < -20 || x > this.W + 20) continue;
+      if (x < -40 || x > this.W + 40) continue;
       const hot = this.hover === it.key;
       const done = it.plant.stats.doneToday;
-      ctx.globalAlpha = slot.appear * (hot ? 0.9 : done ? 0.62 : 0.46);
+      ctx.globalAlpha = slot.appear * (hot ? 0.9 : done ? 0.66 : 0.5);
       const b = this.labelBitmap(name, size);
-      ctx.drawImage(b.c, x - b.w / 2, it.y - 1 - b.h, b.w, b.h);
+      const y = it.labelY ?? it.y - 1;
+      // Vertical labels hang upward from their anchor; horizontal captions sit below it.
+      ctx.drawImage(b.c, x - b.w / 2, b.mode === 'v' ? y - b.h : y, b.w, b.h);
     }
     ctx.restore();
   }
@@ -1173,7 +1398,7 @@ export class GardenScene {
 const yieldFrame = () => new Promise<void>((r) => setTimeout(r, 0));
 
 /** Paint a still image of the whole garden (backdrop, plants, rocks, pond) for export — no UI. */
-export async function renderGardenStill(o: { width: number; height: number; dpr: number; plants: GardenPlant[]; env: SceneEnv }): Promise<HTMLCanvasElement> {
+export async function renderGardenStill(o: { width: number; height: number; dpr: number; plants: GardenPlant[]; env: SceneEnv; framing?: Framing }): Promise<HTMLCanvasElement> {
   const { width: W, height: H, dpr } = o;
   const bd = paintBackdrop(W, backdropPaintHeight(W, H), dpr, o.env);
   const c = document.createElement('canvas');
@@ -1182,7 +1407,7 @@ export async function renderGardenStill(o: { width: number; height: number; dpr:
   const ctx = c.getContext('2d')!;
   ctx.drawImage(bd.canvas, 0, 0);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const { items } = layoutGarden(o.plants, W, H, bd.groundY, bd.pondTop, true, bd.side ?? -1);
+  const { items } = layoutGarden(o.plants, W, H, bd.groundY, bd.pondTop, o.framing ?? 'fit', bd.side ?? -1);
   for (const it of items) {
     const growth = it.plant ? it.plant.stats.growth : 1;
     const vigor = it.plant ? vigorFor(it.plant.stats.freshness) : 1;

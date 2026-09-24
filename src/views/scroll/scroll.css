@@ -9,15 +9,16 @@
 }
 .scroll-stage.is-square { height: auto; }
 .scroll-frame {
+  /* no card: the poster's wall is painted in the page's own paper colour, so the scroll hangs on the page */
   position: relative;
   height: 100%; max-width: 100%;
-  border-radius: 6px; overflow: hidden;
-  background: var(--paper-3);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 18px 40px -18px rgba(30, 20, 5, 0.45), 0 2px 6px -2px rgba(30, 20, 5, 0.2);
 }
 .scroll-stage.is-square .scroll-frame { height: auto; width: max(min(100%, 300px), min(100%, calc(100dvh - 300px))); }
 .scroll-img { display: block; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.4s var(--ease), filter 0.4s var(--ease); -webkit-touch-callout: default; user-select: auto; }
 .scroll-img.is-busy { opacity: 0.45; filter: blur(1.5px) saturate(0.8); }
+/* the year poster is a loose sheet of paper, so it alone casts a soft shadow */
+.scroll-img.is-sheet { box-shadow: 0 1px 2px rgba(40, 30, 10, 0.18), 0 14px 30px -18px rgba(40, 30, 10, 0.45); }
+.scroll-title-en { font-family: var(--font-latin), var(--font-text); font-weight: 500; font-size: 28px; letter-spacing: 0.01em; line-height: 1; margin: 0; }
 
 .scroll-busy {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
@@ -42,8 +43,9 @@
 .scroll-note { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.7; }
 .scroll-empty { padding: 10px 12px; border-radius: 10px; background: var(--cinnabar-soft); }
 .scroll-actions { display: flex; gap: 10px; }
-.scroll-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; }
-.scroll-actions .scroll-reroll { flex: 0 0 auto; padding: 0 16px; }
+.scroll-actions .btn { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.scroll-actions .scroll-reroll { padding: 0 16px; }
+.scroll-actions .scroll-save-btn { min-width: 160px; padding: 0 24px; }
 .scroll-reroll span { font-size: 17px; line-height: 1; }
 .scroll-hint { margin: 0; font-size: 12.5px; }
 .scroll-view .link { color: var(--cinnabar); text-decoration: underline; text-underline-offset: 3px; min-height: 44px; padding: 0 4px; }
@@ -51,11 +53,11 @@
 .scroll-save { display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .scroll-save-img {
   display: block; width: auto; height: auto; max-width: 100%; max-height: min(58dvh, 620px);
-  border-radius: 4px; box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.5);
   -webkit-touch-callout: default; user-select: auto;
 }
 .scroll-save-hint { margin: 0; font-size: 15px; letter-spacing: 0.08em; color: var(--ink); }
-.scroll-save .scroll-actions { width: 100%; }
+.scroll-save .scroll-actions { width: 100%; justify-content: center; }
+.scroll-save .scroll-actions .btn { min-width: 120px; }
 .scroll-save a.btn { text-decoration: none; }
 
 @media (min-width: 900px) {

@@ -22,6 +22,7 @@
 import type { Drawing, PlantSpec, Stroke, StrokePoint } from '../types';
 import { PIGMENTS } from '../types';
 import { makeRng, mixSeed } from '../../core/rng';
+import { growthFor } from '../../core/habits';
 
 type V = { x: number; y: number };
 const DEG = Math.PI / 180;
@@ -98,11 +99,16 @@ export function orchid(spec: PlantSpec): Drawing {
   const rng = makeRng(mixSeed(spec.seed >>> 0, 0x0c41d));
   const sd = () => rng.int(1, 0x7fffffff);
   const minW = (w: number, m: number) => Math.max(m, w);
-  const units: { strokes: Stroke[]; birth: number; step?: number }[] = [];
-  const add = (birth: number, strokes: Stroke[], step?: number) => units.push({ birth, strokes, step });
+  // Growth is choreographed per check-in (see `choreograph`): `first` is the day-one tuft,
+  // `seq` the story in order (each group waits for its check-in `minN`), `fillers` small
+  // touches that keep every check-in visible while the story waits.
+  const first: Stroke[] = [];
+  const seq: Group[] = [];
+  const fillers: Stroke[][] = [];
+  const add = (strokes: Stroke[], minN = 0) => seq.push({ strokes, minN });
 
   const s = rng.chance(0.5) ? 1 : -1; // the long first leaf sweeps to this side
-  const leafW = H * rng.range(0.021, 0.025);
+  const leafW = H * rng.range(0.024, 0.028);
   const allSpines: V[][] = [];
 
   function leafStroke(lp: LeafPlan): Stroke {
@@ -149,7 +155,7 @@ export function orchid(spec: PlantSpec): Drawing {
       const sy = Math.sin(th);
       pts.push({ x: cx + Math.cos(th) * rx * k, y: H * 0.002 + sy * ry * k * (sy > 0 ? 0.45 : 1), w: i === 0 ? H * 0.03 : 0 });
     }
-    add(0, [{ kind: 'wash', pts, tone: 0.1, birth: 0, seed: sd() }]);
+    first.push({ kind: 'wash', pts, tone: 0.1, birth: 0, seed: sd() });
   }
   {
     const n = rng.int(3, 4);
@@ -173,21 +179,21 @@ export function orchid(spec: PlantSpec): Drawing {
       }
       sh.push({ kind: 'brush', pts, tone: rng.range(0.82, 0.95), birth: 0, seed: sd() });
     }
-    add(0.004, sh, 0.005);
+    first.push(...sh);
   }
 
-  // ------------------------------------------------------------ young centre leaves (0.025 – 0.06)
+  // ------------------------------------------------------------ day one: a tuft of young leaves
   {
-    const lv: Stroke[] = [];
-    const n = 2;
+    const n = 3;
     for (let i = 0; i < n; i++) {
-      const side = (i ? -1 : 1) * s;
-      lv.push(leafStroke(plan({
-        base: { x: side * H * 0.004, y: 0 }, a0: side * rng.range(3, 12) * DEG, len: H * rng.range(0.22, 0.32) * (i ? 0.8 : 1),
-        a1: side * rng.range(22, 48) * DEG, p: 1.5, wid: leafW * 0.8, tone: rng.range(0.72, 0.82), belly: 0.3,
-      })));
+      const side = (i === 1 ? -1 : 1) * s;
+      const lf = leafStroke(lift(plan({
+        base: { x: side * H * 0.004, y: 0 }, a0: side * rng.range(4, 14) * DEG, len: H * rng.range(0.3, 0.4) * [1, 0.85, 0.62][i],
+        a1: side * rng.range(40, 80) * DEG, p: rng.range(1.3, 1.7), wid: leafW * 0.85, tone: rng.range(0.74, 0.84), belly: 0.28,
+      }), H * 0.08));
+      if (i < 2) first.push(lf);
+      else add([lf]);
     }
-    add(0.026, lv, 0.02);
   }
 
   // ------------------------------------------------------------ low bowing leaves (0.1 – 0.22)
@@ -205,7 +211,7 @@ export function orchid(spec: PlantSpec): Drawing {
       }), H * 0.02);
       lv.push(leafStroke(lp));
     }
-    add(0.1, lv, 0.055);
+    lv.forEach((l) => add([l]));
   }
 
   // ------------------------------------------------------------ the long leaves (0.24 – 0.42)
@@ -215,7 +221,7 @@ export function orchid(spec: PlantSpec): Drawing {
     a1: -s * rng.range(85, 125) * DEG, p: rng.range(1.5, 2), tone: rng.range(0.7, 0.8),
     twist: rng.chance(0.6) ? rng.range(0.45, 0.58) : 0,
   }), H * 0.06);
-  add(0.25, [leafStroke(counter)]);
+  add([leafStroke(counter)]);
 
   // 1 — the long arc: leans away first, then sweeps over to side s and droops
   const L1 = lift(plan({
@@ -250,9 +256,9 @@ export function orchid(spec: PlantSpec): Drawing {
     a1: s3 * rng.range(30, 70) * DEG, p: rng.range(2, 2.6), wid: leafW * 0.95, tone: rng.range(0.7, 0.8),
     twist: rng.chance(0.5) ? rng.range(0.5, 0.62) : 0,
   }), H * 0.2);
-  add(0.29, [leafStroke(L1)]);
-  add(0.335, [leafStroke(L2)]);
-  add(0.38, [leafStroke(L3)]);
+  add([leafStroke(L1)]);
+  add([leafStroke(L2)]);
+  add([leafStroke(L3)]);
 
   // ------------------------------------------------------------ later leaves (0.43 – 0.54)
   {
@@ -262,7 +268,7 @@ export function orchid(spec: PlantSpec): Drawing {
       base: { x: side * H * 0.008, y: 0 }, a0: side * rng.range(4, 18) * DEG, len: H * rng.range(0.7, 0.9),
       a1: side * rng.range(45, 95) * DEG, p: rng.range(1.7, 2.2), wid: leafW * 0.9, tone: rng.range(0.3, 0.4),
     }), H * 0.12);
-    add(0.44, [leafStroke(back)]);
+    const backLeaf = leafStroke(back);
     // a leaf whose tip turns over (折叶)
     if (rng.chance(0.75)) {
       const fs = rng.chance(0.6) ? -s : s;
@@ -274,7 +280,24 @@ export function orchid(spec: PlantSpec): Drawing {
       }), H * 0.1);
       fl.twist = fl.fold!.t + 0.02;
       fl.belly = rng.range(0.22, 0.3);
-      add(0.5, [leafStroke(fl)]);
+      add([leafStroke(fl)]);
+    }
+    add([backLeaf]);
+    // fillers: one or two more pale leaves behind, and a little offshoot tuft (子兰) nearby
+    for (let i = 0, nb = rng.int(1, 2); i < nb; i++) {
+      const sd2 = rng.chance(0.5) ? 1 : -1;
+      fillers.push([leafStroke(lift(plan({
+        base: { x: sd2 * H * 0.006, y: 0 }, a0: sd2 * rng.range(10, 30) * DEG, len: H * rng.range(0.5, 0.75),
+        a1: sd2 * rng.range(70, 120) * DEG, p: rng.range(1.4, 1.9), wid: leafW * 0.85, tone: rng.range(0.3, 0.4),
+      }), H * 0.06))]);
+    }
+    const ox = -s * H * rng.range(0.2, 0.26);
+    for (let i = 0; i < 2; i++) {
+      const sd2 = (i ? 1 : -1) * -s;
+      fillers.push([leafStroke(lift(plan({
+        base: { x: ox + sd2 * H * 0.003, y: 0 }, a0: sd2 * rng.range(6, 18) * DEG, len: H * rng.range(0.2, 0.28) * (i ? 0.75 : 1),
+        a1: sd2 * rng.range(50, 95) * DEG, p: 1.4, wid: leafW * 0.7, tone: rng.range(0.66, 0.78), belly: 0.28,
+      }), H * 0.05))]);
     }
   }
 
@@ -391,8 +414,6 @@ export function orchid(spec: PlantSpec): Drawing {
   }
 
   const spring = rng.chance(0.6); // 春兰: one flower per stem · 蕙兰: several on one stem
-  const flowerUnits: Stroke[][] = [];
-  const stemUnits: Stroke[][] = [];
   const heads: V[] = [];
   // Flowers must sit in open paper, not on the dark leaves: try many stems, keep the one whose
   // flowering part has the most clearance from every leaf.
@@ -424,35 +445,39 @@ export function orchid(spec: PlantSpec): Drawing {
   };
 
   if (spring) {
+    // a pale bud on a short stem first (check-in ~7), then the flowers: each stalk rises two
+    // check-ins before it opens; the last flower waits for a long streak
+    {
+      const c = pickStem([0.2, 0.32], 45);
+      const st = stem(c.base, c.a0, c.len, c.bend);
+      heads.push(st.tip);
+      add([{ kind: 'brush', pts: st.pts, tone: stemTone + 0.06, color: petalColor, birth: 0, seed: sd() },
+        ...bud(st.tip, st.a + rng.range(-10, 10) * DEG, 0.75)], 7);
+    }
     const n = rng.int(2, 3);
+    const opens = [11, 16, 26];
     for (let i = 0; i < n; i++) {
       const c = pickStem([0.3, 0.58], 44);
       const st = stem(c.base, c.a0, c.len, c.bend);
       heads.push(st.tip);
-      stemUnits.push([{ kind: 'brush', pts: st.pts, tone: stemTone, color: petalColor, birth: 0, seed: sd() }, bract(st.pts, rng.range(0.2, 0.4), rng.chance(0.5) ? 1 : -1)]);
+      add([{ kind: 'brush', pts: st.pts, tone: stemTone, color: petalColor, birth: 0, seed: sd() }, bract(st.pts, rng.range(0.2, 0.4), rng.chance(0.5) ? 1 : -1)], opens[i] - 2);
       const phi = st.a + rng.range(-20, 20) * DEG;
-      flowerUnits.push(blossom(st.tip, phi, rng.range(0.92, 1.08)));
-    }
-    // sometimes a closed bud on a short stem
-    if (rng.chance(0.5)) {
-      const c = pickStem([0.2, 0.32], 45);
-      const st = stem(c.base, c.a0, c.len, c.bend);
-      heads.push(st.tip);
-      stemUnits.push([{ kind: 'brush', pts: st.pts, tone: stemTone + 0.06, color: petalColor, birth: 0, seed: sd() }]);
-      flowerUnits.push(bud(st.tip, st.a + rng.range(-10, 10) * DEG, 0.75));
+      add(blossom(st.tip, phi, rng.range(0.92, 1.08)), opens[i]);
     }
   } else {
     // 蕙: one tall stem, flowers alternating along its upper half, the top one a bud
     const c = pickStem([0.55, 0.72], 26, [0.45, 0.6, 0.75, 0.9]);
     const st = stem(c.base, c.a0, c.len, c.bend);
     heads.push(st.tip);
-    stemUnits.push([
+    // the stalk with its pale top bud comes first (check-in ~7); flowers open bottom-up
+    add([
       { kind: 'brush', pts: st.pts, tone: stemTone, color: petalColor, birth: 0, seed: sd() },
       bract(st.pts, 0.22, 1), bract(st.pts, 0.42, -1),
-    ]);
+      ...bud(st.tip, st.a + rng.range(-8, 8) * DEG, 0.85),
+    ], 7);
     const nf = rng.int(3, 4);
+    const opens = [11, 14, 18, 25];
     let side = rng.chance(0.5) ? 1 : -1;
-    const topBud = bud(st.tip, st.a + rng.range(-8, 8) * DEG, 0.85);
     for (let i = 0; i < nf; i++) {
       const t = lerp(0.4, 0.8, i / (nf - 1)) + rng.range(-0.03, 0.03);
       const k = Math.round(t * (st.pts.length - 1));
@@ -465,13 +490,10 @@ export function orchid(spec: PlantSpec): Drawing {
         { x: p.x, y: p.y, w: minW(H * 0.005, 0.8) }, { x: head.x, y: head.y, w: minW(H * 0.004, 0.7) },
       ] };
       const phi = pa + side * rng.range(10, 40) * DEG;
-      flowerUnits.push([ped, ...blossom(head, phi, rng.range(0.86, 0.98) * (1 - i * 0.05))]);
+      add([ped, ...blossom(head, phi, rng.range(0.86, 0.98) * (1 - i * 0.05))], opens[i]);
       side = -side;
     }
-    flowerUnits.push(topBud);
   }
-  stemUnits.forEach((u, i) => add(0.56 + i * 0.012, u, 0.002));
-  flowerUnits.forEach((u, i) => add(lerp(0.62, 0.9, flowerUnits.length > 1 ? i / (flowerUnits.length - 1) : 0), u, 0.0015));
 
   // ------------------------------------------------------------ moss dots
   const moss: Stroke[] = [];
@@ -484,20 +506,52 @@ export function orchid(spec: PlantSpec): Drawing {
     moss.push({ kind: 'dot', pts: [{ x, y: rng.range(-0.006, 0.006) * H, w: minW(d, 1.4) }],
       tone: rng.chance(0.3) ? rng.range(0.35, 0.45) : rng.range(0.82, 0.95), birth: 0, seed: sd() });
   }
-  add(0.07, moss.slice(0, 2), 0.002);
-  add(0.94, moss.slice(2), 0.01);
+  for (let i = 0; i < moss.length; i += 2) fillers.push(moss.slice(i, i + 2));
 
-  // ------------------------------------------------------------ flatten
-  const strokes: Stroke[] = [];
-  for (const u of units) {
-    const step = u.step ?? 0.001;
-    u.strokes.forEach((st, i) => {
-      st.birth = clamp(u.birth + i * step, 0, 1);
-      strokes.push(st);
-    });
+  return normalise(choreograph(first, seq, fillers), H);
+}
+
+interface Group {
+  strokes: Stroke[];
+  /** the earliest check-in at which the group may appear */
+  minN: number;
+}
+
+/** Check-ins whose growth must each add something visible (growthFor(21) ≈ 0.65). */
+const STORY_CHECKINS = 21;
+
+/**
+ * Assign births so that the plant changes visibly at every check-in 1…21 (growth from
+ * `growthFor`), then spread whatever is left over the long tail up to full growth.
+ * Each check-in n takes the next story group that may appear (minN ≤ n), else a filler, else
+ * pulls the next story group early. A group's strokes land just below growthFor(n).
+ */
+function choreograph(first: Stroke[], seq: Group[], fillers: Stroke[][]): Stroke[] {
+  const out: Stroke[] = [];
+  const put = (strokes: Stroke[], b0: number, step: number) =>
+    strokes.forEach((st, i) => { st.birth = clamp(b0 + i * step, 0, 1); out.push(st); });
+  put(first, 0, Math.min(0.004, 0.05 / Math.max(1, first.length)));
+  const q = [...seq];
+  const f = [...fillers];
+  for (let n = 1; n <= STORY_CHECKINS; n++) {
+    const i = q.findIndex((g) => g.minN <= n);
+    const st = i >= 0 ? q.splice(i, 1)[0].strokes : f.length ? f.shift()! : q.shift()?.strokes;
+    if (!st) break;
+    const step = Math.min(0.0003, 0.006 / st.length);
+    put(st, growthFor(n) - 0.002 - step * (st.length - 1), step);
   }
-  strokes.sort((a, b) => a.birth - b.birth);
-  return normalise(strokes, H);
+  // The long tail: the remaining story (the last flowers) interleaved with fillers.
+  const rest: Stroke[][] = [];
+  while (q.length || f.length) {
+    if (q.length) rest.push(q.shift()!.strokes);
+    if (f.length) rest.push(f.shift()!);
+  }
+  const g0 = growthFor(STORY_CHECKINS) + 0.02;
+  rest.forEach((st, k) => {
+    const b = lerp(g0, 0.95, rest.length > 1 ? k / (rest.length - 1) : 0);
+    put(st, b, Math.min(0.0005, 0.01 / st.length));
+  });
+  return out.sort((a, b) => a.birth - b.birth);
 }
 
 /** Fit to the target height with a small margin; the anchor is the foot of the tuft. */

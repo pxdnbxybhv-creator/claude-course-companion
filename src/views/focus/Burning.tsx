@@ -6,6 +6,9 @@ import * as session from './session';
 import { active, answerNotify, extinguish, notifyAsk, now, togglePause } from './session';
 import { cnRemaining, elapsedMs, enRemaining, formatClock, remainingMs } from './timer';
 import { AmbientPicker } from './Setup';
+import { revealStage } from './reveal';
+import { state } from '../../app/store';
+import { PlantGlyph } from '../../ui/kit';
 
 export function Burning() {
   const t = useT();
@@ -23,6 +26,7 @@ export function Burning() {
   const burnedMin = Math.floor(elapsedMs(s, n) / 60_000);
   const clock = formatClock(rem);
   const reading = t(cnRemaining(rem), enRemaining(rem));
+  const habit = s.habitId ? state.value.habits.find((h) => h.id === s.habitId && !h.archived) : undefined;
 
   return (
     <div class={'fx-burning' + (paused ? ' is-paused' : '')}>
@@ -32,20 +36,23 @@ export function Burning() {
           {paused ? t('香已暂熄 · 静候片刻', 'Paused — the ember rests') : reading}
         </div>
         {s.intent && (
-          <div class="fx-for">{t(`此香为「${s.intent}」而燃`, `For: ${s.intent}`)}</div>
+          <div class="fx-for">
+            {habit && <PlantGlyph kind={habit.plant} size={22} />}
+            <span>{t(`此香为「${s.intent}」而燃`, `For: ${s.intent}`)}</span>
+          </div>
         )}
       </div>
 
       {notifyAsk.value && (
         <div class="fx-ask" role="note">
           <p>{t('香尽时，轻声提醒你？', 'Let you know when it burns out?')}</p>
-          <button class="btn btn-small" onClick={() => answerNotify(true)}>{t('好', 'Yes')}</button>
+          <button class="btn btn-small fx-ask-yes" onClick={() => answerNotify(true)}>{t('好', 'Yes')}</button>
           <button class="btn btn-small btn-ghost" onClick={() => answerNotify(false)}>{t('不必', 'No')}</button>
         </div>
       )}
 
       <div class="fx-actions">
-        <button ref={pauseRef} class={'btn ' + (paused ? 'btn-primary' : '')} onClick={togglePause}>
+        <button ref={pauseRef} class={'btn ' + (paused ? 'btn-primary' : '')} onClick={() => { if (paused) revealStage(); togglePause(); }}>
           {paused ? t('继续', 'Resume') : t('暂停', 'Pause')}
         </button>
         <button class="btn btn-ghost fx-out" onClick={() => setConfirm(true)}>{t('熄灭', 'Put out')}</button>

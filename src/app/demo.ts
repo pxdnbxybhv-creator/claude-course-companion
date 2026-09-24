@@ -38,7 +38,7 @@ export function demoState(today: DateKey, lang: 'zh' | 'en', seed = 2026): AppSt
     : ['Osmanthus opened after the rain.', 'Finished Six Records of a Floating Life.', 'Saw an egret on my run.', 'First early night.', 'Wrote to an old friend.'];
   lines.forEach((l, i) => (notes[addDays(today, -(i * 3 + 1))] = l));
   const focus = Array.from({ length: 40 }, (_, i) => {
-    const day = addDays(today, -Math.floor(i / 2));
+    const day = addDays(today, -1 - Math.floor(i / 2));
     const [y, m, dd] = day.split('-').map(Number);
     return { start: new Date(y, m - 1, dd, 9 + (i % 2) * 5, 0).getTime(), minutes: [25, 25, 45, 30][i % 4], completed: rng() < 0.9 };
   });

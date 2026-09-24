@@ -2,7 +2,8 @@
 import { lang, state, today } from '../../app/store';
 import { useT } from '../../app/i18n';
 import { pickPoem } from '../../data/poems';
-import { Sheet } from '../../ui/kit';
+import { PlantGlyph, Sheet } from '../../ui/kit';
+import { revealStage } from './reveal';
 import { completion, dismissCompletion } from './session';
 import { clockOf, recentDays } from './stats';
 
@@ -43,13 +44,24 @@ export function DoneSheet(props: { onAgain: () => void }) {
           {!zh && <p class="fx-poem-en">{poem.en} <span class="fx-poem-by">— {poem.authorEn}</span></p>}
         </figure>
 
+        {c.habit && (
+          <p class={'fx-done-habit' + (c.habit.marked ? ' is-marked' : '')}>
+            <PlantGlyph kind={c.habit.plant} size={30} />
+            <span>
+              {c.habit.marked
+                ? t(`《${c.habit.name}》已记今日，又长了几笔`, `“${c.habit.name}” — marked done today`)
+                : t(`《${c.habit.name}》今日已完成`, `“${c.habit.name}” was already done today`)}
+            </span>
+          </p>
+        )}
+
         <p class="fx-done-today">
           {t(`今日已燃 ${d.count} 炷 · ${d.minutes} 分钟`, `Today: ${d.count} stick${d.count === 1 ? '' : 's'} · ${d.minutes} minutes`)}
         </p>
 
         <div class="fx-done-btns">
           <button class="btn btn-primary" onClick={dismissCompletion} autoFocus>{t('好', 'Done')}</button>
-          <button class="btn" onClick={() => { dismissCompletion(); props.onAgain(); }}>{t('再燃一炷', 'Light another')}</button>
+          <button class="btn" onClick={() => { dismissCompletion(); revealStage(); props.onAgain(); }}>{t('再燃一炷', 'Light another')}</button>
         </div>
       </div>
     </Sheet>

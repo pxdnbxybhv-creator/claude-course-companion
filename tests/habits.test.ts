@@ -61,6 +61,14 @@ describe('habits', () => {
     expect(bestStreakFor(h, [...done])).toBe(3);
   });
 
+  it('counts only scheduled days in the best streak, like the current streak', () => {
+    const h = habit({ days: [1, 3, 5] });
+    // Mon 21, Tue 22 (rest day, done anyway), Wed 23 — an unbroken run of 2 scheduled days.
+    const days = ['2026-09-21', '2026-09-22', '2026-09-23'];
+    expect(streakFor(h, new Set(days), '2026-09-23')).toBe(2);
+    expect(bestStreakFor(h, days)).toBe(2);
+  });
+
   it('computes best streak across gaps', () => {
     const days = [...lastN(4, '2026-09-10'), ...lastN(7, T)];
     expect(bestStreakFor(habit(), days)).toBe(7);

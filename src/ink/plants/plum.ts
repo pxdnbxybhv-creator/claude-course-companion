@@ -183,7 +183,7 @@ export function plum(spec: PlantSpec): Drawing {
   const lean = rng.range(0.08, 0.42);
   const trunkH = rng.range(0.28, 0.42) * H;
   const brokenTop = rng.chance(0.45);
-  const hollow = rng.chance(0.4);
+  const hollow = rng.chance(0.28);
   const twin = rng.chance(0.25);
   const style: 'rouge' | 'ink' = rng.chance(0.5) ? 'rouge' : 'ink';
   const density = rng.range(0.75, 1.1);
@@ -207,6 +207,23 @@ export function plum(spec: PlantSpec): Drawing {
   const whips: Branch[] = [];
   const twigs: Branch[] = [];
   const cumTrunk = (i: number) => polyLen(trunk.pts.slice(0, i + 1));
+
+  // the old stump (老干) a new plant starts from, and its one fresh shoot (一枝梅)
+  const trunkLen = polyLen(trunk.pts);
+  const stumpH = Math.min(trunkLen * 0.42, rng.range(0.1, 0.13) * H);
+  const stumpTop = at(trunk, stumpH / trunkLen);
+  const shootSide = -side;
+  let shoot: Branch;
+  {
+    const nrm = dir(stumpTop.a + (shootSide * Math.PI) / 2);
+    const base = add(stumpTop.p, nrm, stumpTop.w * 0.3);
+    const a0 = stumpTop.a * 0.3 + shootSide * rng.range(0.2, 0.4);
+    const len = rng.range(0.2, 0.26) * H;
+    const tip = add(base, dir(a0), len);
+    const mid = add(mix(base, tip, 0.5), dir(a0 + Math.PI / 2), len * rng.range(-0.05, 0.05));
+    shoot = { kind: 'whip', pts: [base, mid, tip], w: [3.4, 2.2, 0.6], d0: stumpH, birth: 0.03 };
+    space.addPath(shoot.pts);
+  }
 
   // 忌平行: painters avoid shoots running parallel to their neighbours
   const placed: { m: P; a: number }[] = [];
@@ -340,55 +357,51 @@ export function plum(spec: PlantSpec): Drawing {
   }
 
   // --- growth timeline -----------------------------------------------------
+  // check-in n reaches growth 0.06 + 0.94(1 − e^(−n/21)): 0.104, 0.146, 0.185, 0.223, 0.26, 0.295, 0.33 …
   let maxD = 1;
   for (const b of [trunk, ...limbs, ...secs, ...whips, ...twigs]) maxD = Math.max(maxD, b.d0 + polyLen(b.pts));
   const T = (d: number) => clampN(d / maxD, 0, 1);
 
-  // --- sapling (0 – 0.06) --------------------------------------------------
+  // --- day one (0 – 0.05): a short burnt-ink stump with a cut top, one green-ink shoot, one rouge bud
+  paintStump(rng, trunk, stumpH, side);
+  push('brush', shoot.pts.map((p, i) => ({ ...p, w: shoot.w[i] })), 0.5, 0.03, { dryness: 0 });
+  push('brush', shoot.pts.map((p, i) => ({ ...p, w: shoot.w[i] * 0.72 })), 0.5, 0.032, { color: PIGMENTS.malachite, dryness: 0.1 });
   {
-    // thin stem up the trunk (toward the shadow side, where it later merges into the dark mass)
-    const st: StrokePoint[] = [];
-    for (let i = 0; i <= topIdx; i++) {
-      const p = trunk.pts[i];
-      const a = trunk.pts[Math.max(0, i - 1)], b = trunk.pts[Math.min(topIdx, i + 1)];
-      const L = dist(a, b) || 1;
-      const t = i / topIdx;
-      const o = trunk.w[i] * 0.2;
-      st.push({ x: p.x - ((b.y - a.y) / L) * o, y: Math.min(p.y + ((b.x - a.x) / L) * o, -0.014 * H), w: 0.024 * H * (1 - 0.5 * t) });
-    }
-    const lead = limbs[0];
-    const e1 = at(lead, Math.min(1, (0.05 * H) / polyLen(lead.pts)));
-    const e2 = at(lead, Math.min(1, (0.1 * H) / polyLen(lead.pts)));
-    st.push({ x: e1.p.x, y: e1.p.y, w: 0.009 * H }, { x: e2.p.x, y: e2.p.y, w: 0.004 * H });
-    push('brush', st, 0.6, 0, { dryness: 0, wet: 0.4 });
-    // two little twigs following the first reach of other limbs, each ending in a bud
-    const hosts = limbs.slice(1, 3); // side limbs all leave the trunk, so their first reach touches the stem
-    hosts.forEach((b, k) => {
-      const L = polyLen(b.pts);
-      const tip = at(b, Math.min(1, (0.07 * H) / L));
-      const m = mix(b.pts[0], tip.p, 0.5);
-      push('brush', [{ ...b.pts[0], w: 3.4 }, { ...m, w: 2.4 }, { ...tip.p, w: 1.2 }], 0.68, 0.015 + k * 0.012, { dryness: 0 });
-      push('dot', [{ ...add(tip.p, dir(tip.a), 1.2), w: 4.2 }], 0.86, 0.04 + k * 0.008);
-    });
+    const tip = shoot.pts[2];
+    const a = angOf(shoot.pts[1], tip);
+    const r = 0.018 * H;
+    push('dot', [{ ...add(tip, dir(a), r * 0.55), w: r * 1.35 }], 0.82, 0.045, { color: PIGMENTS.rouge });
+    push('dot', [{ ...add(tip, dir(a), -r * 0.05), w: r * 0.6 }], 0.92, 0.046);
+    // a second, smaller bud along the shoot (check-in 1)
+    const q = mix(shoot.pts[1], tip, rng.range(0.25, 0.45));
+    const a2 = a + shootSide * 1.1;
+    push('dot', [{ ...add(q, dir(a2), r * 0.55), w: r * 0.95 }], 0.78, 0.075, { color: PIGMENTS.rouge });
+    push('dot', [{ ...q, w: r * 0.45 }], 0.9, 0.076);
   }
 
-  // --- young wood: the limbs as slender strokes (0.07–0.2) ------------------
-  limbs.forEach((b) => {
-    b.birth = 0.07 + 0.13 * T(b.d0) / 0.4;
-    push('brush', runSpine(rng, b, 0, b.pts.length - 1, 0.4, 0.5), 0.62, Math.min(0.2, b.birth), { dryness: 0.15 });
+  // --- young wood (0.09–0.25): the trunk grows on out of the stump, then the limbs one by one ----
+  {
+    const st: StrokePoint[] = [];
+    const i0 = Math.max(0, trunk.pts.findIndex((p, i) => i > 0 && cumTrunk(i) > stumpH) - 1);
+    st.push({ ...stumpTop.p, w: stumpTop.w * 0.45 });
+    for (let i = i0 + 1; i <= topIdx; i++) st.push({ ...trunk.pts[i], w: trunk.w[i] * 0.4 });
+    const lead = limbs[0];
+    const e1 = at(lead, Math.min(1, (0.06 * H) / polyLen(lead.pts)));
+    st.push({ ...e1.p, w: lead.w[0] * 0.25 });
+    push('brush', st, 0.62, 0.09, { dryness: 0.1 });
+  }
+  limbs.slice().sort((a, b) => a.d0 - b.d0).forEach((b, k) => {
+    b.birth = 0.115 + 0.035 * k;
+    push('brush', runSpine(rng, b, 0, b.pts.length - 1, 0.4, 0.5), 0.62, b.birth, { dryness: 0.15 });
   });
 
-  // --- trunk grows old (0.2–0.5) --------------------------------------------
-  paintTrunk(rng, trunk, topIdx, brokenTop, hollow, side);
-
-  // --- mature limbs: the brush lifts every two or three 女 joints ----------------
-  for (const b of limbs) paintBranch(rng, b, 0.24 + 0.14 * T(b.d0) / 0.5, rng.range(0.55, 0.66));
+  // --- branches, whips and twigs (0.15–0.52) -------------------------------------
   for (const b of secs) {
-    b.birth = 0.12 + 0.22 * T(b.d0);
+    b.birth = 0.15 + 0.32 * T(b.d0);
     paintBranch(rng, b, b.birth, rng.range(0.7, 0.82));
   }
   whips.forEach((b, k) => {
-    b.birth = 0.3 + 0.1 * (k / Math.max(1, whips.length - 1));
+    b.birth = 0.2 + 0.2 * (k / Math.max(1, whips.length - 1));
     push('brush', [
       { ...b.pts[0], w: b.w[0] * 1.1 },
       { ...mix(b.pts[0], b.pts[1], 0.5), w: b.w[0] * 0.9 },
@@ -398,9 +411,13 @@ export function plum(spec: PlantSpec): Drawing {
     ], rng.range(0.66, 0.78), b.birth, { dryness: 0.25 });
   });
   for (const b of twigs) {
-    b.birth = clampN(0.3 + 0.16 * T(b.d0), 0.34, 0.47);
+    b.birth = clampN(0.24 + 0.3 * T(b.d0), 0.26, 0.54);
     push('brush', b.pts.map((p, i) => ({ ...p, w: b.w[i] })), rng.range(0.82, 0.93), b.birth, { dryness: 0.1 });
   }
+
+  // --- the trunk grows old (0.3–0.5), limbs thicken (0.34–0.5) ---------------------
+  paintTrunk(rng, trunk, topIdx, brokenTop, hollow, side);
+  for (const b of limbs) paintBranch(rng, b, 0.34 + 0.16 * T(b.d0) / 0.5, rng.range(0.55, 0.66));
 
   // --- moss on the limbs near the crotches ------------------------------------
   for (const b of limbs) {
@@ -409,14 +426,27 @@ export function plum(spec: PlantSpec): Drawing {
     const nx = Math.cos(q.a), ny = Math.sin(q.a);
     const s = rng.chance(0.5) ? 1 : -1;
     const n = rng.int(1, 3);
+    const bm = rng.range(0.5, 0.6);
     for (let k = 0; k < n; k++) {
       const o = q.w * 0.5 * s * rng.range(0.8, 1.2);
-      push('dot', [{ x: q.p.x + nx * o + rng.range(-3, 3), y: q.p.y + ny * o + rng.range(-3, 3), w: rng.range(2, 3.6) }], rng.range(0.85, 0.95), rng.range(0.44, 0.5));
+      push('dot', [{ x: q.p.x + nx * o + rng.range(-3, 3), y: q.p.y + ny * o + rng.range(-3, 3), w: rng.range(2, 3.6) }], rng.range(0.85, 0.95), bm + k * 0.003);
     }
   }
 
   // --- buds & blossoms ------------------------------------------------------
-  paintBlossoms(rng, { trunk, limbs, secs, whips, twigs }, style, density);
+  paintBlossoms(rng, { trunk, limbs, secs, whips, twigs, shoot }, style, density);
+
+  // every check-in should add something: fill any quiet stretch with a moss dot on the old stump
+  {
+    const g = (n: number) => 0.06 + 0.94 * (1 - Math.exp(-n / 21));
+    for (let n = 1; n <= 24; n++) {
+      if (out.some((st) => st.birth > g(n - 1) && st.birth <= g(n))) continue;
+      const q = at(trunk, rng.range(0.05, 0.9) * (stumpH / trunkLen));
+      const s2 = rng.chance(0.6) ? 1 : -1;
+      const nrm = dir(q.a + (s2 * Math.PI) / 2);
+      push('dot', [{ ...add(q.p, nrm, q.w * 0.5 * rng.range(0.85, 1.1)), w: rng.range(2, 3.8) }], rng.range(0.86, 0.95), (g(n - 1) + g(n)) / 2);
+    }
+  }
 
   return finalize(out, spec.height);
 }
@@ -442,9 +472,9 @@ function paintBranch(rng: Rng, b: Branch, birth: number, tone: number) {
 
 interface TS { p: P; nx: number; ny: number; hw: number; seg: number; t: number; u: number }
 
-function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean, hollow: boolean, side: number) {
+/** Dense spine samples of the trunk with smoothed normals (right-hand normal: +x for an upward spine). */
+function trunkSamples(rng: Rng, trunk: Branch): TS[] {
   const n = trunk.pts.length - 1;
-  // dense samples of the spine with smoothed normals (right-hand normal: +x for an upward spine)
   const S: TS[] = [];
   const segN = (i: number) => {
     const a = trunk.pts[i], b = trunk.pts[i + 1];
@@ -475,11 +505,44 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
   S.forEach((q, i) => (q.u = i / (S.length - 1)));
   // lift the foot a little so the round start of the broad strokes doesn't sink below the ground
   S[0].p = { x: S[0].p.x, y: S[0].p.y - S[0].hw * 0.55 };
-  const off = (q: TS, k: number): P => ({ x: q.p.x + q.nx * q.hw * k, y: q.p.y + q.ny * q.hw * k });
+  return S;
+}
+
+const offS = (q: TS, k: number): P => ({ x: q.p.x + q.nx * q.hw * k, y: q.p.y + q.ny * q.hw * k });
+
+/** Day one: a short, burnt-ink (焦墨) stump with a broken, dry-brush cut top. */
+function paintStump(rng: Rng, trunk: Branch, stumpH: number, side: number) {
+  const S = trunkSamples(makeRng(7), trunk);
+  const L = polyLen(trunk.pts);
+  const iTop = Math.max(3, S.findIndex((q) => q.u * L >= stumpH));
+  const part = S.slice(0, iTop + 1);
+  const band = (k: number, wf: (q: TS, v: number) => number) => part.map((q, j) => ({ ...offS(q, k), w: wf(q, j / (part.length - 1)) }));
+  push('dry', band(0.05, (q) => q.hw * 1.8), rng.range(0.38, 0.46), 0, { dryness: 0.35 });
+  push('dry', band(0.78, (q, v) => q.hw * 0.5 * (0.7 + 0.3 * Math.sin(Math.PI * v))), rng.range(0.86, 0.94), 0.006, { dryness: 0.3 });
+  push('dry', band(-0.8, (q, v) => q.hw * 0.34 * (0.6 + 0.4 * Math.sin(Math.PI * v))), rng.range(0.72, 0.84), 0.012, { dryness: 0.4 });
+  // the cut: two jagged dry strokes that don't close into a lid
+  const q = S[iTop];
+  const c1 = offS(q, -0.95), c2 = offS(q, 0.95);
+  const up = dir(Math.atan2(q.ny, q.nx)); // along the spine, upward
+  const mid = add(mix(c1, c2, rng.range(0.35, 0.6)), { x: -up.x, y: -up.y }, -q.hw * rng.range(0.25, 0.6));
+  push('dry', [{ ...c1, w: q.hw * 0.4 }, { ...mid, w: q.hw * 0.28 }], 0.9, 0.018, { dryness: 0.55 });
+  push('dry', [{ ...mid, w: q.hw * 0.3 }, { ...add(c2, up, -q.hw * 0.2), w: q.hw * 0.18 }], 0.84, 0.02, { dryness: 0.6 });
+  // moss dots at the foot and the lip
+  for (let k = 0; k < 3; k++) {
+    const qq = S[k < 2 ? rng.int(1, Math.max(2, iTop - 2)) : iTop - 1];
+    const s = k === 1 ? -side : side;
+    push('dot', [{ ...offS(qq, s * rng.range(0.85, 1.1)), w: rng.range(2.4, 4.2) }], rng.range(0.88, 0.96), 0.022 + k * 0.002);
+  }
+}
+
+function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean, hollow: boolean, side: number) {
+  const n = trunk.pts.length - 1;
+  const S = trunkSamples(rng, trunk);
+  const off = offS;
   const band = (i0: number, i1: number, k: number, wf: (q: TS, v: number) => number) =>
     S.slice(i0, i1 + 1).map((q, j, arr) => ({ ...off(q, k), w: wf(q, j / Math.max(1, arr.length - 1)) }));
-  const split = Math.floor(S.length * rng.range(0.4, 0.6));
   const N = S.length - 1;
+  const split = Math.floor(S.length * rng.range(0.4, 0.6));
   const swell = (v: number) => 0.55 + 0.45 * Math.sin(Math.PI * clampN(v * 1.15, 0, 1));
 
   // root flare
@@ -487,51 +550,52 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
     const hw = trunk.w[0] / 2;
     const a = { x: s * hw * 0.2, y: -0.045 * H };
     const b = { x: s * (hw + rng.range(0.03, 0.06) * H), y: rng.range(-0.003, 0.004) * H };
-    push('dry', bowed(a, b, hw * 0.95, 1.2, s * 0.14, 5), s > 0 ? 0.55 : 0.4, 0.2, { dryness: 0.55 });
+    push('dry', bowed(a, b, hw * 0.95, 1.2, s * 0.14, 5), s > 0 ? 0.55 : 0.4, 0.3, { dryness: 0.55 });
   }
 
-  // body: long pale side-brush rubs from the ground up, then a mid-tone mass on the shadow side
+  // body: pale side-brush rubs with plenty of 飞白, from the ground up, then a mid-tone mass on the shadow side
   const endW = brokenTop ? 0.95 : 0.8;
-  push('dry', band(0, split + 2, 0, (q) => q.hw * 1.95), rng.range(0.26, 0.32), 0.21, { dryness: 0.22 });
-  push('dry', band(split - 2, N, 0, (q, v) => q.hw * 1.95 * (1 - (1 - endW) * v)), rng.range(0.26, 0.32), 0.23, { dryness: 0.28 });
-  push('dry', band(0, N, 0.42, (q, v) => q.hw * 1.0 * (1 - 0.3 * v)), rng.range(0.34, 0.42), 0.25, { dryness: 0.3 });
+  push('dry', band(0, split + 2, 0, (q) => q.hw * 1.9), rng.range(0.24, 0.3), 0.31, { dryness: 0.4 });
+  push('dry', band(split - 2, N, 0, (q, v) => q.hw * 1.9 * (1 - (1 - endW) * v)), rng.range(0.24, 0.3), 0.33, { dryness: 0.45 });
+  push('dry', band(0, N, 0.42, (q, v) => q.hw * 1.0 * (1 - 0.3 * v)), rng.range(0.32, 0.4), 0.35, { dryness: 0.45 });
 
-  // contours: the shadow side (right) heavier, the light side thin and broken
-  const cut = Math.floor(S.length * rng.range(0.35, 0.65));
-  push('dry', band(0, cut + 1, 0.8, (q, v) => q.hw * 0.46 * swell(v)), rng.range(0.72, 0.84), 0.27, { dryness: 0.2 });
-  push('dry', band(cut, N, 0.78, (q, v) => q.hw * 0.44 * swell(v)), rng.range(0.68, 0.8), 0.285, { dryness: 0.25 });
-  const lcut = Math.floor(S.length * rng.range(0.3, 0.7));
-  push('dry', band(1, lcut - 2, -0.82, (q, v) => q.hw * 0.3 * swell(v)), rng.range(0.5, 0.6), 0.28, { dryness: 0.3 });
-  push('dry', band(lcut + 1, N, -0.8, (q, v) => q.hw * 0.28 * swell(v)), rng.range(0.46, 0.56), 0.29, { dryness: 0.35 });
-
-  // broken top: a jagged, dark break
-  if (brokenTop) {
-    const a = trunk.pts[n - 1], b = trunk.pts[n];
-    const ang = angOf(a, b);
-    const hw = trunk.w[n] / 2;
-    const nx = Math.cos(ang), ny = Math.sin(ang);
-    const c1 = { x: b.x - nx * hw, y: b.y - ny * hw };
-    const c2 = { x: b.x + nx * hw, y: b.y + ny * hw };
-    const mid = add(mix(c1, c2, rng.range(0.35, 0.65)), dir(ang), rng.range(-0.2, 0.5) * hw);
-    push('dry', [{ ...c1, w: 2.4 }, { ...mid, w: 3.4 }, { ...c2, w: 1.8 }], 0.82, 0.3, { dryness: 0.45 });
-    push('brush', [{ ...add(mid, dir(ang), -hw * 0.25), w: 2.4 }, { ...add(mid, dir(ang), -hw * 1.4), w: 0.6 }], 0.78, 0.3);
+  // contours: broken dry brush in three runs a side, the shadow side (right) heavier
+  for (const s of [1, -1]) {
+    const cuts = [0, Math.floor(N * rng.range(0.28, 0.4)), Math.floor(N * rng.range(0.58, 0.72)), N];
+    for (let k = 0; k < 3; k++) {
+      const i0 = Math.max(0, cuts[k] + (k ? rng.int(0, 2) : 0)), i1 = Math.min(N, cuts[k + 1] + rng.int(-1, 1));
+      if (i1 - i0 < 2) continue;
+      const kk = s * rng.range(0.74, 0.84);
+      push('dry', band(i0, i1, kk, (q, v) => q.hw * (s > 0 ? 0.48 : 0.32) * swell(v)), s > 0 ? rng.range(0.74, 0.86) : rng.range(0.5, 0.62), 0.37 + k * 0.012 + (s > 0 ? 0 : 0.006), { dryness: rng.range(0.4, 0.6) });
+    }
   }
 
-  // hollow: an eye-shaped rot opening in the middle of the trunk
+  // broken top: a jagged, dry-brush break — no lid
+  if (brokenTop) {
+    const q = S[N];
+    const c1 = off(q, -0.95), c2 = off(q, 0.95);
+    const up = dir(angOf(trunk.pts[n - 1], trunk.pts[n]));
+    const mid = add(mix(c1, c2, rng.range(0.35, 0.65)), up, q.hw * rng.range(-0.2, 0.5));
+    push('dry', [{ ...c1, w: q.hw * 0.42 }, { ...mid, w: q.hw * 0.25 }], 0.86, 0.41, { dryness: 0.6 });
+    push('dry', [{ ...mid, w: q.hw * 0.3 }, { ...add(c2, up, -q.hw * 0.4), w: q.hw * 0.15 }], 0.8, 0.412, { dryness: 0.65 });
+  }
+
+  // hollow (some seeds): a ragged, lopsided rot opening, dark on one lip only
   if (hollow && N > 12) {
-    const i0 = Math.floor(N * rng.range(0.25, 0.35));
-    const i1 = Math.floor(N * rng.range(0.55, 0.7));
-    const shift = rng.range(-0.15, 0.15);
+    const i0 = Math.floor(N * rng.range(0.22, 0.34));
+    const i1 = Math.floor(N * rng.range(0.52, 0.68));
+    const shift = rng.range(-0.2, 0.15);
     const inner: StrokePoint[] = [];
     const outer: StrokePoint[] = [];
     for (let i = i0; i <= i1; i++) {
       const q = S[i];
-      const v = Math.sin((Math.PI * (i - i0)) / (i1 - i0));
-      inner.push({ ...off(q, shift - 0.45 * v), w: 0.6 + q.hw * 0.34 * v });
-      outer.push({ ...off(q, shift + 0.28 * v), w: 0.5 + q.hw * 0.16 * v });
+      const v = Math.pow(Math.sin((Math.PI * (i - i0)) / (i1 - i0)), 0.7);
+      const jag = rng.range(-0.08, 0.08);
+      inner.push({ ...off(q, shift - (0.5 + jag) * v), w: 0.6 + q.hw * 0.38 * v * rng.range(0.7, 1.2) });
+      if (i < i0 + (i1 - i0) * 0.75) outer.push({ ...off(q, shift + (0.22 + jag) * v), w: 0.5 + q.hw * 0.12 * v });
     }
-    push('dry', inner, 0.86, 0.32, { dryness: 0.35 });
-    push('dry', outer, 0.5, 0.32, { dryness: 0.5 });
+    push('dry', inner, 0.88, 0.42, { dryness: 0.4 });
+    if (outer.length > 2) push('dry', outer, 0.5, 0.421, { dryness: 0.6 });
   }
 
   // bark rubs 皴: short dry strokes along the grain
@@ -541,24 +605,20 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
     const j = Math.min(N, i + rng.int(3, 6));
     const u = rng.range(-0.5, 0.55);
     const a = off(S[i], u), b = off(S[j], u + rng.range(-0.2, 0.2));
-    push('dry', bowed(a, b, S[i].hw * rng.range(0.16, 0.28), 0.6, rng.range(-0.12, 0.12), 4), rng.range(0.4, 0.56), 0.33 + k * 0.005, { dryness: 0.55 });
+    push('dry', bowed(a, b, S[i].hw * rng.range(0.16, 0.28), 0.6, rng.range(-0.12, 0.12), 4), rng.range(0.42, 0.58), 0.43 + k * 0.004, { dryness: 0.55 });
   }
 
-  // knot scar 节疤 on the light side
-  if (rng.chance(0.6)) {
-    const q = S[rng.int(Math.floor(N * 0.3), Math.floor(N * 0.8))];
-    const c = off(q, -rng.range(0.2, 0.45));
-    const rx = q.hw * rng.range(0.2, 0.28), ry = rx * rng.range(1.3, 1.7);
-    const rot = Math.atan2(q.ny, q.nx);
-    const ring: StrokePoint[] = [];
-    const a0 = rng.range(0, 6.28);
-    for (let k = 0; k <= 9; k++) {
-      const t = a0 + (k / 9) * Math.PI * 1.75;
-      const x = Math.cos(t) * rx, y = Math.sin(t) * ry;
-      ring.push({ x: c.x + x * Math.cos(rot) - y * Math.sin(rot), y: c.y + x * Math.sin(rot) + y * Math.cos(rot), w: 1.7 * (0.5 + 0.5 * Math.sin((k / 9) * Math.PI)) });
+  // a split (裂) along the grain, with moss gathering in it
+  {
+    const i0 = Math.floor(N * rng.range(0.25, 0.45)), i1 = Math.min(N - 2, i0 + Math.floor(N * rng.range(0.18, 0.3)));
+    const u0 = rng.range(-0.3, 0.25);
+    const pts = S.slice(i0, i1 + 1).map((q, j, arr) => ({ ...off(q, u0 + 0.12 * Math.sin(j * 1.7) + rng.range(-0.04, 0.04)), w: 0.6 + q.hw * 0.16 * Math.sin(Math.PI * (j / Math.max(1, arr.length - 1))) }));
+    push('dry', pts, 0.82, 0.45, { dryness: 0.45 });
+    const nm = rng.int(2, 3);
+    for (let k = 0; k < nm; k++) {
+      const q = S[rng.int(i0, i1)];
+      push('dot', [{ ...off(q, u0 + rng.range(-0.25, 0.25)), w: rng.range(2, 3.6) }], rng.range(0.86, 0.96), 0.452 + k * 0.003);
     }
-    push('brush', ring, 0.7, 0.36);
-    push('dot', [{ ...c, w: rx * 0.8 }], 0.8, 0.36);
   }
 
   // dark accents 醒笔 on the shadow edge by the joints
@@ -569,7 +629,7 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
     const a = off(q, 0.88 * s);
     const ang = Math.atan2(q.ny, q.nx) + Math.PI; // along the spine, pointing down
     const b = add(a, dir(ang + s * rng.range(-0.05, 0.12)), rng.range(0.025, 0.045) * H);
-    push('brush', bowed(a, b, q.hw * 0.28, 0.7, rng.range(-0.1, 0.1), 3), rng.range(0.82, 0.92), 0.38 + i * 0.005, { dryness: 0.35 });
+    push('brush', bowed(a, b, q.hw * 0.28, 0.7, rng.range(-0.1, 0.1), 3), rng.range(0.82, 0.92), 0.46 + i * 0.005, { dryness: 0.35 });
   }
 
   // moss dots 苔点, in little groups straddling the contour
@@ -581,7 +641,7 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
     for (let k = 0; k < n2; k++) {
       const u = s * rng.range(0.85, 1.12);
       const along = rng.range(-6, 6);
-      push('dot', [{ x: q.p.x + q.nx * q.hw * u - q.ny * along, y: q.p.y + q.ny * q.hw * u + q.nx * along, w: rng.range(2.2, 4.4) }], rng.range(0.86, 0.96), 0.42 + g * 0.02 + k * 0.004);
+      push('dot', [{ x: q.p.x + q.nx * q.hw * u - q.ny * along, y: q.p.y + q.ny * q.hw * u + q.nx * along, w: rng.range(2.2, 4.4) }], rng.range(0.86, 0.96), 0.48 + g * 0.02 + k * 0.004);
     }
   }
 }
@@ -589,16 +649,16 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
 // ---------------------------------------------------------------------------
 // blossoms
 
-interface Site { p: P; a: number; wt: number; hw: number }
+interface Site { p: P; a: number; wt: number; hw: number; b0: number }
 type View = 'face' | 'tilt' | 'side' | 'back';
 
 function paintBlossoms(
   rng: Rng,
-  tree: { trunk: Branch; limbs: Branch[]; secs: Branch[]; whips: Branch[]; twigs: Branch[] },
+  tree: { trunk: Branch; limbs: Branch[]; secs: Branch[]; whips: Branch[]; twigs: Branch[]; shoot: Branch },
   style: 'rouge' | 'ink',
   density: number,
 ) {
-  const r0 = rng.range(0.024, 0.029) * H; // flower radius
+  const r0 = rng.range(0.03, 0.036) * H; // flower radius
   const sites: Site[] = [];
   const addSites = (b: Branch, tMin: number, wt: number) => {
     const L = polyLen(b.pts);
@@ -609,7 +669,7 @@ function paintBlossoms(
       // plum flowers gather at the joints
       let near = 1e9;
       for (const jp of b.pts) near = Math.min(near, dist(jp, q.p));
-      sites.push({ p: q.p, a: q.a, wt: wt * (near < r0 ? 2.2 : 1), hw: q.w / 2 });
+      sites.push({ p: q.p, a: q.a, wt: wt * (near < r0 ? 2.2 : 1), hw: q.w / 2, b0: b.birth });
     }
   };
   tree.limbs.forEach((b) => addSites(b, 0.35, 0.5));
@@ -643,8 +703,51 @@ function paintBlossoms(
     return sites[sites.length - 1];
   };
 
-  interface F { c: P; r: number; view: View; phi: number }
+  interface F { c: P; r: number; view: View; phi: number; b0: number; first?: boolean }
+  interface Bd { p: P; a: number; r: number; b0: number }
   const flowers: F[] = [];
+  const buds: Bd[] = [];
+  const pickView = (): View => {
+    const u = rng();
+    return u < 0.34 ? 'face' : u < 0.64 ? 'tilt' : u < 0.84 ? 'side' : 'back';
+  };
+  const room = (c: P, r: number, k = 0.95) => flowers.every((f) => dist(f.c, c) > (f.r + r) * k) && trunkClear(c, r);
+
+  // 1 · the first blossom opens on the fresh shoot, just below its rouge bud (check-in ~7)
+  {
+    const q = at(tree.shoot, rng.range(0.58, 0.78));
+    const sg = rng.chance(0.5) ? 1 : -1;
+    const r = r0 * rng.range(0.95, 1.08);
+    const nrm = q.a + (sg * Math.PI) / 2;
+    const c = add(q.p, dir(nrm), q.w / 2 + r * (style === 'ink' ? 0.7 : 0.35));
+    flowers.push({ c, r, view: rng.chance(0.6) ? 'face' : 'tilt', phi: nrm * 0.7, b0: 0, first: true });
+  }
+
+  // 2 · twig ends: a third left bare and tapering, some with buds of different sizes, some in flower
+  for (const b of [...tree.twigs, ...tree.secs, ...tree.whips]) {
+    const p = b.pts[b.pts.length - 1];
+    const a = angOf(b.pts[b.pts.length - 2], p);
+    const u = rng();
+    if (u < 0.34) continue;
+    if (u < 0.74) {
+      const r = r0 * rng.range(0.16, 0.34);
+      const c = add(p, dir(a + rng.range(-0.35, 0.35)), r * 0.7);
+      if (!room(c, r, 0.6)) continue;
+      buds.push({ p: c, a, r, b0: b.birth });
+      if (rng.chance(0.25)) {
+        const s2 = rng.chance(0.5) ? 1 : -1;
+        const r2 = r * rng.range(0.55, 0.8);
+        buds.push({ p: add(add(p, dir(a), -r * 1.6), dir(a + s2 * 1.3), r2 + b.w[b.w.length - 1]), a: a + s2 * 0.9, r: r2, b0: b.birth });
+      }
+    } else {
+      const r = r0 * rng.range(0.8, 1);
+      const c = add(p, dir(a), r * 0.5);
+      if (!room(c, r)) continue;
+      flowers.push({ c, r, view: rng.chance(0.5) ? 'side' : 'tilt', phi: a, b0: b.birth });
+    }
+  }
+
+  // 3 · blossoms along the branches, gathered round the focal clusters
   const nF = Math.round(rng.range(10, 15) * density);
   for (let tries = 0; tries < 400 && flowers.length < nF && sites.length; tries++) {
     const s = pickSite();
@@ -653,50 +756,41 @@ function paintBlossoms(
     const nrm = s.a + (sg * Math.PI) / 2;
     const off = s.hw + r * (style === 'ink' ? rng.range(0.5, 0.9) : rng.range(0.05, 0.6));
     const c = add(s.p, dir(nrm), off);
-    const pair = rng.chance(0.3);
-    if (!flowers.every((f) => dist(f.c, c) > (f.r + r) * (pair ? 0.62 : 0.95))) continue;
-    if (!trunkClear(c, r)) continue;
-    const u = rng();
-    const view: View = u < 0.34 ? 'face' : u < 0.64 ? 'tilt' : u < 0.84 ? 'side' : 'back';
+    if (!room(c, r, rng.chance(0.3) ? 0.62 : 0.95)) continue;
     // flowers face outward from the branch and a little upward
-    const phi = nrm * 0.7 + rng.range(-0.5, 0.5);
-    flowers.push({ c, r, view, phi });
+    flowers.push({ c, r, view: pickView(), phi: nrm * 0.7 + rng.range(-0.5, 0.5), b0: s.b0 });
     s.wt *= 0.3;
   }
-
-  // buds: at some twig and shoot tips, and a few along the branches
-  interface Bd { p: P; a: number; r: number }
-  const buds: Bd[] = [];
-  for (const b of [...tree.twigs, ...tree.secs, ...tree.whips]) {
-    if (!rng.chance(b.kind === 'twig' ? 0.45 : 0.75)) continue;
-    const p = b.pts[b.pts.length - 1];
-    const a = angOf(b.pts[b.pts.length - 2], p);
-    const r = r0 * rng.range(0.24, 0.36);
-    const c = add(p, dir(a + rng.range(-0.4, 0.4)), r * 0.7);
-    if (!flowers.every((f) => dist(f.c, c) > f.r + r * 0.6)) continue;
-    buds.push({ p: c, a, r });
-    if (rng.chance(0.3)) {
-      const q = at(b, rng.range(0.4, 0.85));
-      const s2 = rng.chance(0.5) ? 1 : -1;
-      const c2 = add(q.p, dir(q.a + s2 * 1.2), q.w / 2 + r * 0.8);
-      if (flowers.every((f) => dist(f.c, c2) > f.r + r)) buds.push({ p: c2, a: q.a + s2 * 0.9, r: r * 0.85 });
-    }
+  // and a few buds along the branches
+  for (const b of [...tree.secs, ...tree.whips]) {
+    if (!rng.chance(0.35)) continue;
+    const q = at(b, rng.range(0.4, 0.85));
+    const s2 = rng.chance(0.5) ? 1 : -1;
+    const r = r0 * rng.range(0.18, 0.3);
+    const c = add(q.p, dir(q.a + s2 * 1.2), q.w / 2 + r * 0.8);
+    if (room(c, r, 0.7)) buds.push({ p: c, a: q.a + s2 * 0.9, r, b0: b.birth });
   }
 
-  // buds swell (0.47–0.6)
-  buds.map((b) => ({ b, k: rng() })).sort((x, y) => x.k - y.k).forEach(({ b }, i) => {
-    const birth = 0.47 + 0.12 * (i / Math.max(1, buds.length - 1));
+  // buds swell soon after their twig
+  for (const b of buds) {
+    const birth = clampN(b.b0 + rng.range(0.025, 0.07), 0.1, 0.64);
     const base = add(b.p, dir(b.a), -b.r * 0.75);
-    if (style === 'rouge') push('dot', [{ ...b.p, w: b.r * 2 }], rng.range(0.6, 0.8), birth, { color: PIGMENTS.rouge });
-    else push('dot', [{ ...b.p, w: b.r * 1.5 }], rng.range(0.62, 0.8), birth);
+    if (style === 'rouge') push('dot', [{ ...b.p, w: b.r * 2 }], rng.range(0.6, 0.82), birth, { color: PIGMENTS.rouge });
+    else push('dot', [{ ...b.p, w: b.r * 1.6 }], rng.range(0.55, 0.8), birth);
     push('dot', [{ ...base, w: b.r * 0.85 }], 0.92, birth);
-  });
+  }
 
-  // blossoms open (0.56–1): the first near the main focus, then spreading
-  flowers
+  // blossoms open: the first on the shoot at check-in ~7 (0.315), a real bloom by ~21 (0.65),
+  // full splendour near 66 (0.98); each after its own branch
+  const rest = flowers
+    .filter((f) => !f.first)
     .map((f) => ({ f, k: rng() * 0.5 + (focal.length ? dist(f.c, focal[0]) / H : 0) }))
-    .sort((x, y) => x.k - y.k)
-    .forEach(({ f }, i, arr) => paintFlower(rng, f.c, f.r, f.view, f.phi, style, 0.56 + 0.44 * (i / Math.max(1, arr.length - 1))));
+    .sort((x, y) => x.k - y.k);
+  flowers.filter((f) => f.first).forEach((f) => paintFlower(rng, f.c, f.r, f.view, f.phi, style, 0.315));
+  rest.forEach(({ f }, i) => {
+    const t = 0.34 + 0.64 * Math.pow(i / Math.max(1, rest.length - 1), 1.1);
+    paintFlower(rng, f.c, f.r, f.view, f.phi, style, clampN(Math.max(t, f.b0 + 0.05), 0, 1));
+  });
 }
 
 function paintFlower(rng: Rng, c: P, r: number, view: View, phi: number, style: 'rouge' | 'ink', birth: number) {

@@ -12,6 +12,7 @@ import { MonthCalendar } from './almanac/MonthCalendar';
 import { YearWheel } from './almanac/YearWheel';
 import { dayDate, dayInfo } from './almanac/model';
 import { useMedia } from './almanac/hooks';
+import { InkDivider } from '../ui/kit';
 import './almanac/almanac.css';
 
 export function AlmanacView() {
@@ -46,11 +47,14 @@ export function AlmanacView() {
           <div class="alm-col">
             {hero}
             {yiji}
+            <InkDivider />
             {cal}
           </div>
           <div class="alm-col">
             {todayCard}
+            <InkDivider />
             {poem}
+            <InkDivider />
             {wheel}
           </div>
         </div>
@@ -58,9 +62,13 @@ export function AlmanacView() {
         <div class="alm-stack page-wide">
           {hero}
           {todayCard}
+          <InkDivider />
           {yiji}
+          <InkDivider />
           {poem}
+          <InkDivider />
           {cal}
+          <InkDivider />
           {wheel}
         </div>
       )}

@@ -9,7 +9,7 @@ import { audio } from '../audio/engine';
 import { useT } from '../app/i18n';
 import { go } from '../app/router';
 import { demoState } from '../app/demo';
-import { activeHabits, editHabit, deleteHabit, emptyState, lang, replaceState, setNote, setOnboarded, state, today, toggleCheckin } from '../app/store';
+import { activeHabits, editHabit, deleteHabit, emptyState, hasUserData, lang, replaceState, setNote, setOnboarded, state, today, toggleCheckin } from '../app/store';
 import { PlantGlyph, toast } from '../ui/kit';
 import { GardenScene, type GardenPlant } from './garden/scene';
 import { sceneEnv, todayLine } from './garden/env';
@@ -20,11 +20,14 @@ import './garden/garden.css';
 
 // Dev / README screenshots: /?demo=1#garden seeds the demo garden once (&lang=en for English),
 // /?demo=0#garden shows an empty, already-welcomed garden. The flag is stripped after use.
+// Outside development it never touches a garden that already holds the visitor's own data.
 (function applyDemoFlag() {
   try {
     const q = new URLSearchParams(location.search);
     const flag = q.get('demo');
     if (flag !== '1' && flag !== '0') return;
+    const own = hasUserData() && !state.value.habits.every((h) => h.id.startsWith('demo'));
+    if (own && !import.meta.env.DEV) return;
     const l = q.get('lang');
     const lng = l === 'en' || l === 'zh' ? l : state.value.settings.lang;
     if (flag === '1') seedDemo(today.value, lng);
@@ -163,9 +166,11 @@ export function GardenView() {
             <p class="garden-empty-lead">{t('这半亩地还空着。种下一个习惯，看它一笔一笔长起来。', 'This half-acre is still bare. Plant a habit and watch it grow, stroke by stroke.')}</p>
             <div class="garden-empty-actions">
               <button class="btn btn-primary" onClick={() => setSheet({ kind: 'add' })}>{t('种下第一株', 'Plant a habit')}</button>
-              <button class="btn" onClick={() => { seedDemo(day, lang.value); toast(t('示例园子已种好，可随时在设置中清空', 'Demo garden planted — reset it any time in Settings')); }}>
-                {t('看看示例园子', 'Explore a demo garden')}
-              </button>
+              {!hasUserData() && (
+                <button class="btn" onClick={() => { seedDemo(day, lang.value); toast(t('示例园子已种好，可随时在设置中清空', 'Demo garden planted — reset it any time in Settings')); }}>
+                  {t('看看示例园子', 'Explore a demo garden')}
+                </button>
+              )}
             </div>
           </div>
         ) : (

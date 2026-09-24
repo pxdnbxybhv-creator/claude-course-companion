@@ -98,10 +98,7 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
           <MoonCanvas phase={moon.phase} size={wide ? 104 : 84} south={!!loc && loc.lat < 0} label={t(moon.zh, moon.en)} />
           <figcaption>
             <span class="alm-moon-name">{en ? <span class="latin">{moon.en}</span> : moon.zh}</span>
-            <span class="alm-moon-sub latin">
-              {en ? '' : moon.en + ' · '}
-              {Math.round(moon.illumination * 100)}%
-            </span>
+            <span class="alm-moon-sub latin">{Math.round(moon.illumination * 100)}%</span>
           </figcaption>
         </figure>
       </div>
@@ -117,7 +114,6 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
             <p class="alm-lunar-a">
               农历 {L.yearGanZhi}年 <span class="alm-dot-sep">·</span> {L.zodiac} <span class="alm-dot-sep">·</span> {lunarZh(L)}
             </p>
-            <p class="alm-lunar-b latin" lang="en">{lunarEn(L)}</p>
           </>
         )}
       </div>
@@ -129,12 +125,12 @@ export function Today(props: { dayKey: DateKey; now: Date }) {
             en ? (
               <><span class="latin">{next.fest.en} tomorrow</span> <span class="alm-nextfest-zh" lang="zh-CN">明日{next.fest.zh}</span></>
             ) : (
-              <>明日<span class="alm-nextfest-name">{next.fest.zh}</span><span class="alm-nextfest-en latin" lang="en">{next.fest.en} tomorrow</span></>
+              <>明日<span class="alm-nextfest-name">{next.fest.zh}</span></>
             )
           ) : en ? (
             <><span class="latin">{next.fest.en} in <b>{next.days}</b> days</span> <span class="alm-nextfest-zh" lang="zh-CN">{next.fest.zh}</span></>
           ) : (
-            <>距<span class="alm-nextfest-name">{next.fest.zh}</span>还有 <b class="latin">{next.days}</b> 天<span class="alm-nextfest-en latin" lang="en">{next.fest.en} in {next.days} days</span></>
+            <>距<span class="alm-nextfest-name">{next.fest.zh}</span>还有 <b class="latin">{next.days}</b> 天</>
           )}
         </p>
       )}

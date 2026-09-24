@@ -22,6 +22,8 @@ export interface ActiveFocus {
   /** Planned length in minutes (1…180). */
   minutes: number;
   intent?: string;
+  /** A habit this stick is burned for; burning through checks it off (see session.ts). */
+  habitId?: string;
   /** Total ms spent in pauses that have ended. */
   pausedMs: number;
   /** Epoch ms when the current pause began; null while burning. */
@@ -36,9 +38,13 @@ export function cleanIntent(s: string | undefined | null): string | undefined {
   return v || undefined;
 }
 
-export function light(minutes: number, intent: string | undefined, now: number): ActiveFocus {
+const cleanId = (id: unknown): string | undefined =>
+  typeof id === 'string' && id.length > 0 && id.length <= 64 ? id : undefined;
+
+export function light(minutes: number, intent: string | undefined, now: number, habitId?: string): ActiveFocus {
   const i = cleanIntent(intent);
-  return { start: now, minutes: clampMinutes(minutes), ...(i ? { intent: i } : {}), pausedMs: 0, pausedAt: null };
+  const h = cleanId(habitId);
+  return { start: now, minutes: clampMinutes(minutes), ...(i ? { intent: i } : {}), ...(h ? { habitId: h } : {}), pausedMs: 0, pausedAt: null };
 }
 
 export const durationMs = (s: Pick<ActiveFocus, 'minutes'>): number => s.minutes * 60_000;
@@ -105,10 +111,12 @@ export function parseActive(raw: string | null | undefined): ActiveFocus | null 
   if (typeof pausedMs !== 'number' || !Number.isFinite(pausedMs) || pausedMs < 0) return null;
   if (pausedAt !== null && (typeof pausedAt !== 'number' || !Number.isFinite(pausedAt))) return null;
   const intent = cleanIntent(typeof r.intent === 'string' ? r.intent : undefined);
+  const habitId = cleanId(r.habitId);
   return {
     start,
     minutes: Math.round(minutes),
     ...(intent ? { intent } : {}),
+    ...(habitId ? { habitId } : {}),
     pausedMs,
     pausedAt: pausedAt === null ? null : Math.max(start, pausedAt as number),
   };

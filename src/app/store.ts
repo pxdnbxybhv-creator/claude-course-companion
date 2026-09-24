@@ -99,25 +99,84 @@ export const state = signal<AppState>(load());
 
 /** Re-renders at local midnight so "today" rolls over while the app is open. */
 export const today = signal<DateKey>(todayKey());
-if (typeof window !== 'undefined') {
-  setInterval(() => {
-    const k = todayKey();
-    if (k !== today.value) today.value = k;
-  }, 30_000);
+
+/** Re-read the clock now (timers are throttled while a device sleeps). Returns the fresh key. */
+export function refreshToday(): DateKey {
+  const k = todayKey();
+  if (k !== today.value) today.value = k;
+  return k;
 }
 
+// ----------------------------------------------------------------------------- persistence
+
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
-effect(() => {
-  const snapshot = state.value;
+let pending: AppState | null = null;
+/** The JSON we last wrote or received, so a change arriving from another tab is not echoed back. */
+let lastJSON = '';
+
+function writeNow(): void {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-    } catch {
-      /* private mode / quota — the app keeps working in memory */
-    }
-  }, 150);
+  if (!pending) return;
+  const json = JSON.stringify(pending);
+  pending = null;
+  if (json === lastJSON) return;
+  lastJSON = json;
+  try {
+    localStorage.setItem(STORAGE_KEY, json);
+  } catch {
+    /* private mode / quota — the app keeps working in memory */
+  }
+}
+
+/** Write any debounced change immediately (used when the page is being hidden or closed). */
+export function flushSave(): void {
+  writeNow();
+}
+
+effect(() => {
+  pending = state.value;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(writeNow, 150);
 });
+
+if (typeof window !== 'undefined') {
+  try {
+    lastJSON = localStorage.getItem(STORAGE_KEY) ?? '';
+  } catch {
+    /* storage unavailable */
+  }
+  setInterval(refreshToday, 30_000);
+  const wake = () => refreshToday();
+  window.addEventListener('focus', wake);
+  window.addEventListener('pageshow', wake);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+    else refreshToday();
+  });
+  window.addEventListener('pagehide', flushSave);
+  // Another tab saved: adopt its state instead of overwriting it with ours on our next write.
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY || !e.newValue || e.newValue === lastJSON) return;
+    try {
+      lastJSON = e.newValue;
+      pending = null;
+      clearTimeout(saveTimer);
+      const next = sanitize(JSON.parse(e.newValue));
+      state.value = next;
+      // The effect above queued our copy of what we just received; mark it as already written.
+      pending = null;
+      clearTimeout(saveTimer);
+      lastJSON = e.newValue;
+    } catch {
+      /* ignore malformed writes from elsewhere */
+    }
+  });
+}
+
+/** True when the user has made anything of their own (habits, including archived ones, notes or incense). */
+export function hasUserData(s: AppState = state.value): boolean {
+  return s.habits.length > 0 || Object.keys(s.notes).length > 0 || s.focus.length > 0;
+}
 
 export const lang = computed(() => state.value.settings.lang);
 export const activeHabits = computed(() => state.value.habits.filter((h) => !h.archived));
@@ -135,7 +194,7 @@ export function addHabit(input: { name: string; plant: PlantKind; days?: number[
     name: input.name.trim().slice(0, 40) || '…',
     plant: input.plant,
     seed: hashString(id + input.name),
-    createdAt: today.value,
+    createdAt: refreshToday(),
     ...(input.days && input.days.length && input.days.length < 7 ? { days: [...input.days].sort() } : {}),
   };
   update((s) => ({ ...s, habits: [...s.habits, habit], checkins: { ...s.checkins, [id]: [] } }));
@@ -166,7 +225,7 @@ export function moveHabit(id: string, delta: number): void {
 }
 
 /** Toggle a habit for a day (default today). Returns true if it is now done. */
-export function toggleCheckin(id: string, day: DateKey = today.value): boolean {
+export function toggleCheckin(id: string, day: DateKey = refreshToday()): boolean {
   let nowDone = false;
   update((s) => {
     const days = toggleDay(s.checkins[id] ?? [], day);

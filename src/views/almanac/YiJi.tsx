@@ -32,7 +32,7 @@ export function YiJiList(props: { day: AlmanacDay; compact?: boolean }) {
       <div class="alm-yj-head">
         <SealMark text={kind === 'yi' ? '宜' : '忌'} size={props.compact ? 28 : 38} kind={kind} seed={kind === 'yi' ? 11 : 23} />
         <span class="visually-hidden">{kind === 'yi' ? t('宜', 'Good for') : t('忌', 'Avoid')}</span>
-        <span class="alm-yj-label latin" aria-hidden="true">{kind === 'yi' ? 'good for' : 'avoid'}</span>
+        {en && <span class="alm-yj-label latin" aria-hidden="true">{kind === 'yi' ? 'good for' : 'avoid'}</span>}
       </div>
       <ul class="alm-yj-items">
         {items.map((it) => (
@@ -43,10 +43,7 @@ export function YiJiList(props: { day: AlmanacDay; compact?: boolean }) {
                 <span class="alm-yj-b" lang="zh-CN">{it.zh}</span>
               </>
             ) : (
-              <>
-                <span class="alm-yj-a">{it.zh}</span>
-                <span class="alm-yj-b latin" lang="en">{it.en}</span>
-              </>
+              <span class="alm-yj-a">{it.zh}</span>
             )}
           </li>
         ))}

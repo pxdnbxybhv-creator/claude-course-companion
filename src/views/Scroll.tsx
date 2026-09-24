@@ -35,6 +35,26 @@ function useDark(theme: 'auto' | 'light' | 'dark'): boolean {
   return theme === 'dark' || (theme === 'auto' && sys);
 }
 
+function useMedia(query: string): boolean {
+  const mq = typeof matchMedia === 'function' ? matchMedia(query) : null;
+  const [on, setOn] = useState(!!mq?.matches);
+  useEffect(() => {
+    if (!mq) return;
+    const f = () => setOn(mq.matches);
+    mq.addEventListener?.('change', f);
+    return () => mq.removeEventListener?.('change', f);
+  }, [query]);
+  return on;
+}
+
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function canvasBlob(c: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     try {
@@ -69,6 +89,9 @@ export function ScrollView() {
   const [saveOpen, setSaveOpen] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const urlRef = useRef<string | null>(null);
+  const coarse = useMedia('(pointer: coarse)');
+  const embedded = isEmbedded();
+  const shareFirst = coarse && canShare;
 
   const setKind = (k: PosterKind) => { setKindRaw(k); writePref('kind', k); };
   const setFormat = (f: PosterFormat) => { setFormatRaw(f); writePref('format', f); };
@@ -113,8 +136,9 @@ export function ScrollView() {
     }
   }, [out]);
 
-  function save() {
-    if (!out) return;
+  /** Script-driven download; false where it is blocked (embedded hosts ignore it silently, so we don't try there). */
+  function download(): boolean {
+    if (!out || embedded) return false;
     try {
       const a = document.createElement('a');
       a.href = out.url;
@@ -123,11 +147,31 @@ export function ScrollView() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch { /* downloads may be blocked (embedded); the sheet below always works */ }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * One path per device, never two at once: phones share the file (the share sheet holds
+   * "Save Image" → Photos); desktops download it and offer a preview; anything else gets the
+   * preview sheet, where long-press / right-click always works.
+   */
+  function save() {
+    if (!out) return;
+    if (shareFirst) {
+      void share(true);
+      return;
+    }
+    if (!coarse && download()) {
+      toast(t(`已保存 ${out.name}`, `Saved ${out.name}`), { action: { label: t('预览', 'Preview'), run: () => setSaveOpen(true) } });
+      return;
+    }
     setSaveOpen(true);
   }
 
-  async function share() {
+  async function share(fromSave = false) {
     if (!out) return;
     try {
       const file = new File([out.blob], out.name, { type: 'image/png' });
@@ -135,7 +179,8 @@ export function ScrollView() {
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return;
       setCanShare(false);
-      toast(t('此处无法分享，请保存图片', 'Sharing isn’t available here — save the image instead'));
+      if (fromSave) setSaveOpen(true);
+      else toast(t('此处无法分享，请保存图片', 'Sharing isn’t available here — save the image instead'));
     }
   }
 
@@ -148,7 +193,7 @@ export function ScrollView() {
     <div class="scroll-view">
       <header class="topbar">
         <div class="topbar-title">
-          <h1 class="brush">{t('长卷', 'Scroll')}</h1>
+          {l === 'en' ? <h1 class="latin scroll-title-en">Scroll</h1> : <h1 class="brush">长卷</h1>}
           <span class="topbar-sub">{t('把园子裱成一幅画', 'Your garden, mounted as a painting')}</span>
         </div>
         <button class="btn btn-ghost btn-icon" onClick={() => go('settings')} aria-label={t('设置', 'Settings')} title={t('设置', 'Settings')}>
@@ -161,7 +206,7 @@ export function ScrollView() {
           <div class="scroll-frame" style={{ aspectRatio: `${size.w} / ${size.h}` }}>
             {out && (
               <img
-                class={'scroll-img' + (busy ? ' is-busy' : '')}
+                class={'scroll-img' + (busy ? ' is-busy' : '') + (kind === 'year' ? ' is-sheet' : '')}
                 src={out.url}
                 width={out.w}
                 height={out.h}
@@ -218,11 +263,11 @@ export function ScrollView() {
                 {t('换诗', 'Poem')}
               </button>
             )}
-            <button class="btn btn-primary scroll-save-btn" onClick={save} disabled={!out || busy}>
-              {t('保存图片', 'Save image')}
+            <button class="btn btn-seal scroll-save-btn" onClick={save} disabled={!out || busy}>
+              {shareFirst ? t('保存到相册', 'Save to Photos') : t('保存图片', 'Save image')}
             </button>
-            {canShare && (
-              <button class="btn" onClick={share} disabled={!out || busy}>
+            {canShare && !shareFirst && (
+              <button class="btn" onClick={() => void share()} disabled={!out || busy}>
                 {t('分享', 'Share')}
               </button>
             )}
@@ -250,8 +295,8 @@ export function ScrollView() {
             <img class="scroll-save-img" src={out.url} width={out.w} height={out.h} alt={alt} />
             <p class="scroll-save-hint">{t('长按或右键保存图片', 'Long-press or right-click to save')}</p>
             <div class="scroll-actions">
-              <a class="btn btn-primary" href={out.url} download={out.name}>{t('下载 PNG', 'Download PNG')}</a>
-              <button class="btn" onClick={() => setSaveOpen(false)}>{t('好', 'Done')}</button>
+              {!embedded && <a class="btn" href={out.url} download={out.name}>{t('下载', 'Download')}</a>}
+              <button class="btn btn-primary" onClick={() => setSaveOpen(false)}>{t('好', 'Done')}</button>
             </div>
             <p class="scroll-hint muted num">{out.name} · {out.w}×{out.h}</p>
           </div>

@@ -1,14 +1,17 @@
 /* 时令 · Almanac */
 
-.alm { padding-bottom: 8px; }
+.alm { padding-bottom: 8px; font-variant-numeric: lining-nums; }
+.alm .num { font-variant-numeric: lining-nums; }
 .alm-topbar h1 { margin: 0; }
 .alm-title { font-size: 30px; font-weight: 500; line-height: 1; letter-spacing: 0.01em; }
 
-.alm-stack, .alm-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.alm-cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 26px; align-items: start; }
-.alm-cols .alm-col { gap: 22px; }
+.alm-stack, .alm-col { display: flex; flex-direction: column; min-width: 0; }
+.alm-cols { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 56px; align-items: start; }
+/* sections breathe: 留白 and a brushed hairline between them, no cards */
+.alm-stack > .alm-hero, .alm-col > .alm-hero { margin-bottom: 32px; }
+.alm-stack > .ink-divider, .alm-col > .ink-divider { margin: 30px auto; width: 72%; opacity: 0.28; }
 
-.alm-card { background: var(--paper-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px 20px; }
+.alm-card { padding: 0 2px; }
 .alm-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 14px; font-size: 14px; font-weight: 400; letter-spacing: 0.24em; color: var(--ink-2); }
 .alm-h-sub { font-family: var(--font-latin), var(--font-text); font-style: italic; font-size: 14px; letter-spacing: 0.02em; color: var(--ink-3); }
 :lang(en) .alm-h { letter-spacing: 0.06em; font-family: var(--font-latin), var(--font-text); font-size: 17px; font-weight: 500; }
@@ -185,7 +188,7 @@
 .alm-poem-by { font-size: 14.5px; color: var(--ink-3); letter-spacing: 0.04em; }
 
 /* ------------------------------------------------------------------ calendar */
-.alm-cal { padding-left: 10px; padding-right: 10px; }
+.alm-cal { padding: 0; }
 .alm-cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -4px 0 6px; padding: 0 6px; }
 .alm-cal-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 10px; margin: 0; font-weight: 400; line-height: 1.2; min-width: 0; }
 .alm-cal-title .brush { font-size: 32px; }
@@ -321,8 +324,6 @@
 
 /* ------------------------------------------------------------------ small phones */
 @media (max-width: 374px) {
-  .alm-card { padding: 16px 14px 18px; }
-  .alm-cal { padding-left: 6px; padding-right: 6px; }
   .alm-hero-in { padding: 16px 16px 18px; }
   .alm-pentads { gap: 8px; }
   .alm-pentad-a { font-size: 15px; letter-spacing: 0.02em; }
@@ -344,8 +345,6 @@
   .alm-blurb { max-width: 30em; }
   .alm-pentads { margin-top: 30px; gap: 22px; }
   .alm-pentad-a { font-size: 17px; }
-  .alm-card { padding: 20px 22px 22px; }
-  .alm-cal { padding: 20px 16px 18px; }
   .alm-cell { min-height: 70px; }
   .alm-cell-n { font-size: 22px; }
   .alm-cell-l { font-size: 12px; }

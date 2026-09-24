@@ -1,7 +1,10 @@
 // Before lighting: how long, what for, and what to listen to.
 import { useState } from 'preact/hooks';
 import type { AmbientKind } from '../../core/types';
-import { state } from '../../app/store';
+import { activeHabits, state, today } from '../../app/store';
+import { statsFor } from '../../core/habits';
+import { PlantGlyph, Sheet } from '../../ui/kit';
+import { revealStage } from './reveal';
 import { useT } from '../../app/i18n';
 import { chooseAmbient, lightIncense } from './session';
 import { MAX_MINUTES, MIN_MINUTES, clampMinutes, INTENT_MAX } from './timer';
@@ -42,6 +45,8 @@ export function AmbientPicker(props: { compact?: boolean }) {
   );
 }
 
+const rank = (st: { doneToday: boolean; scheduledToday: boolean }) => (st.doneToday ? 2 : st.scheduledToday ? 0 : 1);
+
 export function Setup(props: { minutes: number; onMinutes: (m: number) => void }) {
   const t = useT();
   const [intent, setIntent] = useState('');
@@ -64,7 +69,24 @@ export function Setup(props: { minutes: number; onMinutes: (m: number) => void }
     props.onMinutes(m);
     setDraft(String(m));
   };
-  const go = (byKeyboard: boolean) => lightIncense(props.minutes, intent, byKeyboard);
+  const [habitId, setHabitId] = useState<string | null>(null);
+  const [habitsOpen, setHabitsOpen] = useState(false);
+  const habits = activeHabits.value;
+  const habit = habits.find((h) => h.id === habitId) ?? null;
+
+  const chooseHabit = (id: string | null) => {
+    const prev = habit;
+    const next = habits.find((h) => h.id === id) ?? null;
+    setHabitId(next ? next.id : null);
+    setHabitsOpen(false);
+    // The habit's name becomes the intention unless the user wrote their own.
+    if (!intent.trim() || (prev && intent === prev.name)) setIntent(next ? next.name : '');
+  };
+
+  const go = (byKeyboard: boolean) => {
+    revealStage({ blur: true });
+    lightIncense(props.minutes, intent, byKeyboard, habit?.id);
+  };
 
   return (
     <div class="fx-setup">
@@ -107,6 +129,7 @@ export function Setup(props: { minutes: number; onMinutes: (m: number) => void }
         </div>
       )}
 
+      <div class="fx-intent-row">
       <label class="fx-intent">
         <span class="visually-hidden">{t('此香为何而燃', 'What is this incense for?')}</span>
         <input
@@ -120,10 +143,51 @@ export function Setup(props: { minutes: number; onMinutes: (m: number) => void }
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.isComposing) go(true); }}
         />
       </label>
+      {habits.length > 0 && (
+        <button
+          class={'fx-habit-btn' + (habit ? ' is-set' : '')}
+          onClick={() => setHabitsOpen(true)}
+          aria-haspopup="dialog"
+          aria-label={habit ? t(`为「${habit.name}」而燃，更改`, `For habit “${habit.name}” — change`) : t('为哪一株而燃', 'For which habit?')}
+        >
+          {habit ? <PlantGlyph kind={habit.plant} size={26} /> : <span class="fx-habit-glyph brush" aria-hidden="true">株</span>}
+          <span class="fx-habit-cap" aria-hidden="true">{habit ? t('已系', 'linked') : t('系一株', 'habit')}</span>
+        </button>
+      )}
+      </div>
+
+      <Sheet open={habitsOpen} onClose={() => setHabitsOpen(false)} title={t('为哪一株而燃', 'For which habit?')} label={t('为哪一株而燃', 'For which habit?')}>
+        <p class="fx-habit-note">{t('燃尽这炷香，便为它记下今日。', 'Burn this stick through and the habit is checked off for today.')}</p>
+        <ul class="fx-habit-list">
+          {habits
+            .map((h) => ({ h, st: statsFor(h, state.value.checkins[h.id] ?? [], today.value) }))
+            // Due and not yet done first; done today last.
+            .sort((a, b) => rank(a.st) - rank(b.st))
+            .map(({ h, st }) => {
+            return (
+              <li>
+                <button class="fx-habit-row" aria-pressed={h.id === habitId} onClick={() => chooseHabit(h.id)}>
+                  <PlantGlyph kind={h.plant} size={36} />
+                  <span class="fx-habit-name">{h.name}</span>
+                  <span class="fx-habit-state">
+                    {st.doneToday ? t('今日已完成', 'done today') : st.scheduledToday ? t('今日待做', 'due today') : t('今日不必', 'not due')}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          <li>
+            <button class="fx-habit-row" aria-pressed={!habitId} onClick={() => chooseHabit(null)}>
+              <span class="fx-habit-none brush" aria-hidden="true">无</span>
+              <span class="fx-habit-name">{t('不系于习惯', 'No habit')}</span>
+            </button>
+          </li>
+        </ul>
+      </Sheet>
 
       <AmbientPicker />
 
-      <button class="btn btn-primary fx-light" onClick={(e) => go(e.detail === 0)}>
+      <button class="btn btn-seal fx-light" onClick={(e) => go(e.detail === 0)}>
         {t('燃香', 'Light the incense')}
       </button>
     </div>

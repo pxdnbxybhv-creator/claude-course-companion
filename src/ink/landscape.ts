@@ -164,8 +164,9 @@ function makeRidge(w: number, base: number, peaks: Peak[], noise: Noise2, depth:
 
 const layoutCache = new Map<string, Layout>();
 
-function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
-  const key = `${w}|${h}|${env.seed}|${env.tod}|${env.hour.toFixed(2)}|${env.moonPhase.toFixed(3)}`;
+function sceneLayout(w: number, h: number, env: SceneEnv, opts: BackdropOptions = {}): Layout {
+  const optKey = `${opts.bodyX?.toFixed(3) ?? ''}|${(opts.avoid ?? []).map((a) => `${Math.round(a.x0)},${Math.round(a.x1)},${Math.round(a.top ?? -1)}`).join(';')}`;
+  const key = `${w}|${h}|${env.seed}|${env.tod}|${env.hour.toFixed(2)}|${env.moonPhase.toFixed(3)}|${optKey}`;
   const hit = layoutCache.get(key);
   if (hit) return hit;
   const rng = makeRng(mixSeed(env.seed, 0x1a4d5ca9));
@@ -218,12 +219,36 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
   const r0 = clamp(0.034 * Math.min(w, h * 1.3), 9, 24);
   let body: Layout['body'];
   const highest = (x: number) => Math.min(...ridges.map((r) => ridgeAt(r, x)));
+  // keep the disc out of the plants: slide to the nearest open sky that the hills also leave
+  // clear; failing that, rise above the tallest plant in the way
+  const avoidPlants = (b: Layout['body'], ceil: (x: number) => number): Layout['body'] => {
+    const av = opts.avoid;
+    if (!av || !av.length || b.r <= 0) return b;
+    const pad = b.r * 1.25;
+    const hits = (x: number, y: number) => av.filter((a) => x + pad > a.x0 && x - pad < a.x1 && (a.top ?? -Infinity) < y + pad);
+    if (!hits(b.x, b.y).length) return b;
+    let best: { x: number; y: number } | null = null;
+    for (let d = b.r * 0.5; d < w * 0.45 && !best; d += b.r * 0.5) {
+      for (const sgn of [1, -1]) {
+        const x = b.x + sgn * d;
+        if (x < w * 0.05 || x > w * 0.95) continue;
+        const y = Math.min(b.y, ceil(x));
+        if (y < skyTop * 0.6 || hits(x, y).length) continue;
+        best = { x, y };
+        break;
+      }
+    }
+    if (best) return { ...b, x: best.x, y: best.y };
+    const top = Math.min(...hits(b.x, b.y).map((a) => a.top ?? skyTop));
+    return { ...b, y: Math.max(b.r * 1.4, top - b.r * 1.6) };
+  };
   if (env.tod !== 'night') {
     let u = (env.hour - 6) / 12;
     if (env.tod === 'dawn') u = clamp(u, -0.02, 0.2);
     else if (env.tod === 'dusk') u = clamp(u, 0.8, 1.02);
     else u = clamp(u, 0.12, 0.88);
-    let x = w * lerp(0.07, 0.93, clamp(u, 0, 1));
+    let x = opts.bodyX !== undefined ? clamp(opts.bodyX, 0.04, 0.96) * w : w * lerp(0.07, 0.93, clamp(u, 0, 1));
+    const x00 = x;
     const alt = Math.pow(Math.max(0, Math.sin(Math.PI * clamp(u, 0, 1))), 0.8);
     let y = lerp(hz - Hz * 0.12, skyTop + Hz * 0.05, alt);
     // a low sun rests on the hills rather than showing through their thin wash: slide it
@@ -237,10 +262,10 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
     // resting on low far hills is fine; hiding behind the big corner mass is not
     if (y - clearAt(x) > Hz * 0.22) {
       const dir = x < w / 2 ? 1 : -1;
-      for (let k = 0; k < 40 && clearAt(x) < y && Math.abs(x - w * lerp(0.07, 0.93, clamp(u, 0, 1))) < w * 0.35; k++) x += dir * r0 * 0.5;
+      for (let k = 0; k < 40 && clearAt(x) < y && Math.abs(x - x00) < w * 0.35; k++) x += dir * r0 * 0.5;
     }
     y = Math.min(y, clearAt(x));
-    body = { kind: 'sun', x, y: Math.max(r0 * 1.5, y), r: r0 };
+    body = avoidPlants({ kind: 'sun', x, y: Math.max(r0 * 1.5, y), r: r0 }, (cx) => clearAt(cx));
   } else {
     const transit = 12 + env.moonPhase * 24;
     let u = ((((env.hour - (transit - 6)) % 24) + 24) % 24) / 12;
@@ -248,12 +273,12 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
     if (u > 1 || lit < 0.03) body = { kind: 'moon', x: 0, y: 0, r: 0 };
     else {
       u = clamp(u, 0.08, 0.92);
-      const x = w * lerp(0.08, 0.92, u);
+      const x = opts.bodyX !== undefined ? clamp(opts.bodyX, 0.05, 0.95) * w : w * lerp(0.08, 0.92, u);
       const alt = Math.pow(Math.sin(Math.PI * u), 0.7);
       let y = lerp(hz - Hz * 0.25, skyTop + Hz * 0.02, alt);
       const rm = r0 * 0.9;
       y = Math.min(y, highest(x) - rm * 1.8); // keep the moon in open sky
-      body = { kind: 'moon', x, y: Math.max(rm * 1.6, y), r: rm };
+      body = avoidPlants({ kind: 'moon', x, y: Math.max(rm * 1.6, y), r: rm }, (cx) => highest(cx) - rm * 1.8);
     }
   }
 
@@ -312,18 +337,30 @@ function palette(season: Season, tod: TimeOfDay): Palette {
 // ---------------------------------------------------------------------------
 // the backdrop
 
+export interface BackdropOptions {
+  /** Preferred horizontal position of the sun/moon, 0..1 of the width (default: by the hour, east = left). */
+  bodyX?: number;
+  /**
+   * Spans (css px of this backdrop) the sun/moon must not sit in — e.g. plants, from x0 to x1,
+   * reaching up to `top` (omit for full height). The disc slides to the nearest open sky, or
+   * rises above them. The bank's shore strokes also cluster under these spans.
+   */
+  avoid?: { x0: number; x1: number; top?: number }[];
+}
+
 /** Wall-clock ms spent in each stage of the last paintBackdrop (for the lab). */
 export const backdropTimings: Record<string, number> = {};
 
 /** Everything behind the plants. Expensive — call once per size/env change and cache. */
-export function paintBackdrop(w: number, h: number, dpr: number, env: SceneEnv): Backdrop {
+export function paintBackdrop(w: number, h: number, dpr: number, env: SceneEnv, opts: BackdropOptions = {}): Backdrop {
   const c = makeCanvas(w * dpr, h * dpr);
   const ctx = c.getContext('2d')!;
   ctx.scale(dpr, dpr);
   const tp = performance.now();
   fillPaper(ctx, w, h, env.seed);
   const tPaper = performance.now() - tp;
-  const L = sceneLayout(w, h, env);
+  const L = sceneLayout(w, h, env, opts);
+  lastBody = { w, ...L.body };
   const pal = palette(env.season, env.tod);
   const rng = makeRng(mixSeed(env.seed, 0x6ac3));
   const noise = makeNoise2(mixSeed(env.seed, 0x51));
@@ -345,7 +382,7 @@ export function paintBackdrop(w: number, h: number, dpr: number, env: SceneEnv):
     if (i === 2) paintHempStrokes(ctx, L, R, pal, env, rng.fork(2), noise);
     lap('texture');
   }
-  paintGround(ctx, L, pal, env, rng.fork(3), noise, fr(0.35));
+  paintGround(ctx, L, pal, env, rng.fork(3), noise, fr(0.35), opts.avoid);
   lap('ground');
   T.paper = tPaper;
   return { canvas: c, groundY: L.groundY, pondTop: L.pondTop, side: L.side, body: { ...L.body } };
@@ -405,17 +442,26 @@ function paintBody(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, nois
   if (b.r <= 0) return;
   ctx.save();
   if (b.kind === 'sun') {
-    const a = env.tod === 'day' ? 0.34 : 0.5;
+    // a soft cinnabar watercolour disc: pigment pools unevenly, the rim dries a little darker,
+    // and a faint bleed wicks out into the paper fibres
+    const a = env.tod === 'day' ? 0.34 : 0.48;
     const col = env.tod === 'dawn' ? mixRgb(CINNABAR, ROUGE, 0.3) : env.tod === 'dusk' ? mixRgb(CINNABAR, [214, 85, 58], 0.5) : CINNABAR;
-    const R = b.r * 1.6;
-    paintField(ctx, b.x - R, b.y - R, R * 2, R * 2, clamp(3 / b.r * 4, 0.6, 2), (x, y, out) => {
-      const ang = Math.atan2(y - b.y, x - b.x);
-      const dd = Math.hypot(x - b.x, y - b.y) / (b.r * (1 + 0.025 * noise(Math.cos(ang) * 2, Math.sin(ang) * 2 + 9)));
-      const mott = 0.82 + 0.18 * noise(x / 5, y / 5) + 0.12 * smoothstep(0.7, 0.98, dd);
-      const core = (1 - smoothstep(0.95, 1.02, dd)) * mott;
-      const glow = Math.exp(-(((dd - 1) * 2.6) ** 2)) * 0.12 * (dd > 1 ? 1 : 0);
+    const R = b.r * 1.45;
+    const m = ctx.getTransform();
+    const dev = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
+    const o = b.x * 0.37 + b.r;
+    paintField(ctx, b.x - R, b.y - R, R * 2, R * 2, clamp(dev * 0.9, 1, 2.5), (x, y, out) => {
+      const dx = x - b.x, dy = y - b.y;
+      const ang = Math.atan2(dy, dx);
+      const ca = Math.cos(ang), sa = Math.sin(ang);
+      const rr = b.r * (1 + 0.03 * noise(ca * 1.6 + o, sa * 1.6) + 0.012 * noise(ca * 5 + o, sa * 5));
+      const d = Math.hypot(dx, dy) / rr;
+      const pool = 0.78 + 0.26 * noise.fbm(x / (b.r * 0.7) + o, y / (b.r * 0.7), 3) + 0.08 * noise(x / 2.5, y / 2.5);
+      const rim = 0.16 * smoothstep(0.72, 0.97, d) * (d < 1.02 ? 1 : 0);
+      const core = (1 - smoothstep(0.96, 1.03, d)) * (pool + rim);
+      const bleed = d > 0.98 ? 0.1 * Math.exp(-(((d - 1) / 0.13) ** 2)) * (0.4 + 0.6 * Math.max(0, noise(ca * 3 + o, sa * 3 + 2) + 0.4)) : 0;
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2];
-      out[3] = a * core + a * glow;
+      out[3] = a * (core + bleed);
     });
   } else {
     // moon: lead-white lit part, the dark limb a faint earthshine
@@ -708,7 +754,7 @@ function paintHempStrokes(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pa
 }
 
 /** A quiet ground band: soft wash, bank edge above the pond, tufts and moss dots. */
-function paintGround(ctx: CanvasRenderingContext2D, L: Layout, pal: Palette, env: SceneEnv, rng: Rng, noise: Noise2, res: number) {
+function paintGround(ctx: CanvasRenderingContext2D, L: Layout, pal: Palette, env: SceneEnv, rng: Rng, noise: Noise2, res: number, avoid?: BackdropOptions['avoid']) {
   const { w, h, groundY: gy, pondTop: pt } = L;
   const snow = env.season === 'winter';
   const scale = clamp(h / 520, 0.75, 1.3);
@@ -729,24 +775,33 @@ function paintGround(ctx: CanvasRenderingContext2D, L: Layout, pal: Palette, env
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = a;
     } else {
       const dd = y - pt;
-      const a = (0.045 + 0.08 * Math.exp(-dd / 6)) * (0.75 + 0.4 * noise(x / 120, y / 16));
+      const a = 0.045 * (0.75 + 0.4 * noise(x / 120, y / 16)) * smoothstep(0, 14, dd);
       out[0] = water[0]; out[1] = water[1]; out[2] = water[2]; out[3] = a;
     }
   });
   const ink = rgbHex(INK);
   const grass = rgbHex(pal.grass);
-  // bank lip: a long, slightly wavering dry line where earth meets water (方塘 edge)
-  let x = -10;
-  while (x < w + 10) {
-    const len = rng.range(60, 180) * scale;
-    const pts: StrokePoint[] = [];
-    for (let i = 0; i <= 10; i++) {
-      const t = i / 10;
-      const xx = x + len * t;
-      pts.push(P(xx, pt - 0.5 + noise(xx / 40, 9.1) * 1.2, (0.5 + 1.2 * Math.sin(Math.PI * t) ** 0.7) * scale));
+  // bank lip: a few clustered dry strokes where earth meets water — under the plants when we
+  // know where they stand — and mist dissolving the shore everywhere else (≤ ~55% of the width)
+  const centers: number[] = [];
+  if (avoid && avoid.length) for (const a of avoid) centers.push((a.x0 + a.x1) / 2 + rng.gauss() * 6);
+  else for (let i = rng.int(2, 3); i > 0; i--) centers.push(rng.range(0.08, 0.92) * w);
+  let budget = w * 0.55;
+  const order = centers.map((c) => ({ c, k: rng() })).sort((a, b) => a.k - b.k).map((o) => o.c);
+  for (const cx of order) {
+    const n = rng.int(1, 2);
+    for (let j = 0; j < n && budget > 20; j++) {
+      const len = Math.min(budget, rng.range(40, 120) * scale);
+      budget -= len;
+      const x0 = cx - len / 2 + (j ? rng.range(-0.6, 0.6) * len : 0);
+      const pts: StrokePoint[] = [];
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        const xx = x0 + len * t;
+        pts.push(P(xx, pt - 0.5 + j * 1.2 + noise(xx / 40, 9.1) * 1.4, (0.4 + 1.3 * Math.sin(Math.PI * t) ** 0.7) * scale));
+      }
+      paintStroke(ctx, { kind: 'dry', tone: snow ? rng.range(0.4, 0.6) : rng.range(0.25, 0.55), color: ink, birth: 0, seed: rng.int(1, 1e9), dryness: 0.6, pts });
     }
-    paintStroke(ctx, { kind: 'dry', tone: snow ? 0.55 : 0.42, color: ink, birth: 0, seed: rng.int(1, 1e9), dryness: 0.55, pts });
-    x += len + rng.range(6, 50) * scale;
   }
   // 折带 texture on the bank face: a few short horizontal dry strokes
   const nt = Math.round(w / 90);
@@ -1021,14 +1076,14 @@ function inside(poly: { x: number; y: number }[], x: number, y: number): boolean
 }
 
 // ---------------------------------------------------------------------------
-// the pond
+// the pond — 半亩方塘一鉴开，天光云影共徘徊
 
 export interface PondOptions {
   /** Pond rectangle in css px. */
   x: number; y: number; w: number; h: number;
   /** Seconds since start — drives ripples. */
   t: number;
-  /** What to reflect: the painted scene above the pond (same css-px coordinate space, drawn at `dpr`). */
+  /** What to reflect: the painted scene above the pond (same css-px coordinate space, drawn at `dpr`). Only rows above `mirrorY` are read. */
   source: CanvasImageSource;
   /** Mirror line in css px (usually the pond top). */
   mirrorY: number;
@@ -1036,79 +1091,118 @@ export interface PondOptions {
   dpr: number;
   /** Optional: the scene seed, so ripples and duckweed differ between gardens. Default 1. */
   seed?: number;
-  /** Optional: night dims the sky glint. */
+  /** Optional: night dims the sky glint and turns the sun's smear into the moon's. */
   tod?: TimeOfDay;
+  /**
+   * Optional: the sun/moon disc in the same css space (e.g. `Backdrop.body` mapped to the view).
+   * Clear water mirrors it as a soft vertical smear. Omitted → the last backdrop's body when the
+   * pond spans that backdrop 1:1; `null` → none.
+   */
+  body?: { x: number; y: number; r: number; kind?: 'sun' | 'moon' } | null;
 }
+
+interface Sprite { c: HTMLCanvasElement; w: number; h: number }
 
 interface PondCache {
   key: string;
-  pond: HTMLCanvasElement; pctx: CanvasRenderingContext2D;
-  refl: HTMLCanvasElement; rctx: CanvasRenderingContext2D; rs: number; pr: number;
-  tint: HTMLCanvasElement;
+  pond: HTMLCanvasElement; pctx: CanvasRenderingContext2D; pr: number;
+  refl: HTMLCanvasElement; rctx: CanvasRenderingContext2D;
+  wob: HTMLCanvasElement; wctx: CanvasRenderingContext2D; rs: number;
   water: HTMLCanvasElement;
-  silt: HTMLCanvasElement;
+  silt: HTMLCanvasElement | null;
+  shore: HTMLCanvasElement;
   mask: HTMLCanvasElement;
-  ripples: { c: HTMLCanvasElement; w: number; h: number }[];
+  ripples: Sprite[];
   glint: HTMLCanvasElement;
+  wisps: Sprite[];
+  smear: HTMLCanvasElement;
+  weed: Sprite[];
+  leaves: Sprite[];
 }
 const pondCaches: PondCache[] = [];
 
-function buildPondCache(o: PondOptions, key: string, full: boolean): PondCache {
+/** Last painted backdrop's body (css px of that backdrop), for the pond's default sun/moon smear. */
+let lastBody: { w: number; x: number; y: number; r: number; kind: 'sun' | 'moon' } | null = null;
+
+function spriteOf(w: number, h: number, res: number, draw: (c: CanvasRenderingContext2D) => void): Sprite {
+  const c = makeCanvas(w * res, h * res);
+  const cc = c.getContext('2d')!;
+  cc.scale(res, res);
+  draw(cc);
+  return { c, w, h };
+}
+
+function buildPondCache(o: PondOptions, key: string, full: boolean, cl: number): PondCache {
   const { w, h, dpr } = o;
   const seed = o.seed ?? 1;
-  const cl = Math.round(clamp(o.clarity, 0, 1) * 10) / 10;
   const pr = Math.min(dpr, 2);
   const pond = makeCanvas(w * pr, h * pr);
   const pctx = pond.getContext('2d')!;
-  // reflections are softer than the thing reflected; murky water blurs them further
-  const rs = Math.min(dpr, 2) * lerp(0.35, 0.8, cl);
+  // Reflections are softer than the thing reflected; stagnant water blurs them to a smudge.
+  const rs = clamp(Math.min(dpr, 2) * lerp(0.15, 0.8, cl), 0.25, 1.6);
   const refl = makeCanvas(w * rs, h * rs);
   const rctx = refl.getContext('2d')!;
+  const wob = makeCanvas(w * rs, h * rs);
+  const wctx = wob.getContext('2d')!;
   const noise = makeNoise2(mixSeed(seed, 0x90d));
-
-  // water tone: a faint indigo breath, a darker shadow line right under the bank
-  const tint = makeCanvas(w * 0.25 + 2, h * 0.25 + 2);
-  {
-    const tc = tint.getContext('2d')!;
-    paintField(tc, 0, 0, tint.width, tint.height, 1, (x, y, out) => {
-      const X = x * 4, Y = y * 4;
-      const v = Y / h;
-      const a = (0.035 + 0.05 * v) * (0.7 + 0.5 * noise.fbm(X / 140, Y / 18, 3)) + 0.2 * Math.exp(-Y / 3.5);
-      out[0] = INDIGO[0] * 0.7; out[1] = INDIGO[1] * 0.75; out[2] = INDIGO[2] * 0.8; out[3] = a;
-    });
-  }
-  // silt: an ochre-grey murk, pooling unevenly
-  const silt = makeCanvas(w * 0.25 + 2, h * 0.25 + 2);
-  {
-    const sc = silt.getContext('2d')!;
-    const col = mixRgb(OCHRE, [90, 88, 80], 0.5);
-    paintField(sc, 0, 0, silt.width, silt.height, 1, (x, y, out) => {
-      const X = x * 4, Y = y * 4;
-      const n = noise.fbm(X / 80 + 40, Y / 22, 4);
-      const a = 0.38 + 0.6 * n + 0.15 * (Y / h);
-      out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = clamp(a, 0, 1);
-    });
-  }
-  // bake the murk into the water tone: one blit per frame instead of two
-  {
-    const murk = (1 - cl) ** 1.3;
-    if (murk > 0.02) {
-      const tc = tint.getContext('2d')!;
-      tc.globalAlpha = murk * 0.4;
-      tc.drawImage(silt, 0, 0);
-      tc.globalAlpha = 1;
-    }
-  }
-  // upscale the water tone once, to the exact device size it is drawn at (a 1:1 blit per frame)
   const tr = full ? dpr : pr;
+  const clearK = smoothstep(0.45, 0.9, cl);
+  const murkK = 1 - smoothstep(0.3, 0.75, cl);
+
+  // water tone: 天光 — clear water holds a pale, luminous sky (brighter far off); the shore
+  // dissolves into mist (no hard line under the bank)
+  const lo = makeCanvas(w * 0.25 + 2, h * 0.25 + 2);
+  paintField(lo.getContext('2d')!, 0, 0, lo.width, lo.height, 1, (x, y, out) => {
+    const X = x * 4, Y = y * 4, v = Y / h;
+    const shore = smoothstep(0, 14, Y);
+    const n = noise.fbm(X / 150, Y / 20, 3);
+    // indigo sky tint, stronger when clear
+    const aI = (0.03 + 0.05 * clearK) * (0.7 + 0.5 * n) * (0.6 + 0.6 * v);
+    // lead-white sky light near the far bank
+    const aW = clearK * 0.32 * Math.exp(-v * 3.2) * (0.8 + 0.3 * n);
+    const a = aI + aW * (1 - aI);
+    if (a <= 0) return;
+    out[0] = (INDIGO[0] * 0.8 * aI + 255 * aW * (1 - aI)) / a;
+    out[1] = (INDIGO[1] * 0.85 * aI + 253 * aW * (1 - aI)) / a;
+    out[2] = (INDIGO[2] * 0.9 * aI + 246 * aW * (1 - aI)) / a;
+    out[3] = a * shore;
+  });
   const water = makeCanvas(w * tr, h * tr);
   {
     const wc = water.getContext('2d')!;
     wc.imageSmoothingEnabled = true;
     wc.imageSmoothingQuality = 'high';
-    wc.drawImage(tint, 0, 0, tint.width - 2, tint.height - 2, 0, 0, water.width, water.height);
+    wc.drawImage(lo, 0, 0, lo.width - 2, lo.height - 2, 0, 0, water.width, water.height);
   }
-  // mask: fade the side ends so the water sits in the paper, not in a box
+  // silt: an ochre-grey murk pooling in clouds, laid over the reflection
+  let silt: HTMLCanvasElement | null = null;
+  if (murkK > 0.02) {
+    const sl = makeCanvas(w * 0.25 + 2, h * 0.25 + 2);
+    const col = mixRgb(OCHRE, [96, 90, 78], 0.35);
+    paintField(sl.getContext('2d')!, 0, 0, sl.width, sl.height, 1, (x, y, out) => {
+      const X = x * 4, Y = y * 4;
+      const n = noise.fbm(X / 70 + 40, Y / 18, 4);
+      const a = (0.2 + 0.55 * Math.max(0, n + 0.2) + 0.12 * (Y / h)) * smoothstep(0, 10, Y);
+      out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = clamp(a, 0, 1) * murkK * 0.55;
+    });
+    silt = makeCanvas(w * tr, h * tr);
+    const sc = silt.getContext('2d')!;
+    sc.imageSmoothingEnabled = true;
+    sc.imageSmoothingQuality = 'high';
+    sc.drawImage(sl, 0, 0, sl.width - 2, sl.height - 2, 0, 0, silt.width, silt.height);
+  }
+  // shore mist: paper dissolving the first few px of water under the bank
+  const shore = makeCanvas(8, Math.max(2, Math.round(14 * tr)));
+  {
+    const sc = shore.getContext('2d')!;
+    const g = sc.createLinearGradient(0, 0, 0, shore.height);
+    g.addColorStop(0, 'rgba(241,233,216,0.9)');
+    g.addColorStop(0.45, 'rgba(241,233,216,0.45)');
+    g.addColorStop(1, 'rgba(241,233,216,0)');
+    sc.fillStyle = g;
+    sc.fillRect(0, 0, shore.width, shore.height);
+  }
+  // mask: fade the side ends so a narrower pond sits in the paper, not in a box
   const mask = makeCanvas(w * pr, 4);
   {
     const mc = mask.getContext('2d')!;
@@ -1121,43 +1215,96 @@ function buildPondCache(o: PondOptions, key: string, full: boolean): PondCache {
     mc.fillStyle = g;
     mc.fillRect(0, 0, mask.width, mask.height);
   }
-  // 水纹: fine tapered wave lines, some doubled, painted with the brush engine
   const rng = makeRng(mixSeed(seed, 0x317));
-  const ripples: PondCache['ripples'] = [];
   const res = Math.min(dpr, 2) * 1.5;
+  // 水纹: fine tapered wave lines, some doubled
+  const ripples: Sprite[] = [];
   for (let i = 0; i < 7; i++) {
     const len = rng.range(26, 70);
-    const hh = 8;
-    const c = makeCanvas((len + 6) * res, hh * res);
-    const cc = c.getContext('2d')!;
-    cc.scale(res, res);
-    const lines = rng.chance(0.4) ? 2 : 1;
-    for (let l = 0; l < lines; l++) {
-      const pts: StrokePoint[] = [];
-      const n = 14;
-      const off = l * rng.range(2.2, 3);
-      const ll = len * (l ? rng.range(0.4, 0.7) : 1);
-      const x0 = 3 + (l ? rng.range(0, len - ll) : 0);
-      const ph = rng.range(0, 6), fq = rng.range(2.5, 4.5);
-      for (let k = 0; k <= n; k++) {
-        const t = k / n;
-        pts.push(P(x0 + ll * t, 3 + off * 0.6 + Math.sin(ph + t * fq * Math.PI) * 0.7, 1.1 * Math.sin(Math.PI * t) ** 0.8 + 0.05));
+    ripples.push(spriteOf(len + 6, 8, res, (cc) => {
+      const lines = rng.chance(0.4) ? 2 : 1;
+      for (let l = 0; l < lines; l++) {
+        const pts: StrokePoint[] = [];
+        const off = l * rng.range(2.2, 3);
+        const ll = len * (l ? rng.range(0.4, 0.7) : 1);
+        const x0 = 3 + (l ? rng.range(0, len - ll) : 0);
+        const ph = rng.range(0, 6), fq = rng.range(2.5, 4.5);
+        for (let k = 0; k <= 14; k++) {
+          const t = k / 14;
+          pts.push(P(x0 + ll * t, 3 + off * 0.6 + Math.sin(ph + t * fq * Math.PI) * 0.7, 1.1 * Math.sin(Math.PI * t) ** 0.8 + 0.05));
+        }
+        paintStroke(cc, { kind: 'line', tone: l ? 0.4 : 0.55, birth: 0, seed: rng.int(1, 1e9), pts });
       }
-      paintStroke(cc, { kind: 'line', tone: l ? 0.4 : 0.55, birth: 0, seed: rng.int(1, 1e9), pts });
-    }
-    ripples.push({ c, w: len + 6, h: hh });
+    }));
   }
-  // sky-light glint: soft white streaks (lighter than paper — the one place we use lead white)
+  // sky-light glint: soft white patch (lighter than paper — lead white)
   const glint = makeCanvas(128, 16);
-  {
-    const gc = glint.getContext('2d')!;
-    paintField(gc, 0, 0, 128, 16, 1, (x, y, out) => {
-      const u = (x - 64) / 64, v = (y - 8) / 5;
-      const a = Math.exp(-u * u * 3 - v * v) * (0.6 + 0.4 * noise(x / 11, y / 4));
-      out[0] = 255; out[1] = 253; out[2] = 246; out[3] = a;
+  paintField(glint.getContext('2d')!, 0, 0, 128, 16, 1, (x, y, out) => {
+    const u = (x - 64) / 64, v = (y - 8) / 5;
+    const a = Math.exp(-u * u * 3 - v * v) * (0.6 + 0.4 * noise(x / 11, y / 4));
+    out[0] = 255; out[1] = 253; out[2] = 246; out[3] = a;
+  });
+  // 云影: reflected cloud wisps — long soft paper-white bodies with a faint grey underside
+  const wisps: Sprite[] = [];
+  for (let i = 0; i < 3; i++) {
+    const ww = 160, wh = 24;
+    const c = makeCanvas(ww, wh);
+    const o2 = rng.range(0, 50);
+    paintField(c.getContext('2d')!, 0, 0, ww, wh, 1, (x, y, out) => {
+      const u = (x - ww / 2) / (ww / 2);
+      const top = wh * 0.5 + noise(x / 26 + o2, 3.3) * wh * 0.22 - (1 - u * u) * wh * 0.12;
+      const body = Math.exp(-(((y - top) / (wh * 0.18)) ** 2)) * (1 - u * u) ** 1.5;
+      const under = Math.exp(-(((y - top - wh * 0.2) / (wh * 0.08)) ** 2)) * (1 - u * u) ** 2;
+      const aW = body * (0.75 + 0.35 * noise(x / 12 + o2, y / 5));
+      const aG = under * 0.35 * (1 - aW);
+      const a = aW + aG;
+      if (a <= 0) return;
+      out[0] = (255 * aW + 120 * aG) / a; out[1] = (253 * aW + 128 * aG) / a; out[2] = (246 * aW + 140 * aG) / a;
+      out[3] = a;
     });
+    wisps.push({ c, w: ww, h: wh });
   }
-  return { key, pond, pctx, refl, rctx, rs, pr, tint, water, silt, mask, ripples, glint };
+  // the sun's / moon's broken column on the water
+  const smear = makeCanvas(48, 160);
+  paintField(smear.getContext('2d')!, 0, 0, 48, 160, 1, (x, y, out) => {
+    const v = y / 160;
+    const half = 8 + 12 * v;
+    const u = (x - 24) / half;
+    const brk = 0.45 + 0.55 * Math.max(0, Math.sin(y * 0.55 + noise(x / 6, y / 9) * 3));
+    const a = Math.exp(-u * u * 2) * (1 - v) ** 1.3 * brk * smoothstep(0, 0.06, v);
+    out[0] = 255; out[1] = 255; out[2] = 255; out[3] = a;
+  });
+  // duckweed clusters (浮萍) and fallen leaves for stagnant water
+  const weed: Sprite[] = [];
+  const leaves: Sprite[] = [];
+  if (murkK > 0.02) {
+    for (let i = 0; i < 6; i++) {
+      const cw = rng.range(40, 80), ch = cw * 0.32;
+      weed.push(spriteOf(cw, ch, res, (cc) => {
+        const n = rng.int(12, 20);
+        for (let k = 0; k < n; k++) {
+          const gx = cw / 2 + rng.gauss() * cw * 0.2, gy = ch / 2 + rng.gauss() * ch * 0.18;
+          const r = rng.range(1.2, 2.6) * (1 - Math.abs(gx - cw / 2) / cw);
+          paintStroke(cc, { kind: 'dot', tone: rng.range(0.45, 0.75), color: rng.chance(0.8) ? PIGMENTS.malachite : PIGMENTS.ink, birth: 0, seed: rng.int(1, 1e9), pts: [P(gx, gy, r * 2)] });
+          if (rng.chance(0.35)) paintStroke(cc, { kind: 'dot', tone: 0.6, color: PIGMENTS.malachite, birth: 0, seed: rng.int(1, 1e9), pts: [P(gx + r * 1.2, gy + r * 0.2, r * 1.4)] });
+        }
+      }));
+    }
+    for (let i = 0; i < 4; i++) {
+      leaves.push(spriteOf(22, 10, res, (cc) => {
+        const pts: StrokePoint[] = [];
+        for (let k = 0; k < 16; k++) {
+          const a = (k / 16) * Math.PI * 2;
+          const ca = Math.cos(a), sa = Math.sin(a);
+          const taper = ca > 0 ? Math.pow(1 - ca, 0.7) * 0.9 + 0.1 : 1;
+          pts.push(P(11 + ca * 8.5, 5 + sa * 3.2 * taper, 1));
+        }
+        paintStroke(cc, { kind: 'fill', tone: rng.range(0.55, 0.8), color: rng.pick([PIGMENTS.ochre, '#8a5a2e', PIGMENTS.ochre, PIGMENTS.gamboge]), birth: 0, seed: rng.int(1, 1e9), pts });
+        paintStroke(cc, { kind: 'line', tone: 0.4, birth: 0, seed: rng.int(1, 1e9), pts: [P(1, 5.4, 0.5), P(8, 5.1, 0.5), P(18, 4.8, 0.2)] });
+      }));
+    }
+  }
+  return { key, pond, pctx, pr, refl, rctx, wob, wctx, rs, water, silt, shore, mask, ripples, glint, wisps, smear, weed, leaves };
 }
 
 const hash01 = (a: number, b: number) => mixSeed(a, b) / 4294967296;
@@ -1169,33 +1316,55 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   // A pond spanning the whole width is painted straight onto the scene; a narrower one goes
   // through its own layer so its ends can be feathered into the paper.
   const full = o.x <= 0.5 && o.x + o.w >= ctx.canvas.width / o.dpr - 0.5;
-  const key = `${o.w}|${o.h}|${o.dpr}|${Math.round(clarity * 10)}|${o.seed ?? 1}|${full}`;
-  // a few sizes stay cached (the garden, the scroll export…); most recent first
+  const cl = Math.round(clarity * 20) / 20;
+  const key = `${o.w}|${o.h}|${o.dpr}|${cl}|${o.seed ?? 1}|${full}`;
   let ci = pondCaches.findIndex((c) => c.key === key);
   if (ci < 0) {
-    pondCaches.unshift(buildPondCache(o, key, full));
+    pondCaches.unshift(buildPondCache(o, key, full, cl));
     if (pondCaches.length > 3) pondCaches.pop();
     ci = 0;
   }
   const C = pondCaches[ci];
   const { w, h, t, dpr } = o;
-  const pr = C.pr;
   const seed = o.seed ?? 1;
   const night = o.tod === 'night';
+  const clearK = smoothstep(0.45, 0.9, clarity);
+  const murkK = 1 - smoothstep(0.3, 0.75, clarity);
+  const liveK = smoothstep(0.35, 0.7, clarity); // living water moves; stagnant water is still
 
-  // 1 · grab the mirrored band above the water once (safe even if source is the target canvas)
-  const rctx = C.rctx;
+  // 1 · grab the mirrored band above the water once (safe even if source is the target canvas;
+  //     only rows above mirrorY are read, so things painted later — lotus — are not assumed)
+  const { rctx, wctx, rs } = C;
+  const rw = C.refl.width, rh = C.refl.height;
   rctx.setTransform(1, 0, 0, 1, 0, 0);
-  rctx.clearRect(0, 0, C.refl.width, C.refl.height);
+  rctx.clearRect(0, 0, rw, rh);
   const sy0 = Math.max(0, o.mirrorY - h);
   const shCss = o.mirrorY - sy0;
   if (shCss > 1) {
-    rctx.setTransform(1, 0, 0, -1, 0, shCss * C.rs);
-    rctx.drawImage(o.source as CanvasImageSource, o.x * dpr, sy0 * dpr, w * dpr, shCss * dpr, 0, 0, w * C.rs, shCss * C.rs);
+    rctx.setTransform(1, 0, 0, -1, 0, shCss * rs);
+    rctx.drawImage(o.source as CanvasImageSource, o.x * dpr, sy0 * dpr, w * dpr, shCss * dpr, 0, 0, w * rs, shCss * rs);
     rctx.setTransform(1, 0, 0, 1, 0, 0);
   }
+  // 2 · wobble it row by row (one buffer px per row → sub-pixel, stepless), fading with depth so
+  //     the near water is bare paper (水 as 留白)
+  wctx.setTransform(1, 0, 0, 1, 0, 0);
+  wctx.globalAlpha = 1;
+  wctx.clearRect(0, 0, rw, rh);
+  const a0 = lerp(0.03, 0.36, clarity ** 1.6);
+  const ampK = lerp(1.2, 0.8, clarity) * rs;
+  for (let j = 0; j < rh; j++) {
+    const yc = (j + 0.5) / rs; // css px below the mirror line
+    const dn = yc / h;
+    const fade = (1 - dn) ** 1.5 * (1 - smoothstep(0.62, 0.8, dn)) * smoothstep(0, 5, yc);
+    if (fade <= 0.004) continue;
+    const ph = 7 * Math.log(dn + 0.1);
+    const dx = ampK * (0.2 + 2.2 * dn) * (Math.sin(ph * 3 + t * 1.1) + 0.35 * Math.sin(ph * 5.1 - t * 0.7 + 1.7));
+    const crest = Math.max(0, Math.sin(ph * 1.3 + t * 0.5 + 0.4)) ** 6 * liveK;
+    wctx.globalAlpha = a0 * fade * (1 - 0.55 * crest);
+    wctx.drawImage(C.refl, 0, j, rw, 1, dx, j, rw, 1);
+  }
+  wctx.globalAlpha = 1;
 
-  // 2 · draw it in strips, displaced sideways by waves that grow toward the viewer
   let p: CanvasRenderingContext2D;
   if (full) {
     p = ctx;
@@ -1209,112 +1378,138 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     p.globalAlpha = 1;
     p.globalCompositeOperation = 'source-over';
     p.clearRect(0, 0, C.pond.width, C.pond.height);
-    p.setTransform(pr, 0, 0, pr, 0, 0);
+    p.setTransform(C.pr, 0, 0, C.pr, 0, 0);
   }
+  p.imageSmoothingEnabled = true;
+  // 3 · water tone (sky light when clear), then 云影 and the sun's/moon's column
   p.drawImage(C.water, 0, 0, w, h);
-  const ampK = lerp(1.35, 0.8, clarity);
-  const a0 = lerp(0.12, 0.5, clarity);
-  let y = 0;
-  while (y < h) {
-    const dn = y / h;
-    const sh = 1 + 3 * dn;
-    // phase advances in perspective (log depth): many fine ripples far off, broad swells near,
-    // and never more than ~0.6 rad between neighbouring strips — no staircase
-    const ph = 7 * Math.log(dn + 0.1);
-    const dx = ampK * (0.25 + 4 * dn) * (Math.sin(ph * 3 + t * 1.1) + 0.35 * Math.sin(ph * 5.1 - t * 0.7 + 1.7));
-    // brief breaks in the reflection where a wave crest catches the sky
-    const crest = Math.max(0, Math.sin(ph * 1.3 + t * 0.5 + 0.4)) ** 6;
-    p.globalAlpha = a0 * (1 - 0.75 * dn ** 0.8) * (1 - 0.6 * crest);
-    const syR = y * C.rs, shR = Math.min(sh, h - y) * C.rs;
-    if (syR < C.refl.height && shR > 0) p.drawImage(C.refl, 0, syR, C.refl.width, Math.min(shR, C.refl.height - syR), dx, y, w, Math.min(sh, h - y));
-    y += sh;
+  if (clearK > 0.02) {
+    for (let i = 0; i < 3; i++) {
+      const sp = C.wisps[i];
+      const dn = 0.1 + 0.32 * hash01(seed + 41, i);
+      const ww = w * (0.28 + 0.18 * hash01(seed + 42, i)) * (0.7 + dn);
+      const wh = ww * 0.09 * (0.6 + dn);
+      const span = w + ww;
+      let x = (hash01(seed + 43, i) * span + t * (1.2 + i * 0.5)) % span;
+      x -= ww / 2;
+      p.globalAlpha = clearK * (night ? 0.35 : 0.8);
+      p.drawImage(sp.c, x - ww / 2, dn * h - wh / 2, ww, wh);
+    }
+    let b = o.body;
+    if (b === undefined && lastBody && Math.abs(lastBody.w - w) < 1 && o.x <= 0.5) b = lastBody;
+    if (b && b.r > 0 && b.x > -b.r * 2 && b.x - o.x < w + b.r * 2) {
+      const moon = b.kind === 'moon' || night;
+      const sw = b.r * 3.2, sh = h * 0.62;
+      const bx = b.x - o.x;
+      p.globalAlpha = clearK * (moon ? 0.85 : 0.5);
+      if (!moon) {
+        // a sheen of paper-white light, then the cinnabar of the sun on it
+        p.globalAlpha = clearK * 0.5;
+        p.drawImage(C.smear, bx - sw / 2 + Math.sin(t * 0.6) * 1.2, 0, sw, sh);
+        p.globalAlpha = clearK * 0.32;
+        p.drawImage(sunSmear(C.smear), bx - sw / 2 + Math.sin(t * 0.6) * 1.2, 0, sw, sh);
+      } else {
+        p.drawImage(C.smear, bx - sw / 2 + Math.sin(t * 0.6) * 1.2, 0, sw, sh);
+      }
+    }
+    p.globalAlpha = 1;
   }
-  p.globalAlpha = 1;
-
-  // 3 · murk (silt clouds, a greyer surface) is baked into the water tone drawn first
-
-  // 4 · 天光: sky-light glints near the far bank, breathing
-  const gA = (night ? 0.35 : 0.8) * clarity ** 1.5;
-  if (gA > 0.02) {
+  // 4 · the mirrored scene
+  p.drawImage(C.wob, 0, 0, rw, rh, 0, 0, rw / rs, rh / rs);
+  // 5 · murk: silt clouds over the mirror
+  if (C.silt) p.drawImage(C.silt, 0, 0, w, h);
+  // 6 · 天光 glints
+  const gA = (night ? 0.5 : 1) * Math.min(1, 1.6 * clarity ** 2);
+  if (gA > 0.03) {
     for (let i = 0; i < 3; i++) {
       const gx = w * (0.12 + 0.76 * hash01(seed, i)) + Math.sin(t * 0.07 + i) * 12;
-      const gy = h * (0.06 + 0.3 * hash01(seed, i + 9) ** 1.5);
+      const gy = h * (0.06 + 0.26 * hash01(seed, i + 9) ** 1.5);
       const gw = Math.min(w * 0.4, h * 1.6) * (0.5 + 0.5 * hash01(seed, i + 3)) * (0.6 + gy / h);
       const gh = h * (0.08 + 0.1 * gy / h);
-      p.globalAlpha = gA * 0.7 * (0.5 + 0.3 * Math.sin(t * 0.5 + i * 2.1));
+      p.globalAlpha = gA * (0.5 + 0.3 * Math.sin(t * 0.5 + i * 2.1));
       p.drawImage(C.glint, gx - gw / 2, gy - gh / 2, gw, gh);
     }
     p.globalAlpha = 1;
   }
-
-  // 5 · 水纹: slow ink wave lines, spaced in perspective (dense far, open near)
-  const nr = Math.round(clamp(w / 45, 5, 14));
-  for (let i = 0; i < nr; i++) {
-    const hr = hash01(seed + 101, i);
-    const dn = 0.06 + 0.9 * ((i + 0.5 * hr) / nr) ** 1.6;
-    const sp = C.ripples[i % C.ripples.length];
-    const k = 0.45 + 0.9 * dn;
-    const span = w + sp.w * k * 2;
-    const speed = (4 + 5 * dn) * (hr > 0.5 ? 1 : -1);
-    let x = (hash01(seed + 7, i) * span + t * speed) % span;
-    if (x < 0) x += span;
-    x -= sp.w * k;
-    const yy = dn * h + Math.sin(t * 0.4 + i) * 1.2;
-    p.globalAlpha = (0.35 + 0.3 * Math.sin(t * 0.33 + i * 1.7) ** 2) * lerp(0.75, 1, 1 - clarity) * (night ? 0.7 : 1);
-    p.drawImage(sp.c, x, yy - (sp.h * k) / 2, sp.w * k, sp.h * k);
-  }
-  p.globalAlpha = 1;
-
-  // 6 · rings: a fish rising or a drop falling, now and then
-  const period = 4.2;
-  const k0 = Math.floor(t / period);
-  p.strokeStyle = PIGMENTS.ink;
-  for (let k = k0 - 1; k <= k0; k++) {
-    if (hash01(seed + 3, k) < 0.25) continue;
-    const ts = k * period + hash01(seed + 5, k) * period * 0.8;
-    const age = (t - ts) / 3.6;
-    if (age < 0 || age > 1) continue;
-    const dn = 0.2 + 0.7 * hash01(seed + 11, k);
-    const rx0 = w * (0.1 + 0.8 * hash01(seed + 13, k)), ry0 = dn * h;
-    const persp = 0.5 + 0.9 * dn;
-    for (let r = 0; r < 3; r++) {
-      const ag = age - r * 0.12;
-      if (ag <= 0) continue;
-      const rad = (2 + ag * 26) * persp;
-      p.globalAlpha = (1 - ag) ** 1.6 * 0.4 * (1 - r * 0.25);
-      p.lineWidth = (1.1 - ag * 0.6) * persp;
-      p.beginPath();
-      p.ellipse(rx0, ry0, rad, rad * (0.16 + 0.22 * dn), 0, 0, Math.PI * 2);
-      p.stroke();
+  // 7 · 水纹: slow ink wave lines in perspective — only living water moves
+  if (liveK > 0.02) {
+    const nr = Math.round(clamp(w / 45, 5, 14));
+    for (let i = 0; i < nr; i++) {
+      const hr = hash01(seed + 101, i);
+      const dn = 0.06 + 0.8 * ((i + 0.5 * hr) / nr) ** 1.6;
+      const sp = C.ripples[i % C.ripples.length];
+      const k = 0.45 + 0.9 * dn;
+      const span = w + sp.w * k * 2;
+      const speed = (4 + 5 * dn) * (hr > 0.5 ? 1 : -1);
+      let x = (hash01(seed + 7, i) * span + t * speed) % span;
+      if (x < 0) x += span;
+      x -= sp.w * k;
+      const yy = dn * h + Math.sin(t * 0.4 + i) * 1.2;
+      p.globalAlpha = liveK * (0.35 + 0.3 * Math.sin(t * 0.33 + i * 1.7) ** 2) * (night ? 0.7 : 1) * (1 - 0.5 * dn);
+      p.drawImage(sp.c, x, yy - (sp.h * k) / 2, sp.w * k, sp.h * k);
     }
-  }
-  p.globalAlpha = 1;
-
-  // 7 · duckweed when the water stagnates
-  const nd = Math.round(clamp((0.62 - clarity) / 0.62, 0, 1) * 36);
-  if (nd > 0) {
-    const green = `rgba(${MALACHITE.map((v) => Math.round(v * 0.85)).join(',')},`;
-    for (let i = 0; i < nd; i++) {
-      const cxi = Math.floor(i / 4);
-      const bx = w * (0.08 + 0.84 * hash01(seed + 21, cxi)) + (hash01(seed + 22, i) - 0.5) * 14;
-      const dn = 0.12 + 0.8 * hash01(seed + 23, cxi);
-      const by = dn * h + (hash01(seed + 24, i) - 0.5) * 5;
-      const dx = Math.sin(t * 0.05 + cxi * 1.3) * 6 + Math.sin(t * 0.13 + i) * 0.8;
-      const r = (1.1 + 1.5 * hash01(seed + 25, i)) * (0.55 + 0.8 * dn);
-      p.fillStyle = green + (0.5 + 0.3 * hash01(seed + 26, i)).toFixed(2) + ')';
-      p.beginPath();
-      p.ellipse(bx + dx, by, r * 1.3, r * 0.75, 0, 0, Math.PI * 2);
-      p.fill();
-      if (i % 3 === 0) {
-        p.fillStyle = 'rgba(27,25,22,0.45)';
+    p.globalAlpha = 1;
+    // rings: a fish rising, now and then
+    const period = 4.2;
+    const k0 = Math.floor(t / period);
+    p.strokeStyle = PIGMENTS.ink;
+    for (let k = k0 - 1; k <= k0; k++) {
+      if (hash01(seed + 3, k) < 0.25) continue;
+      const ts = k * period + hash01(seed + 5, k) * period * 0.8;
+      const age = (t - ts) / 3.6;
+      if (age < 0 || age > 1) continue;
+      const dn = 0.2 + 0.55 * hash01(seed + 11, k);
+      const rx0 = w * (0.1 + 0.8 * hash01(seed + 13, k)), ry0 = dn * h;
+      const persp = 0.5 + 0.9 * dn;
+      for (let r = 0; r < 3; r++) {
+        const ag = age - r * 0.12;
+        if (ag <= 0) continue;
+        const rad = (2 + ag * 26) * persp;
+        p.globalAlpha = liveK * (1 - ag) ** 1.6 * 0.4 * (1 - r * 0.25);
+        p.lineWidth = (1.1 - ag * 0.6) * persp;
         p.beginPath();
-        p.ellipse(bx + dx + r * 0.6, by + r * 0.2, r * 0.6, r * 0.35, 0, 0, Math.PI * 2);
-        p.fill();
+        p.ellipse(rx0, ry0, rad, rad * (0.16 + 0.22 * dn), 0, 0, Math.PI * 2);
+        p.stroke();
       }
     }
+    p.globalAlpha = 1;
   }
+  // 8 · stagnant water: clustered duckweed and a few fallen leaves, barely drifting
+  if (murkK > 0.02 && C.weed.length) {
+    const nc = 4 + Math.round(2 * hash01(seed, 77));
+    for (let i = 0; i < nc; i++) {
+      const sp = C.weed[i % C.weed.length];
+      const dn = 0.15 + 0.7 * hash01(seed + 51, i);
+      const k = (0.55 + 0.8 * dn) * (0.6 + 0.6 * murkK);
+      const x = w * (0.06 + 0.88 * hash01(seed + 52, i)) + Math.sin(t * 0.03 + i * 1.7) * 4;
+      p.globalAlpha = murkK;
+      p.drawImage(sp.c, x - (sp.w * k) / 2, dn * h - (sp.h * k) / 2, sp.w * k, sp.h * k);
+      if (hash01(seed + 53, i) > 0.4) {
+        // satellites: a smaller raft or two near the big one
+        const k2 = k * 0.45;
+        p.drawImage(sp.c, x + sp.w * k * 0.55, dn * h + sp.h * k * 0.5, sp.w * k2, sp.h * k2);
+      }
+    }
+    const nl = 3 + Math.round(2 * hash01(seed, 78));
+    for (let i = 0; i < nl; i++) {
+      const sp = C.leaves[i % C.leaves.length];
+      const dn = 0.12 + 0.75 * hash01(seed + 61, i);
+      const k = 0.6 + 0.8 * dn;
+      const x = w * (0.05 + 0.9 * hash01(seed + 62, i)) + Math.sin(t * 0.02 + i) * 3;
+      const rot = (hash01(seed + 63, i) - 0.5) * 2.4;
+      p.save();
+      p.globalAlpha = murkK * 0.9;
+      p.translate(x, dn * h);
+      p.rotate(rot);
+      p.scale(k, k * (0.55 + 0.3 * dn));
+      p.drawImage(sp.c, -sp.w / 2, -sp.h / 2, sp.w, sp.h);
+      p.restore();
+    }
+    p.globalAlpha = 1;
+  }
+  // 9 · shore mist: the bank dissolves into the water
+  p.drawImage(C.shore, 0, 0, w, 14);
 
-  // 8 · soften the ends, then lay the water onto the scene
   if (full) {
     ctx.restore();
     return;
@@ -1324,6 +1519,22 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   p.drawImage(C.mask, 0, 0, C.pond.width, C.pond.height);
   p.globalCompositeOperation = 'source-over';
   ctx.drawImage(C.pond, o.x, o.y, w, h);
+}
+
+const sunSmearCache = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+/** The white column recoloured cinnabar (once). */
+function sunSmear(white: HTMLCanvasElement): HTMLCanvasElement {
+  let c = sunSmearCache.get(white);
+  if (!c) {
+    c = makeCanvas(white.width, white.height);
+    const cc = c.getContext('2d')!;
+    cc.drawImage(white, 0, 0);
+    cc.globalCompositeOperation = 'source-in';
+    cc.fillStyle = rgbHex(mixRgb(CINNABAR, ROUGE, 0.3));
+    cc.fillRect(0, 0, c.width, c.height);
+    sunSmearCache.set(white, c);
+  }
+  return c;
 }
 
 // ---------------------------------------------------------------------------
@@ -1342,7 +1553,7 @@ export interface LightOptions {
 /** Per-frame overlay for time of day (dawn warmth, dusk glow, night indigo). Multiplies a cached, low-res light map. */
 export function paintLight(ctx: CanvasRenderingContext2D, w: number, h: number, env: SceneEnv, opts: LightOptions = {}): void {
   if (env.tod === 'day') return;
-  const ob = opts.body;
+  const ob = opts.body !== undefined ? opts.body : lastBody && Math.abs(lastBody.w - w) < 1 ? lastBody : undefined;
   const bKey = ob ? `${Math.round(ob.x / 4)},${Math.round(ob.y / 4)},${Math.round(ob.r)}` : ob === null ? 'none' : 'auto';
   const key = `${w}|${h}|${env.tod}|${env.season}|${env.hour.toFixed(2)}|${env.moonPhase.toFixed(3)}|${env.seed}|${bKey}`;
   let c = lightCache.get(key);

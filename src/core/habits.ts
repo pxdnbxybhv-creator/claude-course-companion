@@ -67,10 +67,13 @@ export function streakFor(h: Pick<Habit, 'days'>, done: ReadonlySet<DateKey>, to
   return n;
 }
 
-/** Longest run of consecutive scheduled completions ever. */
+/**
+ * Longest run of consecutive scheduled completions ever. Like streakFor, only scheduled days count:
+ * a rest day neither breaks nor extends a run.
+ */
 export function bestStreakFor(h: Pick<Habit, 'days'>, days: readonly DateKey[]): number {
-  if (days.length === 0) return 0;
-  const sorted = [...new Set(days)].sort();
+  const sorted = [...new Set(days)].filter((d) => isScheduled(h, d)).sort();
+  if (sorted.length === 0) return 0;
   let best = 1, run = 1;
   for (let i = 1; i < sorted.length; i++) {
     // Walk from the previous done day to this one; any scheduled day in between breaks the run.

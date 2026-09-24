@@ -85,8 +85,9 @@ export function History() {
       <h2 class="section-title">
         <span>{t('近七日', 'This week')}</span>
         <span class="spacer" />
-        <span class="fx-hist-total num">{formatMinutes(weekMin, zh)}</span>
+        {weekMin > 0 && <span class="fx-hist-total num">{formatMinutes(weekMin, zh)}</span>}
       </h2>
+      {weekCount === 0 && weekMin === 0 ? <EmptyWeek days={days} zh={zh} /> : (
       <figure class="fx-week">
         <svg viewBox={`0 0 ${COL * 7} ${VB_H}`} role="img" aria-label={summary}>
           <defs>
@@ -112,6 +113,7 @@ export function History() {
           <circle cx={COL / 2 + 6 * COL} cy={VB_H - 1.5} r="1.6" class="fx-today-dot" />
         </svg>
       </figure>
+      )}
 
       <h2 class="section-title">
         <span>{t('今日', 'Today')}</span>
@@ -130,6 +132,31 @@ export function History() {
         </ul>
       )}
     </div>
+  );
+}
+
+/** No incense this week yet: one faint painted stick, the week's ash beds, and an invitation. */
+function EmptyWeek(props: { days: DaySummary[]; zh: boolean }) {
+  const t = useT();
+  const H = 58, B = 34;
+  return (
+    <figure class="fx-week is-empty">
+      <svg viewBox={`0 0 ${COL * 7} ${H}`} aria-hidden="true">
+        {props.days.map((d, i) => {
+          const cx = COL / 2 + i * COL;
+          return (
+            <g>
+              <path d={`M${cx - 8} ${B + 1.5} Q${cx} ${B - 0.4} ${cx + 8} ${B + 1.2} Q${cx} ${B + 3.2} ${cx - 8} ${B + 1.5}Z`} class="fx-ash" opacity="0.2" />
+              {i === 6 && <path d={stickPath(cx, 26, 0.8, 7, B)} class="fx-stick is-ghost" />}
+              <text x={cx} y={H - 4} text-anchor="middle" class={'fx-wd' + (i === 6 ? ' is-today' : '')}>
+                {(props.zh ? WD_ZH : WD_EN)[weekday(d.day)]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <figcaption>{t('燃过的香，会一炷炷立在这里。', 'Each stick you burn will stand here.')}</figcaption>
+    </figure>
   );
 }
 

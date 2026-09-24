@@ -8,7 +8,7 @@ import { pickPoem, type Poem } from '../../data/poems';
 import { fillPaper } from '../../ink/paper';
 import type { SceneEnv } from '../../ink/scene-types';
 import { renderGardenStill } from '../garden/scene';
-import { drawHangingScroll, drawPanel, drawWall, mountPalette, type MountPalette, type Rect } from './mount';
+import { drawHangingScroll, drawPanel, drawWall, mountPalette, parseColor, type MountPalette, type Rect } from './mount';
 import { drawInscription, ensureFonts, fontStacks, planInscription, type Fonts, type InscriptionPlan } from './inscription';
 import { composeInscription, englishCaption, posterData, type Inscription, type PosterData } from './text';
 import { drawYear } from './year';
@@ -41,7 +41,7 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
   const ctx = c.getContext('2d')!;
   const fonts = fontStacks();
   const d = posterData(o.state, o.today);
-  const pal = mountPalette(o.dark);
+  const pal = mountPalette(o.dark, parseColor(cssColor('--paper')));
   if (o.kind === 'year') {
     await ensureFonts(RUNTIME_GLYPHS + '岁时记正腊闰' + (o.state.settings.sealName || '半亩'), fonts);
     await drawYear(ctx, W, H, o, d, fonts, pal);
@@ -118,10 +118,19 @@ async function gardenCanvas(d: PosterData, P: Rect, o: PosterOptions): Promise<H
     seed: hashString('banmu-scroll'),
   };
   try {
-    return await renderGardenStill({ width: logicalW, height: Math.round((P.h / dpr) * extra), dpr, plants: d.plants, env });
+    // `framing: 'poster'` asks the scene for a painting-like composition: plants as the subject, a short pond.
+    return await renderGardenStill({ width: logicalW, height: Math.round((P.h / dpr) * extra), dpr, plants: d.plants, env, framing: 'poster' });
   } catch (e) {
     console.warn('[scroll] garden still failed', e);
     return null;
+  }
+}
+
+function cssColor(name: string): string {
+  try {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  } catch {
+    return '';
   }
 }
 
