@@ -1,5 +1,6 @@
 // 设置 · Settings — seal, language, theme, sound, location, data, about.
 import type { ComponentChildren } from 'preact';
+import { hostSave } from '../app/hostSave';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { state, today, setSettings, exportJSON, importJSON, resetAll, replaceState } from '../app/store';
 import { demoState } from '../app/demo';
@@ -370,8 +371,13 @@ function DataSection() {
   const incense = st.focus.filter((f) => f.completed).length;
   const plants = st.habits.filter((h) => !h.archived).length;
 
-  const exportFile = () => {
-    download(new Blob([exportJSON()], { type: 'application/json' }), `banmu-backup-${stamp()}.json`);
+  const exportFile = async () => {
+    const name = `banmu-backup-${stamp()}.json`;
+    const json = exportJSON();
+    const r = await hostSave(name, json);
+    if (r === 'saved') return void toast(t(`已保存 ${name}`, `Saved ${name}`));
+    if (r === 'declined') return;
+    download(new Blob([json], { type: 'application/json' }), name);
     toast(t('备份已开始下载；若无反应，请改用「复制」', 'Backup download started — if nothing happens, use Copy'), 3600);
   };
   const copy = () => {

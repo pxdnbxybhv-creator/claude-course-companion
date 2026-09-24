@@ -1,6 +1,7 @@
 // 长卷 · Scroll — mount the garden as a hanging scroll (or a square panel), or review the year in
 // ink, and save / share it as an image.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { hostSave } from '../app/hostSave';
 import { state, today, lang, activeHabits } from '../app/store';
 import { useT } from '../app/i18n';
 import { go } from '../app/router';
@@ -158,8 +159,17 @@ export function ScrollView() {
    * "Save Image" → Photos); desktops download it and offer a preview; anything else gets the
    * preview sheet, where long-press / right-click always works.
    */
-  function save() {
+  async function save() {
     if (!out) return;
+    if (embedded) {
+      // Inside a host page ordinary downloads are blocked; ask the host to save it, if it can.
+      const r = await hostSave(out.name, out.blob);
+      if (r === 'saved') {
+        toast(t(`已保存 ${out.name}`, `Saved ${out.name}`));
+        return;
+      }
+      if (r === 'declined') return;
+    }
     if (shareFirst) {
       void share(true);
       return;
