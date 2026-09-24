@@ -233,8 +233,11 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
       for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, highest(cx + dx));
       return top - r0 * 0.85;
     };
-    const dir = x < w / 2 ? 1 : -1;
-    for (let k = 0; k < 40 && clearAt(x) < y && Math.abs(x - w * lerp(0.07, 0.93, clamp(u, 0, 1))) < w * 0.35; k++) x += dir * r0 * 0.5;
+    // resting on low far hills is fine; hiding behind the big corner mass is not
+    if (y - clearAt(x) > Hz * 0.22) {
+      const dir = x < w / 2 ? 1 : -1;
+      for (let k = 0; k < 40 && clearAt(x) < y && Math.abs(x - w * lerp(0.07, 0.93, clamp(u, 0, 1))) < w * 0.35; k++) x += dir * r0 * 0.5;
+    }
     y = Math.min(y, clearAt(x));
     body = { kind: 'sun', x, y: Math.max(r0 * 1.5, y), r: r0 };
   } else {
@@ -468,7 +471,6 @@ function hillDensity(L: Layout, R: Ridge, x: number, y: number, noise: Noise2): 
     const patch = smoothstep(-0.2, 0.3, noise(x / 140 + 3, 1.7));
     a *= 1 - 0.95 * band * patch;
   }
-  void L;
   return a;
 }
 
@@ -1371,7 +1373,7 @@ function buildLight(w: number, h: number, env: SceneEnv): HTMLCanvasElement {
       const warm: RGB = tod === 'dawn' ? [250, 218, 210] : [249, 214, 166];
       const band = Math.exp(-(((y - hzY) / (h * 0.28)) ** 2));
       const near = b.r > 0 ? Math.exp(-(((x - b.x) / (w * 0.4)) ** 2) - (((y - b.y) / (h * 0.35)) ** 2)) : 0.3;
-      const s = clamp((0.32 * band + 0.5 * near) * (1 + mott) + 0.04, 0, 1) * (tod === 'dawn' ? 0.55 : 0.6);
+      const s = clamp((0.32 * band + 0.5 * near) * (1 + mott) + 0.04, 0, 1) * (tod === 'dawn' ? 0.42 : 0.6);
       r = lerp(255, warm[0], s); g = lerp(255, warm[1], s); bl = lerp(255, warm[2], s);
     }
     out[0] = r; out[1] = g; out[2] = bl; out[3] = 1;

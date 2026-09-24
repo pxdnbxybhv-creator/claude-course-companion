@@ -76,7 +76,7 @@ export function silkTile(color: RGB, seed = 3, damask = 0): HTMLCanvasElement {
         const u = ((x + y) % 64 + 64) % 64, v = ((x - y) % 64 + 64) % 64;
         const du = Math.abs(u - 32), dv = Math.abs(v - 32);
         const ring = Math.abs(du + dv - 24) < 3 || (du < 3.5 && dv < 3.5);
-        if (ring) b += (over ? 3.6 : -1.4) * damask;
+        if (ring) b += (over ? 5 : -2.2) * damask;
       }
       h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0;
       b += ((h & 255) / 255 - 0.5) * 3;

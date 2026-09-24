@@ -209,7 +209,7 @@ export function drawInscription(ctx: CanvasRenderingContext2D, ins: Inscription,
   });
   const nameSeal = makeSeal(ins.seal, { size: sealSize, dpr: 1, style: 'bai', seed: seed + 1 });
   pressSeal(ctx, { canvas: nameSeal, x: signX, y: signBottom + s * 0.35 + sealSize / 2, size: sealSize, rot: rng.gauss() * 0.02 });
-  const lz = Math.round(S * 1.25);
+  const lz = Math.round(S * 1.4);
   const leisure = makeSeal(ins.leisure, { size: lz, dpr: 1, style: 'zhu', shape: 'oval', seed: seed + 2 });
   pressSeal(ctx, { canvas: leisure, x: right + lz * 0.26, y: top + lz * 0.22, size: lz, rot: rng.gauss() * 0.02 });
 }

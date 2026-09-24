@@ -37,7 +37,8 @@
 .scroll-controls { display: flex; flex-wrap: wrap; gap: 10px 12px; justify-content: space-between; }
 .scroll-field { display: flex; align-items: center; gap: 12px; }
 .scroll-label { display: none; font-size: 13px; letter-spacing: 0.18em; color: var(--ink-3); }
-.scroll-field .seg button { min-height: 40px; }
+.scroll-field .seg { padding: 2px; }
+.scroll-field .seg button { min-height: 42px; }
 .scroll-note { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.7; }
 .scroll-empty { padding: 10px 12px; border-radius: 10px; background: var(--cinnabar-soft); }
 .scroll-actions { display: flex; gap: 10px; }

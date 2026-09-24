@@ -139,12 +139,17 @@ def fetch(url: str, dest: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_name(dest.name + '.part')
     print(f'  ↓ {url}')
-    if shutil.which('curl'):
-        # curl honours the proxy / CA configuration of the environment.
-        subprocess.run(['curl', '-sSLf', '--retry', '3', '-o', str(tmp), url], check=True)
-    else:
-        with urllib.request.urlopen(url, timeout=60) as r, open(tmp, 'wb') as f:
-            shutil.copyfileobj(r, f)
+    try:
+        if shutil.which('curl'):
+            # curl honours the proxy / CA configuration of the environment.
+            subprocess.run(['curl', '-sSLf', '--retry', '3', '-o', str(tmp), url], check=True)
+        else:
+            with urllib.request.urlopen(url, timeout=60) as r, open(tmp, 'wb') as f:
+                shutil.copyfileobj(r, f)
+    except Exception as err:  # noqa: BLE001 — any failure means the same thing here
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(f'✗ could not download {url} ({err}).\n'
+                         f'  Everything already fetched is cached in {CACHE.relative_to(ROOT)}; retry when online.')
     tmp.replace(dest)
     want = KNOWN_SHA256.get(dest.name)
     if want and hashlib.sha256(dest.read_bytes()).hexdigest() != want:

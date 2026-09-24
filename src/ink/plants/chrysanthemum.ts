@@ -64,22 +64,6 @@ function subPath(p: V[], L: number[], t0: number, t1: number, n: number): V[] {
 
 const rot = (v: V, a: number): V => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
 
-/** A noisy ellipse-ish blot outline. `tip` > 0 pulls the +x end into a soft point. */
-function blot(c: V, rx: number, ry: number, ang: number, noise: Noise2, nseed: number, n = 20, rough = 0.14, tip = 0): V[] {
-  const out: V[] = [];
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    const nz = noise(Math.cos(a) * 1.3 + nseed, Math.sin(a) * 1.3 + nseed * 0.7);
-    let r = 1 + rough * nz * 2;
-    const ca = Math.cos(a);
-    if (tip > 0 && ca > 0) r *= 1 + tip * Math.pow(ca, 6);
-    const lx = ca * rx * r, ly = Math.sin(a) * ry * r * (tip > 0 ? 1 - 0.25 * tip * Math.max(0, ca) : 1);
-    const q = rot({ x: lx, y: ly }, ang);
-    out.push({ x: c.x + q.x, y: c.y + q.y });
-  }
-  return out;
-}
-
 function pointInPoly(x: number, y: number, poly: V[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -124,88 +108,109 @@ interface LeafOpts {
   base: V; dir: number; len: number; tone: number; birth: number; squash: number; side: number; droop: number;
 }
 
+/** Closed Catmull-Rom through a loop of points. */
+function catmullClosed(ctrl: V[], perSeg: number): V[] {
+  const n = ctrl.length, out: V[] = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = ctrl[(i - 1 + n) % n], p1 = ctrl[i], p2 = ctrl[(i + 1) % n], p3 = ctrl[(i + 2) % n];
+    for (let k = 0; k < perSeg; k++) {
+      const t = k / perSeg, t2 = t * t, t3 = t2 * t;
+      out.push({
+        x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * 菊叶: one wet wash in a lobed, notched silhouette (a terminal lobe and one or two pairs of
+ * side lobes, never quite symmetric), a darker wet-in-wet pool near the base that fades out,
+ * then crisp burnt-ink veins (勾筋) hooked in over it — midrib and one vein into each lobe.
+ */
 function leaf(c: Ctx, o: LeafOpts) {
-  const { rng, noise, u } = c;
+  const { rng, u } = c;
   const L = o.len;
-  // The midrib: from the node outward, sagging under its own weight.
   const d = { x: Math.cos(o.dir), y: Math.sin(o.dir) };
   const nrm = { x: -d.y, y: d.x };
   const sag = o.droop * L;
-  const mid = (t: number): V => {
-    const along = t * L;
-    const bend = sag * t * t;
-    return { x: o.base.x + d.x * along + nrm.x * bend * o.side, y: o.base.y + d.y * along + nrm.y * bend * o.side + bend * 0.35 };
+  // leaf-local (x along the midrib 0..L, y across) → drawing space, following the sagging midrib
+  const mid = (x: number): V => {
+    const t = x / L, bend = sag * t * t;
+    return { x: o.base.x + d.x * x + nrm.x * bend * o.side, y: o.base.y + d.y * x + nrm.y * bend * o.side + bend * 0.35 };
   };
-  const pet = 0.18; // petiole fraction
-  const b = o.birth;
-  // Petiole: a short dark twig from the stem.
-  add(c, 'brush', brushPts([mid(0), mid(pet * 0.5), mid(pet + 0.04)], 2.2 * u, 1.6 * u, 1.1, 0.6), clamp(o.tone + 0.08, 0.5, 0.92), b, { wet: 0.4 });
-
-  const wsc = o.squash; // foreshortening across the leaf
-  const midAng = (t: number) => {
-    const a = mid(t), bb = mid(Math.min(1, t + 0.02));
-    return Math.atan2(bb.y - a.y, bb.x - a.x);
+  const at = (x: number, y: number): V => {
+    const p = mid(x), q = mid(Math.min(L, x + L * 0.02)), r = mid(Math.max(0, x - L * 0.02));
+    const tx = q.x - r.x, ty = q.y - r.y, tl = Math.hypot(tx, ty) || 1;
+    const yy = y * o.squash;
+    return { x: p.x - (ty / tl) * yy, y: p.y + (tx / tl) * yy };
   };
-  // Body wash: pale underlayer that ties the lobes together.
-  const bodyC = mid(0.55);
-  const tones = (dt: number) => clamp(o.tone + dt + rng.range(-0.06, 0.06), 0.18, 0.95);
-  if (rng.chance(0.6)) add(c, 'wash', poly(blot(bodyC, L * 0.36, L * 0.2 * wsc, midAng(0.56), noise, rng.range(0, 99), 18, 0.16, 0.3), 1.5 * u), tones(-0.12), b + 0.0005, { wet: 0.7 });
+  const pet = L * 0.16; // petiole length; the blade starts here
+  const B = L - pet;    // blade length
+  const X = (f: number) => pet + f * B;
 
-  // Lobes: side-brush dabs, pressed from the midrib outward. 3–5 per leaf, not symmetric.
-  const lobes: { t: number; s: number; len: number; wid: number; ang: number }[] = [];
-  lobes.push({ t: 0.66, s: 0, len: 0.4, wid: 0.3, ang: rng.range(-0.1, 0.1) }); // terminal lobe
-  const pairs = rng.chance(0.55) ? [0.36, 0.58] : [0.46];
-  for (const t of pairs) {
-    for (const s of [-1, 1]) {
-      if (rng.chance(0.15)) continue;
-      lobes.push({ t, s, len: rng.range(0.3, 0.4) * (t < 0.4 ? 0.85 : 1), wid: rng.range(0.24, 0.3), ang: s * rng.range(0.5, 0.85) });
-    }
-  }
-  const tipPts: V[] = [];
-  lobes.forEach((lb, k) => {
-    const start = mid(lb.t - (lb.s === 0 ? 0.2 : 0.02));
-    const a0 = midAng(lb.t) + lb.ang;
-    const dd = { x: Math.cos(a0), y: Math.sin(a0) };
-    // foreshorten the lateral component
-    const ln = L * lb.len;
+  // --- silhouette -------------------------------------------------------------------------
+  const pairs = rng.chance(0.65) ? 2 : 1;
+  const lobeAt = pairs === 2 ? [0.3, 0.6] : [0.48];
+  const lobeExt = pairs === 2 ? [0.3, 0.36] : [0.38];
+  const sideLobes = (s: number): V[] => {
     const pts: V[] = [];
-    const lat = { x: -Math.sin(midAng(lb.t)), y: Math.cos(midAng(lb.t)) };
-    for (let i = 0; i < 5; i++) {
-      const t = i / 4;
-      let px = start.x + dd.x * ln * t, py = start.y + dd.y * ln * t;
-      // squash towards the midrib line
-      const offx = px - mid(lb.t).x, offy = py - mid(lb.t).y;
-      const latC = offx * lat.x + offy * lat.y;
-      px -= lat.x * latC * (1 - wsc);
-      py -= lat.y * latC * (1 - wsc);
-      pts.push({ x: px, y: py });
-    }
-    tipPts.push(pts[pts.length - 1]);
-    const W = L * lb.wid * lerp(0.75, 1, wsc);
-    const sp: StrokePoint[] = pts.map((p, i) => {
-      const t = i / 4;
-      const w = W * (t < 0.3 ? lerp(0.6, 1, t / 0.3) : t < 0.6 ? 1 : lerp(1, 0.22, (t - 0.6) / 0.4));
-      return { ...p, w };
+    // cuneate base
+    pts.push({ x: X(0.04), y: s * B * 0.06 });
+    lobeAt.forEach((a0, k) => {
+      const a = a0 + rng.range(-0.04, 0.04);
+      const e = B * lobeExt[k] * rng.range(0.82, 1.12) * (rng.chance(0.12) ? 0.6 : 1);
+      pts.push({ x: X(a - 0.13), y: s * e * rng.range(0.28, 0.4) });   // sinus (notch)
+      pts.push({ x: X(a - 0.06), y: s * e * 0.86 });                    // inner shoulder
+      pts.push({ x: X(a + 0.05), y: s * e });                           // lobe tip, leaning forward
+      pts.push({ x: X(a + 0.12), y: s * e * 0.7 });                     // outer shoulder
     });
-    add(c, 'brush', sp, tones(k === 0 ? 0.05 : rng.range(-0.24, 0.04)), b + 0.001 + k * 0.0005, { wet: 0.85, dryness: 0.15 });
-  });
+    const last = lobeAt[lobeAt.length - 1];
+    pts.push({ x: X(last + 0.19), y: s * B * rng.range(0.1, 0.14) });  // notch below the terminal lobe
+    pts.push({ x: X(0.86), y: s * B * rng.range(0.17, 0.22) });        // terminal lobe shoulder
+    return pts;
+  };
+  const left = sideLobes(-1), right = sideLobes(1);
+  const loop: V[] = [{ x: pet, y: 0 }, ...left, { x: X(1.0), y: rng.range(-0.03, 0.03) * B }, ...right.reverse()];
+  const outline = catmullClosed(loop.map((p) => at(p.x, p.y)), 4);
 
-  // Veins 勾筋: burnt-ink hooks laid in while the lobes are wet.
-  const vt = clamp(Math.max(o.tone + 0.25, 0.82), 0, 0.97);
-  const vb = b + 0.005;
-  const rib: V[] = [];
-  for (let i = 0; i <= 6; i++) rib.push(mid(lerp(pet * 0.9, 0.86, i / 6)));
-  add(c, 'brush', rib.map((p, i) => ({ ...p, w: lerp(1.9, 0.5, i / 6) * u })), vt, vb, { wet: 0.45 });
-  lobes.forEach((lb, k) => {
-    if (lb.s === 0 || rng.chance(0.25)) return;
-    const s0 = mid(lb.t - 0.06);
-    const e = tipPts[k];
-    const bend = rng.range(0.06, 0.14) * lb.s;
-    const dx = e.x - s0.x, dy = e.y - s0.y;
-    const m = { x: lerp(s0.x, e.x, 0.5) - dy * bend, y: lerp(s0.y, e.y, 0.5) + dx * bend };
-    const e2 = { x: lerp(s0.x, e.x, 0.8), y: lerp(s0.y, e.y, 0.8) };
-    add(c, 'brush', [{ ...s0, w: 1.4 * u }, { ...m, w: 1.0 * u }, { ...e2, w: 0.35 * u }], vt, vb + 0.001, { wet: 0.45 });
-  });
+  const b = o.birth;
+  // petiole: a short twig from the stem
+  add(c, 'brush', brushPts([mid(0), mid(pet * 0.5), mid(pet * 1.15)], 2 * u, 1.5 * u, 1.1, 0.6), clamp(o.tone + 0.25, 0.55, 0.85), b, { wet: 0.35 });
+  // the blade: one wet wash
+  add(c, 'wash', poly(outline, 2.2 * u), o.tone, b + 0.0005, { wet: 0.75 });
+  // wet-in-wet: a darker pool near the base, fading out into the blade
+  {
+    const cx = rng.range(0.22, 0.38), sy = rng.range(-0.06, 0.06) * B;
+    const pool: V[] = [];
+    const rx = B * rng.range(0.2, 0.28), ry = B * rng.range(0.12, 0.17);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * TAU;
+      const r = 1 + 0.18 * c.noise(Math.cos(a) * 1.4 + b * 50, Math.sin(a) * 1.4);
+      pool.push(at(X(cx) + Math.cos(a) * rx * r, sy + Math.sin(a) * ry * r));
+    }
+    add(c, 'wash', poly(pool, 4.5 * u), clamp(o.tone * 0.55 + 0.1, 0.18, 0.5), b + 0.001, { wet: 0.9 });
+  }
+  // 勾筋: crisp veins over the damp blade
+  const vt = clamp(o.tone + 0.45, 0.78, 0.94);
+  const vb = b + 0.002;
+  const rib: StrokePoint[] = [];
+  for (let i = 0; i <= 6; i++) rib.push({ ...at(lerp(pet * 0.9, X(0.9), i / 6), 0), w: lerp(1.15, 0.45, i / 6) * u });
+  add(c, 'line', rib, vt, vb, { wet: 0.25 });
+  for (const s of [-1, 1]) {
+    lobeAt.forEach((a0) => {
+      if (rng.chance(0.15)) return;
+      const x0 = X(a0 - 0.1), x1 = X(a0 + 0.03);
+      const ext = B * 0.26 * rng.range(0.85, 1.05);
+      const pts: StrokePoint[] = [
+        { ...at(x0, 0), w: 0.95 * u },
+        { ...at(lerp(x0, x1, 0.55), s * ext * 0.5), w: 0.75 * u },
+        { ...at(x1, s * ext * 0.85), w: 0.4 * u },
+      ];
+      add(c, 'line', pts, vt, vb + 0.0001, { wet: 0.25 });
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -506,41 +511,46 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
   });
 
   // --- Leaves -------------------------------------------------------------------------------
-  const leafSpots: { st: StemPlan; t: number; side: number; big: number }[] = [];
+  // Larger and fuller low on the stem, smaller and sparser toward the flowers.
+  const leafSpots: { st: StemPlan; t: number; side: number; sprout: boolean }[] = [];
   stems.forEach((st, si) => {
     let side = rng.chance(0.5) ? 1 : -1;
-    st.nodes.forEach((t, k) => {
-      if ((si > 0 && t < 0.35) || (t < 0.2 && rng.chance(0.5))) return;
-      leafSpots.push({ st, t, side, big: k });
+    st.nodes.forEach((t) => {
+      if ((si > 0 && !st.branch && t < 0.35) || (t < 0.2 && rng.chance(0.4))) return;
+      if (t > 0.55 && rng.chance(lerp(0.1, 0.45, (t - 0.55) / 0.4))) { side = -side; return; }
+      leafSpots.push({ st, t, side, sprout: false });
       side = -side;
-      // extra leaf on the other side, sometimes, near the top
-      if (si === 0 && t > 0.55 && rng.chance(0.3)) leafSpots.push({ st, t: t + 0.03, side, big: k });
     });
-    // a cluster right under the head
-    if (st.head !== 'bud') leafSpots.push({ st, t: rng.range(0.78, 0.86), side: rng.chance(0.5) ? 1 : -1, big: 9 });
+    // now and then a small leaf just under the head
+    if (st.head !== 'bud' && rng.chance(0.45)) leafSpots.push({ st, t: rng.range(0.8, 0.88), side: rng.chance(0.5) ? 1 : -1, sprout: false });
   });
   // sprout leaves: at the very base, first strokes of the painting
   const main = stems[0];
-  for (const s of [-1, 1]) leafSpots.push({ st: main, t: s < 0 ? 0.03 : 0.05, side: s, big: -1 });
+  for (const s of [-1, 1]) leafSpots.push({ st: main, t: s < 0 ? 0.03 : 0.05, side: s, sprout: true });
+  // 1–3 accent leaves in thick ink (浓); everything else stays in mid tones (淡–重)
+  const accentPool = leafSpots.map((ls, i) => ({ ls, i })).filter(({ ls }) => !ls.sprout && ls.t > 0.15 && ls.t < 0.85);
+  const accents = new Set<number>();
+  const nAcc = Math.min(accentPool.length, rng.int(1, 3));
+  while (accents.size < nAcc) accents.add(accentPool[rng.int(0, accentPool.length - 1)].i);
 
-  for (const ls of leafSpots) {
+  leafSpots.forEach((ls, i) => {
     const q = along(ls.st.path, ls.st.L, ls.t);
     const up = Math.atan2(q.d.y, q.d.x); // stem tangent (pointing up the stem)
     const lowness = 1 - ls.t;
     // lower leaves spread and droop; upper leaves reach up
     const spread = rad(lerp(40, 80, lowness) + rng.range(-12, 12));
     const dir = up + ls.side * spread;
-    const size = ls.big < 0 ? 0.12 : ls.t > 0.85 ? rng.range(0.15, 0.19) : lerp(0.15, 0.22, Math.sin(Math.PI * ls.t)) * rng.range(0.85, 1.12);
-    const dark = rng.chance(ls.t > 0.75 ? 0.55 : 0.35);
+    const size = ls.sprout ? 0.12 : lerp(0.21, 0.11, clamp(ls.t / 0.9, 0, 1)) * rng.range(0.88, 1.12) * (ls.st.branch ? 0.85 : 1);
+    const accent = accents.has(i);
     // 反叶: now and then a leaf turned edge-on, showing its paler underside
-    const turned = !dark && ls.big >= 0 && rng.chance(0.3);
-    const tone = dark ? rng.range(0.68, 0.82) : turned ? rng.range(0.26, 0.34) : rng.range(0.34, 0.46);
-    const birth = ls.big < 0 ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.015, 0.045);
+    const turned = !accent && !ls.sprout && rng.chance(0.25);
+    const tone = accent ? rng.range(0.62, 0.72) : turned ? rng.range(0.22, 0.28) : rng.range(0.3, 0.5);
+    const birth = ls.sprout ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.015, 0.045);
     leaf(c, {
-      base: q.p, dir, len: H * size, tone, birth, squash: turned ? rng.range(0.3, 0.42) : rng.range(0.55, 1), side: ls.side,
+      base: q.p, dir, len: H * size, tone, birth, squash: turned ? rng.range(0.35, 0.5) : rng.range(0.7, 1), side: ls.side,
       droop: lerp(0.05, 0.35, lowness) * rng.range(0.6, 1.3),
     });
-  }
+  });
 
   // --- Heads ---------------------------------------------------------------------------------
   const palettes: HeadOpts['palette'][] = [];

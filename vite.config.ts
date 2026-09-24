@@ -9,6 +9,8 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
+    // The single-file build must not depend on anything beside index.html.
+    publicDir: single ? false : 'public',
     plugins: [preact(), ...(single ? [viteSingleFile()] : [])],
     build: {
       outDir: single ? 'dist-single' : 'dist',

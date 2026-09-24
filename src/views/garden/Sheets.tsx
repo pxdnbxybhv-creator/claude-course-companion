@@ -63,7 +63,8 @@ export function HabitEditor(props: { open: boolean; habit?: Habit; onClose: () =
 
   return (
     <Sheet open={props.open} onClose={props.onClose} title={h ? t('修剪', 'Edit habit') : t('种一株', 'Plant a habit')} label={h ? t('编辑习惯', 'Edit habit') : t('新习惯', 'New habit')}>
-      <form class="editor" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+      {/* Not a <form>: the kit's segmented buttons have no type and would submit it. */}
+      <div class="editor">
         <label class="field">
           <span>{t('习惯', 'Habit')}</span>
           <input
@@ -74,6 +75,7 @@ export function HabitEditor(props: { open: boolean; habit?: Habit; onClose: () =
             onInput={(e) => setName((e.target as HTMLInputElement).value)}
             enterKeyHint="done"
             autoComplete="off"
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); submit(); } }}
           />
         </label>
 
@@ -139,7 +141,7 @@ export function HabitEditor(props: { open: boolean; habit?: Habit; onClose: () =
         </div>
 
         <div class="editor-actions">
-          <button type="submit" class="btn btn-primary editor-go" disabled={!valid}>
+          <button type="button" class="btn btn-primary editor-go" disabled={!valid} onClick={submit}>
             {h ? t('保存', 'Save') : t('种下', 'Plant')}
           </button>
         </div>
@@ -163,7 +165,7 @@ export function HabitEditor(props: { open: boolean; habit?: Habit; onClose: () =
             </button>
           </div>
         )}
-      </form>
+      </div>
     </Sheet>
   );
 }

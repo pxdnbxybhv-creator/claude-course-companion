@@ -13,7 +13,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "snap": "node scripts/snap.mjs",
-    "fonts": "python3 scripts/build_fonts.py"
+    "fonts": "python3 scripts/build_fonts.py",
+    "icons": "node scripts/make_icons.mjs",
+    "fonts:check": "python3 scripts/build_fonts.py --check",
+    "build:artifact": "vite build --mode single && node scripts/make_artifact.mjs"
   },
   "dependencies": {
     "@preact/signals": "^2.11.2",
