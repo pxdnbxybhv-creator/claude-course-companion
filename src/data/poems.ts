@@ -199,7 +199,7 @@ export const POEMS: Poem[] = [
   { lines: ['清水出芙蓉，天然去雕饰。'], author: '李白', dynasty: '唐', title: '经乱离后天恩流夜郎忆旧游书怀赠江夏韦太守良宰', authorEn: 'Li Bai',
     en: 'A lotus rising from clear water — natural, with no carving or ornament.',
     plants: ['lotus'], seasons: SUMMER, themes: ['water'] },
-  { lines: ['江南可采莲，莲叶何田田，鱼戏莲叶间。'], author: '佚名', dynasty: '汉', title: '江南', authorEn: 'Anonymous (Han yuefu)',
+  { lines: ['江南可采莲，莲叶何田田。鱼戏莲叶间。'], author: '佚名', dynasty: '汉', title: '江南', authorEn: 'Anonymous (Han yuefu)',
     en: 'South of the river we gather lotus — how the lotus leaves spread! Fish play among the leaves.',
     plants: ['lotus'], seasons: SUMMER, terms: [9], themes: ['water'] },
   { lines: ['兴尽晚回舟，误入藕花深处。', '争渡，争渡，惊起一滩鸥鹭。'], author: '李清照', dynasty: '宋', title: '如梦令', authorEn: 'Li Qingzhao',

@@ -436,7 +436,7 @@ function paintSpineStroke(P: Paint, st: Stroke, full: Spine, progress: number, t
   }
 
   // body ink: stays until the brush runs dry, then ends raggedly and never comes back
-  const tEnd = isDry ? 0.12 + 0.55 * (1 - dry) : 1.05 - 0.4 * dry;
+  const tEnd = isDry ? 0.12 + 0.55 * (1 - dry) : 1.1 - 0.6 * dry * dry;
   const body = new Float64Array(n);
   // body width as the ink runs out: narrows only a little, then the run ends raggedly
   const bodyW = (v: number) => 0.4 + 0.6 * smoothstep(0, 0.4, v);

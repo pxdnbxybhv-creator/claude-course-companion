@@ -13,6 +13,7 @@
 .alm-h-sub { font-family: var(--font-latin), var(--font-text); font-style: italic; font-size: 14px; letter-spacing: 0.02em; color: var(--ink-3); }
 :lang(en) .alm-h { letter-spacing: 0.06em; font-family: var(--font-latin), var(--font-text); font-size: 17px; font-weight: 500; }
 .latin { font-family: var(--font-latin), var(--font-text); }
+.alm-n { font-family: var(--font-latin), var(--font-text); font-size: 1.14em; letter-spacing: 0.02em; font-variant-numeric: lining-nums; margin: 0 0.06em; }
 
 /* A painting stays on paper, whatever the chrome does (dark mode = mounted on dark silk). */
 .alm-paper {
@@ -62,7 +63,8 @@
 
 .alm-pentads { list-style: none; padding: 0; margin: 22px 0 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .alm-pentad { display: flex; flex-direction: column; min-width: 0; }
-.alm-pentad-ord { font-size: 12px; letter-spacing: 0.22em; color: var(--ink-3); }
+.alm-pentad-ord { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-size: 12px; letter-spacing: 0.22em; color: var(--ink-3); }
+.alm-pentad-date { font-size: 13px; letter-spacing: 0.02em; font-variant-numeric: lining-nums; text-transform: none; font-variant: normal; color: var(--ink-3); }
 :lang(en) .alm-pentad-ord { font-family: var(--font-latin), var(--font-text); font-size: 13px; letter-spacing: 0.1em; font-variant: small-caps; text-transform: lowercase; }
 .alm-pentad-line { position: relative; height: 1px; background: var(--line-strong); margin: 7px 0 9px; }
 .alm-pentad-fill { position: absolute; left: 0; top: -0.5px; height: 2px; background: var(--ink); opacity: 0.55; border-radius: 1px; }

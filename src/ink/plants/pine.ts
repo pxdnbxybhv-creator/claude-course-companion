@@ -236,7 +236,7 @@ export function pine(spec: PlantSpec): Drawing {
       const q = trunkAt((fSp * i) / m);
       const o = q.w * 0.22;
       const n = dir(q.a + Math.PI / 2);
-      pts.push({ x: q.p.x + n.x * o, y: q.p.y + n.y * o, w: 0.02 * H * (1 - 0.35 * (i / m)) });
+      pts.push({ x: q.p.x + n.x * o, y: Math.min(q.p.y + n.y * o, -0.014 * H), w: 0.02 * H * (1 - 0.35 * (i / m)) });
     }
     const bend = mix(spT.p, spC, 0.55);
     pts.push({ ...add(bend, dir(0), 0.012 * H), w: 0.011 * H }, { ...spC, w: 0.007 * H });
@@ -417,6 +417,8 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
     for (let i = N; i >= 0; i--) pts.push({ ...off(S[i], 0.95 * knob(S[i], 2)), w: 0 });
     push('wash', pts, rng.range(0.22, 0.3), 0.41, { color: PIGMENTS.ochre, wet: 0.4 });
   }
+  // lift the foot a little so the round start of the broad strokes doesn't sink below the ground
+  S[0] = { ...S[0], p: { x: S[0].p.x, y: S[0].p.y - S[0].hw * 0.55 } };
   // a mid-tone rub on the shadow side, for roundness
   push('dry', S.map((s) => ({ ...off(s, 0.1), w: s.hw * 1.7 })), rng.range(0.22, 0.28), 0.415, { dryness: 0.3 });
   push('dry', S.map((s) => ({ ...off(s, 0.42), w: s.hw * 1.1 })), rng.range(0.36, 0.44), 0.42, { dryness: 0.25 });

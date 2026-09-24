@@ -36,6 +36,7 @@ Re-run whenever new Chinese text lands in the source (the --check mode tells you
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import logging
 import re
@@ -61,6 +62,13 @@ BRUSH_CHARS = ROOT / 'scripts' / 'brush_chars.txt'
 
 WENKAI_PKG = 'https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0'
 GFONTS = 'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl'
+# google/fonts is fetched from its main branch; these hashes pin what the committed fonts were
+# built from, so a changed upstream file is reported instead of silently altering the output.
+KNOWN_SHA256 = {
+    'MaShanZheng-Regular.ttf': '6d2546bb189c732a8ca29af9e22457b152387d158aa459e4ac2ce1e51788b7fb',
+    'CormorantGaramond[wght].ttf': 'b20b7d9626dd956b2c5e558692ad328b1f19e3275e2782db4fa07670d83f35e0',
+    'CormorantGaramond-Italic[wght].ttf': '0f48ea6abb2084537854f7174c470991a463b13036309e3b50a81511611c530d',
+}
 # Jun Da's character frequency list (Modern Chinese corpus), via the `hanzi` npm package.
 # Only used at build time, to pick which extra characters go into wenkai-common.woff2.
 FREQ_URL = 'https://cdn.jsdelivr.net/npm/hanzi@3.2.0/lib/data/frequencyjunda.txt.js'
@@ -130,6 +138,10 @@ def fetch(url: str, dest: Path) -> Path:
         with urllib.request.urlopen(url, timeout=60) as r, open(tmp, 'wb') as f:
             shutil.copyfileobj(r, f)
     tmp.replace(dest)
+    want = KNOWN_SHA256.get(dest.name)
+    if want and hashlib.sha256(dest.read_bytes()).hexdigest() != want:
+        print(f'  ! {dest.name} differs from the version the committed fonts were built from '
+              f'(upstream changed); check the output, then update KNOWN_SHA256')
     return dest
 
 
@@ -283,7 +295,7 @@ def wenkai_slices() -> list[tuple[str, set[int]]]:
     return [(name, parse_unicode_range(spec)) for name, spec in blocks]
 
 
-def build_wenkai(cps: set[int], dest: Path, tmp: Path, label: str) -> tuple[TTFont, set[int]]:
+def build_wenkai(cps: set[int], tmp: Path, label: str) -> tuple[TTFont, set[int]]:
     """Subset the needed slices and merge them into one font covering `cps`."""
     parts: list[Path] = []
     for name, rng in wenkai_slices():
@@ -389,7 +401,7 @@ def main() -> int:
 
         # --- LXGW WenKai: core (everything the app uses) ----------------------------------------
         core_cps = {ord(c) for c in text_chars}
-        wk, core_cov = build_wenkai(core_cps, OUT / 'wenkai.woff2', tmp, 'core')
+        wk, core_cov = build_wenkai(core_cps, tmp, 'core')
         absent |= {chr(c) for c in core_cps - core_cov if is_cjkish(c)}
         sizes['wenkai.woff2'] = save_woff2(wk, OUT / 'wenkai.woff2')
         copyright_wk = wk['name'].getDebugName(0) or 'Copyright 2021-2024 LXGW'
@@ -398,7 +410,7 @@ def main() -> int:
         freq = load_frequency()
         common = {ord(c) for c in freq[:COMMON_TOP_N]} - core_cov
         common |= {ord(c) for c in '，。、；：？！“”（）《》…—·'} - core_cov
-        wkc, common_cov = build_wenkai(common, OUT / 'wenkai-common.woff2', tmp, 'common')
+        wkc, common_cov = build_wenkai(common, tmp, 'common')
         sizes['wenkai-common.woff2'] = save_woff2(wkc, OUT / 'wenkai-common.woff2')
 
         # --- Ma Shan Zheng: display set (eager) + the rest of the source's hanzi (lazy) ----------

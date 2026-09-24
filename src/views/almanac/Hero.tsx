@@ -10,8 +10,9 @@ import { lang } from '../../app/store';
 import { paintHeroBackdrop } from './paint';
 import { dpr, useSize } from './hooks';
 import { SealMark } from './YiJi';
+import { Nums } from './Nums';
 import { MONTH_EN } from './model';
-import { chinaMD, termProgress, SEASON_ZH } from './model';
+import { chinaDay, chinaMD, termProgress, SEASON_ZH } from './model';
 
 const MENG = ['孟', '仲', '季'];
 const MENG_EN = ['Early', 'Mid', 'Late'];
@@ -29,6 +30,12 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
   const sub = Math.floor((i % 6) / 2);
   const p = termProgress(day, ctx.current, ctx.next);
   const start = chinaMD(ctx.current.at);
+  // pentad k begins on day a + ⌈k·n/3⌉ (the same thirds termContext uses)
+  const a = chinaDay(ctx.current.at), n = chinaDay(ctx.next.at) - a;
+  const pentadStart = (k: number) => {
+    const d = new Date((a + Math.ceil((k * n) / 3)) * 86_400_000);
+    return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+  };
 
   const box = useRef<HTMLElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
@@ -53,7 +60,7 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
         <p class="alm-kicker">
           <span>{t(`二十四节气 · 第${cnNumber(i + 1)}`, `Solar term ${i + 1} of 24`)}</span>
           <span class="alm-kicker-when">
-            {t(`${start.m}月${start.d}日 ${start.hh} 交节`, `from ${MONTH_EN[start.m - 1].slice(0, 3)} ${start.d}, ${start.hh} CST`)}
+            {en ? `from ${MONTH_EN[start.m - 1].slice(0, 3)} ${start.d}, ${start.hh} CST` : <Nums>{`${start.m}月${start.d}日 ${start.hh} 交节`}</Nums>}
           </span>
         </p>
         <div class="alm-hero-main">
@@ -93,7 +100,10 @@ export function Hero(props: { day: Date; ctx: TermContext }) {
             const f = state === 'past' ? 1 : state === 'future' ? 0 : Math.min(1, Math.max(0, p * 3 - k));
             return (
               <li class={`alm-pentad is-${state}`} aria-current={state === 'now' ? 'true' : undefined}>
-                <span class="alm-pentad-ord">{t(PENTAD_ZH[k], PENTAD_EN[k])}</span>
+                <span class="alm-pentad-ord">
+                  {t(PENTAD_ZH[k], PENTAD_EN[k])}
+                  <span class="alm-pentad-date latin">{pentadStart(k)}</span>
+                </span>
                 <span class="alm-pentad-line" aria-hidden="true">
                   <span class="alm-pentad-fill" style={{ width: `${f * 100}%` }} />
                   {state === 'now' && <span class="alm-pentad-dot" style={{ left: `${f * 100}%` }} />}

@@ -80,16 +80,6 @@ function blot(c: V, rx: number, ry: number, ang: number, noise: Noise2, nseed: n
   return out;
 }
 
-function convexHull(pts: V[]): V[] {
-  const p = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
-  if (p.length < 3) return p;
-  const cross = (o: V, a: V, b: V) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-  const lo: V[] = [], hi: V[] = [];
-  for (const q of p) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
-  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], q) <= 0) hi.pop(); hi.push(q); }
-  return [...lo.slice(0, -1), ...hi.slice(0, -1)];
-}
-
 function pointInPoly(x: number, y: number, poly: V[]): boolean {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
@@ -350,14 +340,6 @@ function head(c: Ctx, o: HeadOpts) {
   for (const ap of allPetals) {
     if (!byRing.has(ap.ringIdx)) byRing.set(ap.ringIdx, []);
     byRing.get(ap.ringIdx)!.push(ap);
-  }
-  // 白粉 ground under the head's core, so leaves behind never muddy the petals.
-  if (!o.bud && o.outline) {
-    const core = allPetals.filter((a) => a.ringIdx <= 2).flatMap((a) => a.p.poly);
-    const hull = convexHull(core);
-    const cx = hull.reduce((s, p) => s + p.x, 0) / hull.length, cy = hull.reduce((s, p) => s + p.y, 0) / hull.length;
-    const shrunk = hull.map((p) => ({ x: lerp(cx, p.x, 0.78), y: lerp(cy, p.y, 0.78) }));
-    add(c, 'fill', poly(shrunk, 3 * u), 0.9, o.birth + 0.009, { color: PIGMENTS.white, wet: 0.2 });
   }
   const zs = allPetals.map((a) => a.p.z);
   const zmin = Math.min(...zs), zmax = Math.max(...zs);

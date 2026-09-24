@@ -203,7 +203,7 @@ export function HabitDetail(props: { open: boolean; habit?: Habit; stats?: Habit
   useEffect(() => {
     if (!props.open) return;
     const el = box.current;
-    if (el) setW(Math.min(420, Math.max(240, Math.round(el.getBoundingClientRect().width))));
+    if (el) setW(Math.min(420, Math.max(220, Math.round(el.getBoundingClientRect().width) - 14)));
   }, [props.open]);
   if (!h || !st) return <Sheet open={false} onClose={props.onClose}>{null}</Sheet>;
   const info = PLANT_INFO[h.plant];

@@ -7,6 +7,7 @@ import { TERMS } from '../../data/terms';
 import { Sheet } from '../../ui/kit';
 import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
+import { Nums } from './Nums';
 import { chinaMD, sunLongitude, termsIn, SEASON_ZH, SEASON_EN, MONTH_EN } from './model';
 
 const R = 150;
@@ -133,7 +134,7 @@ function TermSheet(props: { index: number | null; at?: Date; onClose: () => void
         <p class="alm-ts-en latin">
           <span class="alm-ts-pinyin">{term.pinyin}</span> {term.en}
         </p>
-        {md && <p class="alm-ts-when">{t(`今年 ${md.m}月${md.d}日 ${md.hh} 交节`, `This year: ${MONTH_EN[md.m - 1]} ${md.d}, ${md.hh} China time`)}</p>}
+        {md && <p class="alm-ts-when">{en ? `This year: ${MONTH_EN[md.m - 1]} ${md.d}, ${md.hh} China time` : <Nums>{`今年 ${md.m}月${md.d}日 ${md.hh} 交节`}</Nums>}</p>}
         {(term.blurbZh || term.blurbEn) && (
           <div class="alm-ts-blurb">
             <p>{en ? <span class="latin">{term.blurbEn}</span> : term.blurbZh}</p>

@@ -539,7 +539,12 @@ function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Pa
   wctx.scale(k, k);
   let count = 0;
   const xs: number[] = [];
-  for (let x = 0; x < L.w; x += 4) if (R.base - ridgeAt(R, x) > 16) xs.push(x);
+  let Hmax = 1;
+  for (let x = 0; x < L.w; x += 4) {
+    const H = R.base - ridgeAt(R, x);
+    if (H > 16) xs.push(x);
+    Hmax = Math.max(Hmax, H);
+  }
   if (xs.length) {
     for (let pass = 0; pass < 3 && count < limit; pass++) {
       if (pass === 2) {
@@ -550,11 +555,13 @@ function paintMiDots(ctx: CanvasRenderingContext2D, L: Layout, R: Ridge, pal: Pa
         ctx.restore();
       }
       const target = pass < 2 ? wctx : ctx;
-      const nc = Math.round(clusters * [0.4, 0.38, 0.22][pass]);
+      const nc = Math.round(clusters * [0.4, 0.38, 0.22][pass] * 1.6);
       for (let c = 0; c < nc; c++) {
         const cx = rng.pick(xs) + rng.range(-4, 4);
         const r = ridgeAt(R, cx);
         const H = R.base - r;
+        // tall masses carry the dabs; thin saddles stay wash (no dotted "trails")
+        if (H < 30 * scale || rng() > H / Hmax) continue;
         const sl = (ridgeAt(R, cx + 4) - ridgeAt(R, cx - 4)) / 8;
         // shadowed (right-facing) flanks and the crest collect the ink; lit flanks stay wash
         if (sl < -0.05 && rng.chance(pass === 2 ? 0.6 : 0.4)) continue;
@@ -1072,8 +1079,8 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
     const col = mixRgb(OCHRE, [90, 88, 80], 0.5);
     paintField(sc, 0, 0, silt.width, silt.height, 1, (x, y, out) => {
       const X = x * 4, Y = y * 4;
-      const n = noise.fbm(X / 90 + 40, Y / 26, 4);
-      const a = 0.45 + 0.35 * n + 0.15 * (Y / h);
+      const n = noise.fbm(X / 80 + 40, Y / 22, 4);
+      const a = 0.38 + 0.6 * n + 0.15 * (Y / h);
       out[0] = col[0]; out[1] = col[1]; out[2] = col[2]; out[3] = clamp(a, 0, 1);
     });
   }
@@ -1082,7 +1089,7 @@ function buildPondCache(o: PondOptions, key: string): PondCache {
     const murk = (1 - cl) ** 1.3;
     if (murk > 0.02) {
       const tc = tint.getContext('2d')!;
-      tc.globalAlpha = murk * 0.42;
+      tc.globalAlpha = murk * 0.4;
       tc.drawImage(silt, 0, 0);
       tc.globalAlpha = 1;
     }
@@ -1264,7 +1271,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   p.globalAlpha = 1;
 
   // 7 · duckweed when the water stagnates
-  const nd = Math.round(clamp((0.62 - clarity) / 0.62, 0, 1) * 26);
+  const nd = Math.round(clamp((0.62 - clarity) / 0.62, 0, 1) * 36);
   if (nd > 0) {
     const green = `rgba(${MALACHITE.map((v) => Math.round(v * 0.85)).join(',')},`;
     for (let i = 0; i < nd; i++) {
@@ -1273,7 +1280,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
       const dn = 0.12 + 0.8 * hash01(seed + 23, cxi);
       const by = dn * h + (hash01(seed + 24, i) - 0.5) * 5;
       const dx = Math.sin(t * 0.05 + cxi * 1.3) * 6 + Math.sin(t * 0.13 + i) * 0.8;
-      const r = (0.8 + 1.3 * hash01(seed + 25, i)) * (0.55 + 0.8 * dn);
+      const r = (1.1 + 1.5 * hash01(seed + 25, i)) * (0.55 + 0.8 * dn);
       p.fillStyle = green + (0.5 + 0.3 * hash01(seed + 26, i)).toFixed(2) + ')';
       p.beginPath();
       p.ellipse(bx + dx, by, r * 1.3, r * 0.75, 0, 0, Math.PI * 2);

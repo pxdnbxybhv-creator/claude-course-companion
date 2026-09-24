@@ -452,7 +452,7 @@ export function bamboo(spec: PlantSpec): Drawing {
     units.push({ strokes: culmStrokes(far), birth: 0.585, step: 0.002 });
     const fol = foliage(far, 0.45, 2, [0.14, 0.22]).map((f) => f.unit);
     // at most a whisper of indigo (花青) in the far leaves
-    if (rng.chance(0.4)) for (const u of fol) for (const st of u) { st.color = PIGMENTS.indigo; st.tone *= 0.9; }
+    if (rng.chance(0.4)) for (const u of fol) for (const st of u) { st.color = PIGMENTS.indigo; st.tone *= 0.75; }
     schedule(fol, 0.615, 0.84);
   }
 

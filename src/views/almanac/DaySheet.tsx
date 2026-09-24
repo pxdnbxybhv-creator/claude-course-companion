@@ -12,6 +12,7 @@ import { lang, state } from '../../app/store';
 import { dayDate, dayInfo, lunarEn, MONTH_EN, WEEK_EN, WEEK_ZH } from './model';
 import { Festivals, MoonCanvas } from './Today';
 import { YiJiList } from './YiJi';
+import { Nums } from './Nums';
 
 const PENTAD_ZH = ['初候', '二候', '三候'];
 
@@ -38,7 +39,7 @@ export function DaySheet(props: { dayKey: DateKey | null; todayKey: DateKey; onC
   return (
     <Sheet open onClose={props.onClose} title={<span class={en ? 'latin alm-sheet-title-en' : ''}>{title}</span>} label={title}>
       <div class="alm-day">
-        <p class="alm-day-rel">{relText} <span class="latin">· {info.y}</span></p>
+        <p class="alm-day-rel">{en ? relText : <Nums>{relText}</Nums>} <span class="latin">· {info.y}</span></p>
         <div class="alm-day-top">
           <div class="alm-day-lunar">
             {en ? (

@@ -346,7 +346,11 @@ function DayNote(props: { day: DateKey }) {
   const saved = state.value.notes[props.day] ?? '';
   const [text, setText] = useState(saved);
   const timer = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => setText(state.value.notes[props.day] ?? ''), [props.day]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Follow the stored note (new day, demo seeded, backup imported) unless the user is typing.
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) setText(saved);
+  }, [props.day, saved]);
   const flush = (v: string) => {
     clearTimeout(timer.current);
     if (v !== (state.value.notes[props.day] ?? '')) setNote(props.day, v);
@@ -364,6 +368,7 @@ function DayNote(props: { day: DateKey }) {
     <div class="daynote">
       <label class="daynote-label" for="daynote">{t('今日一句', 'A line for today')}</label>
       <input
+        ref={inputRef}
         id="daynote"
         class="input daynote-input"
         value={text}

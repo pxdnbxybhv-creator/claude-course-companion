@@ -21,7 +21,7 @@ interface Particle {
   /** Emission time (s, sim clock) — neighbours' Δte / distance gives the ribbon's line density. */
   te: number;
   age: number;
-  /** Source strength at emission (a dying ember gives thinner smoke). */
+  /** Source strength at emission (a dying ember gives thinner smoke) × a slow puffiness. */
   g: number;
 }
 
@@ -179,7 +179,8 @@ export class SmokePlume {
         this.emitAcc -= 1 / rate;
         const age = this.emitAcc;
         for (const s of this.strands) {
-          s.pts.push({ x: this.x + s.off * u, y: this.y, vx: 0, vy: -30 * u, te: t - age, age, g: this.strength });
+          const puff = 0.7 + 0.3 * this.nSlow((t - age) * 0.5, 3.7 + s.salt);
+          s.pts.push({ x: this.x + s.off * u, y: this.y, vx: 0, vy: -30 * u, te: t - age, age, g: this.strength * puff });
         }
       }
     } else this.emitAcc = 0;
@@ -220,7 +221,9 @@ export class SmokePlume {
         tx += 1.2 * u * this.nFlow2(t * 0.9 + s.salt, 3.3) * (1 - T);
         for (const im of imps) {
           const ex = p.x - im.x, ey = p.y - im.y;
-          const w = Math.exp(-(ex * ex + ey * ey) / R2 - im.age / 0.35);
+          const d2 = ex * ex + ey * ey;
+          if (d2 > R2 * 6) continue;
+          const w = Math.exp(-d2 / R2 - im.age / 0.35);
           if (w > 0.002) {
             tx += im.vx * w * 0.6; ty += im.vy * w * 0.6;
             // a moving hand sheds a counter-rotating vortex pair: swirl on either side of its path
@@ -326,10 +329,9 @@ export class SmokePlume {
         rhoS += (rho - rhoS) * 0.35;
         const T = smoothstep(1.0, 4.5, age);
         const w = w0 + (0.22 + 0.55 * T) * age * u;
-        const puff = 0.7 + 0.3 * this.nSlow(a.te * 0.5, 3.7 + s.salt);
         const fadeIn = smoothstep(0, 0.18, age);
         const life = Math.exp(-age / 7.5) * smoothstep(14, 9.5, age);
-        const base = s.gain * (a.g + b.g) * 0.5 * puff * fadeIn * life * Math.pow(rhoS, 0.55) * Math.pow(w0 / w, 0.35);
+        const base = s.gain * (a.g + b.g) * 0.5 * fadeIn * life * Math.pow(rhoS, 0.55) * Math.pow(w0 / w, 0.35);
         const id0 = s.id * 1e6 + i, id1 = id0 - 1;
         // core: crisp thread, thins out as the smoke diffuses
         const ca = 0.38 * base * (1 - 0.45 * T);

@@ -40,7 +40,7 @@ function cases(): Case[] {
   };
   return [
     { name: 'pluck 宫 F3 (degree 0)', dur: 6, pitch: degreeFreq(0), play: (m) => playPluck(m, 0.05, 0, 0.7) },
-    { name: 'pluck 徵 C2 (degree −7, lowest string)', dur: 7, pitch: degreeFreq(-7), play: (m) => playPluck(m, 0.05, -7, 0.85) },
+    { name: 'pluck 徵 C2 (degree −7, lowest string)', dur: 9, pitch: degreeFreq(-7), play: (m) => playPluck(m, 0.05, -7, 0.85) },
     { name: 'pluck 徵 C5 (degree 8)', dur: 5, pitch: degreeFreq(8), play: (m) => playPluck(m, 0.05, 8, 0.6) },
     { name: 'chime(1) — 2 harmonics', dur: 5, play: (m) => playChime(m, 0.05, 1) },
     { name: 'chime(30) — 4 harmonics + 散音 + low 泛', dur: 6, play: (m) => playChime(m, 0.05, 30) },

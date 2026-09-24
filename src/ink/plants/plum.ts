@@ -338,7 +338,7 @@ export function plum(spec: PlantSpec): Drawing {
       const L = dist(a, b) || 1;
       const t = i / topIdx;
       const o = trunk.w[i] * 0.2;
-      st.push({ x: p.x - ((b.y - a.y) / L) * o, y: p.y + ((b.x - a.x) / L) * o, w: 0.024 * H * (1 - 0.5 * t) });
+      st.push({ x: p.x - ((b.y - a.y) / L) * o, y: Math.min(p.y + ((b.x - a.x) / L) * o, -0.014 * H), w: 0.024 * H * (1 - 0.5 * t) });
     }
     const lead = limbs[0];
     const e1 = at(lead, Math.min(1, (0.05 * H) / polyLen(lead.pts)));
@@ -457,6 +457,8 @@ function paintTrunk(rng: Rng, trunk: Branch, topIdx: number, brokenTop: boolean,
   const nl = segN(n - 1);
   S.push({ p: trunk.pts[n], nx: nl.nx, ny: nl.ny, hw: trunk.w[n] / 2, seg: n - 1, t: 1, u: 1 });
   S.forEach((q, i) => (q.u = i / (S.length - 1)));
+  // lift the foot a little so the round start of the broad strokes doesn't sink below the ground
+  S[0].p = { x: S[0].p.x, y: S[0].p.y - S[0].hw * 0.55 };
   const off = (q: TS, k: number): P => ({ x: q.p.x + q.nx * q.hw * k, y: q.p.y + q.ny * q.hw * k });
   const band = (i0: number, i1: number, k: number, wf: (q: TS, v: number) => number) =>
     S.slice(i0, i1 + 1).map((q, j, arr) => ({ ...off(q, k), w: wf(q, j / Math.max(1, arr.length - 1)) }));

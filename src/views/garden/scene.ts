@@ -871,18 +871,58 @@ export class GardenScene {
     }
   }
 
+  private labelCache = new Map<string, { c: HTMLCanvasElement; w: number; h: number }>();
+
+  /** A habit name as a small vertical inscription, rasterised once (text with a soft paper halo). */
+  private labelBitmap(name: string, size: number): { c: HTMLCanvasElement; w: number; h: number } {
+    const key = `${name}|${size}|${this.dpr}|${this.labelFont}`;
+    const hit = this.labelCache.get(key);
+    if (hit) return hit;
+    if (this.labelCache.size > 64) this.labelCache.clear();
+    const dpr = this.dpr;
+    const lh = size * 1.18;
+    const cjk = isCJK(name);
+    const chars = [...name].slice(0, 9);
+    if ([...name].length > 9) chars[8] = '…';
+    const latin = name.length > 18 ? name.slice(0, 17) + '…' : name;
+    const pad = 4;
+    const m = document.createElement('canvas').getContext('2d')!;
+    m.font = `italic ${size + 1}px ${this.labelFont}`;
+    const w = cjk ? size + pad * 2 : size + 3 + pad * 2;
+    const h = (cjk ? chars.length * lh : m.measureText(latin).width) + pad * 2;
+    const c = document.createElement('canvas');
+    c.width = Math.ceil(w * dpr);
+    c.height = Math.ceil(h * dpr);
+    const ctx = c.getContext('2d')!;
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = 'rgb(52,46,38)';
+    ctx.shadowColor = 'rgba(241,233,216,0.95)';
+    ctx.shadowBlur = 3 * dpr;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (cjk) {
+      ctx.font = `${size}px ${this.labelFont}`;
+      chars.forEach((ch, i) => ctx.fillText(ch, w / 2, pad + lh * (i + 0.5)));
+    } else {
+      ctx.translate(w / 2, h - pad);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = 'left';
+      ctx.font = `italic ${size + 1}px ${this.labelFont}`;
+      ctx.fillText(latin, 0, 0);
+    }
+    const out = { c, w, h };
+    this.labelCache.set(key, out);
+    return out;
+  }
+
   private drawLabels(): void {
     const ctx = this.ctx;
     if (!this.labelFont) {
-      const fam = getComputedStyle(document.documentElement).getPropertyValue('--font-text').trim() || 'serif';
-      this.labelFont = fam;
+      this.labelFont = getComputedStyle(document.documentElement).getPropertyValue('--font-text').trim() || 'serif';
+      this.labelCache.clear();
     }
     const size = this.labelSize;
-    const lh = size * 1.18;
     ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `${size}px ${this.labelFont}`;
     for (const it of this.items) {
       if (!it.plant) continue;
       const slot = this.slots.get(it.key);
@@ -893,26 +933,9 @@ export class GardenScene {
       if (x < -20 || x > this.W + 20) continue;
       const hot = this.hover === it.key;
       const done = it.plant.stats.doneToday;
-      const alpha = slot.appear * (hot ? 0.9 : done ? 0.62 : 0.46);
-      ctx.fillStyle = `rgba(52,46,38,${alpha.toFixed(3)})`;
-      ctx.shadowColor = 'rgba(241,233,216,0.9)';
-      ctx.shadowBlur = 3;
-      const bottom = it.y - 5;
-      if (isCJK(name)) {
-        const chars = [...name].slice(0, 9);
-        if ([...name].length > 9) chars[8] = '…';
-        const top = bottom - chars.length * lh;
-        chars.forEach((ch, i) => ctx.fillText(ch, x, top + lh * (i + 0.5)));
-      } else {
-        const label = name.length > 18 ? name.slice(0, 17) + '…' : name;
-        ctx.save();
-        ctx.translate(x, bottom);
-        ctx.rotate(-Math.PI / 2);
-        ctx.textAlign = 'left';
-        ctx.font = `italic ${size + 1}px ${this.labelFont}`;
-        ctx.fillText(label, 0, 0);
-        ctx.restore();
-      }
+      ctx.globalAlpha = slot.appear * (hot ? 0.9 : done ? 0.62 : 0.46);
+      const b = this.labelBitmap(name, size);
+      ctx.drawImage(b.c, x - b.w / 2, it.y - 1 - b.h, b.w, b.h);
     }
     ctx.restore();
   }

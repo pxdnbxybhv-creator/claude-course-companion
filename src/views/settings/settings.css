@@ -80,13 +80,10 @@
 }
 
 /* about */
-.set-poem { margin: 14px 0 6px; display: flex; justify-content: center; align-items: flex-end; gap: 10px; }
-.set-poem-cols {
-  writing-mode: vertical-rl; text-orientation: upright;
-  display: flex; gap: 0 4px; max-height: 16em;
-}
-.set-poem-cols p { margin: 0; font-size: 25px; line-height: 1.55; letter-spacing: 0.16em; color: var(--ink); }
-.set-poem-cols .set-poem-by { font-family: var(--font-text); font-size: 13px; letter-spacing: 0.2em; color: var(--ink-3); padding-top: 3.2em; margin-left: 2px; }
+.set-poem { margin: 14px 0 6px; display: flex; flex-direction: row-reverse; justify-content: center; align-items: flex-end; gap: 6px; }
+.set-poem-cols { writing-mode: vertical-rl; text-orientation: upright; }
+.set-poem-cols p { margin: 0; font-size: 25px; line-height: 1.6; letter-spacing: 0.16em; color: var(--ink); white-space: nowrap; }
+.set-poem-cols .set-poem-by { font-family: var(--font-text); font-size: 13px; line-height: 2.2; letter-spacing: 0.22em; color: var(--ink-3); padding-inline-start: 5.2em; }
 .set-poem .seal-stamp { margin-bottom: 4px; mix-blend-mode: multiply; }
 :root[data-theme='dark'] .set-poem .seal-stamp { mix-blend-mode: normal; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .set-poem .seal-stamp { mix-blend-mode: normal; } }
