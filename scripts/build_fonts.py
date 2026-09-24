@@ -303,6 +303,19 @@ def wenkai_slices() -> list[tuple[str, set[int]]]:
     return [(name, parse_unicode_range(spec)) for name, spec in blocks]
 
 
+def wenkai_slice_ttf(name: str) -> Path:
+    """A slice, downloaded and unpacked to TTF once (re-reading WOFF2 glyf data is the slow part)."""
+    ttf = CACHE / 'lxgw-ttf' / name.replace('.woff2', '.ttf')
+    if not ttf.exists():
+        font = load_font(fetch(f'{WENKAI_PKG}/files/{name}', CACHE / 'lxgw' / name))
+        font.flavor = None
+        ttf.parent.mkdir(parents=True, exist_ok=True)
+        tmp = ttf.with_name(ttf.name + '.part')
+        font.save(tmp)
+        tmp.replace(ttf)
+    return ttf
+
+
 def build_wenkai(cps: set[int], tmp: Path, label: str) -> tuple[TTFont, set[int]]:
     """Subset the needed slices and merge them into one font covering `cps`."""
     parts: list[Path] = []
@@ -310,8 +323,7 @@ def build_wenkai(cps: set[int], tmp: Path, label: str) -> tuple[TTFont, set[int]
         want = cps & rng
         if not want:
             continue
-        src = fetch(f'{WENKAI_PKG}/files/{name}', CACHE / 'lxgw' / name)
-        font = load_font(src)
+        font = load_font(wenkai_slice_ttf(name))
         want &= cmap_of(font)
         if not want:
             continue

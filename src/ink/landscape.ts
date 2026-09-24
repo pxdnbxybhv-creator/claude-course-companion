@@ -1149,8 +1149,8 @@ function buildPondCache(o: PondOptions, key: string, full: boolean): PondCache {
   {
     const gc = glint.getContext('2d')!;
     paintField(gc, 0, 0, 128, 16, 1, (x, y, out) => {
-      const u = (x - 64) / 64, v = (y - 8) / 3.2;
-      const a = Math.exp(-u * u * 2.2 - v * v) * (0.7 + 0.3 * noise(x / 9, y / 3));
+      const u = (x - 64) / 64, v = (y - 8) / 5;
+      const a = Math.exp(-u * u * 3 - v * v) * (0.6 + 0.4 * noise(x / 11, y / 4));
       out[0] = 255; out[1] = 253; out[2] = 246; out[3] = a;
     });
   }
@@ -1214,11 +1214,13 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   let y = 0;
   while (y < h) {
     const dn = y / h;
-    const sh = 1.4 + 3 * dn;
-    const ph = 5.5 / (dn + 0.1);
-    const dx = ampK * (0.3 + 4.2 * dn) * (Math.sin(ph + t * 1.15) + 0.45 * Math.sin(ph * 2.3 - t * 0.8 + 1.7));
+    const sh = 1 + 3 * dn;
+    // phase advances in perspective (log depth): many fine ripples far off, broad swells near,
+    // and never more than ~0.6 rad between neighbouring strips — no staircase
+    const ph = 7 * Math.log(dn + 0.1);
+    const dx = ampK * (0.25 + 4 * dn) * (Math.sin(ph * 3 + t * 1.1) + 0.35 * Math.sin(ph * 5.1 - t * 0.7 + 1.7));
     // brief breaks in the reflection where a wave crest catches the sky
-    const crest = Math.max(0, Math.sin(ph * 0.5 + t * 0.6 + 0.4)) ** 6;
+    const crest = Math.max(0, Math.sin(ph * 1.3 + t * 0.5 + 0.4)) ** 6;
     p.globalAlpha = a0 * (1 - 0.75 * dn ** 0.8) * (1 - 0.6 * crest);
     const syR = y * C.rs, shR = Math.min(sh, h - y) * C.rs;
     if (syR < C.refl.height && shR > 0) p.drawImage(C.refl, 0, syR, C.refl.width, Math.min(shR, C.refl.height - syR), dx, y, w, Math.min(sh, h - y));
@@ -1231,12 +1233,13 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   // 4 · 天光: sky-light glints near the far bank, breathing
   const gA = (night ? 0.35 : 0.8) * clarity ** 1.5;
   if (gA > 0.02) {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 3; i++) {
       const gx = w * (0.12 + 0.76 * hash01(seed, i)) + Math.sin(t * 0.07 + i) * 12;
-      const gy = h * (0.08 + 0.35 * hash01(seed, i + 9) ** 1.5);
-      const gw = w * (0.18 + 0.2 * hash01(seed, i + 3)) * (0.6 + gy / h);
-      p.globalAlpha = gA * (0.45 + 0.35 * Math.sin(t * 0.5 + i * 2.1));
-      p.drawImage(C.glint, gx - gw / 2, gy - 3, gw, 6 + 6 * (gy / h));
+      const gy = h * (0.06 + 0.3 * hash01(seed, i + 9) ** 1.5);
+      const gw = Math.min(w * 0.4, h * 1.6) * (0.5 + 0.5 * hash01(seed, i + 3)) * (0.6 + gy / h);
+      const gh = h * (0.08 + 0.1 * gy / h);
+      p.globalAlpha = gA * 0.7 * (0.5 + 0.3 * Math.sin(t * 0.5 + i * 2.1));
+      p.drawImage(C.glint, gx - gw / 2, gy - gh / 2, gw, gh);
     }
     p.globalAlpha = 1;
   }
