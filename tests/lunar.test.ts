@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  astronomicalLunarMonths, festivalsOn, fromLunar, ganZhiOfYear, leapMonthOf, lunarDayName, lunarMonths, toLunar,
+  type LunarDate, astronomicalLunarMonths, festivalsOn, fromLunar, ganZhiOfYear, leapMonthOf, lunarDayName, lunarMonths, toLunar,
 } from '../src/core/lunar';
 
 const ymd = (d: Date | null) =>
@@ -120,19 +120,19 @@ describe('toLunar / fromLunar vs the Hong Kong Observatory tables', () => {
   });
 
   it('round-trips fromLunar(toLunar(d)) for every day 1901–2099', () => {
-    let prev = toLunar(new Date(1900, 11, 31));
+    let prev: LunarDate | null = toLunar(new Date(1900, 11, 31));
     for (let t = Date.UTC(1901, 0, 1); t < Date.UTC(2100, 0, 1); t += 86400e3) {
       const u = new Date(t);
       const d = new Date(u.getUTCFullYear(), u.getUTCMonth(), u.getUTCDate());
-      if (d.getDate() !== u.getUTCDate()) { prev = toLunar(d); continue; } // a day this time zone skipped
+      if (d.getDate() !== u.getUTCDate()) { prev = null; continue; } // a day this time zone skipped
       const l = toLunar(d);
       const back = fromLunar(l.year, l.month, l.day, l.leap);
       if (ymd(back) !== ymd(d)) throw new Error(`round trip failed at ${ymd(d)}: ${JSON.stringify(l)}`);
       // consecutive days advance by exactly one lunar day
-      if (l.day !== 1 && (l.day !== prev.day + 1 || l.month !== prev.month || l.leap !== prev.leap)) {
+      if (prev && l.day !== 1 && (l.day !== prev.day + 1 || l.month !== prev.month || l.leap !== prev.leap)) {
         throw new Error(`discontinuity at ${ymd(d)}`);
       }
-      if (l.day === 1 && prev.day !== prev.monthDays) throw new Error(`month ended early at ${ymd(d)}`);
+      if (prev && l.day === 1 && prev.day !== prev.monthDays) throw new Error(`month ended early at ${ymd(d)}`);
       prev = l;
     }
   });

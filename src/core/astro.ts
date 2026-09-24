@@ -1,11 +1,12 @@
 // Small astronomy for the almanac: the Sun's and Moon's apparent longitudes, moon phases and
 // sunrise/sunset. Pure functions, no DOM, no dependencies.
 //
-// Sun  — VSOP87D (Bretagnon & Francou 1988), truncated here to the ~130 largest Earth terms
-//        (max error vs. the full theory ≈ 0.3″ over 1850–2150), + FK5 correction, aberration and
-//        IAU 1980 nutation (largest 17 terms) — Meeus, *Astronomical Algorithms*, ch. 22, 25, 32.
-// Moon — ELP-2000/82 main terms as tabulated by Meeus ch. 47 (longitude error ≲ 10″, i.e. a phase
-//        instant to within ~20 s).
+// Sun  — VSOP87D (Bretagnon & Francou 1988), truncated here to its 105 largest Earth-longitude
+//        terms (max error vs. the full theory 0.3″ ≈ 7 s of time over 1850–2150), + FK5
+//        correction, aberration and IAU 1980 nutation (largest 17 terms) — Meeus, *Astronomical
+//        Algorithms*, ch. 22, 25, 32. Solar-term instants agree with 寿星万年历 within 31 s, 1901–2099.
+// Moon — ELP-2000/82 main terms as tabulated by Meeus ch. 47 (longitude error ≲ 10″); phases are
+//        solved on the Moon−Sun elongation and agree with Meeus ch. 49 within 36 s, 1900–2100.
 // ΔT   — Espenak & Meeus polynomials (NASA Five Millennium Canon), 1600–2150+.
 // Sun times — the NOAA solar calculator algorithm, refined at the event time.
 

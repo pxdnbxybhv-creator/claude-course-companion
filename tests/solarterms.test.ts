@@ -183,6 +183,9 @@ describe('termContext', () => {
     expect(at('2026-10-07')).toMatchObject({ pentad: 2, daysToNext: 1 });
     expect(NAMES[at('2026-10-08').current.index]).toBe('寒露');
     expect(at('2026-09-24')).toMatchObject({ pentad: 0, daysToNext: 14 });
+    // 夏至 2026-06-21 → 小暑 2026-07-07 is 16 days: 5 + 6 + 5.
+    const split = Array.from({ length: 16 }, (_, i) => termContext(new Date(2026, 5, 21 + i)).pentad).join('');
+    expect(split).toBe('0000011111122222');
   });
 
   it('crosses the year boundary', () => {

@@ -28,6 +28,8 @@ export interface FocusSession {
   minutes: number;
   /** True when it burned to the end; false when extinguished early. */
   completed: boolean;
+  /** Minutes actually burned, for sessions extinguished early. */
+  burned?: number;
   /** Optional intention written before lighting. */
   intent?: string;
 }

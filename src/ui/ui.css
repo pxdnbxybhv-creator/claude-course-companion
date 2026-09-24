@@ -64,6 +64,7 @@
   background: var(--paper); color: var(--ink); border-radius: 20px 20px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
   box-shadow: 0 -10px 40px -10px rgba(0, 0, 0, 0.35); animation: sheet-in 0.35s var(--ease);
 }
+.sheet:focus-visible { outline: none; }
 .sheet-grip { width: 40px; height: 4px; border-radius: 4px; background: var(--line-strong); margin: 0 auto 10px; }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .sheet-head h2 { margin: 0; font-size: 22px; font-weight: 400; }

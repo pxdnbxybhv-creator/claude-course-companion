@@ -25,7 +25,7 @@ export function defaultSettings(): Settings {
     sound: true,
     volume: 0.7,
     ambient: 'none',
-    focusMinutes: 25,
+    focusMinutes: 30,
     theme: 'auto',
   };
 }
@@ -66,7 +66,9 @@ export function sanitize(raw: unknown): AppState {
   }
   const focus: FocusSession[] = Array.isArray(r.focus)
     ? r.focus.filter((f) => f && Number.isFinite(f.start) && Number.isFinite(f.minutes)).map((f) => ({
-        start: f.start, minutes: f.minutes, completed: !!f.completed, ...(f.intent ? { intent: String(f.intent).slice(0, 80) } : {}),
+        start: f.start, minutes: f.minutes, completed: !!f.completed,
+        ...(Number.isFinite(f.burned) ? { burned: Math.max(0, Math.min(f.minutes, f.burned!)) } : {}),
+        ...(f.intent ? { intent: String(f.intent).slice(0, 80) } : {}),
       }))
     : [];
   const s = (r.settings ?? {}) as Partial<Settings>;
@@ -78,7 +80,7 @@ export function sanitize(raw: unknown): AppState {
     volume: Number.isFinite(s.volume) ? Math.min(1, Math.max(0, s.volume!)) : base.settings.volume,
     ambient: ['none', 'rain', 'stream', 'pines', 'qin'].includes(s.ambient as string) ? s.ambient! : 'none',
     theme: s.theme === 'light' || s.theme === 'dark' ? s.theme : 'auto',
-    focusMinutes: Number.isFinite(s.focusMinutes) ? Math.min(180, Math.max(1, Math.round(s.focusMinutes!))) : 25,
+    focusMinutes: Number.isFinite(s.focusMinutes) ? Math.min(180, Math.max(1, Math.round(s.focusMinutes!))) : 30,
     ...(s.location && Number.isFinite(s.location.lat) && Number.isFinite(s.location.lon) ? { location: s.location } : {}),
   };
   return { version: 1, habits, checkins, notes, focus, settings, onboarded: !!r.onboarded };

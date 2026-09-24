@@ -1,7 +1,8 @@
 // Chinese lunisolar calendar (农历).
 //
 // 1900–2100: the classic compact month table (lunarInfo, as used by most open-source Chinese
-// calendars), which agrees with the Hong Kong Observatory's 公历与农历日期对照表. Outside that
+// calendars); it agrees with the Hong Kong Observatory's 公历与农历日期对照表 on every day of
+// 1901–2100, and with our own ephemeris from 1929 on (see tests/lunar.test.ts). Outside that
 // range the calendar is computed astronomically with the modern rules (GB/T 33661-2017): months
 // begin on the China-time (UTC+8) day of the true new moon, the month holding 冬至 is 十一月, and
 // in a 13-month 岁 the first month without a 中气 is the leap month. Lunar dates are China-time
@@ -251,8 +252,8 @@ export function leapMonthOf(year: number): number {
 }
 
 /**
- * The lunar year computed purely astronomically (ignoring the 1900–2100 table), as
- * [month, leap, days, 初一 as local midnight] rows. Exposed for verification.
+ * The months of lunar year `year` computed purely from the ephemeris with the modern rules,
+ * ignoring the 1900–2100 table. Exposed for verification (it reproduces the table from 1929 on).
  */
 export function astronomicalLunarMonths(year: number): LunarMonthInfo[] {
   return astronomicalYear(year).months.map((m) => ({
@@ -269,7 +270,6 @@ export function astronomicalLunarMonths(year: number): LunarMonthInfo[] {
 function lunarFromDayNumber(n: number, gregorianYear: number): LunarDate {
   let span = yearSpan(gregorianYear);
   if (n < span.start) span = yearSpan(gregorianYear - 1);
-  else if (n >= span.end) span = yearSpan(gregorianYear + 1); // cannot happen for valid input
   let m = span.months[0];
   for (const mm of span.months) {
     if (mm.start > n) break;
@@ -319,20 +319,20 @@ const LUNAR_FESTIVALS: Record<number, Festival> = {
   101: { zh: '春节', en: 'Spring Festival', kind: 'lunar' },
   115: { zh: '元宵', en: 'Lantern Festival', kind: 'lunar' },
   202: { zh: '龙抬头', en: 'Dragon Raises Its Head', kind: 'lunar' },
-  303: { zh: '上巳', en: 'Shangsi Spring Outing', kind: 'lunar' },
+  303: { zh: '上巳', en: 'Double Third Festival', kind: 'lunar' },
   505: { zh: '端午', en: 'Dragon Boat Festival', kind: 'lunar' },
-  707: { zh: '七夕', en: 'Qixi, Night of the Weaver', kind: 'lunar' },
+  707: { zh: '七夕', en: 'Double Seventh Festival', kind: 'lunar' },
   715: { zh: '中元', en: 'Ghost Festival', kind: 'lunar' },
   815: { zh: '中秋', en: 'Mid-Autumn Festival', kind: 'lunar' },
   909: { zh: '重阳', en: 'Double Ninth Festival', kind: 'lunar' },
   1001: { zh: '寒衣', en: 'Winter Clothing Day', kind: 'lunar' },
-  1015: { zh: '下元', en: 'Xiayuan Water Festival', kind: 'lunar' },
+  1015: { zh: '下元', en: 'Xiayuan Festival', kind: 'lunar' },
   1208: { zh: '腊八', en: 'Laba Festival', kind: 'lunar' },
   1223: { zh: '小年', en: 'Little New Year', kind: 'lunar' },
 };
 const NEW_YEARS_EVE: Festival = { zh: '除夕', en: "Lunar New Year's Eve", kind: 'lunar' };
 const TERM_FESTIVALS: Record<number, Festival> = {
-  4: { zh: '清明', en: 'Qingming, Tomb-Sweeping Day', kind: 'term' },
+  4: { zh: '清明', en: 'Qingming Festival', kind: 'term' },
   21: { zh: '冬至', en: 'Winter Solstice', kind: 'term' },
 };
 

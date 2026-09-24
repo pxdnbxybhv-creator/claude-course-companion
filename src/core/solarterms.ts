@@ -50,14 +50,16 @@ export function solarLongitudeInstant(longitude: number, jdGuess: number): Date 
   return dateFromJde(jde);
 }
 
-// Approximate day-of-year offsets (from Jan 0.0 UTC) for the terms of one Gregorian year.
 // Order within a Gregorian year: 小寒(22) 大寒(23) 立春(0) … 冬至(21).
 const YEAR_ORDER = [22, 23, ...Array.from({ length: 22 }, (_, i) => i)];
 
 const yearCache = new Map<number, TermInstant[]>();
 const dayIndexCache = new Map<number, Map<number, TermInstant>>();
 
-/** All 24 term instants whose instant falls in Gregorian `year` (UTC+8), sorted by time. */
+/**
+ * All 24 term instants whose instant falls in Gregorian `year` (UTC+8), sorted by time:
+ * 小寒 (index 22), 大寒 (23), 立春 (0) … 冬至 (21). Cached — the array is shared, do not mutate it.
+ */
 export function termsOfYear(year: number): TermInstant[] {
   const hit = yearCache.get(year);
   if (hit) return hit;
@@ -86,9 +88,10 @@ export function termInstant(year: number, index: number): TermInstant {
 }
 
 export interface TermContext {
-  /** The term we are in now (most recent term instant ≤ date). */
+  /** The term we are in: the latest term whose China-time day is ≤ the date's day (so a term
+   *  holds for the whole of the day on which it begins). */
   current: TermInstant;
-  /** The next term instant after date. */
+  /** The term after `current` (it begins on a later day). */
   next: TermInstant;
   /** 0, 1, 2 — which of the term's three pentads (候, ~5 days each) we are in. */
   pentad: 0 | 1 | 2;
@@ -101,7 +104,7 @@ export interface TermContext {
  * from the start of its China-time (UTC+8) calendar day, and `date` is read by its local Y/M/D
  * (as toLunar and termOnDay do). So on the day of 秋分 `current` is 秋分 all day long, and
  * `daysToNext` ≥ 1. The pentad splits the days from `current`'s day to `next`'s day in thirds
- * (a 15-day term → 5 + 5 + 5 days).
+ * by each day's midpoint (a 15-day term → 5 + 5 + 5 days, 16 → 5 + 6 + 5, 14 → 5 + 4 + 5).
  */
 export function termContext(date: Date): TermContext {
   const day = localDayNumber(date);
@@ -113,7 +116,8 @@ export function termContext(date: Date): TermContext {
   const next = list[i + 1];
   const startDay = chinaDayNumber(current.at);
   const nextDay = chinaDayNumber(next.at);
-  const pentad = Math.min(2, Math.max(0, Math.floor(((day - startDay) * 3) / (nextDay - startDay)))) as 0 | 1 | 2;
+  // Which third of [current's day, next's day) the middle of this day falls in.
+  const pentad = Math.min(2, Math.max(0, Math.floor(((day - startDay + 0.5) * 3) / (nextDay - startDay)))) as 0 | 1 | 2;
   return { current, next, pentad, daysToNext: nextDay - day };
 }
 
