@@ -104,6 +104,10 @@ export function GardenView() {
       // Written into the emptiest part of the sky, away from the plant.
       const side = sceneRef.current?.poemSide(p.habit.id) ?? openSide;
       setPoem({ poem: chosen, side, key: Date.now() });
+    } else {
+      toast(t(`已取消《${p.habit.name}》今日的记录`, `Unmarked “${p.habit.name}” for today`), {
+        action: { label: t('撤销', 'Undo'), run: () => toggleCheckin(p.habit.id, day) },
+      });
     }
   };
 
@@ -188,6 +192,9 @@ export function GardenView() {
                 </span>
               ))}
             </h2>
+            {scheduled.length > 0 && Object.values(state.value.checkins).every((d) => d.length === 0) && (
+              <p class="garden-first-hint muted">{t('轻点右侧的圆相，记下今天。', 'Tap the circle on the right to mark today done.')}</p>
+            )}
             {scheduled.length === 0 && <p class="garden-rest-all muted">{t('今日园中无事，且听风声。', 'Nothing is due today. Listen to the wind.')}</p>}
             <ul class="hlist">
               {scheduled.map((p) => (

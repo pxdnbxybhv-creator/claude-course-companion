@@ -708,6 +708,15 @@ export class GardenScene {
 
   /** Habit id of the plant under a point (css px relative to the canvas), or null. */
   hitTest(x: number, y: number): string | null {
+    // A name inscription belongs to its own plant, even when it stands nearer a neighbour's stem.
+    const size = this.labelSize;
+    for (const it of this.items) {
+      if (!it.plant || it.labelX === undefined || it.labelY === undefined) continue;
+      const box = labelBox(it.plant.habit.name.trim(), size, LABEL_LATIN);
+      const cx = it.labelX - this.pan;
+      const y0 = box.mode === 'v' ? it.labelY - box.h : it.labelY;
+      if (x >= cx - box.w / 2 - 4 && x <= cx + box.w / 2 + 4 && y >= y0 - 4 && y <= y0 + box.h + 4) return it.key;
+    }
     let best: string | null = null;
     let bestD = Infinity;
     for (const it of this.items) {

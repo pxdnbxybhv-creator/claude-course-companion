@@ -226,3 +226,5 @@
 @media (prefers-reduced-motion: reduce) {
   .inscription .ch, .inscription-en, .inscription-by { filter: none !important; transform: none !important; }
 }
+
+.garden-first-hint { margin: -2px 0 6px; font-size: 14px; letter-spacing: 0.04em; }

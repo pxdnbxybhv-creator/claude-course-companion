@@ -308,7 +308,13 @@ function InkCalendar(props: { habit: Habit; days: DateKey[]; today: DateKey }) {
                   aria-pressed={done}
                   aria-label={label}
                   title={label}
-                  onClick={() => toggleCheckin(h.id, k)}
+                  onClick={() => {
+                    const nowDone = toggleCheckin(h.id, k);
+                    const md = t(`${d.getMonth() + 1}月${d.getDate()}日`, d.toLocaleDateString('en', { month: 'short', day: 'numeric' }));
+                    toast(nowDone ? t(`已补记 ${md}`, `Marked ${md} as done`) : t(`已取消 ${md} 的记录`, `Unmarked ${md}`), {
+                      action: { label: t('撤销', 'Undo'), run: () => toggleCheckin(h.id, k) },
+                    });
+                  }}
                 >
                   <i style={done ? { width: `${size}%`, height: `${size}%`, opacity: 0.72 + (hv % 25) / 100, borderRadius: `${46 + (hv % 9)}% ${50 - (hv % 7)}% ${48 + (hv % 5)}% ${52 - (hv % 8)}%` } : undefined} />
                 </button>
