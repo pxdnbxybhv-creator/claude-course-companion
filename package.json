@@ -1,0 +1,31 @@
+{
+  "name": "banmu",
+  "private": true,
+  "version": "1.0.0",
+  "description": "半亩 Half-Acre — a habit garden painted in Chinese ink, with an incense-stick focus timer and a solar-term almanac.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:single": "vite build --mode single",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "snap": "node scripts/snap.mjs",
+    "fonts": "python3 scripts/build_fonts.py"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.11.2",
+    "preact": "^10.29.8"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^26.6.2",
+    "playwright-core": "^1.56.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^5.0.1"
+  }
+}
