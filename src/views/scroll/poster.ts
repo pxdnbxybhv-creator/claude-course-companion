@@ -4,7 +4,7 @@ import type { AppState, DateKey } from '../../core/types';
 import { hashString } from '../../core/rng';
 import { seasonOfTerm } from '../../core/solarterms';
 import { moonInfo } from '../../core/astro';
-import { pickPoem } from '../../data/poems';
+import { pickPoem, type Poem } from '../../data/poems';
 import { fillPaper } from '../../ink/paper';
 import type { SceneEnv } from '../../ink/scene-types';
 import { renderGardenStill } from '../garden/scene';
@@ -47,7 +47,7 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
     await drawYear(ctx, W, H, o, d, fonts, pal);
     return c;
   }
-  const poem = pickPoem({ term: d.termIndex, salt: hashString(o.today) + o.salt * 7919 });
+  const poem = choosePoem(d, o.today, o.salt);
   const ins = composeInscription(d, poem.lines, o.state.settings.sealName, o.salt);
   await ensureFonts([...ins.verses, ...ins.date, ...ins.record, ins.sign, ins.seal, ins.leisure].join(''), fonts);
   const caption = o.lang === 'en' ? englishCaption(d) : '';
@@ -76,6 +76,29 @@ export async function renderPoster(o: PosterOptions): Promise<HTMLCanvasElement>
     if (caption) drawCaption(ctx, W, H - 28, caption, '', fonts, pal);
   }
   return c;
+}
+
+/**
+ * The poem for the inscription: first the one for today's solar term; each 换诗 steps through a
+ * de-duplicated list of poems about the user's own plants in this season, and about the season.
+ */
+function choosePoem(d: PosterData, today: DateKey, salt: number): Poem {
+  const h = hashString(today);
+  const season = seasonOfTerm(d.termIndex);
+  const list: Poem[] = [];
+  const seen = new Set<string>();
+  const add = (p: Poem) => {
+    const k = p.lines.join('');
+    if (!seen.has(k)) { seen.add(k); list.push(p); }
+  };
+  add(pickPoem({ term: d.termIndex, salt: h }));
+  if (salt === 0) return list[0];
+  for (let i = 0; i < 16 && list.length <= salt; i++) {
+    if (d.kinds.length) add(pickPoem({ plant: d.kinds[i % d.kinds.length], season, salt: h + i }));
+    add(pickPoem({ season, salt: h + i * 31 }));
+    add(pickPoem({ term: d.termIndex, salt: h + i * 7 }));
+  }
+  return list[salt % list.length];
 }
 
 /** The garden still in a portrait/square composition (logical width ≈ a phone screen). */

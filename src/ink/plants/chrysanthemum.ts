@@ -346,7 +346,7 @@ function head(c: Ctx, o: HeadOpts) {
   const zmin = Math.min(...zs), zmax = Math.max(...zs);
   for (const [ri, list] of [...byRing.entries()].sort((a, b) => a[0] - b[0])) {
     list.sort((a, b) => a.p.z - b.p.z);
-    list.forEach((ap, k) => {
+    list.forEach((ap) => {
       const depth = (ap.p.z - zmin) / (zmax - zmin || 1);
       const heart = ri === 0 && !o.bud;
       const col = heart ? colours.heart : colours.main;
