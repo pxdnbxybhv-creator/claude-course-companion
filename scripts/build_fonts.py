@@ -74,7 +74,7 @@ KNOWN_SHA256 = {
 FREQ_URL = 'https://cdn.jsdelivr.net/npm/hanzi@3.2.0/lib/data/frequencyjunda.txt.js'
 
 # How many of the most frequent characters to make available for user-typed text.
-COMMON_TOP_N = 3500
+COMMON_TOP_N = 3000  # ≈99 % of running modern text
 
 # Base set that is always included (numbers, dates, punctuation), whether or not the
 # source happens to use it today.
