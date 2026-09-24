@@ -86,7 +86,7 @@
 .hrow-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
 .hrow-name { font-size: 17px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.3s; }
 .hrow-sub { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink-3); white-space: nowrap; }
-.hrow-streak { overflow: hidden; text-overflow: ellipsis; }
+.hrow-streak { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hrow .plant-glyph { transition: background 0.35s, color 0.35s, border-color 0.35s; }
 .hrow.is-done .plant-glyph { border-color: var(--ink-2); }
 .hlist.is-resting .hrow-main { opacity: 0.72; }
@@ -129,7 +129,10 @@
 
 /* 今日一句 */
 .daynote { margin: 34px 0 6px; }
+.daynote-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .daynote-label { display: block; font-size: 13px; letter-spacing: 0.18em; color: var(--ink-3); }
+.daynote-ack { font-size: 12px; letter-spacing: 0.12em; color: var(--ink-3); opacity: 0; transition: opacity 0.5s var(--ease); }
+.daynote-ack.is-on { opacity: 1; }
 .daynote-input { font-size: 18px; padding: 10px 2px; }
 .daynote-input::placeholder { color: var(--ink-3); opacity: 0.7; }
 .daynote-recent { margin: 8px 0 0; font-size: 13px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

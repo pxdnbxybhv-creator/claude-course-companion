@@ -1,7 +1,7 @@
 // 园圃 — the home screen: the living ink garden, today's habits, one line for the day.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { DateKey, Habit } from '../core/types';
-import { addDays, isValidKey } from '../core/date';
+import { addDays, diffDays, isValidKey } from '../core/date';
 import { isScheduled, statsFor, type HabitStats } from '../core/habits';
 import { hashString } from '../core/rng';
 import { pickPoem, POEMS, type Poem } from '../data/poems';
@@ -316,7 +316,7 @@ function HabitRow(props: { p: GardenPlant; days: DateKey[]; today: DateKey; onOp
         <span class="hrow-text">
           <span class="hrow-name">{h.name}</span>
           <span class="hrow-sub">
-            <StreakText stats={st} />
+            <StreakText stats={st} days={props.days} today={props.today} />
             <WeekDots habit={h} days={props.days} today={props.today} />
           </span>
         </span>
@@ -331,12 +331,16 @@ function HabitRow(props: { p: GardenPlant; days: DateKey[]; today: DateKey; onOp
   );
 }
 
-function StreakText(props: { stats: HabitStats }) {
+function StreakText(props: { stats: HabitStats; days: DateKey[]; today: DateKey }) {
   const t = useT();
   const st = props.stats;
   if (st.streak > 0) return <span class="hrow-streak">{t(`连续 ${st.streak} 日`, `${st.streak}-day streak`)}</span>;
   if (st.done === 0) return <span class="hrow-streak">{t('新种下', 'Just planted')}</span>;
-  return <span class="hrow-streak">{t('重新起笔', 'Pick up the brush again')}</span>;
+  let last: DateKey | undefined;
+  for (const d of props.days) if (d <= props.today) last = d;
+  const ago = last ? diffDays(last, props.today) : 0;
+  if (ago <= 2) return <span class="hrow-streak">{t('重新起笔', 'Pick up the brush again')}</span>;
+  return <span class="hrow-streak">{t(`${ago} 日前 · 重新起笔`, `Last done ${ago} days ago`)}</span>;
 }
 
 function WeekDots(props: { habit: Habit; days: DateKey[]; today: DateKey }) {
@@ -367,9 +371,18 @@ function DayNote(props: { day: DateKey }) {
   useEffect(() => {
     if (document.activeElement !== inputRef.current) setText(saved);
   }, [props.day, saved]);
+  const [ack, setAck] = useState(0);
+  useEffect(() => {
+    if (!ack) return;
+    const id = setTimeout(() => setAck(0), 1800);
+    return () => clearTimeout(id);
+  }, [ack]);
   const flush = (v: string) => {
     clearTimeout(timer.current);
-    if (v !== (state.value.notes[props.day] ?? '')) setNote(props.day, v);
+    if (v !== (state.value.notes[props.day] ?? '')) {
+      setNote(props.day, v);
+      if (v.trim()) setAck(Date.now());
+    }
   };
   const recent = useMemo(() => {
     for (let i = 1; i <= 7; i++) {
@@ -382,7 +395,10 @@ function DayNote(props: { day: DateKey }) {
   const ago = (i: number) => (i === 1 ? t('昨日', 'Yesterday') : i === 2 ? t('前日', 'Two days ago') : t(`${i} 日前`, `${i} days ago`));
   return (
     <div class="daynote">
-      <label class="daynote-label" for="daynote">{t('今日一句', 'A line for today')}</label>
+      <div class="daynote-head">
+        <label class="daynote-label" for="daynote">{t('今日一句', 'A line for today')}</label>
+        <span class={'daynote-ack' + (ack ? ' is-on' : '')} aria-live="polite">{ack ? t('已记下', 'Kept') : ''}</span>
+      </div>
       <input
         ref={inputRef}
         id="daynote"

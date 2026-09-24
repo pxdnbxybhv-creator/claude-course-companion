@@ -31,7 +31,7 @@ export function Sheet(props: { open: boolean; onClose: () => void; title?: Compo
         {props.title !== undefined && (
           <div class="sheet-head">
             <h2 class="brush">{props.title}</h2>
-            <button class="btn btn-ghost btn-icon" onClick={props.onClose} aria-label={t('关闭', 'Close')}>✕</button>
+            <button type="button" class="btn btn-ghost btn-icon" onClick={props.onClose} aria-label={t('关闭', 'Close')}>✕</button>
           </div>
         )}
         {props.children}
@@ -44,14 +44,14 @@ export function Segmented<T extends string | number>(props: { options: { value: 
   return (
     <div class="seg" role="group" aria-label={props.label}>
       {props.options.map((o) => (
-        <button aria-pressed={o.value === props.value} onClick={() => props.onChange(o.value)}>{o.label}</button>
+        <button type="button" aria-pressed={o.value === props.value} onClick={() => props.onChange(o.value)}>{o.label}</button>
       ))}
     </div>
   );
 }
 
 export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return <button class="toggle" role="switch" aria-checked={props.checked} aria-label={props.label} onClick={() => props.onChange(!props.checked)} />;
+  return <button type="button" class="toggle" role="switch" aria-checked={props.checked} aria-label={props.label} onClick={() => props.onChange(!props.checked)} />;
 }
 
 const toastMsg = signal<{ text: string; id: number } | null>(null);
