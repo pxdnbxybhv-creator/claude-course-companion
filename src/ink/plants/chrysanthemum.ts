@@ -532,10 +532,12 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     const dir = up + ls.side * spread;
     const size = ls.big < 0 ? 0.12 : ls.t > 0.85 ? rng.range(0.15, 0.19) : lerp(0.15, 0.22, Math.sin(Math.PI * ls.t)) * rng.range(0.85, 1.12);
     const dark = rng.chance(ls.t > 0.75 ? 0.55 : 0.35);
-    const tone = dark ? rng.range(0.68, 0.82) : rng.range(0.34, 0.46);
+    // 反叶: now and then a leaf turned edge-on, showing its paler underside
+    const turned = !dark && ls.big >= 0 && rng.chance(0.3);
+    const tone = dark ? rng.range(0.68, 0.82) : turned ? rng.range(0.26, 0.34) : rng.range(0.34, 0.46);
     const birth = ls.big < 0 ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.015, 0.045);
     leaf(c, {
-      base: q.p, dir, len: H * size, tone, birth, squash: rng.range(0.55, 1), side: ls.side,
+      base: q.p, dir, len: H * size, tone, birth, squash: turned ? rng.range(0.3, 0.42) : rng.range(0.55, 1), side: ls.side,
       droop: lerp(0.05, 0.35, lowness) * rng.range(0.6, 1.3),
     });
   }

@@ -120,7 +120,7 @@ export const YI: AlmanacItem[] = [
   i('定一个小目标', 'Set one small goal', 'plan'),
   // spring
   i('种一棵树', 'Plant a tree', 'tree', { s: SP }),
-  i('折枝插瓶', 'Put a fallen spray in a vase', 'vase', { s: SP }),
+  i('插一瓶花', 'Arrange a vase of flowers', 'vase', { s: SP }),
   i('晒晒被褥', 'Air the quilts in the sun', 'sun', { s: SP }),
   i('放风筝', 'Fly a kite', 'kite', { s: SP }),
   i('赏花', 'Go and see the blossom', 'flowers', { s: SP }),
@@ -258,7 +258,7 @@ export const JI: AlmanacItem[] = [
   i('正午暴晒', 'Standing in the noon sun', 'sun', { s: SU }),
   i('午睡太久', 'Napping too long', 'nap', { s: SU }),
   i('心急上火', 'Getting hot and bothered', 'anger', { s: SU }),
-  i('汗后冲凉', 'A cold shower straight after sweating', 'bath', { s: SU }),
+  i('湿衣久穿', 'Staying in damp clothes', 'clothes', { s: SU }),
   // autumn
   i('无故悲秋', 'Moping over autumn for no reason', 'mood', { s: AU }),
   i('秋冻过头', 'Taking “autumn toughening” too far', 'clothes', { s: AU }),

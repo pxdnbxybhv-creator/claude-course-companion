@@ -55,6 +55,7 @@
 }
 .scroll-save-hint { margin: 0; font-size: 15px; letter-spacing: 0.08em; color: var(--ink); }
 .scroll-save .scroll-actions { width: 100%; }
+.scroll-save a.btn { text-decoration: none; }
 
 @media (min-width: 900px) {
   .scroll-body { flex-direction: row; align-items: flex-start; justify-content: center; gap: 40px; padding-top: 8px; }

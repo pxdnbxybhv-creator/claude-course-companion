@@ -103,11 +103,16 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     for (let i = 0; i < N; i++) { weather.step(1 / 60); weather.draw(ctx); }
     ctx.getImageData(0, 0, 1, 1);
     const tWeather = (performance.now() - a) / N;
+    // baseline: one plain blit of the pond-sized region (what a single full-area op costs here)
+    a = performance.now();
+    for (let i = 0; i < N; i++) ctx.drawImage(scene, 0, 0, scene.width, (H - bd.pondTop) * dpr, px, bd.pondTop, pw, H - bd.pondTop);
+    ctx.getImageData(0, 0, 1, 1);
+    const tBlit = (performance.now() - a) / N;
     a = performance.now();
     rockDrawing(99, 120);
     const tRock = performance.now() - a;
     frame(T);
-    const msg = `backdrop ${tBackdrop.toFixed(0)}ms · plants ${tPlants.toFixed(0)}ms · pond ${tPond.toFixed(2)}ms · light ${tLight.toFixed(2)}ms · weather ${tWeather.toFixed(2)}ms · rockGen ${tRock.toFixed(1)}ms`;
+    const msg = `backdrop ${tBackdrop.toFixed(0)}ms · plants ${tPlants.toFixed(0)}ms · pond ${tPond.toFixed(2)}ms (1 blit ${tBlit.toFixed(2)}ms) · light ${tLight.toFixed(2)}ms · weather ${tWeather.toFixed(2)}ms · rockGen ${tRock.toFixed(1)}ms`;
     console.log(msg);
     console.log('backdrop stages', JSON.stringify(Object.fromEntries(Object.entries(backdropTimings).map(([k, v]) => [k, Math.round(v)]))));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
