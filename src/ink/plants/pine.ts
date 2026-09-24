@@ -257,7 +257,8 @@ export function pine(spec: PlantSpec): Drawing {
           const q = trunkAt(Math.max(0, prevF - 0.02 + ((f1 - prevF + 0.02) * i) / m));
           const o = q.w * 0.22;
           const n = dir(q.a + Math.PI / 2);
-          pts.push({ x: q.p.x + n.x * o, y: q.p.y + n.y * o, w: q.w * 0.4 * (i === m ? 0.6 : 1) });
+          // taper both ends so the overlap with the previous year's growth leaves no knot
+          pts.push({ x: q.p.x + n.x * o, y: q.p.y + n.y * o, w: q.w * 0.4 * (i === m ? 0.6 : i === 0 ? 0.5 : 1) });
         }
         push('brush', pts, 0.6, l.birth - 0.005, { dryness: 0.1 });
         prevF = l.f;

@@ -114,7 +114,6 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
     frame(T);
     const msg = `backdrop ${tBackdrop.toFixed(0)}ms · plants ${tPlants.toFixed(0)}ms · pond ${tPond.toFixed(2)}ms (1 blit ${tBlit.toFixed(2)}ms) · light ${tLight.toFixed(2)}ms · weather ${tWeather.toFixed(2)}ms · rockGen ${tRock.toFixed(1)}ms`;
     console.log(msg);
-    console.log('pond stages', JSON.stringify(Object.fromEntries(Object.entries((globalThis as any).__pondT ?? {}).map(([k, v]) => [k, ((v as number) / (N + 1)).toFixed(2)]))));
     console.log('backdrop stages', JSON.stringify(Object.fromEntries(Object.entries(backdropTimings).map(([k, v]) => [k, Math.round(v)]))));
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.font = '12px system-ui';

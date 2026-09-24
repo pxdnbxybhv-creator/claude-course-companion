@@ -352,7 +352,7 @@ function head(c: Ctx, o: HeadOpts) {
       const col = heart ? colours.heart : colours.main;
       let tone = (heart ? colours.heartTone : colours.tone) * rng.range(0.7, 1.05);
       if (o.palette !== 'white') tone *= lerp(0.88, 1.04, depth);
-      const b = ap.birth + k * 0.0004;
+      const b = ap.birth; // a ring opens as one unit; ties keep the far → near order
       if (o.outline) {
         add(c, 'fill', poly(ap.p.poly, 0.6 * u), 0.85, b, { color: PIGMENTS.white, wet: 0.1 });
         if (heart) add(c, 'fill', poly(ap.p.poly, 0.8 * u), 0.3, b, { color: col, wet: 0.3 });
@@ -370,7 +370,7 @@ function head(c: Ctx, o: HeadOpts) {
       const n = pl.length;
       let run: StrokePoint[] = [];
       const flush = () => {
-        if (run.length >= 3) add(c, 'line', run, 0.72, ap.birth + 0.003, { wet: 0.2 });
+        if (run.length >= 3) add(c, 'line', run, 0.72, ap.birth + 0.001, { wet: 0.2 });
         run = [];
       };
       for (let i = 0; i <= n; i++) {
