@@ -25,6 +25,9 @@ export function App() {
     document.documentElement.lang = lang.value === 'zh' ? 'zh-CN' : 'en';
   }, [lang.value]);
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [r]);
+  useEffect(() => {
     const el = document.documentElement;
     if (theme === 'auto') el.removeAttribute('data-theme');
     else el.setAttribute('data-theme', theme);

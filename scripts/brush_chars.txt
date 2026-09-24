@@ -1,0 +1,24 @@
+# Characters that must exist in the Ma Shan Zheng display subset (and in WenKai).
+# `npm run fonts` also scans src/**/*.{ts,tsx,css} and index.html; list here anything
+# that is built at runtime (dates, numbers, names) rather than written literally in the source.
+# Lines starting with # are ignored; whitespace is ignored.
+
+# brand · tabs · views
+半亩方塘一鉴开天光云影共徘徊问渠那得清如许为有源头活水来
+园香历卷设置一炷香专注节气农历画轴长卷印章落款
+# the six plants and friends
+梅兰竹菊松荷莲柏石苔
+# seasons, directions, times of day
+春夏秋冬晨昼暮夜晴雨雪霜风露雾阴
+# the 24 solar terms
+立春雨水惊蛰春分清明谷雨立夏小满芒种夏至小暑大暑
+立秋处暑白露秋分寒露霜降立冬小雪大雪冬至小寒大寒
+# numerals and date words
+〇零一二三四五六七八九十廿卅百千万两年月日时分秒周星期天今明昨初上中下旬
+# lunar months and days
+正腊闰冬月初一二三四五六七八九十廿卅
+# heavenly stems, earthly branches, zodiac
+甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥
+鼠牛虎兔龙蛇马羊猴鸡狗猪
+# almanac
+宜忌候始生鸣至见降

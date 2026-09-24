@@ -15,3 +15,13 @@
 .tab-label { font-size: 11px; letter-spacing: 0.08em; }
 .tab.is-active { color: var(--ink); }
 .tab.is-active .tab-glyph { background: var(--cinnabar); color: #fbf5ea; transform: rotate(-4deg); border-radius: 30% 42% 36% 40%; }
+
+@media (min-width: 900px) {
+  .tabbar {
+    left: 50%; right: auto; bottom: 18px; transform: translateX(-50%);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+    box-shadow: var(--shadow);
+  }
+  .tab { flex: 0 0 88px; }
+  .view { padding-bottom: 110px; }
+}
