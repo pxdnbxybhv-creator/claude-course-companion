@@ -144,10 +144,12 @@ describe('almanac', () => {
       expect(it.topic).not.toBe('');
     }
     const yiZh = new Set(YI.map((x) => x.zh));
+    expect(yiZh.size).toBe(YI.length);
+    expect(new Set(JI.map((x) => x.zh)).size).toBe(JI.length);
     for (const j of JI) expect(yiZh.has(j.zh), j.zh).toBe(false);
     // Every term has at least one custom of its own among the 宜.
     const tagged = new Set(YI.flatMap((x) => x.terms ?? []));
-    expect(tagged.size).toBeGreaterThanOrEqual(20);
+    expect(tagged.size).toBe(24);
   });
 
   it('is deterministic and well-behaved over two years of days', () => {
@@ -170,9 +172,7 @@ describe('almanac', () => {
       for (const x of all) {
         const it = byZh.get(x.zh)!;
         const ok = it.terms ? it.terms.includes(term) : !it.seasons || it.seasons.includes(seasonOfTerm(term));
-        // 踏青 exists both as a spring item and as 清明's custom; either tag qualifies.
-        const twin = YI.filter((y) => y.zh === x.zh).some((y) => (y.terms ? y.terms.includes(term) : !y.seasons || y.seasons.includes(seasonOfTerm(term))));
-        expect(ok || twin, `${x.zh} on term ${term}`).toBe(true);
+        expect(ok, `${x.zh} on term ${term}`).toBe(true);
       }
     }
   });

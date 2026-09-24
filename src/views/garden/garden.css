@@ -138,6 +138,7 @@
 .archived summary { list-style: none; cursor: pointer; min-height: 44px; display: grid; place-items: center; font-size: 13px; letter-spacing: 0.1em; color: var(--ink-3); }
 .archived summary::-webkit-details-marker { display: none; }
 .archived ul { list-style: none; margin: 0; padding: 0; }
+.archived .btn { min-height: 44px; }
 .btn.is-danger { color: var(--cinnabar); border-color: var(--cinnabar); }
 
 /* ------------------------------------------------------------------ editor */

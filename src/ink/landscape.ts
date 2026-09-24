@@ -1167,6 +1167,9 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   const seed = o.seed ?? 1;
   const night = o.tod === 'night';
 
+  const __T: Record<string, number> = ((globalThis as any).__pondT ??= {});
+  let __t0 = performance.now();
+  const __lap = (k: string) => { (ctx as any).getImageData?.(0, 0, 1, 1); const t1 = performance.now(); __T[k] = (__T[k] ?? 0) + t1 - __t0; __t0 = t1; };
   // 1 · grab the mirrored band above the water once (safe even if source is the target canvas)
   const rctx = C.rctx;
   rctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1179,6 +1182,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     rctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  rctx.getImageData(0, 0, 1, 1); __lap('flip');
   // 2 · draw it in strips, displaced sideways by waves that grow toward the viewer
   // A pond spanning the whole width is painted straight onto the scene (clipped); a narrower
   // one goes through its own layer so its ends can be feathered into the paper.
@@ -1202,6 +1206,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     p.setTransform(pr, 0, 0, pr, 0, 0);
   }
   p.drawImage(C.tint, 0, 0, C.tint.width - 2, C.tint.height - 2, 0, 0, w, h);
+  __lap('tint');
   const ampK = lerp(1.35, 0.8, clarity);
   const a0 = lerp(0.12, 0.5, clarity);
   let y = 0;
@@ -1219,6 +1224,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   }
   p.globalAlpha = 1;
 
+  __lap('strips');
   // 3 · murk (silt clouds, a greyer surface) is baked into the water tone drawn first
 
   // 4 · 天光: sky-light glints near the far bank, breathing
@@ -1234,6 +1240,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     p.globalAlpha = 1;
   }
 
+  __lap('glint');
   // 5 · 水纹: slow ink wave lines, spaced in perspective (dense far, open near)
   const nr = Math.round(clamp(w / 45, 5, 14));
   for (let i = 0; i < nr; i++) {
@@ -1252,6 +1259,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   }
   p.globalAlpha = 1;
 
+  __lap('ripples');
   // 6 · rings: a fish rising or a drop falling, now and then
   const period = 4.2;
   const k0 = Math.floor(t / period);
@@ -1277,6 +1285,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   }
   p.globalAlpha = 1;
 
+  __lap('rings');
   // 7 · duckweed when the water stagnates
   const nd = Math.round(clamp((0.62 - clarity) / 0.62, 0, 1) * 36);
   if (nd > 0) {
@@ -1301,6 +1310,7 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
     }
   }
 
+  __lap('duck');
   // 8 · soften the ends, then lay the water onto the scene
   if (full) {
     ctx.restore();

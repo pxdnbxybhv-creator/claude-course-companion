@@ -161,6 +161,7 @@ export const YI: AlmanacItem[] = [
   // solar-term customs
   i('咬春', '“Bite into spring”: eat spring rolls', 'seasonal-food', { t: [0] }),
   i('迎春', 'Go out to meet the spring', 'outing', { t: [0] }),
+  i('看草色', 'Look for the first green haze of grass', 'outing', { t: [1] }),
   i('听春雷', 'Listen for the spring thunder', 'thunder', { t: [2] }),
   i('看桃花', 'Go and see the peach blossom', 'flowers', { t: [2] }),
   i('竖蛋', 'Try to stand an egg on end', 'egg', { t: [3] }),
@@ -185,6 +186,8 @@ export const YI: AlmanacItem[] = [
   i('吃柿子', 'Eat a persimmon', 'fruit', { t: [17] }),
   i('补冬', 'Eat a warming, nourishing meal', 'seasonal-food', { t: [18], c: ['meal'] }),
   i('腌菜', 'Pickle some vegetables', 'pickle', { t: [19, 20] }),
+  i('腌腊肉', 'Cure some bacon for the New Year', 'pickle', { t: [20, 21] }),
+  i('温一壶酒', 'Warm a pot of wine', 'wine', { t: [19] }),
   i('吃饺子', 'Eat dumplings', 'seasonal-food', { t: [21] }),
   i('吃汤圆', 'Eat sweet rice balls', 'seasonal-food', { t: [21] }),
   i('画消寒图', 'Start a “dispelling the cold” chart', 'nines', { t: [21] }),
@@ -243,7 +246,7 @@ export const JI: AlmanacItem[] = [
   i('好高骛远', 'Reaching too high, skipping the basics', 'greed'),
   i('贪杯', 'One cup too many', 'wine'),
   i('自责太久', 'Blaming yourself for too long', 'self'),
-  i('终日闭门', 'Staying indoors all day', 'outing'),
+  i('足不出户', 'Never setting foot outside', 'outing'),
   // spring
   i('过早减衣', 'Shedding layers too early', 'clothes', { s: SP }),
   i('春困贪睡', 'Giving in to spring drowsiness', 'morning', { s: SP }),
@@ -264,6 +267,9 @@ export const JI: AlmanacItem[] = [
   i('秋冻过头', 'Taking “autumn toughening” too far', 'clothes', { s: AU }),
   i('辛辣过度', 'Too much spicy food', 'spicy', { s: ['autumn', 'winter'] }),
   i('贪吃秋瓜', 'Too much melon once autumn comes', 'fruit', { s: AU, c: ['meal'] }),
+  i('登高逞强', 'Climbing beyond your strength', 'climb', { s: AU }),
+  i('秋燥少饮', 'Drinking too little in the dry autumn air', 'water', { s: AU }),
+  i('贴膘过度', 'Overdoing the autumn fattening', 'seasonal-food', { s: AU, c: ['meal'] }),
   // winter
   i('冷水洗头', 'Washing your hair in cold water', 'cold', { s: WI }),
   i('终日闭窗', 'Keeping the windows shut all day', 'air', { s: WI }),
@@ -271,7 +277,7 @@ export const JI: AlmanacItem[] = [
   i('贪暖久卧', 'Staying under the quilt too long', 'morning', { s: WI }),
   i('衣薄出门', 'Going out underdressed', 'clothes', { s: WI }),
   i('冬泳逞强', 'Showing off with a winter swim', 'cold', { s: WI }),
-  i('终日守着火炉', 'Hugging the stove all day', 'stove', { s: WI }),
+  i('抱着火炉不放', 'Hugging the stove all day', 'stove', { s: WI }),
   // solar-term flavour
   i('赖在冬天', 'Lingering in winter', 'mood', { t: [0] }),
   i('大惊小怪', 'Making a fuss over nothing', 'worry', { t: [2] }),
@@ -322,11 +328,11 @@ export function eligible(list: readonly AlmanacItem[], termIndex: number): { ter
   };
 }
 
-function pickSide(list: readonly AlmanacItem[], termIndex: number, n: number, termChance: number, used: Set<string>, rng: Rng): AlmanacItem[] {
+function pickSide(list: readonly AlmanacItem[], termIndex: number, n: number, termChance: number, seasonChance: number, used: Set<string>, rng: Rng): AlmanacItem[] {
   const pools = eligible(list, termIndex);
   const out: AlmanacItem[] = [];
   if (rng() < termChance) take(pools.term, 1, used, rng, out);
-  take(pools.season, 1, used, rng, out);
+  if (rng() < seasonChance) take(pools.season, 1, used, rng, out);
   take([...pools.general, ...pools.season], n - out.length, used, rng, out);
   return out;
 }
@@ -338,8 +344,8 @@ export function almanacFor(dateKey: string, termIndex: number): AlmanacDay {
   const nJi = rng() < 0.5 ? 2 : 3;
   const used = new Set<string>();
   // A term's custom shows on most days of its fortnight; a 忌 with term flavour now and then.
-  const yi = pickSide(YI, termIndex, nYi, 0.8, used, rng);
-  const ji = pickSide(JI, termIndex, nJi, 0.35, used, rng);
+  const yi = pickSide(YI, termIndex, nYi, 0.8, 0.9, used, rng);
+  const ji = pickSide(JI, termIndex, nJi, 0.35, 0.6, used, rng);
   const strip = ({ zh, en }: AlmanacItem) => ({ zh, en });
   return { yi: yi.map(strip), ji: ji.map(strip) };
 }

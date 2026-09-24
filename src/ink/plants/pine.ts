@@ -471,12 +471,14 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
   let cnt = 0;
   let f = 0.04;
   let row = 0;
-  while (f < 0.9 && cnt < 40) {
+  const R = rng.int(12, 14);
+  for (; row < R && cnt < 44; row++) {
+    f = 0.035 + (0.85 * (row + rng.range(0, 0.6))) / R;
     const i = clampN(Math.round(f * N), 0, N);
     const s = S[i];
-    const stepU = 0.5;
+    const stepU = 0.55;
     for (let u = -0.85 + (row % 2) * stepU * 0.5 + rng.range(-0.08, 0.08); u < 0.9; u += stepU * rng.range(0.85, 1.15)) {
-      if (!rng.chance(u < -0.3 ? 0.5 : 0.8)) continue;
+      if (!rng.chance(u < -0.3 ? 0.4 : 0.72)) continue;
       const fore = Math.sqrt(Math.max(0.05, 1 - u * u));
       const sw = s.hw * 0.28 * fore * rng.range(0.8, 1.2);
       const sh = s.hw * 0.2 * rng.range(0.8, 1.2);
@@ -492,8 +494,6 @@ function paintTrunk(rng: Rng, nz: Noise, spine: P[], tw: (f: number) => number, 
       push('line', pts, u > 0.2 ? rng.range(0.7, 0.85) : rng.range(0.5, 0.65), 0.55 + 0.25 * f + cnt * 0.0005);
       cnt++;
     }
-    f += (s.hw * rng.range(0.5, 0.7)) / (along(spine, 1) && polyLen(spine));
-    row++;
   }
 
   // moss dots 苔点 at the foot and along the shadow edge

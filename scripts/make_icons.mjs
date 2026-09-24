@@ -148,7 +148,8 @@ const fmt = (v) => {
 };
 function pathD(polys) {
   return polys
-    .map((poly) => 'M' + poly.map(([x, y]) => `${fmt(x)} ${fmt(y)}`).join('L') + 'Z')
+    // After M, further coordinate pairs are implicit line-tos.
+    .map((poly) => 'M' + poly.map(([x, y]) => `${fmt(x)} ${fmt(y)}`).join(' ') + 'Z')
     .join('');
 }
 /** Smooth closed path through the points (quadratic midpoints) — used for blobs. */
@@ -223,7 +224,7 @@ function buildSeal() {
     corner: 18,
     amp: 3.2,
     scale: 40,
-    step: 3,
+    step: 3.5,
     chips: [
       { at: 0.07, depth: 7, width: 9 },
       { at: 0.335, depth: 4.5, width: 14 },
@@ -234,7 +235,7 @@ function buildSeal() {
   });
 
   let seed = 100;
-  const strokes = [...ban, ...mu].map((p) => weather(p, { seed: seed++, corner: 4, amp: 1.9, scale: 24, step: 2.5 }));
+  const strokes = [...ban, ...mu].map((p) => weather(p, { seed: seed++, corner: 4, amp: 1.9, scale: 24, step: 3.2 }));
 
   const rand = mulberry32(2026);
   // Paste mottling: faint, darker clouds where the seal paste sits thick.

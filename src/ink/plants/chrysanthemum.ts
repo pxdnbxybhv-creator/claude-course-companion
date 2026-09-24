@@ -546,6 +546,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
   const palettes: HeadOpts['palette'][] = [];
   for (let i = 0; i < stems.length; i++) {
     if (outline) palettes.push('white');
+    else if (i > 0 && stems[i].head === 'bud') palettes.push(palettes[0]); // buds promise the main head's colour
     else palettes.push(i === 0 ? (rng.chance(0.85) ? 'gamboge' : 'ochre') : rng.pick(['gamboge', 'gamboge', 'gamboge', 'ochre', 'rouge'] as const));
   }
   let openIdx = 0;

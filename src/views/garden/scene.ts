@@ -279,6 +279,8 @@ interface Slot {
   overlay: HTMLCanvasElement | null;
   queued: boolean;
   nodAt: number;
+  /** performance.now() before which a pending stroke animation waits (e.g. for a pan to settle). */
+  animAt: number;
   phase: number;
 }
 
@@ -591,7 +593,7 @@ export class GardenScene {
       if (!slot || slot.drawing !== it.drawing) {
         slot = {
           key: it.key, drawing: it.drawing, kind: it.plant?.habit.plant, shown: null, want, bmp: null, prev: null,
-          fade: 1, appear: 0, anim: null, overlay: null, queued: false, nodAt: -1e9, phase: (it.seed % 1000) * 0.37,
+          fade: 1, appear: 0, anim: null, overlay: null, queued: false, nodAt: -1e9, animAt: 0, phase: (it.seed % 1000) * 0.37,
         };
         this.slots.set(it.key, slot);
         this.enqueue(slot);
@@ -631,7 +633,9 @@ export class GardenScene {
     ov.width = bmp.width;
     ov.height = bmp.height;
     slot.overlay = ov;
-    const per = clamp(2600 / strokes.length, 45, 120);
+    // A few strokes are painted deliberately; a long backlog quickly (whole growth ≲ 2.6 s).
+    const per = clamp(1500 / Math.max(1, strokes.length), 55, 260);
+    slot.animAt = performance.now() + (this.tween ? Math.max(0, this.tween.t0 + this.tween.dur * 0.8 - performance.now()) : 140);
     slot.anim = new StrokeAnimation(strokes, bmp.getContext('2d')!, { scale: slot.shown!.px, vigor: slot.shown!.vigor, msPerStroke: this.reduced ? 20 : per });
     // Delay the first stroke until the pan / nod has begun.
     slot.shown = { ...slot.shown!, n: toN };
@@ -753,7 +757,7 @@ export class GardenScene {
         s.fade = Math.min(1, s.fade + dt / 0.6);
         if (s.fade >= 1) s.prev = null;
       }
-      if (s.anim) {
+      if (s.anim && now >= s.animAt) {
         const ov = s.overlay!;
         const octx = ov.getContext('2d')!;
         octx.clearRect(0, 0, ov.width, ov.height);
