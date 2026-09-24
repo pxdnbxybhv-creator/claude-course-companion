@@ -50,33 +50,33 @@ export function silkTile(color: RGB, seed = 3, damask = 0): HTMLCanvasElement {
   const key = `${color.join(',')}|${seed}|${damask}`;
   const hit = silkCache.get(key);
   if (hit) return hit;
-  const N = 128;
-  const T = 64; // threads per tile (2 px each)
+  const N = 256;
+  const T = 128; // threads per tile (2 px each)
   const c = canvas(N);
   const ctx = c.getContext('2d')!;
   const img = ctx.createImageData(N, N);
   const d = img.data;
   const rng = makeRng(seed * 97 + 11);
-  const weft = Array.from({ length: T }, () => rng.gauss() * 0.9);
-  const warp = Array.from({ length: T }, () => rng.gauss() * 0.6);
-  // occasional thicker slubs along a weft
-  for (let i = 0; i < 6; i++) weft[rng.int(0, T - 1)] += rng.range(1.2, 2.4) * (rng() < 0.5 ? 1 : -1);
-  const mott = makeNoise2(seed * 13 + 5, 2);
+  const weft = Array.from({ length: T }, () => rng.gauss() * 0.5);
+  const warp = Array.from({ length: T }, () => rng.gauss() * 0.4);
+  // a few slightly thicker slubs along a weft — kept faint so the tile never reads as stripes
+  for (let i = 0; i < 5; i++) weft[rng.int(0, T - 1)] += rng.range(0.5, 1.1) * (rng() < 0.5 ? 1 : -1);
+  const mott = makeNoise2(seed * 13 + 5, 3);
   let h = (seed * 2654435761) >>> 0;
   for (let y = 0; y < N; y++) {
     for (let x = 0; x < N; x++) {
       const tx = x >> 1, ty = y >> 1;
       const over = (tx + ty) & 1; // 1 = warp on top
       const sub = over ? (x & 1) : (y & 1); // position across the thread → round sheen
-      let b = over ? 2.2 + warp[tx] * 2.4 : -1.6 + weft[ty] * 3.2;
-      b += sub ? -1.4 : 1.2;
-      b += mott(x / N * 2, y / N * 2) * 5;
+      let b = over ? 2 + warp[tx] * 2 : -1.6 + weft[ty] * 2.2;
+      b += sub ? -1.3 : 1.1;
+      b += mott(x / N * 3, y / N * 3) * 4;
       if (damask) {
         // lozenge lattice, period 32: the damask shows as a change of sheen, never of colour
-        const u = ((x + y) % 32 + 32) % 32, v = ((x - y) % 32 + 32) % 32;
-        const du = Math.abs(u - 16), dv = Math.abs(v - 16);
-        const ring = Math.abs(du + dv - 12) < 2.2 || (du < 2 && dv < 2);
-        if (ring) b += (over ? 3.2 : -1.2) * damask;
+        const u = ((x + y) % 64 + 64) % 64, v = ((x - y) % 64 + 64) % 64;
+        const du = Math.abs(u - 32), dv = Math.abs(v - 32);
+        const ring = Math.abs(du + dv - 24) < 3 || (du < 3.5 && dv < 3.5);
+        if (ring) b += (over ? 3.6 : -1.4) * damask;
       }
       h ^= h << 13; h >>>= 0; h ^= h >>> 17; h ^= h << 5; h >>>= 0;
       b += ((h & 255) / 255 - 0.5) * 3;

@@ -176,7 +176,7 @@ export function planInscription(ins: Inscription, S: number): InscriptionPlan {
   const colWs = s * 1.62;
   const colophon = packColumns([...ins.date, ...ins.record], maxS);
   const signCells = Array.from(ins.sign);
-  const sealSize = Math.round(s * 1.9);
+  const sealSize = Math.round(s * 2.2);
   const last = colophon[colophon.length - 1] ?? [];
   const sealCells = sealSize / (s * leadS) + 0.4;
   if (last.length && cellsLen(last) + 1 + signCells.length + sealCells <= maxS + 1.5) last.push(null, null, ...signCells);
