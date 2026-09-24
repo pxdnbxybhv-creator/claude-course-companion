@@ -22,7 +22,8 @@
 /* Primary = ink; cinnabar is kept for the one hero action on a screen (.btn-seal). */
 .btn-primary { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .btn-primary:hover { background: color-mix(in srgb, var(--ink) 86%, var(--paper)); }
-.btn-seal { min-width: 160px; background: var(--cinnabar); border-color: var(--cinnabar); color: #fbf5ea; letter-spacing: 0.3em; padding: 0 28px; }
+.btn-seal { min-width: 160px; background: var(--cinnabar); border-color: var(--cinnabar); color: #fbf5ea; letter-spacing: 0.08em; padding: 0 28px; }
+html:lang(zh) .btn-seal { letter-spacing: 0.3em; }
 .btn-seal:hover { background: color-mix(in srgb, var(--cinnabar) 88%, black); }
 .btn-ghost { border-color: transparent; }
 .btn-small { min-height: 36px; padding: 0 12px; font-size: 13px; position: relative; }

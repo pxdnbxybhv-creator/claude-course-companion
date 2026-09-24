@@ -52,11 +52,15 @@ src/
     weather.ts      seasonal particles
     seal.ts         seal stamps
     incense.ts      censer, incense stick, smoke (focus view)
-  audio/       Web Audio synthesis (guqin, bells, ambient beds)
-  app/         store (signals + localStorage), router, i18n, App shell
+  audio/       Web Audio synthesis in a worker (guqin, harmonics, bowl, knock, ambient beds)
+  app/         store (signals + localStorage, cross-tab sync), router, i18n, App shell, demo data,
+               PWA registration, hostSave (downloads when embedded in a host page)
+  ui/          shared kit: Sheet, Segmented, Toggle, toast (with Undo), PlantGlyph
   views/       Garden, Focus, Almanac, Scroll, Settings
   lab/         visual test bench: /lab.html?scene=<name> (scenes in src/lab/scenes/*.ts)
-scripts/snap.mjs   headless screenshots: node scripts/snap.mjs "/lab.html?scene=brush" .snaps/x.png
+scripts/snap.mjs          headless screenshots: node scripts/snap.mjs "/lab.html?scene=brush" .snaps/x.png
+scripts/build_fonts.py    subsets the bundled fonts to the characters the source uses (npm run fonts)
+scripts/make_artifact.mjs turns the single-file build into an embeddable HTML fragment
 ```
 
 ## Contracts & rules
