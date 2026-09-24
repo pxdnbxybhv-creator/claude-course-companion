@@ -41,29 +41,64 @@ function inkDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, 
     ctx.stroke();
     return;
   }
-  const a = 0.1 + 0.84 * Math.pow(share, 1.25);
-  const rr = r * (0.42 + 0.42 * share);
+  const a = 0.12 + 0.82 * Math.pow(share, 1.2);
+  const rr = r * (0.44 + 0.4 * share) * (0.94 + rng() * 0.12);
+  const shape = blob(x, y, rr, rng);
   // bleed: a pale halo where the wet ink crept into the fibres
-  ctx.globalAlpha = a * 0.1;
+  ctx.globalAlpha = a * 0.13;
   ctx.fillStyle = grainPattern(ctx, INK, 'wash');
   ctx.beginPath();
-  ctx.ellipse(x + rng.gauss() * r * 0.04, y + rng.gauss() * r * 0.04, rr * 1.16, rr * (1.08 + rng() * 0.08), rng() * Math.PI, 0, Math.PI * 2);
+  ctx.ellipse(x, y, rr * 1.2, rr * 1.14, rng() * Math.PI, 0, Math.PI * 2);
   ctx.fill();
-  // body: two overlapping dabs, never a perfect circle
+  // body
   ctx.fillStyle = INK;
-  for (let k = 0; k < 2; k++) {
-    ctx.globalAlpha = a * (k ? 0.55 : 0.75);
-    const ox = rng.gauss() * rr * 0.07, oy = rng.gauss() * rr * 0.07;
+  ctx.globalAlpha = a * 0.8;
+  trace(ctx, shape);
+  ctx.fill();
+  // ink pools at the rim of a wet dot (水墨边), and the heaviest dots keep a dark heart
+  ctx.strokeStyle = INK;
+  ctx.globalAlpha = a * 0.32;
+  ctx.lineWidth = Math.max(1, rr * 0.09);
+  ctx.stroke();
+  if (share > 0.55) {
+    ctx.globalAlpha = a * 0.22;
     ctx.beginPath();
-    ctx.ellipse(x + ox, y + oy, rr * (0.9 + rng() * 0.12), rr * (0.86 + rng() * 0.12), rng() * Math.PI, 0, Math.PI * 2);
+    ctx.arc(x + rng.gauss() * rr * 0.12, y + rng.gauss() * rr * 0.12, rr * 0.5, 0, Math.PI * 2);
     ctx.fill();
   }
   // grain: the paper shows through where the brush was drier
-  ctx.globalAlpha = a * 0.3;
+  ctx.globalAlpha = a * 0.22;
   ctx.fillStyle = grainPattern(ctx, INK, 'fine');
-  ctx.beginPath();
-  ctx.arc(x, y, rr * 0.95, 0, Math.PI * 2);
+  trace(ctx, shape);
   ctx.fill();
+}
+
+/** An irregular, softly lobed dab outline around (x, y). */
+function blob(x: number, y: number, rr: number, rng: Rng): [number, number][] {
+  const n = 14;
+  const p1 = rng() * 6.283, p2 = rng() * 6.283, e = 0.88 + rng() * 0.14, rot = rng() * Math.PI;
+  const c = Math.cos(rot), s = Math.sin(rot);
+  const pts: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * Math.PI * 2;
+    const k = rr * (1 + 0.06 * Math.sin(2 * t + p1) + 0.04 * Math.sin(3 * t + p2) + rng.gauss() * 0.02);
+    const px = Math.cos(t) * k, py = Math.sin(t) * k * e;
+    pts.push([x + px * c - py * s, y + px * s + py * c]);
+  }
+  return pts;
+}
+
+function trace(ctx: CanvasRenderingContext2D, pts: [number, number][]) {
+  const n = pts.length;
+  const mid = (i: number) => [(pts[i % n][0] + pts[(i + 1) % n][0]) / 2, (pts[i % n][1] + pts[(i + 1) % n][1]) / 2];
+  ctx.beginPath();
+  const m0 = mid(n - 1);
+  ctx.moveTo(m0[0], m0[1]);
+  for (let i = 0; i < n; i++) {
+    const m = mid(i);
+    ctx.quadraticCurveTo(pts[i][0], pts[i][1], m[0], m[1]);
+  }
+  ctx.closePath();
 }
 
 function todayRing(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, share: number | null) {

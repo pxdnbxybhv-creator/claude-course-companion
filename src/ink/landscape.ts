@@ -230,7 +230,8 @@ function sceneLayout(w: number, h: number, env: SceneEnv): Layout {
     // toward open sky first, and only lift it if the hills fill the whole way
     const clearAt = (cx: number) => {
       let top = Infinity;
-      for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, highest(cx + dx));
+      // only the nearer masses hide it; the pale far hills may veil its lower edge
+      for (let dx = -r0; dx <= r0; dx += r0 / 3) top = Math.min(top, ridgeAt(ridges[1], cx + dx), ridgeAt(ridges[2], cx + dx));
       return top - r0 * 0.85;
     };
     // resting on low far hills is fine; hiding behind the big corner mass is not
@@ -1330,13 +1331,23 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
 
 const lightCache = new Map<string, HTMLCanvasElement>();
 
+export interface LightOptions {
+  /**
+   * Where the sun/moon actually is on screen (css px), when the backdrop is drawn scaled or
+   * panned (e.g. `Backdrop.body` mapped to the view). Default: the layout for a w×h backdrop.
+   */
+  body?: { x: number; y: number; r: number } | null;
+}
+
 /** Per-frame overlay for time of day (dawn warmth, dusk glow, night indigo). Multiplies a cached, low-res light map. */
-export function paintLight(ctx: CanvasRenderingContext2D, w: number, h: number, env: SceneEnv): void {
+export function paintLight(ctx: CanvasRenderingContext2D, w: number, h: number, env: SceneEnv, opts: LightOptions = {}): void {
   if (env.tod === 'day') return;
-  const key = `${w}|${h}|${env.tod}|${env.season}|${env.hour.toFixed(2)}|${env.moonPhase.toFixed(3)}|${env.seed}`;
+  const ob = opts.body;
+  const bKey = ob ? `${Math.round(ob.x / 4)},${Math.round(ob.y / 4)},${Math.round(ob.r)}` : ob === null ? 'none' : 'auto';
+  const key = `${w}|${h}|${env.tod}|${env.season}|${env.hour.toFixed(2)}|${env.moonPhase.toFixed(3)}|${env.seed}|${bKey}`;
   let c = lightCache.get(key);
   if (!c) {
-    c = buildLight(w, h, env);
+    c = buildLight(w, h, env, ob);
     if (lightCache.size > 6) lightCache.delete(lightCache.keys().next().value!);
     lightCache.set(key, c);
   }
@@ -1347,13 +1358,13 @@ export function paintLight(ctx: CanvasRenderingContext2D, w: number, h: number, 
   ctx.restore();
 }
 
-function buildLight(w: number, h: number, env: SceneEnv): HTMLCanvasElement {
+function buildLight(w: number, h: number, env: SceneEnv, body?: LightOptions['body']): HTMLCanvasElement {
   const L = sceneLayout(w, h, env);
   const k = 1 / 8;
   const c = makeCanvas(w * k + 2, h * k + 2);
   const cc = c.getContext('2d')!;
   const noise = makeNoise2(mixSeed(env.seed, 0x11ab));
-  const b = L.body;
+  const b = body === undefined ? L.body : body === null ? { ...L.body, r: 0 } : { kind: L.body.kind, ...body };
   const tod = env.tod;
   const hzY = L.hz - (L.hz - L.skyTop) * 0.2;
   paintField(cc, 0, 0, c.width, c.height, 1, (fx, fy, out) => {

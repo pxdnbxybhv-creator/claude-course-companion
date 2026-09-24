@@ -371,6 +371,9 @@ export class GardenScene {
   private pending = new Map<string, number>();
   private events: { at: number; fn: () => void }[] = [];
   private lastPanAt = -1e9;
+  /** A breeze from the pointer sweeping across the painting, −1..1, decaying. */
+  private gust = 0;
+  private lastMove: { t: number; x: number } | null = null;
   private pannableNow = false;
   private labelFont = '';
   private ro: ResizeObserver | null = null;
@@ -833,8 +836,10 @@ export class GardenScene {
       }
     }
 
+    this.gust *= Math.exp(-1.6 * dt);
+    if (Math.abs(this.gust) < 0.003) this.gust = 0;
     if (this.weather && !this.reduced) {
-      const wind = clamp(-this.vel / 1600 + (this.drag ? 0 : 0), -1, 1);
+      const wind = clamp(-this.vel / 1600 + this.gust, -1, 1);
       this.weather.step(dt, wind);
     }
   }
@@ -887,7 +892,7 @@ export class GardenScene {
         // A slow nod when the habit is done — one lean and back, never bouncy.
         const nt = (now - slot.nodAt) / 2400;
         if (nt >= 0 && nt < 1) angle += 1.1 * Math.sin(Math.PI * nt) * (1 - nt * 0.3);
-        angle += clamp(-this.vel / 900, -0.6, 0.6);
+        angle += clamp(-this.vel / 900, -0.6, 0.6) + this.gust * 0.9 * (amp / 1.35);
         angle = clamp(angle, -1.5, 1.5) * DEG;
       }
       ctx.save();
@@ -1016,8 +1021,19 @@ export class GardenScene {
     this.kick();
   };
 
+  /** Pointer sweeps become a breeze: particles drift, plants lean a little. */
+  private feelWind(e: PointerEvent): void {
+    const t = performance.now();
+    const lm = this.lastMove;
+    this.lastMove = { t, x: e.clientX };
+    if (!lm || t - lm.t > 120 || this.reduced) return;
+    const v = (e.clientX - lm.x) / Math.max(8, t - lm.t); // px per ms
+    this.gust = clamp(this.gust * 0.7 + clamp(v / 2.2, -1, 1) * 0.3, -1, 1);
+  }
+
   private onMove = (e: PointerEvent): void => {
     const d = this.drag;
+    if (!d?.captured) this.feelWind(e);
     if (!d || d.id !== e.pointerId) {
       if (e.pointerType === 'mouse') {
         const r = this.canvas.getBoundingClientRect();

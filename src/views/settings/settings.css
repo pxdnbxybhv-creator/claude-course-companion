@@ -1,4 +1,5 @@
 /* 设置 · Settings */
+.settings-view .topbar { max-width: 680px; }
 .settings-view .topbar-title { align-items: center; gap: 6px; }
 .set-back { margin-left: -10px; }
 .set-page { padding-bottom: 28px; }

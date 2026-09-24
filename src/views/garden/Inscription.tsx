@@ -24,19 +24,12 @@ export function Inscription(props: {
   const p = props.poem;
   const lines = props.short ? p.lines.slice(0, 1) : p.lines;
   const cls = 'inscription' + (props.side === 'left' ? ' is-left' : ' is-right') + (props.transient ? ' is-transient' : '');
-  if (props.lang === 'en') {
-    const en = props.short ? firstSentence(p.en) : p.en;
-    return (
-      <div class={cls + ' is-en'} aria-live="polite">
-        <p class="inscription-en">{en}</p>
-        <p class="inscription-by">— {p.authorEn}</p>
-      </div>
-    );
-  }
   const cols = clauses(lines);
   let k = 0;
+  const en = props.lang === 'en';
+  const caption = en ? (props.short ? firstClause(p.en) : firstSentence(p.en)) : '';
   return (
-    <div class={cls} aria-live="polite" aria-label={lines.join('') + ' —' + p.author}>
+    <div class={cls + (en ? ' is-en' : '')} aria-live="polite" aria-label={en ? `${caption} — ${p.authorEn}` : lines.join('') + ' —' + p.author}>
       <div class="inscription-cols" aria-hidden="true">
         {cols.map((c) => (
           <span class="inscription-col">
@@ -49,6 +42,11 @@ export function Inscription(props: {
           <span class="ch" style={{ animationDelay: `${k * 55 + 120}ms` }}>{p.dynasty}·{p.author}</span>
         </span>
       </div>
+      {en && (
+        <p class="inscription-en" aria-hidden="true" style={{ animationDelay: `${k * 55 + 200}ms` }}>
+          {caption} <span class="inscription-by">— {p.authorEn}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -59,4 +57,11 @@ function firstSentence(s: string): string {
   let out = (m ? m[0] : s).trim();
   if (out.length > 130 && out.includes(';')) out = out.slice(0, out.indexOf(';')) + '.';
   return out;
+}
+
+/** The briefest English for a passing check-in poem: its first clause. */
+function firstClause(s: string): string {
+  const one = firstSentence(s);
+  const i = one.search(/[;:—]/);
+  return i > 18 ? one.slice(0, i).trim() + '.' : one;
 }

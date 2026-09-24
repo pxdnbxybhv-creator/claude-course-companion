@@ -62,7 +62,6 @@ function subPath(p: V[], L: number[], t0: number, t1: number, n: number): V[] {
   return out;
 }
 
-const rot = (v: V, a: number): V => ({ x: v.x * Math.cos(a) - v.y * Math.sin(a), y: v.x * Math.sin(a) + v.y * Math.cos(a) });
 
 function pointInPoly(x: number, y: number, poly: V[]): boolean {
   let inside = false;
@@ -153,22 +152,24 @@ function leaf(c: Ctx, o: LeafOpts) {
   // --- silhouette -------------------------------------------------------------------------
   const pairs = rng.chance(0.65) ? 2 : 1;
   const lobeAt = pairs === 2 ? [0.3, 0.6] : [0.48];
-  const lobeExt = pairs === 2 ? [0.3, 0.36] : [0.38];
+  const lobeExt = pairs === 2 ? [0.4, 0.46] : [0.48];
+  const tips: { s: number; a: number; e: number }[] = [];
   const sideLobes = (s: number): V[] => {
     const pts: V[] = [];
     // cuneate base
-    pts.push({ x: X(0.04), y: s * B * 0.06 });
+    pts.push({ x: X(0.03), y: s * B * 0.1 });
     lobeAt.forEach((a0, k) => {
       const a = a0 + rng.range(-0.04, 0.04);
       const e = B * lobeExt[k] * rng.range(0.82, 1.12) * (rng.chance(0.12) ? 0.6 : 1);
-      pts.push({ x: X(a - 0.13), y: s * e * rng.range(0.28, 0.4) });   // sinus (notch)
-      pts.push({ x: X(a - 0.06), y: s * e * 0.86 });                    // inner shoulder
+      pts.push({ x: X(a - 0.13), y: s * e * rng.range(0.42, 0.56) });  // sinus (notch)
+      pts.push({ x: X(a - 0.07), y: s * e * 0.92 });                    // inner shoulder
       pts.push({ x: X(a + 0.05), y: s * e });                           // lobe tip, leaning forward
-      pts.push({ x: X(a + 0.12), y: s * e * 0.7 });                     // outer shoulder
+      tips.push({ s, a, e });
+      pts.push({ x: X(a + 0.12), y: s * e * 0.8 });                     // outer shoulder
     });
     const last = lobeAt[lobeAt.length - 1];
-    pts.push({ x: X(last + 0.19), y: s * B * rng.range(0.1, 0.14) });  // notch below the terminal lobe
-    pts.push({ x: X(0.86), y: s * B * rng.range(0.17, 0.22) });        // terminal lobe shoulder
+    pts.push({ x: X(last + 0.19), y: s * B * rng.range(0.16, 0.2) });  // notch below the terminal lobe
+    pts.push({ x: X(0.85), y: s * B * rng.range(0.22, 0.27) });        // terminal lobe shoulder
     return pts;
   };
   const left = sideLobes(-1), right = sideLobes(1);
@@ -184,7 +185,7 @@ function leaf(c: Ctx, o: LeafOpts) {
   {
     const cx = rng.range(0.22, 0.38), sy = rng.range(-0.06, 0.06) * B;
     const pool: V[] = [];
-    const rx = B * rng.range(0.2, 0.28), ry = B * rng.range(0.12, 0.17);
+    const rx = B * rng.range(0.22, 0.3), ry = B * rng.range(0.16, 0.22);
     for (let i = 0; i < 14; i++) {
       const a = (i / 14) * TAU;
       const r = 1 + 0.18 * c.noise(Math.cos(a) * 1.4 + b * 50, Math.sin(a) * 1.4);
@@ -196,20 +197,21 @@ function leaf(c: Ctx, o: LeafOpts) {
   const vt = clamp(o.tone + 0.45, 0.78, 0.94);
   const vb = b + 0.002;
   const rib: StrokePoint[] = [];
-  for (let i = 0; i <= 6; i++) rib.push({ ...at(lerp(pet * 0.9, X(0.9), i / 6), 0), w: lerp(1.15, 0.45, i / 6) * u });
+  for (let i = 0; i <= 6; i++) rib.push({ ...at(lerp(pet * 0.9, X(0.8), i / 6), 0), w: lerp(1.15, 0.45, i / 6) * u });
   add(c, 'line', rib, vt, vb, { wet: 0.25 });
-  for (const s of [-1, 1]) {
-    lobeAt.forEach((a0) => {
-      if (rng.chance(0.15)) return;
-      const x0 = X(a0 - 0.1), x1 = X(a0 + 0.03);
-      const ext = B * 0.26 * rng.range(0.85, 1.05);
-      const pts: StrokePoint[] = [
-        { ...at(x0, 0), w: 0.95 * u },
-        { ...at(lerp(x0, x1, 0.55), s * ext * 0.5), w: 0.75 * u },
-        { ...at(x1, s * ext * 0.85), w: 0.4 * u },
-      ];
-      add(c, 'line', pts, vt, vb + 0.0001, { wet: 0.25 });
-    });
+  for (const tp of tips) {
+    if (rng.chance(0.15)) continue;
+    // from the midrib into the lobe, stopping well short of the damp edge
+    // left and right veins leave the midrib at different points, and arc gently outward
+    const x0 = X(tp.a - 0.12 + (tp.s < 0 ? 0 : rng.range(0.03, 0.06))), x1 = X(tp.a + 0.03);
+    const ext = tp.e * rng.range(0.6, 0.7);
+    const pts: StrokePoint[] = [
+      { ...at(x0, 0), w: 0.95 * u },
+      { ...at(lerp(x0, x1, 0.35), tp.s * ext * 0.45), w: 0.8 * u },
+      { ...at(lerp(x0, x1, 0.72), tp.s * ext * 0.8), w: 0.6 * u },
+      { ...at(x1, tp.s * ext), w: 0.35 * u },
+    ];
+    add(c, 'line', pts, vt, vb + 0.0001, { wet: 0.25 });
   }
 }
 
@@ -540,11 +542,11 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
     // lower leaves spread and droop; upper leaves reach up
     const spread = rad(lerp(40, 80, lowness) + rng.range(-12, 12));
     const dir = up + ls.side * spread;
-    const size = ls.sprout ? 0.12 : lerp(0.21, 0.11, clamp(ls.t / 0.9, 0, 1)) * rng.range(0.88, 1.12) * (ls.st.branch ? 0.85 : 1);
+    const size = ls.sprout ? 0.12 : lerp(0.23, 0.12, clamp(ls.t / 0.9, 0, 1)) * rng.range(0.88, 1.12) * (ls.st.branch ? 0.85 : 1);
     const accent = accents.has(i);
     // 反叶: now and then a leaf turned edge-on, showing its paler underside
     const turned = !accent && !ls.sprout && rng.chance(0.25);
-    const tone = accent ? rng.range(0.62, 0.72) : turned ? rng.range(0.22, 0.28) : rng.range(0.3, 0.5);
+    const tone = accent ? rng.range(0.64, 0.74) : turned ? rng.range(0.24, 0.3) : rng.range(0.34, 0.55);
     const birth = ls.sprout ? (ls.side < 0 ? 0.012 : 0.03) : lerp(ls.st.birth0, ls.st.birth1, ls.t) + rng.range(0.015, 0.045);
     leaf(c, {
       base: q.p, dir, len: H * size, tone, birth, squash: turned ? rng.range(0.35, 0.5) : rng.range(0.7, 1), side: ls.side,
@@ -557,7 +559,7 @@ export function chrysanthemum(spec: PlantSpec): Drawing {
   for (let i = 0; i < stems.length; i++) {
     if (outline) palettes.push('white');
     else if (i > 0 && stems[i].head === 'bud') palettes.push(palettes[0]); // buds promise the main head's colour
-    else palettes.push(i === 0 ? (rng.chance(0.85) ? 'gamboge' : 'ochre') : rng.pick(['gamboge', 'gamboge', 'gamboge', 'ochre', 'rouge'] as const));
+    else palettes.push(i === 0 ? (rng.chance(0.85) ? 'gamboge' : 'ochre') : rng.pick(['gamboge', 'gamboge', 'gamboge', 'gamboge', 'gamboge', 'ochre', 'ochre', 'rouge'] as const));
   }
   let openIdx = 0;
   stems.forEach((st, si) => {

@@ -372,7 +372,7 @@ function DataSection() {
 
   const exportFile = () => {
     download(new Blob([exportJSON()], { type: 'application/json' }), `banmu-backup-${stamp()}.json`);
-    toast(t('备份已导出', 'Backup exported'));
+    toast(t('备份已开始下载；若无反应，请改用「复制」', 'Backup download started — if nothing happens, use Copy'), 3600);
   };
   const copy = () => {
     const json = exportJSON();
