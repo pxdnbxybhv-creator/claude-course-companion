@@ -26,6 +26,7 @@ export function defaultSettings(): Settings {
     volume: 0.7,
     ambient: 'none',
     focusMinutes: 25,
+    theme: 'auto',
   };
 }
 
@@ -74,6 +75,7 @@ export function sanitize(raw: unknown): AppState {
     sound: s.sound !== false,
     volume: Number.isFinite(s.volume) ? Math.min(1, Math.max(0, s.volume!)) : base.settings.volume,
     ambient: ['none', 'rain', 'stream', 'pines', 'qin'].includes(s.ambient as string) ? s.ambient! : 'none',
+    theme: s.theme === 'light' || s.theme === 'dark' ? s.theme : 'auto',
     focusMinutes: Number.isFinite(s.focusMinutes) ? Math.min(180, Math.max(1, Math.round(s.focusMinutes!))) : 25,
     ...(s.location && Number.isFinite(s.location.lat) && Number.isFinite(s.location.lon) ? { location: s.location } : {}),
   };

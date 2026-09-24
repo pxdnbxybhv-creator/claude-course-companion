@@ -12,7 +12,9 @@
 import { createServer } from 'vite';
 import { chromium } from 'playwright-core';
 import { mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { rmSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const opts = { w: 1200, h: 800, dpr: 2, wait: 300, full: false, dark: false, timeout: 20000 };
@@ -30,7 +32,9 @@ if (pairs.length < 2 || pairs.length % 2) {
   process.exit(2);
 }
 
-const server = await createServer({ logLevel: 'error', server: { port: 0, host: '127.0.0.1', hmr: false }, clearScreen: false });
+// A private cache dir per run: several snap processes may run at once.
+const cacheDir = join(tmpdir(), `banmu-vite-${process.pid}`);
+const server = await createServer({ logLevel: 'error', cacheDir, server: { port: 0, host: '127.0.0.1', hmr: false, watch: null }, clearScreen: false });
 await server.listen();
 const addr = server.httpServer.address();
 const origin = `http://127.0.0.1:${addr.port}`;
@@ -69,5 +73,6 @@ try {
 } finally {
   await browser.close();
   await server.close();
+  rmSync(cacheDir, { recursive: true, force: true });
 }
 process.exit(failures ? 1 : 0);

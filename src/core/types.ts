@@ -44,6 +44,7 @@ export interface Settings {
   volume: number; // 0..1
   ambient: AmbientKind;
   focusMinutes: number;
+  theme: 'auto' | 'light' | 'dark';
   /** Optional coordinates for sunrise/sunset in the almanac. */
   location?: { lat: number; lon: number; label?: string };
 }
