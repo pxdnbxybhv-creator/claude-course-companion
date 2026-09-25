@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { play, emptyPlay, record, recordMax, flag, visitRegion, unlocked, selectCharacter, dailyPicksFor, sanitizePlay, celebrations, questValue, redeemCode, revokeCode, codeActive, isUnlockedIn } from '../src/app/play';
+import { play, emptyPlay, record, recordMax, flag, visitRegion, unlocked, selectCharacter, dailyPicksFor, sanitizePlay, celebrations, questValue, redeemCode, revokeCode, codeActive, isUnlockedIn, _acceptCodeForTests, CODE_COINS, waypointOpen, earn, spend, questCoins, unlockWaypoint, markEncounter, encounterMet, ERRAND_COINS, ERRANDS_ALL_COINS } from '../src/app/play';
 import { state, emptyState, exportJSON, importJSON } from '../src/app/store';
 import { QUESTS, QUEST } from '../src/data/quests';
 import { CHARACTERS } from '../src/data/characters';
@@ -71,15 +71,20 @@ describe('play progress', () => {
     expect(unlocked.value).toContain('change');
   });
 
-  it('the test code CZ opens every companion without finishing any quest', () => {
+  it('a code opens every companion and waypoint and fills the purse, finishing no quest', () => {
+    _acceptCodeForTests('TESTING');
     expect(redeemCode('nope')).toBe('invalid');
     expect(redeemCode('')).toBe('invalid');
     expect(unlocked.value).toEqual(['scholar']);
-    expect(redeemCode(' cz ')).toBe('unlocked');
+    expect(waypointOpen(play.value, 'lake')).toBe(false);
+    expect(redeemCode(' testing ')).toBe('ok');
     expect(codeActive.value).toBe(true);
     expect(unlocked.value).toEqual(CHARACTERS.map((c) => c.id));
     expect(isUnlockedIn(play.value, 'change')).toBe(true);
-    expect(redeemCode('ＣＺ')).toBe('already');
+    expect(waypointOpen(play.value, 'lake')).toBe(true);
+    expect(play.value.coins).toBeGreaterThanOrEqual(CODE_COINS);
+    expect(redeemCode('ＴＥＳＴＩＮＧ')).toBe('already');
+    expect(play.value.coins).toBeLessThan(CODE_COINS * 2);
     // nothing was earned: no quest done, nothing to celebrate, 群贤毕至 still counts only earned ones
     expect(play.value.done).toEqual({});
     expect(celebrations.value).toEqual([]);
@@ -91,19 +96,44 @@ describe('play progress', () => {
     expect(importJSON(json)).toBe(true);
     expect(codeActive.value).toBe(true);
     expect(play.value.character).toBe('guan');
-    // taken back: companions you only borrowed go, and you walk as the scholar again
     revokeCode();
     expect(codeActive.value).toBe(false);
     expect(unlocked.value).toEqual(['scholar']);
     expect(play.value.character).toBe('scholar');
   });
 
-  it('revoking the code keeps a companion you really earned', () => {
+  it('revoking a code keeps a companion you really earned', () => {
+    _acceptCodeForTests('TESTING');
     for (let i = 0; i < 7; i++) record('water');
-    redeemCode('CZ');
+    redeemCode('TESTING');
     selectCharacter('gardener');
     revokeCode();
     expect(play.value.character).toBe('gardener');
+  });
+
+  it('coins: quests pay, spending needs enough, waypoints and 奇遇 are remembered', () => {
+    const c0 = play.value.coins;
+    for (let i = 0; i < 7; i++) record('water');
+    // the quest pays, and so does today's errand if watering happens to be one of them
+    const paid = play.value.daily.paid;
+    const errands = paid.filter((id) => id !== 'all').length * ERRAND_COINS + (paid.includes('all') ? ERRANDS_ALL_COINS : 0);
+    expect(play.value.coins - c0).toBe(questCoins(QUEST['q-water']) + errands);
+    const before = play.value.coins;
+    expect(spend(before + 1)).toBe(false);
+    expect(play.value.coins).toBe(before);
+    expect(spend(20)).toBe(true);
+    expect(play.value.coins).toBe(before - 20);
+    earn(5);
+    expect(play.value.coins).toBe(before - 15);
+    expect(unlockWaypoint('garden')).toBe(false);
+    expect(unlockWaypoint('lake')).toBe(true);
+    expect(unlockWaypoint('lake')).toBe(false);
+    expect(waypointOpen(play.value, 'lake')).toBe(true);
+    const c1 = play.value.coins;
+    expect(markEncounter('zhiyin', 50)).toBe(true);
+    expect(markEncounter('zhiyin', 50)).toBe(false);
+    expect(encounterMet(play.value, 'zhiyin')).toBe(true);
+    expect(play.value.coins - c1).toBe(50);
   });
 
   it('daily errands are three, stable for the day, and vary by day', () => {

@@ -4,14 +4,14 @@
 // (characters/*) its MotionState every frame. The scholar in a moon-white robe with a cinnabar sash
 // is built here, as the default model and the fallback for any character without one.
 import * as THREE from 'three';
-import type { EmoteKind, Player } from '../types';
+import type { EmoteKind, MoveMods, Player } from '../types';
 import type { CharacterModel, MotionState } from '../characters/types';
 import type { Ability, CharacterId } from '../../../data/characters';
 import { Bag, damp, dampAngle, glowTexture, inked, outlineMaterial, toon } from './kit';
 import { NO_REFLECT } from './pond';
 
 export type Emote = EmoteKind;
-const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8 };
+const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8, skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
 
 export interface MoveInput {
   /** desired horizontal direction in world space (length 0..1) */
@@ -433,6 +433,34 @@ export class PlayerController implements Player {
     return this.frozen || this.riding !== null;
   }
 
+  // ── skills: pushes and temporary movement changes (see MoveMods in types.ts)
+  private mods: MoveMods | null = null;
+  private airLeft = 0;
+  /** While > 0 a dash carries: the walker's own steering barely damps it. */
+  private dashT = 0;
+
+  setMoveMods(m: MoveMods | null): void {
+    this.mods = m ? { ...m } : null;
+    if (this.grounded) this.airLeft = this.mods?.airJumps ?? 0;
+  }
+
+  impulse(vx: number, vy: number, vz: number): void {
+    if (this.frozen || this.riding) return;
+    const ok = (v: number) => (Number.isFinite(v) ? v : 0);
+    this.vx += ok(vx);
+    this.vz += ok(vz);
+    if (Math.hypot(vx, vz) > 0.5) this.dashT = 0.35;
+    if (ok(vy) > 0) {
+      this.vy = Math.max(this.vy, 0) + ok(vy);
+      this.grounded = false;
+    }
+  }
+
+  /** Stands on water now (the gift of 凌波, or a skill). */
+  get floats(): boolean {
+    return this.gifts.float || !!this.mods?.float;
+  }
+
   update(dt: number, input: MoveInput, phys: Physics): void {
     this.time += dt;
     let floor: number;
@@ -522,10 +550,12 @@ export class PlayerController implements Player {
     if (mag > 0.25 && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
     const busy = this.busy;
     this.running = input.run;
-    const maxSpeed = (input.run ? 4.3 : 2.1) * mag * this.gifts.speed;
+    const mods = this.mods;
+    const maxSpeed = (input.run ? 4.3 : 2.1) * mag * this.gifts.speed * (mods?.speed ?? 1);
     const tx = mag > 0.01 && !busy ? (input.x / Math.max(mag, 1e-6)) * maxSpeed : 0;
     const tz = mag > 0.01 && !busy ? (input.z / Math.max(mag, 1e-6)) * maxSpeed : 0;
-    const acc = this.grounded ? 10 : 3;
+    this.dashT = Math.max(0, this.dashT - dt);
+    const acc = this.dashT > 0 ? 1.2 : this.grounded ? 10 : 3;
     this.vx = damp(this.vx, tx, acc, dt);
     this.vz = damp(this.vz, tz, acc, dt);
     const px = this.position.x, pz = this.position.z;
@@ -543,15 +573,21 @@ export class PlayerController implements Player {
     this.position.x = nx;
     this.position.z = nz;
 
+    const jump = this.gifts.jump * (mods?.jump ?? 1);
     if (input.jump && this.grounded) {
-      this.vy = 4.1 * this.gifts.jump;
+      this.vy = 4.1 * jump;
       this.grounded = false;
+    } else if (input.jump && !this.grounded && this.airLeft > 0) {
+      // a second jump in the air (轻功)
+      this.airLeft--;
+      this.vy = 3.8 * jump;
     }
     const floor = phys.floorY(nx, nz);
     if (!this.grounded) {
-      this.vy -= 12.5 * dt;
+      if (mods?.hover) this.vy = damp(this.vy, 0, 1.6, dt); // held up: no gravity, a gentle settle
+      else this.vy -= 12.5 * dt;
       // the jade rabbit drifts down
-      if (this.gifts.glide && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
+      if ((this.gifts.glide || mods?.glide) && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
       this.position.y += this.vy * dt;
       if (this.position.y <= floor) {
         this.position.y = floor;
@@ -562,7 +598,10 @@ export class PlayerController implements Player {
       if (floor < this.position.y - 0.35) { this.grounded = false; this.vy = 0; }
       else this.position.y = damp(this.position.y, floor, 25, dt);
     }
-    if (this.grounded) this.standY = floor;
+    if (this.grounded) {
+      this.standY = floor;
+      this.airLeft = mods?.airJumps ?? 0;
+    }
 
     if (moved > 0.002 && mag > 0.05) {
       this.targetHeading = null;

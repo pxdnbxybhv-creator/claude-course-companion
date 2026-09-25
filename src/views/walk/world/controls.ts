@@ -10,13 +10,15 @@ export interface InputState {
   stickRun: boolean;
   jumpQueued: boolean;
   actQueued: boolean;
+  /** The skill (Q / 技) was pressed since the last frame. */
+  skillQueued: boolean;
 }
 
 /** The painted plants are upright flats: looking down on them from much above ~37° flattens them. */
 const MAX_PITCH = 0.65;
 
 export class Controls {
-  readonly input: InputState = { stickX: 0, stickY: 0, stickRun: false, jumpQueued: false, actQueued: false };
+  readonly input: InputState = { stickX: 0, stickY: 0, stickRun: false, jumpQueued: false, actQueued: false, skillQueued: false };
   private keys = new Set<string>();
   yaw = 0;
   pitch = 0.24;
@@ -110,6 +112,9 @@ export class Controls {
     } else if (code === 'KeyE' || code === 'Enter' || code === 'NumpadEnter') {
       e.preventDefault();
       this.input.actQueued = true;
+    } else if (code === 'KeyQ') {
+      e.preventDefault();
+      this.input.skillQueued = true;
     }
   }
 

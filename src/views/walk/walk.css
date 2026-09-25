@@ -591,3 +591,8 @@
   .walk-curtain { transition-duration: 0.12s; }
 }
 @keyframes walk-fade-hold { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
+
+/* the skill button (技): a cooldown shade sweeps back as it recharges (the core refines this) */
+.walk-skill { position: relative; overflow: hidden; }
+.walk-skill.is-cooling::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(27, 25, 22, 0.35) calc(var(--cd, 0) * 360deg), transparent 0); pointer-events: none; }
+.walk-skill.is-active { box-shadow: 0 0 0 3px rgba(185, 58, 43, 0.55); }

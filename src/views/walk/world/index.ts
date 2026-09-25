@@ -45,6 +45,7 @@ import { terrain } from './terrain';
 import { buildLand } from './land';
 import { buildWater } from './water';
 import { buildScatter } from './scatter';
+import { createGrade } from './grade';
 import { bridgeSpecs, buildBridges, setBridgeReplaced } from './bridges';
 import {
   GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, WALL, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallPath, wallSegments, waterAt,
@@ -88,6 +89,8 @@ export interface WorldHandle {
   input: InputState;
   act(): void;
   jump(): void;
+  /** Use the character's skill (技). */
+  skill(): void;
   /** While a card or sheet is open the keyboard does not walk. */
   setPaused(p: boolean): void;
   /** Where the player is (map screen). */
@@ -149,6 +152,7 @@ const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ }> = {
   bamboo: { x: -66, z: 29.5, face: ANCHORS.bambooClearing },
   plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
   mountain: { x: 27.1, z: -87.6, face: ANCHORS.templeHall },   // before the temple gate
+  home: { x: -34, z: -24, face: { x: -50, z: -24 } },           // at the homestead gate, looking in
 };
 
 /** How far beyond its radius a place stays drawn. */
@@ -206,7 +210,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   cv.setAttribute('role', 'img');
   cv.style.touchAction = 'none';
 
+  // every frame reaches the screen through the colour grade (grade.ts)
+  const grade = createGrade(renderer, { lowEnd, reduced });
   const disposeRenderer = () => {
+    grade.dispose();
     renderer.dispose();
     renderer.forceContextLoss();
     cv.remove();
@@ -387,7 +394,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   /** The surface this walker stands on: with the gift of 凌波, water holds you up. */
   const standY = (x: number, z: number) => {
     const f = floorY(x, z);
-    if (!player.gifts.float) return f;
+    if (!player.floats) return f;
     const w = waterAt(x, z);
     return w === null ? f : Math.max(f, w + 0.02);
   };
@@ -457,7 +464,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     if (c) colliders.push(c);
   }
   for (const t of tabletSpecs) colliders.push({ x: t.x, z: t.z, r: 0.3 });
-  const walkHere = (x: number, z: number) => walkableGround(x, z) || (player.gifts.float && x * x + z * z < 172 * 172);
+  const walkHere = (x: number, z: number) => walkableGround(x, z) || (player.floats && x * x + z * z < 172 * 172);
   const resolve = (x: number, z: number, r: number, fx: number, fz: number): [number, number] => {
     const nearGarden = x * x + z * z < 40 * 40;
     for (let pass = 0; pass < 2; pass++) {
@@ -768,7 +775,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
 
   // --- the player's input, for mini-games (rowing a boat, casting a line)
-  const ctxInput = { x: 0, y: 0, run: false, actionPressed: false };
+  const ctxInput = { x: 0, y: 0, run: false, actionPressed: false, jumpPressed: false, skillPressed: false };
+  // the world's clock can be slowed (棋士's 推演): features and the walker get the scaled dt
+  let timeScale = 1, timeScaleWant = 1;
 
   const hudApi: Hud = {
     toast: hud.toast,
@@ -776,6 +785,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     showCard: hud.showCard,
     mount: hud.mount,
     say: hud.say,
+    skill: hud.skill,
   };
 
   const ctx: WorldCtxCore = {
@@ -811,6 +821,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     frameCamera(x: number, z: number, y: number, secs?: number) {
       controls.frame(player.position.x, player.position.z, x, z, y, secs);
     },
+    setTimeScale(f: number) {
+      timeScaleWant = Number.isFinite(f) ? Math.max(0.05, Math.min(1, f)) : 1;
+    },
   };
 
   let playerMirrored = true;
@@ -826,7 +839,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     playerMirrored = true;
     player.emote('bow');
     // off the water if the new walker cannot stand on it
-    if (!player.gifts.float && !walkableGround(player.position.x, player.position.z)) {
+    if (!player.floats && !walkableGround(player.position.x, player.position.z)) {
       const a = ARRIVE[lastPlace];
       player.teleport(a.x, a.z, Math.atan2(a.face.x - a.x, a.face.z - a.z));
     }
@@ -859,6 +872,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       pr = Math.max(minPr, Math.round((pr - 0.25) * 100) / 100);
       renderer.setPixelRatio(pr);
       renderer.setSize(W(), H());
+      grade.setSize(W(), H());
       pond.setSize(W() * pr, H() * pr);
       setPx();
       nDeltas = 0;
@@ -911,18 +925,25 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   }
   const regionOf = new Map<Interactable, RegionId | null>();
   let frozenShown = false;
-  const step = (dt: number, t: number) => {
+  const step = (rawDt: number, t: number) => {
     frameNo++;
+    timeScale += (timeScaleWant - timeScale) * Math.min(1, rawDt * 6);
+    if (Math.abs(timeScale - timeScaleWant) < 0.01) timeScale = timeScaleWant;
+    const dt = rawDt * timeScale;
     const mv = controls.move();
     const inp = controls.input;
     ctxInput.x = controls.intent.x;
     ctxInput.y = controls.intent.y;
     ctxInput.run = controls.intent.run;
     ctxInput.actionPressed = inp.actQueued && !paused;
+    ctxInput.jumpPressed = inp.jumpQueued && !paused;
+    ctxInput.skillPressed = inp.skillQueued && !paused;
+    inp.skillQueued = false;
     player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve, built: (x, z) => floorY(x, z) > terrainY(x, z) + 0.01 });
     inp.jumpQueued = false;
-    camFollow(dt);
+    camFollow(rawDt);
     sky.update(dt, camera);
+    grade.setLight({ night: sky.night01, tint: sky.tint });
     camPos.copy(camera.position);
     mountains.follow(camPos);
     flora.mist.position.set(camPos.x, 0, camPos.z);
@@ -1010,7 +1031,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     const t = (nowMs - t0) / 1000;
     step(dt, t);
     if (warming) return;
-    renderer.render(scene, camera);
+    grade.render(scene, camera);
     adapt(t);
   };
   const onVis = () => {
@@ -1026,6 +1047,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const ro = new ResizeObserver(() => {
     const w = W(), h = H();
     renderer.setSize(w, h);
+    grade.setSize(w, h);
     camera.aspect = w / h;
     camera.fov = w / h < 0.8 ? 62 : 50;
     camera.updateProjectionMatrix();
@@ -1077,7 +1099,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   ro.observe(host);
   await warm(scene.children, 0.6, 0.7);
   check();
-  renderer.render(scene, camera);
+  grade.render(scene, camera);
   raf = requestAnimationFrame(frame);
   enter(region, false);
 
@@ -1152,7 +1174,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     nDeltas = 0;
     adaptAt = (performance.now() - t0) / 1000 + 6;
     last = performance.now();
-    renderer.render(scene, camera);
+    grade.render(scene, camera);
   }
   hud.progress(1);
 
@@ -1243,6 +1265,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     // queued, so the world's own step and mini-games (ctx.input.actionPressed) both see it
     act: () => { if (!paused) controls.input.actQueued = true; },
     jump: () => { controls.input.jumpQueued = true; },
+    skill: () => { if (!paused) controls.input.skillQueued = true; },
     setPaused: (p: boolean) => { paused = p; controls.paused = p; },
     where: () => ({ x: player.position.x, z: player.position.z, heading: player.heading, region }),
     travel,

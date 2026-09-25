@@ -66,6 +66,7 @@ export function WalkView() {
   const arrivalTimer = useRef<ReturnType<typeof setTimeout>>();
   const [curtain, setCurtain] = useState(false);
   const [frozen, setFrozen] = useState(false);
+  const [skillUi, setSkillUi] = useState<{ glyph: string; zh: string; en: string; cooldown: number; active?: boolean } | null>(null);
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const dialogSeq = useRef(0);
   const [mapOpen, setMapOpen] = useState(false);
@@ -121,6 +122,13 @@ export function WalkView() {
       arrive: (a) => setArrival({ ...a, key: Date.now() }),
       curtain: (on) => setCurtain(on),
       frozen: (on) => setFrozen(on),
+      skill: (o) => setSkillUi((cur) => {
+        if (!o) return null;
+        // cooldowns tick every frame: only re-render on a visible change
+        const cd = Math.round(o.cooldown * 40) / 40;
+        if (cur && cur.glyph === o.glyph && cur.cooldown === cd && !!cur.active === !!o.active && cur.zh === o.zh) return cur;
+        return { ...o, cooldown: cd };
+      }),
     };
     import('./world')
       .then((m) => (worldModule = m, m))
@@ -334,6 +342,17 @@ export function WalkView() {
           <button type="button" class="walk-jump" aria-label={t('跳', 'Jump')} onPointerDown={(e) => { e.preventDefault(); worldRef.current?.jump(); }}>
             <span class="brush" aria-hidden="true">跃</span>
           </button>
+          {skillUi && (
+            <button
+              type="button"
+              class={'walk-jump walk-skill' + (skillUi.active ? ' is-active' : '') + (skillUi.cooldown > 0 ? ' is-cooling' : '')}
+              style={{ '--cd': String(skillUi.cooldown) }}
+              aria-label={t(`技：${skillUi.zh}`, `Skill: ${skillUi.en}`)}
+              onPointerDown={(e) => { e.preventDefault(); worldRef.current?.skill(); }}
+            >
+              <span class="brush" aria-hidden="true">{skillUi.glyph}</span>
+            </button>
+          )}
           <button
             type="button"
             class={'walk-act' + (prompt || frozen ? ' is-on' : '')}
