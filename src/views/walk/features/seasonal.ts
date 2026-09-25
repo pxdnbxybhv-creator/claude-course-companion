@@ -4,7 +4,7 @@
 // or laba porridge, the 九九消寒图).
 import type * as T from 'three';
 import type { WorldCtx } from '../types';
-import { Bag, BRUSH_FONT, canvasTexture, claims, entry, feature, findSpot, glowTexture, landmarks, loadBrush, pondDist, reducedMotion, shorePoint, TEXT_FONT, tween, dayRng } from './kit';
+import { Bag, BRUSH_FONT, canvasTexture, claims, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, loadBrush, outlineMat, pondDist, propMat, reducedMotion, reflects, shorePoint, TEXT_FONT, tween, dayRng } from './kit';
 import { birdGeometry, instanceAttrs, merge, part, wingMaterial } from './geo';
 import { bowl, burst, glints, stoneTable } from './props';
 import { fireflySwarm } from './life';
@@ -143,14 +143,15 @@ export const qingming = feature('qingming', async (bag, ctx) => {
   const strandGeo = new THREE.PlaneGeometry(0.05, 1.7, 1, 4);
   strandGeo.translate(0, -0.85, 0);
   const strandMat = new THREE.MeshLambertMaterial({ color: '#9bb07d', side: THREE.DoubleSide });
-  const trunkMat = new THREE.MeshLambertMaterial({ color: '#4d3f31', flatShading: true });
+  const trunkGeo = merge(THREE, [part(THREE, new THREE.CylinderGeometry(0.12, 0.2, 2.6, 6), '#4d3f31')]);
+  bag.own(trunkGeo);
   let willowAt: T.Vector3 | null = null;
   const wa = rng() * TAU;
   for (let w = 0; w < 2; w++) {
     const { at } = landingAt(ctx, wa + w * 2.4, 1.4);
     claims(ctx).push({ x: at.x, z: at.z, r: 1.4 });
     willowAt ??= at;
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 2.6, 6), trunkMat);
+    const trunk = inked(ctx, trunkGeo, { width: 0.014 });
     trunk.position.set(at.x, at.y + 1.3, at.z);
     trunk.rotation.z = 0.12;
     bag.add(trunk);
@@ -234,10 +235,9 @@ function dragonBoat(ctx: WorldCtx): { group: T.Group; paddles: T.InstancedMesh; 
   parts.push(part(THREE, new THREE.CylinderGeometry(0.06, 0.08, 0.26, 5), P.ink, { p: [0, 0.28, L / 2 - 0.72] }));
   parts.push(part(THREE, new THREE.IcosahedronGeometry(0.055, 0), '#d8b48c', { p: [0, 0.46, L / 2 - 0.72] }));
   const group = new THREE.Group();
-  group.add(new THREE.Mesh(merge(THREE, parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-  const pg = new THREE.BoxGeometry(0.035, 0.012, 0.62);
-  pg.translate(0, 0, -0.18);
-  const paddles = new THREE.InstancedMesh(pg, new THREE.MeshLambertMaterial({ color: '#8a6a44', flatShading: true }), seats.length);
+  group.add(inked(ctx, merge(THREE, parts), { width: 0.01 }));
+  const pg = merge(THREE, [part(THREE, new THREE.BoxGeometry(0.035, 0.012, 0.62), '#8a6a44', { p: [0, 0, -0.18] })]);
+  const paddles = new THREE.InstancedMesh(pg, propMat(ctx), seats.length);
   group.add(paddles);
   return { group, paddles, seats };
 }
@@ -282,7 +282,7 @@ export const dragonboat = feature('dragonboat', (bag, ctx) => {
     if (score > bestScore) { bestScore = score; best = c; }
   }
   const { group, paddles, seats } = dragonBoat(ctx);
-  bag.add(group);
+  bag.add(reflects(group));
   const scale = Math.min(1, (Math.min(best.ax, best.az) * 2) / 3.2);
   group.scale.setScalar(Math.max(0.7, scale));
   let u = rng() * TAU, beatT = 0, beats = 0;
@@ -321,12 +321,11 @@ export const dragonboat = feature('dragonboat', (bag, ctx) => {
 
   // Five zongzi to find.
   const zGeo = merge(THREE, [
-    part(THREE, new THREE.TetrahedronGeometry(0.11, 0), '#5f7f4f', { s: [1, 1.25, 1], r: [0.3, 0.6, 0] }),
-    part(THREE, new THREE.TorusGeometry(0.075, 0.008, 3, 10), '#b58a4a', { p: [0, 0, 0], r: [Math.PI / 2, 0, 0] }),
+    part(THREE, new THREE.TetrahedronGeometry(0.11, 0), '#627a63', { s: [1, 1.25, 1], r: [0.3, 0.6, 0] }),
+    part(THREE, new THREE.TorusGeometry(0.075, 0.008, 3, 10), ctx.palette.ochre, { p: [0, 0, 0], r: [Math.PI / 2, 0, 0] }),
   ]);
   zGeo.translate(0, 0.09, 0);
-  const zMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  bag.own(zGeo); bag.own(zMat);
+  bag.own(zGeo);
   const tAt = findSpot(ctx, rng, { clear: 1.6, pondMargin: 2 });
   const table = stoneTable(ctx, tAt, rng() * TAU, 2);
   bag.add(table.group);
@@ -346,7 +345,7 @@ export const dragonboat = feature('dragonboat', (bag, ctx) => {
   const label = { zh: '粽子', en: 'Zongzi' };
   bag.counter('zongzi', label, `0/${spots.length}`);
   spots.forEach((at, i) => {
-    const mesh = new THREE.Mesh(zGeo, zMat);
+    const mesh = inked(ctx, zGeo, { width: 0.006 });
     mesh.position.copy(at);
     mesh.rotation.y = rng() * TAU;
     bag.add(mesh);
@@ -428,11 +427,12 @@ export const qixi = feature('qixi', (bag, ctx) => {
   if (!ctx.env.festivals.includes('qixi')) return;
   const { THREE, palette: P } = ctx;
   const rng = dayRng(ctx, '707');
-  ctx.sky.forceNight(true);
-  bag.onDispose(() => ctx.sky.forceNight(false));
+  const night = festivalNight(bag);
   ctx.hud.toast('七夕 · 今夜鹊桥相会', 'Qixi: tonight the magpies build their bridge', 4000);
-  milkyWay(bag);
-  fireflySwarm(bag, ctx, 50, true);
+  if (night) {
+    milkyWay(bag);
+    fireflySwarm(bag, ctx, 50, true);
+  }
 
   // A bridge of magpies across the pond, east to west.
   const A = landingAt(ctx, 0, 0.3).at, B = landingAt(ctx, Math.PI, 0.3).at;
@@ -440,7 +440,7 @@ export const qixi = feature('qixi', (bag, ctx) => {
   const geo = birdGeometry(THREE, { body: '#1f1e1c', belly: '#f1ede4', wing: '#26313d', tip: '#f1ede4', beak: P.ink });
   const attrs = instanceAttrs(THREE, geo, n, (i) => i * 0.9);
   const anim = wingMaterial(THREE, { rate: 20, angle: 0.8, lift: 0.1, fold: 0.3 });
-  const mesh = bag.add(new THREE.InstancedMesh(geo, anim.material, n));
+  const mesh = bag.add(reflects(new THREE.InstancedMesh(geo, anim.material, n)));
   mesh.frustumCulled = false;
   const span = A.distanceTo(B);
   const birds = Array.from({ length: n }, (_, i) => {
@@ -510,7 +510,7 @@ export const chongyang = feature('chongyang', (bag, ctx) => {
 
   // Potted chrysanthemums in two groups.
   const parts: T.BufferGeometry[] = [];
-  const blooms = [P.gamboge, '#f4efe4', P.rouge, '#e0913a', P.gamboge, '#f4efe4', '#d9b3d0'];
+  const blooms = [P.gamboge, P.white, P.rouge, '#c98a45', P.gamboge, P.white, '#bfa9b4'];
   for (let g = 0; g < 2; g++) {
     const c = findSpot(ctx, rng, { clear: 1.8, pondMargin: 1.5, maxR: ctx.bounds.radius * 0.7 });
     const k = g === 0 ? 4 : 3;
@@ -518,8 +518,8 @@ export const chongyang = feature('chongyang', (bag, ctx) => {
       const a = (i / k) * TAU + rng(), r = k === 4 ? 0.55 : 0.45;
       const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r, y = ctx.groundY(x, z);
       const potH = 0.3 + rng() * 0.1;
-      parts.push(part(THREE, new THREE.CylinderGeometry(0.2, 0.14, potH, 8), g ? P.indigo : '#8a5a3a', { p: [x, y + potH / 2, z] }));
-      parts.push(part(THREE, new THREE.IcosahedronGeometry(0.26, 0), '#4f6a4a', { p: [x, y + potH + 0.16, z], s: [1, 0.8, 1] }));
+      parts.push(part(THREE, new THREE.CylinderGeometry(0.2, 0.14, potH, 8), g ? '#5d6670' : '#8a7560', { p: [x, y + potH / 2, z] }));
+      parts.push(part(THREE, new THREE.IcosahedronGeometry(0.26, 0), '#56695a', { p: [x, y + potH + 0.16, z], s: [1, 0.8, 1] }));
       const col = blooms[(g * 4 + i) % blooms.length];
       for (let f = 0; f < 6; f++) {
         const fa = rng() * TAU, fr = rng() * 0.18;
@@ -529,7 +529,7 @@ export const chongyang = feature('chongyang', (bag, ctx) => {
       }
     }
   }
-  bag.add(new THREE.Mesh(merge(THREE, parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  bag.add(inked(ctx, merge(THREE, parts), { width: 0.01 }));
 
   // The highest ground you can walk to: a stele, a sprig of dogwood (茱萸), a gourd of wine.
   let top = new THREE.Vector3(0, -Infinity, 0);
@@ -547,23 +547,25 @@ export const chongyang = feature('chongyang', (bag, ctx) => {
     g.fillStyle = P.cinnabar; g.font = `44px ${BRUSH_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     ['登', '高'].forEach((c, i) => g.fillText(c, w / 2, h * (0.32 + i * 0.36)));
   });
-  const stone = new THREE.MeshLambertMaterial({ color: '#8f8b80', flatShading: true });
-  const sMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.95, 0.12), [stone, stone, stone, stone, new THREE.MeshLambertMaterial({ map: steleTex }), stone]);
+  const stone = propMat(ctx);
+  const sGeo = part(THREE, new THREE.BoxGeometry(0.34, 0.95, 0.12), '#8f8b80'); // keeps the box's face groups
+  const sMesh = new THREE.Mesh(sGeo, [stone, stone, stone, stone, new THREE.MeshLambertMaterial({ map: steleTex }), stone]);
+  sMesh.add(new THREE.Mesh(sGeo, outlineMat(ctx, 0.012)));
   sMesh.position.set(stele.x, stele.y + 0.47, stele.z);
   sMesh.rotation.y = Math.atan2(-stele.x, -stele.z);
   bag.add(sMesh);
-  const sprig = new THREE.Mesh(merge(THREE, [
+  const sprig = inked(ctx, merge(THREE, [
     part(THREE, new THREE.CylinderGeometry(0.008, 0.01, 0.4, 3), '#4a3b2c', { p: [0, 0.2, 0], r: [0, 0, 0.2] }),
     ...Array.from({ length: 7 }, (_, i) => part(THREE, new THREE.IcosahedronGeometry(0.025, 0), P.cinnabar, { p: [0.03 + Math.cos(i) * 0.05, 0.36 + Math.sin(i * 2) * 0.04, Math.sin(i) * 0.05] })),
-  ]), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  ]), { width: 0.004 });
   sprig.position.set(stele.x + 0.25, stele.y, stele.z + 0.1);
   bag.add(sprig);
-  const gourd = new THREE.Mesh(merge(THREE, [
+  const gourd = inked(ctx, merge(THREE, [
     part(THREE, new THREE.SphereGeometry(0.11, 8, 6), '#c9963e', { p: [0, 0.11, 0] }),
     part(THREE, new THREE.SphereGeometry(0.075, 8, 6), '#c9963e', { p: [0, 0.27, 0] }),
     part(THREE, new THREE.CylinderGeometry(0.02, 0.025, 0.06, 5), P.cinnabar, { p: [0, 0.36, 0] }),
     part(THREE, new THREE.TorusGeometry(0.05, 0.01, 3, 8), P.cinnabar, { p: [0, 0.2, 0], r: [Math.PI / 2, 0, 0] }),
-  ]), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  ]), { width: 0.006 });
   gourd.position.set(stele.x - 0.3, stele.y, stele.z + 0.15);
   bag.add(gourd);
   glints(bag, [new THREE.Vector3(stele.x, stele.y + 0.8, stele.z)], '#ffcf7a', 0.9);
@@ -676,9 +678,8 @@ export const winter = feature('winter', async (bag, ctx) => {
   let food: T.Object3D | null = null;
   if (dz) {
     // dumplings: plump crescents
-    const dg = new THREE.SphereGeometry(0.05, 8, 4, 0, TAU, 0, Math.PI / 2);
-    dg.scale(1.3, 0.7, 0.7);
-    const dumplings = new THREE.InstancedMesh(dg, new THREE.MeshLambertMaterial({ color: '#f6f0e2', flatShading: true }), 6);
+    const dg = merge(THREE, [part(THREE, new THREE.SphereGeometry(0.05, 8, 4, 0, TAU, 0, Math.PI / 2), '#f6f0e2', { s: [1.3, 0.7, 0.7] })]);
+    const dumplings = new THREE.InstancedMesh(dg, propMat(ctx), 6);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion();
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU;
@@ -689,7 +690,7 @@ export const winter = feature('winter', async (bag, ctx) => {
     bag.add(dumplings);
     food = dumplings;
   } else {
-    const beans = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.014, 0), new THREE.MeshLambertMaterial({ color: '#5a2a24' }), 14);
+    const beans = new THREE.InstancedMesh(merge(THREE, [part(THREE, new THREE.IcosahedronGeometry(0.014, 0), '#5a2a24')]), propMat(ctx), 14);
     const m = new THREE.Matrix4();
     for (let i = 0; i < 14; i++) { const a = rng() * TAU, r = rng() * 0.11; m.makeTranslation(tAt.x + Math.cos(a) * r, table.top + 0.105, tAt.z + Math.sin(a) * r); beans.setMatrixAt(i, m); }
     bag.add(beans);
@@ -745,10 +746,10 @@ export const winter = feature('winter', async (bag, ctx) => {
       });
       g.fillStyle = '#1b1916'; g.font = `16px ${TEXT_FONT}`; g.fillText('九九消寒图', w / 2, 22);
     });
-    const board = new THREE.Mesh(merge(THREE, [
+    const board = inked(ctx, merge(THREE, [
       part(THREE, new THREE.BoxGeometry(0.06, 1.3, 0.06), '#4a3c2b', { p: [-0.55, 0.65, -0.03] }),
       part(THREE, new THREE.BoxGeometry(0.06, 1.3, 0.06), '#4a3c2b', { p: [0.55, 0.65, -0.03] }),
-    ]), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    ]), { width: 0.008 });
     const face = Math.atan2(tAt.x - at.x, tAt.z - at.z);
     board.position.copy(at);
     board.rotation.y = face;

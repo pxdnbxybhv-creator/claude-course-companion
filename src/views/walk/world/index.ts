@@ -22,13 +22,14 @@ import { buildMountains } from './mountains';
 import { buildGround } from './ground';
 import { buildArchitecture } from './architecture';
 import { buildPond, NO_REFLECT } from './pond';
-import { BURST_COLOR, buildPlant, buildTablets, growPlant, interactRadius, plantCollider, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
+import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, rebrushTablet, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
+import { InkMarks } from './marks';
 import { Scholar } from './player';
 import { Controls, type InputState } from './controls';
 import { buildAir, Bursts } from './particles';
 import { buildFlora } from './flora';
 import {
-  BOUNDS_R, GATE, LOOP, PAVILION, PAVILION_Y, POND, SPAWN, floorY, layoutPlants, polyAt, staticColliders, walkableGround, wallSegments,
+  BOUNDS_R, GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallSegments,
   type Circle, type PlantSlot,
 } from './site';
 
@@ -61,6 +62,46 @@ export interface WorldHandle {
 }
 
 export class WebGLUnavailable extends Error {}
+
+export { releasePlantBitmaps };
+
+/** A solid prop on the land: the player walks round it (and, given a height, the camera never hides behind it). */
+import type { Collider, Occluder } from '../types';
+export type { Collider, Occluder };
+
+/** Colliders and occluders are now part of WorldCtx itself; kept as an alias for older call sites. */
+export type WorldCtxCore = WorldCtx;
+
+/** Where the ray from t to c first enters an upright cylinder, as a fraction of the way (null = never). */
+function rayCylinder(tx: number, ty: number, tz: number, dx: number, dy: number, dz: number, o: Occluder): number | null {
+  const ox = tx - o.x, oz = tz - o.z;
+  const a = dx * dx + dz * dz;
+  const c = ox * ox + oz * oz - o.r * o.r;
+  let f0: number, f1: number;
+  if (a < 1e-9) {
+    if (c > 0) return null;
+    f0 = 0; f1 = 1;
+  } else {
+    const b = 2 * (ox * dx + oz * dz);
+    const disc = b * b - 4 * a * c;
+    if (disc < 0) return null;
+    const q = Math.sqrt(disc);
+    f0 = (-b - q) / (2 * a); f1 = (-b + q) / (2 * a);
+  }
+  f0 = Math.max(0, f0); f1 = Math.min(1, f1);
+  if (f0 >= f1) return null;
+  // clip to the cylinder's height
+  if (Math.abs(dy) < 1e-9) {
+    if (ty < o.y0 || ty > o.y1) return null;
+  } else {
+    let g0 = (o.y0 - ty) / dy, g1 = (o.y1 - ty) / dy;
+    if (g0 > g1) { const t = g0; g0 = g1; g1 = t; }
+    f0 = Math.max(f0, g0); f1 = Math.min(f1, g1);
+    if (f0 >= f1) return null;
+  }
+  // the player is already inside it (e.g. under a canopy): nothing to pull in for
+  return f0 <= 0.02 ? null : f0;
+}
 
 const WILD: { kind: PlantKind; seed: number }[] = [
   { kind: 'bamboo', seed: 71 }, { kind: 'orchid', seed: 5 }, { kind: 'pine', seed: 9 }, { kind: 'chrysanthemum', seed: 23 }, { kind: 'plum', seed: 41 },
@@ -119,7 +160,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   if (o.time === 'day') { base.tod = 'day'; base.hour = 11; }
   if (o.time === 'night') { base.tod = 'night'; base.hour = 21.5; }
   const festivals: FestivalKey[] = o.festival ? [o.festival] : festivalsOn(now);
-  const env = { ...base, date: now, festivals };
+  const env = { ...base, date: now, festivals, timeMode: o.time };
   const aspect = W() / H();
 
   // --- scene & camera
@@ -179,13 +220,20 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     if (o.cancelled()) { bail(); throw new Error('cancelled'); }
   }
 
-  // tablets with the habits' names
+  if (import.meta.env.DEV && plants.length !== total) console.error('[walk] a habit has no plant', plants.length, total);
+  scene.add(buildJars(bag, slots));
+
+  // tablets with the habits' names, and the streak brushed small in the corner
+  const noteFor = (st: HabitStats): string | null => {
+    if (lang === 'zh') return st.streak > 1 ? `连${cnNum(st.streak)}日` : st.done ? `种${cnNum(st.done)}日` : null;
+    return st.streak > 1 ? `${st.streak} days running` : st.done ? `${st.done} ${st.done === 1 ? 'day' : 'days'}` : null;
+  };
   const tabletSpecs: TabletSpec[] = [];
   const tabletFor = new Map<string, number>();
   for (const e of plants) {
     if (!e.habit) continue;
     tabletFor.set(e.key, tabletSpecs.length);
-    tabletSpecs.push({ ...e.slot.tablet, text: e.habit.name, glyph: PLANT_INFO[e.kind].zh });
+    tabletSpecs.push({ ...e.slot.tablet, text: e.habit.name, glyph: PLANT_INFO[e.kind].zh, note: noteFor(stats.get(e.habit.id)!) });
   }
   let invite: { x: number; z: number } | null = null;
   if (!habits.length) {
@@ -195,6 +243,23 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   }
   const tablets = buildTablets(bag, tabletSpecs);
   scene.add(tablets.group);
+  const rebrush = (e: PlantEntity, st: HabitStats) => {
+    const i = tabletFor.get(e.key);
+    if (i === undefined) return;
+    tabletSpecs[i].note = noteFor(st);
+    rebrushTablet(tablets.faces[i], tabletSpecs[i]);
+  };
+
+  // ink on the ground: the bloom of each watering, and the damp patch of plants tended today
+  const marks = new InkMarks(bag, reduced);
+  scene.add(marks.group);
+  const WET_R: Record<PlantKind, number> = { pine: 1.25, bamboo: 1.05, plum: 1.15, chrysanthemum: 0.75, orchid: 0.65, lotus: 0.85 };
+  const markWet = (e: PlantEntity, st: HabitStats) => {
+    if (e.slot.inWater) return;
+    marks.setWet(e.key, e.slot.x, e.slot.z, st.doneToday, Math.min(1, st.streak / 21), WET_R[e.kind]);
+  };
+  for (const e of plants) if (e.habit) markWet(e, stats.get(e.habit.id)!);
+  marks.settle();
 
   // --- the protagonist and the camera
   const player = new Scholar(bag, SPAWN.x, floorY(SPAWN.x, SPAWN.z), SPAWN.z, SPAWN.heading, reduced);
@@ -220,14 +285,16 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   if (air) scene.add(air.points);
   const bursts = new Bursts(bag, 1);
   scene.add(bursts.points);
+  // the pixel ratio actually in use: lowered step by step if frames run long (see the loop)
+  let pr = dpr;
   const setPx = () => {
-    const px = (H() * dpr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const px = (H() * pr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     if (air) (air.points.material as THREE.ShaderMaterial).uniforms.uPx.value = px;
     (bursts.points.material as THREE.ShaderMaterial).uniforms.uPx.value = px;
   };
   setPx();
 
-  // --- collisions
+  // --- collisions (features add their props through addCollider)
   const colliders: Circle[] = [...staticColliders()];
   for (const e of plants) {
     const c = plantCollider(e);
@@ -263,14 +330,53 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // a little clearance round every trunk, stone and tablet, so features never plant a prop inside a canopy
   const isWalkable = (x: number, z: number) => walkableGround(x, z, 0.1) && !colliders.some((c) => Math.hypot(x - c.x, z - c.z) < c.r + 0.45);
 
+  // --- what the camera must never hide behind: tall rocks, the pavilion roof, features' big props
+  const occluders: Occluder[] = [];
+  for (const r of ROCKS) if (r.h >= 0.9) { const y = terrainY(r.x, r.z); occluders.push({ x: r.x, z: r.z, r: r.w * 0.5, y0: y - 0.2, y1: y + r.h }); }
+  occluders.push({ x: PAVILION.x, z: PAVILION.z, r: PAVILION.r + 0.55, y0: PAVILION_Y + 2.3, y1: PAVILION_Y + 4.2 });
+  const addOccluder = (o: Occluder) => {
+    const c = { ...o };
+    occluders.push(c);
+    return () => { const i = occluders.indexOf(c); if (i >= 0) occluders.splice(i, 1); };
+  };
+  const addCollider = (c0: Collider) => {
+    const c: Circle = { x: c0.x, z: c0.z, r: Math.max(0.05, c0.r) };
+    colliders.push(c);
+    let offOcc: (() => void) | null = null;
+    if ((c0.h ?? 0) >= 0.9) {
+      const y = floorY(c.x, c.z);
+      offOcc = addOccluder({ x: c.x, z: c.z, r: c.r * 0.9, y0: y - 0.1, y1: y + c0.h! });
+    }
+    return () => {
+      const i = colliders.indexOf(c);
+      if (i >= 0) colliders.splice(i, 1);
+      offOcc?.();
+      offOcc = null;
+    };
+  };
+  const gateOcclusion = controls.occlusion!;
+  controls.occlusion = (tx, ty, tz, cx, cy, cz) => {
+    let f = gateOcclusion(tx, ty, tz, cx, cy, cz);
+    const dx = cx - tx, dy = cy - ty, dz = cz - tz;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    for (const o of occluders) {
+      const hit = rayCylinder(tx, ty, tz, dx, dy, dz, o);
+      if (hit !== null) f = Math.min(f, Math.max(0.08, hit - 0.3 / len));
+    }
+    return f;
+  };
+
   // --- interactables
   const interactables = new Set<Interactable>();
+  /** A plant can be reached at its trunk or at its name tablet, whichever is nearer. */
+  const alsoAt = new Map<Interactable, { x: number; z: number }>();
   let nearest: Interactable | null = null;
   let shown = '';
   const addInteractable = (i: Interactable) => {
     interactables.add(i);
     return () => {
       interactables.delete(i);
+      alsoAt.delete(i);
       if (nearest === i) nearest = null;
     };
   };
@@ -300,6 +406,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       },
     };
     addInteractable(it);
+    if (!e.slot.inWater) alsoAt.set(it, { x: tabletSpecs[tIdx].x, z: tabletSpecs[tIdx].z });
   }
   const relabel = (it: Interactable, h: Habit) => Object.assign(it, labelFor(h, statsOf(h, refreshToday())));
 
@@ -318,8 +425,11 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     if (!toggleCheckin(h.id)) toggleCheckin(h.id);
     const st = statsOf(h, refreshToday());
     relabel(it, h);
+    if (!e.slot.inWater) later(180, () => marks.bloom(x, z, e.slot.jar ? 1.3 : WET_R[e.kind] * 1.7));
     later(420, () => {
       growPlant(e, st.growth, vigorFor(st.freshness), reduced);
+      markWet(e, st);
+      rebrush(e, st);
       audio.chime(st.streak);
       bursts.petals(x, e.baseY + (top - e.baseY) * 0.75, z, BURST_COLOR[e.kind], 24);
       if (e.slot.inWater) { pond.ripple(x, z, 1.3); later(300, () => pond.ripple(x + 0.3, z - 0.2, 0.8)); }
@@ -334,6 +444,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
             const s1 = statsOf(h, refreshToday());
             repaint(e, s1.growth, vigorFor(s1.freshness));
             relabel(it, h);
+            markWet(e, s1);
+            rebrush(e, s1);
           },
         },
       );
@@ -394,7 +506,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     return () => void frameFns.delete(fn);
   };
 
-  const ctx: WorldCtx = {
+  const ctx: WorldCtxCore = {
     THREE, scene, camera, renderer,
     groundY: floorY,
     isWalkable,
@@ -403,6 +515,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     player,
     env,
     addInteractable,
+    addCollider,
+    addOccluder,
     hud: { toast: hud.toast, setCounter: hud.setCounter, showCard: hud.showCard },
     audio,
     rng: makeRng(hashString('walk:' + day)),
@@ -417,7 +531,31 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   let last = performance.now();
   let running = true;
   let paused = false;
-  let fps = 60;
+  // real frame times (ms), for the adaptive pixel ratio and the DEV readout
+  const deltas = new Float32Array(120);
+  let nDeltas = 0;
+  let adaptAt = 6; // past the start-up hitches (shader compiles, features dressing the garden)
+  const minPr = Math.min(dpr, touch ? 1 : 0.75);
+  const frameStats = () => {
+    const n = Math.min(nDeltas, deltas.length);
+    if (!n) return { median: 0, p90: 0, n: 0 };
+    const a = Array.from(deltas.subarray(0, n)).sort((x, y) => x - y);
+    return { median: a[Math.floor(n * 0.5)], p90: a[Math.min(n - 1, Math.floor(n * 0.9))], n };
+  };
+  const adapt = (t: number) => {
+    if (t < adaptAt || nDeltas < 30) return;
+    adaptAt = t + 2.5;
+    const { median } = frameStats();
+    if (median > 22 && pr > minPr + 1e-3) {
+      pr = Math.max(minPr, Math.round((pr - 0.25) * 100) / 100);
+      renderer.setPixelRatio(pr);
+      renderer.setSize(W(), H());
+      pond.setSize(W() * pr, H() * pr);
+      setPx();
+      nDeltas = 0;
+      if (import.meta.env.DEV) console.info(`[walk] frames at ${median.toFixed(0)} ms: pixel ratio → ${pr}`);
+    }
+  };
   const camPos = new THREE.Vector3();
   const step = (dt: number, t: number) => {
     const mv = controls.move();
@@ -434,13 +572,16 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     pond.update(dt, t, sky.fogColor, sky.night01);
     if (air) air.update(t, camPos, sky.night01);
     bursts.update(dt, t);
+    marks.update(dt, sky.night01);
     for (const fn of frameFns) {
       try { fn(dt, t); } catch (err) { console.error('[walk] feature frame failed', err); frameFns.delete(fn); }
     }
     // the nearest thing to do
     let best: Interactable | null = null, bd = Infinity;
     for (const i of interactables) {
-      const d = Math.hypot(i.position.x - player.position.x, i.position.z - player.position.z);
+      let d = Math.hypot(i.position.x - player.position.x, i.position.z - player.position.z);
+      const alt = alsoAt.get(i);
+      if (alt) d = Math.min(d, Math.hypot(alt.x - player.position.x, alt.z - player.position.z));
       if (d < i.radius && d < bd && Math.abs(i.position.y - player.position.y) < 3) { best = i; bd = d; }
     }
     nearest = best;
@@ -468,11 +609,15 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const frame = (nowMs: number) => {
     if (!running) return;
     raf = requestAnimationFrame(frame);
-    const dt = Math.min(0.05, Math.max(0, (nowMs - last) / 1000));
+    const raw = Math.max(0, nowMs - last);
+    // a long stall (tab switch, GC) must not fling the player; a slow device still walks in real time
+    const dt = Math.min(0.1, raw / 1000);
     last = nowMs;
-    if (dt > 0) fps = fps * 0.95 + (1 / dt) * 0.05;
-    step(dt, (nowMs - t0) / 1000);
+    if (raw > 0 && raw < 2000) deltas[nDeltas++ % deltas.length] = raw;
+    const t = (nowMs - t0) / 1000;
+    step(dt, t);
     renderer.render(scene, camera);
+    adapt(t);
   };
   const onVis = () => {
     if (document.visibilityState === 'hidden') {
@@ -490,7 +635,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     camera.aspect = w / h;
     camera.fov = w / h < 0.8 ? 62 : 50;
     camera.updateProjectionMatrix();
-    pond.setSize(w * dpr, h * dpr);
+    pond.setSize(w * pr, h * pr);
     setPx();
   });
 
@@ -529,6 +674,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     interactables.clear();
     controls.dispose();
     pond.dispose();
+    for (const e of plants) freePlant(e);
     // anything left in the scene (including what features forgot) gives its GPU memory back
     const mats = new Set<THREE.Material>();
     scene.traverse((obj) => {
@@ -549,7 +695,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   if (import.meta.env.DEV) {
     (window as unknown as { __walk?: unknown }).__walk = {
       ctx, player, controls, sky, plants,
-      fps: () => Math.round(fps),
+      /** Real frame times: median and 90th percentile (ms) of the last 120 frames, and the pixel ratio. */
+      fps: () => { const f = frameStats(); return { median: +f.median.toFixed(1), p90: +f.p90.toFixed(1), fps: f.median ? Math.round(1000 / f.median) : 0, pr }; },
+      occluders: () => occluders.length,
+      colliders: () => colliders.length,
       info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }),
       teleport(x: number, z: number, heading?: number) {
         player.position.set(x, floorY(x, z), z);
@@ -557,6 +706,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         controls.update(0, player.position, player.heading, 0, floorY, true);
       },
       night: (on: boolean) => sky.forceNight(on),
+      toPlant: (key: string) => { const e = plants.find((p) => p.key === key || p.habit?.name === key); if (e) { player.position.set(e.slot.tablet.x, floorY(e.slot.tablet.x, e.slot.tablet.z), e.slot.tablet.z + 0.6); } },
       act: doAct,
       nearest: () => nearest?.id ?? null,
       slots: () => slots.map((s: PlantSlot) => ({ key: s.key, kind: s.kind, x: +s.x.toFixed(2), z: +s.z.toFixed(2) })),

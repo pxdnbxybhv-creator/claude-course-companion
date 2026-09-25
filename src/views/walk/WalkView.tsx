@@ -18,6 +18,8 @@ interface Card { titleZh: string; titleEn: string; bodyZh: string; bodyEn: strin
 interface Toast { id: number; zh: string; en: string; action?: { zh: string; en: string; run: () => void } }
 
 const HINT_KEY = 'banmu.walk.hint';
+/** The lazily loaded world module, once it has been loaded. */
+let worldModule: typeof import('./world') | null = null;
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 
 function readHintSeen(): boolean {
@@ -84,6 +86,7 @@ export function WalkView() {
       progress: (f) => setProgress(f),
     };
     import('./world')
+      .then((m) => (worldModule = m, m))
       .then((m) => m.createWorld({ host, lang, festival, time, hud, cancelled: () => cancelled }).then(
         (w) => {
           if (cancelled) { w.dispose(); return; }
@@ -110,6 +113,11 @@ export function WalkView() {
   }, [festival, time, lang]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
+
+  // leaving the walk gives the painted plant bitmaps back (they are kept between rebuilds only)
+  useEffect(() => () => {
+    if (worldModule) worldModule.releasePlantBitmaps();
+  }, []);
 
   // pause walking while a card or the picker is open
   useEffect(() => {

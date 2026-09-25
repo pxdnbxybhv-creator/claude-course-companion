@@ -1,122 +1,166 @@
-// Shared festival props: rows of red lanterns, stone tables, plates, twinkling glints, crumb bursts,
-// flat rocks, bowls — low-poly, flat-shaded, in the ink palette.
+// Shared festival props: paper lanterns, stone tables, plates, twinkling glints, crumb bursts, flat
+// rocks, bowls — toon-washed and ink-outlined like the core's buildings, in the ink palette.
 import type * as T from 'three';
 import type { WorldCtx } from '../types';
-import { Bag, glowTexture, reducedMotion, shorePoint, claims, pondDist } from './kit';
+import { Bag, claims, entry, glowTexture, inked, lanternMat, outlineMat, propMat, reducedMotion, reflects, shorePoint } from './kit';
 import { merge, part } from './geo';
 
 const TAU = Math.PI * 2;
 
-// ───────────────────────────── red lanterns ─────────────────────────────
+// ───────────────────────────── paper lanterns ─────────────────────────────
 
-export interface LanternRowOpts {
-  /** Paper colour (default cinnabar). */
-  color?: string;
-  /** Post height. */
-  height?: number;
+export interface Hook { x: number; y: number; z: number }
+
+export interface LanternOpts {
+  /** Paper colour of each lantern (default: warm apricot / ochre paper; pass one cinnabar as the accent). */
+  colors?: string[];
   /** Always lit, or only at night. */
   alwaysLit?: boolean;
   /** Lantern size multiplier. */
   size?: number;
+  /** Cord length from the hook to the lantern's top, metres. */
+  drop?: number;
 }
 
-/** Red lanterns hung from bamboo posts at `spots`, arms reaching toward `face` (the pond, the path). */
-export function lanternRow(bag: Bag, spots: T.Vector3[], face: T.Vector3 | null, o: LanternRowOpts = {}): { lanterns: T.Vector3[] } {
+/** Warm paper, not red: most lanterns sit quietly in the ink; one cinnabar is the accent. */
+export const PAPER_APRICOT = '#e6c48c';
+export const PAPER_OCHRE = '#d3a266';
+
+export interface Lanterns {
+  /** Centres of the lanterns (updated as they sway). */
+  lanterns: T.Vector3[];
+  /** Move a hook (a lantern hanging from a turning branch). */
+  setHook(i: number, h: Hook): void;
+}
+
+/**
+ * Paper lanterns hanging on cords from hooks in the air — an eave, a branch, the tip of a leaning
+ * bamboo. Toon-washed and ink-outlined like the core's lanterns; lit softly from inside at night.
+ */
+export function hangLanterns(bag: Bag, hooks: Hook[], o: LanternOpts = {}): Lanterns {
   const ctx = bag.ctx;
   const { THREE, palette: P } = ctx;
-  const n = spots.length;
-  const H = o.height ?? 2.2, S = o.size ?? 1;
-  const postGeo = merge(THREE, [
-    part(THREE, new THREE.CylinderGeometry(0.035, 0.05, H, 5), '#5c4a33', { p: [0, H / 2, 0] }),
-    part(THREE, new THREE.CylinderGeometry(0.025, 0.025, 0.55, 4), '#5c4a33', { p: [0.26, H - 0.08, 0], r: [0, 0, Math.PI / 2] }),
-    part(THREE, new THREE.CylinderGeometry(0.06, 0.07, 0.1, 5), '#4a3c2b', { p: [0, 0.05, 0] }),
+  const n = hooks.length;
+  const S = o.size ?? 1, drop = o.drop ?? 0.18;
+  const cols = o.colors ?? hooks.map((_, i) => (i % 2 ? PAPER_OCHRE : PAPER_APRICOT));
+  // one geometry: paper body (vertex colour set per lantern below), dark caps and a tassel
+  const body = new THREE.SphereGeometry(0.2 * S, 12, 8);
+  body.scale(1, 0.84, 1);
+  const parts = (paper: string) => merge(THREE, [
+    part(THREE, body.clone(), paper),
+    part(THREE, new THREE.CylinderGeometry(0.09 * S, 0.11 * S, 0.05 * S, 8), P.ink, { p: [0, 0.165 * S, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.11 * S, 0.09 * S, 0.05 * S, 8), P.ink, { p: [0, -0.165 * S, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.018 * S, 0.035 * S, 0.2 * S, 5), P.cinnabar, { p: [0, -0.29 * S, 0] }),
   ]);
-  const posts = bag.add(new THREE.InstancedMesh(postGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), n));
-  const paperGeo = new THREE.SphereGeometry(0.22 * S, 10, 7);
-  paperGeo.scale(1, 0.82, 1);
-  // Ribs: darken alternate latitude bands a touch.
-  const paperMat = new THREE.MeshLambertMaterial({ color: o.color ?? P.cinnabar, flatShading: true, emissive: new THREE.Color('#ff7a3a'), emissiveIntensity: 0 });
-  const paper = bag.add(new THREE.InstancedMesh(paperGeo, paperMat, n));
-  const trimGeo = merge(THREE, [
-    part(THREE, new THREE.CylinderGeometry(0.1 * S, 0.12 * S, 0.06 * S, 8), '#b8892f', { p: [0, 0.18 * S, 0] }),
-    part(THREE, new THREE.CylinderGeometry(0.12 * S, 0.1 * S, 0.06 * S, 8), '#b8892f', { p: [0, -0.18 * S, 0] }),
-    part(THREE, new THREE.CylinderGeometry(0.006, 0.006, 0.3 * S, 3), P.ink, { p: [0, 0.34 * S, 0] }),
-    part(THREE, new THREE.CylinderGeometry(0.025 * S, 0.045 * S, 0.24 * S, 6), P.cinnabar, { p: [0, -0.33 * S, 0] }),
-  ]);
-  const trim = bag.add(new THREE.InstancedMesh(trimGeo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), n));
+  body.dispose();
+  const glowMatl = lanternMat(ctx);
+  const outline = outlineMat(ctx, 0.012);
+  const meshes: T.Mesh[] = cols.map((c) => {
+    const m = new THREE.Mesh(parts(c), glowMatl);
+    const hull = new THREE.Mesh(m.geometry, outline);
+    hull.name = 'outline';
+    m.add(hull);
+    return bag.add(reflects(m)); // lanterns glow twice: in the air and in the pond
+  });
+  // cords
+  const cordPos = new Float32Array(n * 6);
+  const cordGeo = new THREE.BufferGeometry();
+  cordGeo.setAttribute('position', new THREE.BufferAttribute(cordPos, 3).setUsage(THREE.DynamicDrawUsage));
+  const cords = bag.add(reflects(new THREE.LineSegments(cordGeo, new THREE.LineBasicMaterial({ color: P.ink, transparent: true, opacity: 0.7 }))));
+  cords.frustumCulled = false;
+  // a soft halo at night (small, warm, restrained)
   const glowPos = new Float32Array(n * 3);
   const glowGeo = new THREE.BufferGeometry();
-  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
-  const glowMat = new THREE.PointsMaterial({
-    size: 1.5 * S, map: glowTexture(THREE, 64, 0.1), color: '#ff9a4a', transparent: true, opacity: 0,
+  glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3).setUsage(THREE.DynamicDrawUsage));
+  const halo = new THREE.PointsMaterial({
+    size: 1.1 * S, map: glowTexture(THREE, 64, 0.1), color: '#ffc98a', transparent: true, opacity: 0,
     depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true, fog: false,
   });
-  const glow = bag.add(new THREE.Points(glowGeo, glowMat));
+  const glow = bag.add(reflects(new THREE.Points(glowGeo, halo)));
   glow.frustumCulled = false;
 
-  const hang: { x: number; y: number; z: number; rot: number; ph: number }[] = [];
-  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
-  const centres: T.Vector3[] = [];
-  spots.forEach((s, i) => {
-    const rot = face ? Math.atan2(-(face.z - s.z), face.x - s.x) : (i * 2.4) % TAU; // arm (+x) toward face
-    e.set(0, rot, 0);
-    q.setFromEuler(e);
-    m.compose(s, q, one);
-    posts.setMatrixAt(i, m);
-    const ax = s.x + Math.cos(rot) * 0.5, az = s.z - Math.sin(rot) * 0.5;
-    hang.push({ x: ax, y: s.y + H - 0.08, z: az, rot, ph: i * 1.7 });
-    centres.push(new THREE.Vector3(ax, s.y + H - 0.08 - 0.42 * S, az));
-  });
+  const hk = hooks.map((h, i) => ({ ...h, ph: i * 1.7 }));
+  const centres = hooks.map(() => new THREE.Vector3());
   const still = reducedMotion();
+  const L = drop + 0.19 * S; // hook → lantern centre
   const place = (t: number) => {
     for (let i = 0; i < n; i++) {
-      const h = hang[i];
-      const sw = still ? 0 : Math.sin(t * 0.9 + h.ph) * 0.06, sw2 = still ? 0 : Math.cos(t * 0.7 + h.ph) * 0.04;
-      e.set(sw2, h.rot, sw);
-      q.setFromEuler(e);
-      // pivot at the hook: centre = hook + R·(0, -drop, 0)
-      v.set(0, -0.42 * S, 0).applyQuaternion(q);
-      const cx = h.x + v.x, cy = h.y + v.y, cz = h.z + v.z;
-      m.compose(v.set(cx, cy, cz), q, one);
-      paper.setMatrixAt(i, m);
-      trim.setMatrixAt(i, m);
-      glowPos[i * 3] = cx; glowPos[i * 3 + 1] = cy; glowPos[i * 3 + 2] = cz;
+      const h = hk[i];
+      const sx = still ? 0 : Math.sin(t * 0.9 + h.ph) * 0.05, sz = still ? 0 : Math.cos(t * 0.7 + h.ph) * 0.035;
+      const cx = h.x + Math.sin(sx) * L, cy = h.y - Math.cos(sx) * Math.cos(sz) * L, cz = h.z + Math.sin(sz) * L;
+      const m = meshes[i];
+      m.position.set(cx, cy, cz);
+      m.rotation.set(sz, h.ph, -sx);
+      centres[i].set(cx, cy, cz);
+      cordPos.set([h.x, h.y, h.z, cx, cy + 0.17 * S, cz], i * 6);
+      glowPos.set([cx, cy, cz], i * 3);
     }
-    paper.instanceMatrix.needsUpdate = true;
-    trim.instanceMatrix.needsUpdate = true;
+    cordGeo.attributes.position.needsUpdate = true;
     glowGeo.attributes.position.needsUpdate = true;
   };
   place(0);
   let lit = -1;
   bag.frame((_dt, t) => {
-    if (!still) place(t);
+    place(still ? 0 : t);
     const want = o.alwaysLit || ctx.sky.isNight() ? 1 : 0;
     if (lit < 0) lit = want;
     lit += (want - lit) * 0.05;
-    const flick = 0.92 + Math.sin(t * 7.3) * 0.03 + Math.sin(t * 11.1) * 0.03;
-    paperMat.emissiveIntensity = lit * 0.85 * flick;
-    glowMat.opacity = lit * 0.55 * flick;
+    const flick = still ? 1 : 0.94 + Math.sin(t * 7.3) * 0.03 + Math.sin(t * 11.1) * 0.03;
+    glowMatl.emissiveIntensity = lit * 0.32 * flick;
+    halo.opacity = lit * 0.3 * flick;
     glow.visible = lit > 0.02;
   });
-  return { lanterns: centres };
+  return {
+    lanterns: centres,
+    setHook(i, h) { hk[i].x = h.x; hk[i].y = h.y; hk[i].z = h.z; },
+  };
 }
 
-/** `n` posts spaced round the pond, `out` metres from the shore, on walkable ground. */
-export function aroundPond(ctx: WorldCtx, n: number, out: number, phase = 0): T.Vector3[] {
-  const res: T.Vector3[] = [];
+/**
+ * A slender bamboo pole planted at `base` and leaning toward `toward` (over the water, over a path),
+ * like a fishing rod holding out a lantern (挑灯). Returns the hook at its tip.
+ */
+export function leaningPole(bag: Bag, base: T.Vector3, toward: { x: number; z: number }, h = 2.5): Hook {
+  const ctx = bag.ctx;
+  const { THREE } = ctx;
+  const a = Math.atan2(toward.x - base.x, toward.z - base.z);
+  const lean = 0.42;
+  const geo = merge(THREE, [
+    part(THREE, new THREE.CylinderGeometry(0.022, 0.034, h, 5), '#6b5a3e', { p: [0, h / 2, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.03, 0.03, 0.03, 5), '#4a3c2b', { p: [0, h * 0.35, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.028, 0.028, 0.03, 5), '#4a3c2b', { p: [0, h * 0.7, 0] }),
+  ]);
+  const pole = inked(ctx, geo, { width: 0.008 });
+  pole.position.copy(base);
+  pole.rotation.set(lean, a, 0, 'YXZ');
+  bag.add(reflects(pole));
+  const tip = new THREE.Vector3(0, h, 0).applyEuler(pole.rotation).add(base);
+  return { x: tip.x, y: tip.y, z: tip.z };
+}
+
+/**
+ * Hooks for `n` lanterns held out over the water from the shore on the side the visitor arrives,
+ * either side of the view across the pond (so they sit in the reflection, not in the path).
+ */
+export function shoreLanterns(bag: Bag, n: number, spread = 0.55): Hook[] {
+  const ctx = bag.ctx;
+  const way = entry(ctx);
+  const ahead = Math.atan2(way.dz * ctx.pond.radiusX, way.dx * ctx.pond.radiusZ); // shore angle facing the arrival
+  const hooks: Hook[] = [];
   const list = claims(ctx);
   for (let i = 0; i < n; i++) {
-    for (let k = 0; k < 6; k++) {
-      const a = phase + (i / n) * TAU + k * 0.09 * (k % 2 ? 1 : -1);
-      const p = shorePoint(ctx, a, out + (k > 3 ? 0.8 : 0));
+    const side = n === 1 ? 0 : (i / (n - 1) - 0.5) * 2; // -1 … 1
+    for (let k = 0; k < 8; k++) {
+      const a = ahead + side * spread + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.12;
+      const p = shorePoint(ctx, a, 0.45);
       if (!ctx.isWalkable(p.x, p.z)) continue;
-      if (list.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < s.r + 0.35)) continue;
-      list.push({ x: p.x, z: p.z, r: 0.4 });
-      res.push(p);
+      if (list.some((s) => Math.hypot(s.x - p.x, s.z - p.z) < s.r + 0.2)) continue;
+      list.push({ x: p.x, z: p.z, r: 0.35 });
+      hooks.push(leaningPole(bag, p, ctx.pond.center));
       break;
     }
   }
-  return res;
+  return hooks;
 }
 
 // ───────────────────────────── furniture ─────────────────────────────
@@ -135,7 +179,7 @@ export function stoneTable(ctx: WorldCtx, at: T.Vector3, rot = 0, stools = 3): {
     parts.push(part(THREE, new THREE.CylinderGeometry(0.17, 0.2, 0.42, 7), STONE, { p: [Math.cos(a) * 0.95, 0.21, Math.sin(a) * 0.95] }));
   }
   const g = new THREE.Group();
-  g.add(new THREE.Mesh(merge(THREE, parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  g.add(inked(ctx, merge(THREE, parts), { width: 0.016 }));
   g.position.copy(at);
   g.rotation.y = rot;
   return { group: g, top: at.y + 0.77 };
@@ -148,7 +192,7 @@ export function plate(ctx: WorldCtx, r = 0.24): T.Mesh {
     part(THREE, new THREE.CylinderGeometry(r, r * 0.7, 0.025, 14), '#f3efe6', { p: [0, 0.0125, 0] }),
     part(THREE, new THREE.TorusGeometry(r * 0.98, 0.008, 3, 20), P.indigo, { p: [0, 0.026, 0], r: [Math.PI / 2, 0, 0] }),
   ]);
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  return inked(ctx, geo, { width: 0.006 });
 }
 
 /** A little celadon teapot with two cups. */
@@ -164,15 +208,14 @@ export function teaSet(ctx: WorldCtx): T.Mesh {
   for (const [x, z] of [[0.2, 0.08], [0.16, -0.14]]) {
     parts.push(part(THREE, new THREE.CylinderGeometry(0.035, 0.025, 0.04, 8), '#f3efe6', { p: [x, 0.02, z] }));
   }
-  return new THREE.Mesh(merge(THREE, parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  return inked(ctx, merge(THREE, parts), { width: 0.006 });
 }
 
 /** A low, flat boulder by the water. */
 export function flatRock(ctx: WorldCtx, at: T.Vector3, r = 0.7): { mesh: T.Mesh; top: number } {
   const { THREE } = ctx;
-  const g = new THREE.DodecahedronGeometry(r, 0);
-  g.scale(1.1, 0.45, 0.9);
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: '#7d786d', flatShading: true }));
+  const g = part(THREE, new THREE.DodecahedronGeometry(r, 0), '#8a857a', { s: [1.1, 0.45, 0.9] });
+  const mesh = inked(ctx, merge(THREE, [g]), { width: 0.018 });
   mesh.position.set(at.x, at.y + r * 0.2, at.z);
   mesh.rotation.y = at.x * 1.3;
   return { mesh, top: at.y + r * 0.2 + r * 0.42 };
@@ -181,10 +224,8 @@ export function flatRock(ctx: WorldCtx, at: T.Vector3, r = 0.7): { mesh: T.Mesh;
 /** A round lotus leaf floating on the water. */
 export function lotusPad(ctx: WorldCtx, r = 0.55): T.Mesh {
   const { THREE, palette: P } = ctx;
-  const g = new THREE.CircleGeometry(r, 14, 0.25, TAU - 0.25);
-  g.rotateX(-Math.PI / 2);
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: P.malachite, flatShading: true, side: THREE.DoubleSide }));
-  return mesh;
+  const g = part(THREE, new THREE.CircleGeometry(r, 14, 0.25, TAU - 0.25), P.malachite, { r: [-Math.PI / 2, 0, 0] });
+  return inked(ctx, merge(THREE, [g]), { width: 0 });
 }
 
 /** A bowl (lathe), e.g. for 汤圆, dumplings, laba porridge. `fill` is the colour of what's inside. */
@@ -200,7 +241,7 @@ export function bowl(ctx: WorldCtx, fill: string, r = 0.14): T.Mesh {
     part(THREE, new THREE.TorusGeometry(r * 0.985, 0.006, 3, 18), P.indigo, { p: [0, r * 0.73, 0], r: [Math.PI / 2, 0, 0] }),
     part(THREE, new THREE.CircleGeometry(r * 0.9, 14), fill, { p: [0, r * 0.6, 0], r: [-Math.PI / 2, 0, 0] }),
   ]);
-  return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide }));
+  return inked(ctx, geo, { width: 0.005 });
 }
 
 // ───────────────────────────── glints & crumbs ─────────────────────────────
@@ -236,7 +277,7 @@ export function glints(bag: Bag, spots: T.Vector3[], color = '#ffd98a', size = 0
 export function burst(bag: Bag, at: T.Vector3, color: string, n = 16, o: { speed?: number; size?: number; life?: number } = {}): void {
   const { THREE } = bag.ctx;
   const size = o.size ?? 0.025;
-  const mesh = bag.add(new THREE.InstancedMesh(new THREE.TetrahedronGeometry(size, 0), new THREE.MeshLambertMaterial({ color, flatShading: true }), n));
+  const mesh = bag.add(new THREE.InstancedMesh(merge(THREE, [part(THREE, new THREE.TetrahedronGeometry(size, 0), color)]), propMat(bag.ctx), n));
   mesh.frustumCulled = false;
   const sp = o.speed ?? 1.2;
   const ps = Array.from({ length: n }, () => {
@@ -268,6 +309,3 @@ export function burst(bag: Bag, at: T.Vector3, color: string, n = 16, o: { speed
   });
   bag.onDispose(() => { off?.(); off = null; });
 }
-
-/** True when (x, z) is on land a comfortable distance from the water. */
-export const dryLand = (ctx: WorldCtx, x: number, z: number, margin = 0.8) => ctx.isWalkable(x, z) && pondDist(ctx, x, z, margin) >= 1;

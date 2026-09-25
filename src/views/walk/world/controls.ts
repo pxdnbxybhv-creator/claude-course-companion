@@ -12,6 +12,9 @@ export interface InputState {
   actQueued: boolean;
 }
 
+/** The painted plants are upright flats: looking down on them from much above ~37° flattens them. */
+const MAX_PITCH = 0.65;
+
 export class Controls {
   readonly input: InputState = { stickX: 0, stickY: 0, stickRun: false, jumpQueued: false, actQueued: false };
   private keys = new Set<string>();
@@ -57,7 +60,7 @@ export class Controls {
       }
       const k = e.pointerType === 'touch' ? 0.009 : 0.006;
       this.yaw -= dx * k;
-      this.pitch = THREE.MathUtils.clamp(this.pitch + dy * k * 0.7, 0.04, 1.15);
+      this.pitch = THREE.MathUtils.clamp(this.pitch + dy * k * 0.7, 0.04, MAX_PITCH);
       this.lastDrag = this.clock;
     }) as EventListener);
     const up = ((e: PointerEvent) => {
@@ -91,10 +94,20 @@ export class Controls {
       return;
     }
     if (!down || e.repeat) return;
+    // A focused button or link keeps Enter for itself, and Space too when it was reached with the
+    // keyboard (Tab): keyboard users can activate it. A button merely clicked with the mouse still
+    // lets Space jump (it does not match :focus-visible). E never activates a button, so it acts.
+    const onControl = !!(t && (t.tagName === 'BUTTON' || t.tagName === 'A' || t.tagName === 'SELECT' || t.closest?.('[role="button"]')));
+    if (onControl && (code === 'Enter' || code === 'NumpadEnter')) return;
+    if (onControl && code === 'Space') {
+      let kb = true;
+      try { kb = t!.matches(':focus-visible'); } catch { /* old engines: treat as keyboard focus */ }
+      if (kb) return;
+    }
     if (code === 'Space') {
       e.preventDefault();
       this.input.jumpQueued = true;
-    } else if (code === 'KeyE' || ((code === 'Enter' || code === 'NumpadEnter') && !(t && (t.tagName === 'BUTTON' || t.tagName === 'A')))) {
+    } else if (code === 'KeyE' || code === 'Enter' || code === 'NumpadEnter') {
       e.preventDefault();
       this.input.actQueued = true;
     }
@@ -181,12 +194,26 @@ export class Controls {
     y = Math.max(y, floorY(x, z) + 0.45);
     let rate = 14;
     if (this.occlusion) {
-      const f = this.occlusion(this.target.x, this.target.y, this.target.z, x, y, z);
+      const T = this.target;
+      let f = this.occlusion(T.x, T.y, T.z, x, y, z);
+      // pulled in right up to the player's head? rather rise and look over the rock / the prop
+      if (f < 1 && f * d < 1.8) {
+        for (const lift of [1.2, 2.2, 3.4]) {
+          const ly = y + lift;
+          const lf = this.occlusion(T.x, T.y, T.z, x, ly, z);
+          if (lf * Math.hypot(x - T.x, ly - T.y, z - T.z) > Math.max(1.8, f * d + 0.5)) { y = ly; f = lf; break; }
+        }
+      }
       if (f < 1) {
-        x = this.target.x + (x - this.target.x) * f;
-        y = this.target.y + (y - this.target.y) * f;
-        z = this.target.z + (z - this.target.z) * f;
+        x = T.x + (x - T.x) * f;
+        y = T.y + (y - T.y) * f;
+        z = T.z + (z - T.z) * f;
         rate = 40;
+        // backed right up against something tall: never sit inside the scholar's head — rise
+        // above it and look down over the shoulder (the occluder is further off than this)
+        const h = Math.hypot(x - T.x, z - T.z);
+        const MIN = 1.25;
+        if (Math.hypot(h, y - T.y) < MIN) y = Math.max(y, T.y + Math.min(Math.sqrt(Math.max(0, MIN * MIN - h * h)), 1.6 * h + 0.2));
       }
     }
     if (snap) cam.set(x, y, z);

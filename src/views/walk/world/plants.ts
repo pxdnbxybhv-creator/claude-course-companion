@@ -10,8 +10,8 @@ import { PIGMENTS } from '../../../ink/types';
 import { plantDrawing } from '../../../ink/plants';
 import { applyInkGrain, paintDrawing, StrokeAnimation } from '../../../ink/brush';
 import { hashString } from '../../../core/rng';
-import { Bag, canvas, canvasTexture, tint } from './kit';
-import { KIND_H, KIND_R, TALL, POND, terrainY, type PlantSlot } from './site';
+import { Bag, canvas, canvasTexture, tint, toon } from './kit';
+import { JAR_H, JAR_R, KIND_H, KIND_R, TALL, POND, terrainY, type PlantSlot } from './site';
 
 const REF_H = 300;
 const KIND_SWAY: Record<PlantKind, number> = { bamboo: 1.35, orchid: 1.15, lotus: 1.0, chrysanthemum: 0.9, plum: 0.65, pine: 0.45 };
@@ -54,16 +54,40 @@ function cropOf(d: Drawing): Crop {
   return { x0, y0, w: x1 - x0, h: y1 - y0 };
 }
 
-// Painted bitmaps outlive a world rebuild (festival preview) so switching is instant.
+// Painted bitmaps outlive a world rebuild (festival / time preview) so switching is instant; the
+// view releases them when you leave the walk (iOS caps the total canvas memory of a page).
 const BMP = new Map<string, HTMLCanvasElement>();
+const BMP_MAX = 24;
+const freeCanvas = (c: HTMLCanvasElement) => { c.width = c.height = 0; };
 function cached(key: string, make: () => HTMLCanvasElement): HTMLCanvasElement {
   let c = BMP.get(key);
-  if (!c) {
-    c = make();
+  if (c) {
+    // most recently used last
+    BMP.delete(key);
     BMP.set(key, c);
-    if (BMP.size > 40) BMP.delete(BMP.keys().next().value as string);
+    return c;
+  }
+  c = make();
+  BMP.set(key, c);
+  while (BMP.size > BMP_MAX) {
+    const k = BMP.keys().next().value as string;
+    freeCanvas(BMP.get(k)!);
+    BMP.delete(k);
   }
   return c;
+}
+
+/** Give every cached plant bitmap back (call when leaving the walk, not between rebuilds). */
+export function releasePlantBitmaps(): void {
+  for (const c of BMP.values()) freeCanvas(c);
+  BMP.clear();
+}
+
+/** Free a plant's own texture canvas once its world is gone. */
+export function freePlant(e: PlantEntity): void {
+  e.anim = null;
+  const c = e.tex.image as HTMLCanvasElement | undefined;
+  if (c && 'width' in c) freeCanvas(c);
 }
 
 function paintCrop(d: Drawing, crop: Crop, growth: number, s: number, vigor: number): HTMLCanvasElement {
@@ -114,7 +138,7 @@ export interface PlantSpec {
 export function buildPlant(bag: Bag, spec: PlantSpec, slot: PlantSlot, lowEnd: boolean): PlantEntity {
   const d = plantDrawing({ kind: spec.kind, seed: spec.seed, height: REF_H });
   const crop = cropOf(d);
-  const H = KIND_H[spec.kind] * (0.94 + (hashString(spec.key) % 100) / 100 * 0.12);
+  const H = KIND_H[spec.kind] * (0.94 + (hashString(spec.key) % 100) / 100 * 0.12) * (slot.jar ? 0.72 : 1);
   // metres per drawing unit: the full-grown painted height maps to the kind's real height
   const k = H / Math.max(40, d.anchor.y - crop.y0);
   const maxPx = Math.min(lowEnd ? 720 : 900, Math.max(420, H * 300));
@@ -132,7 +156,7 @@ export function buildPlant(bag: Bag, spec: PlantSpec, slot: PlantSlot, lowEnd: b
   geo.translate((cx - d.anchor.x) * k, (d.anchor.y - cy) * k, 0);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.rotation.order = 'YXZ';
-  const baseY = slot.inWater ? POND.waterY - 0.02 : terrainY(slot.x, slot.z) - 0.03;
+  const baseY = slot.inWater ? POND.waterY - 0.02 : slot.jar ? terrainY(slot.x, slot.z) + JAR_H - 0.07 : terrainY(slot.x, slot.z) - 0.03;
   mesh.position.set(slot.x, baseY, slot.z);
   mesh.name = 'plant:' + spec.key;
   mesh.renderOrder = 2;
@@ -190,7 +214,12 @@ export function repaint(e: PlantEntity, growth: number, vigor: number): void {
 /** Per frame: face the camera, sway, grow-pulse, and advance any stroke animation. */
 export function tickPlant(e: PlantEntity, dt: number, t: number, cam: THREE.Vector3, tintColor: THREE.Color, reduced: boolean): void {
   const m = e.mesh;
-  m.rotation.y = Math.atan2(cam.x - m.position.x, cam.z - m.position.z);
+  const dx = cam.x - m.position.x, dz = cam.z - m.position.z;
+  m.rotation.y = Math.atan2(dx, dz);
+  // a partial spherical billboard: as the view rises the painting leans back toward it (the foot
+  // stays planted), so from above a plum never lies on the lawn like a fallen twig
+  const elev = Math.atan2(cam.y - (m.position.y + 0.8), Math.hypot(dx, dz));
+  m.rotation.x = -Math.max(0, Math.min(0.42, (elev - 0.12) * 0.55));
   const sway = reduced ? 0 : KIND_SWAY[e.kind] * (Math.PI / 180) * (Math.sin(t * 0.7 + e.phase) * 0.7 + Math.sin(t * 1.9 + e.phase * 2) * 0.3);
   m.rotation.z = sway;
   if (e.pulse > 0) {
@@ -219,10 +248,26 @@ export function tickPlant(e: PlantEntity, dt: number, t: number, cam: THREE.Vect
 
 const isCJK = (s: string) => /[㐀-鿿豈-﫿]/.test(s);
 
-function tabletCanvas(text: string, glyph: string | null): HTMLCanvasElement {
+const CN = '〇一二三四五六七八九';
+/** 1 → 一, 12 → 十二, 105 → 一百零五 (enough for streaks). */
+export function cnNum(n: number): string {
+  n = Math.max(0, Math.floor(n));
+  if (n < 10) return CN[n];
+  if (n < 20) return '十' + (n % 10 ? CN[n % 10] : '');
+  if (n < 100) return CN[Math.floor(n / 10)] + '十' + (n % 10 ? CN[n % 10] : '');
+  if (n < 1000) {
+    const r = n % 100;
+    return CN[Math.floor(n / 100)] + '百' + (r === 0 ? '' : r < 10 ? '零' + CN[r] : r < 20 ? '一' + cnNum(r) : cnNum(r));
+  }
+  return String(n);
+}
+
+function tabletCanvas(text: string, glyph: string | null, note: string | null = null, into?: HTMLCanvasElement): HTMLCanvasElement {
   const W = 160, H = 244;
-  const c = canvas(W, H);
+  const c = into ?? canvas(W, H);
   const g = c.getContext('2d')!;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, W, H);
   g.fillStyle = '#d3cdbf';
   g.fillRect(0, 0, W, H);
   // stone mottling
@@ -263,6 +308,23 @@ function tabletCanvas(text: string, glyph: string | null): HTMLCanvasElement {
     const top = (H - 30 - size * 1.1 * lines.length) / 2 + size / 2;
     lines.slice(0, 5).forEach((l, i) => g.fillText(l, W / 2, top + i * size * 1.1, W - 24));
   }
+  if (note) {
+    // the streak, brushed small in the lower corner like a painter's inscription (款); re-brushed
+    // on every watering, so the stone keeps count
+    g.save();
+    g.fillStyle = 'rgba(35,32,28,0.78)';
+    if (isCJK(note)) {
+      const chars = [...note].slice(0, 7);
+      const size = Math.min(15, 96 / chars.length);
+      g.font = `${size}px "LXGW WenKai", "Kaiti SC", "KaiTi", serif`;
+      chars.forEach((ch, i) => g.fillText(ch, 24, H - 24 - (chars.length - i) * size + size / 2));
+    } else {
+      g.font = 'italic 15px "Cormorant Garamond", Georgia, serif';
+      g.textAlign = 'left';
+      g.fillText(note, 17, H - 30, glyph ? W / 2 - 34 : W - 34);
+    }
+    g.restore();
+  }
   if (glyph) {
     // a small cinnabar seal with the plant's character
     g.fillStyle = PIGMENTS.cinnabar;
@@ -274,7 +336,15 @@ function tabletCanvas(text: string, glyph: string | null): HTMLCanvasElement {
   return c;
 }
 
-export interface TabletSpec { x: number; z: number; rot: number; text: string; glyph: string | null }
+export interface TabletSpec { x: number; z: number; rot: number; text: string; glyph: string | null; note?: string | null }
+
+/** Re-brush one tablet (its streak changed). */
+export function rebrushTablet(face: THREE.Mesh, spec: TabletSpec): void {
+  const tex = (face.material as THREE.MeshBasicMaterial).map as THREE.CanvasTexture | null;
+  if (!tex) return;
+  tabletCanvas(spec.text, spec.glyph, spec.note ?? null, tex.image as HTMLCanvasElement);
+  tex.needsUpdate = true;
+}
 
 export function buildTablets(bag: Bag, list: TabletSpec[]): { group: THREE.Group; faces: THREE.Mesh[] } {
   const group = new THREE.Group();
@@ -297,7 +367,7 @@ export function buildTablets(bag: Bag, list: TabletSpec[]): { group: THREE.Group
       parts.push(p);
       lines.push(new THREE.EdgesGeometry(p, 30));
     }
-    const mat = bag.add(new THREE.MeshBasicMaterial({ map: canvasTexture(bag, tabletCanvas(t.text, t.glyph)) }));
+    const mat = bag.add(new THREE.MeshBasicMaterial({ map: canvasTexture(bag, tabletCanvas(t.text, t.glyph, t.note ?? null)) }));
     const face = new THREE.Mesh(faceGeo, mat);
     face.position.set(0, 0.45, 0.052).applyMatrix4(m);
     face.rotation.y = t.rot;
@@ -316,9 +386,39 @@ export function buildTablets(bag: Bag, list: TabletSpec[]): { group: THREE.Group
 
 export function plantCollider(e: PlantEntity): { x: number; z: number; r: number } | null {
   if (e.slot.inWater) return null;
-  return { x: e.slot.x, z: e.slot.z, r: KIND_R[e.kind] };
+  return { x: e.slot.x, z: e.slot.z, r: e.slot.jar ? JAR_R + 0.04 : KIND_R[e.kind] };
 }
 
 export function interactRadius(kind: PlantKind): number {
-  return TALL.has(kind) ? 2.7 : 2.3;
+  return TALL.has(kind) ? 3.2 : 2.4;
+}
+
+// ------------------------------------------------------------------------------------ water jars
+
+/** 荷缸: a glazed stoneware jar for the lotus the pond had no room for. One merged draw call. */
+export function buildJars(bag: Bag, slots: PlantSlot[]): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'jars';
+  const list = slots.filter((s) => s.jar);
+  if (!list.length) return group;
+  const profile: THREE.Vector2[] = [
+    [0.001, 0], [0.3, 0], [0.38, 0.08], [0.46, 0.3], [0.47, 0.46], [0.44, 0.58], [JAR_R + 0.02, JAR_H - 0.02], [JAR_R - 0.04, JAR_H], [JAR_R - 0.07, JAR_H - 0.06],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  const parts: THREE.BufferGeometry[] = [];
+  const water: THREE.BufferGeometry[] = [];
+  for (const s of list) {
+    const y = terrainY(s.x, s.z) - 0.04;
+    parts.push(tint(new THREE.LatheGeometry(profile, 18).translate(s.x, y, s.z), '#6f6a62', 0.05, hashString(s.key)));
+    water.push(new THREE.CircleGeometry(JAR_R - 0.07, 18).rotateX(-Math.PI / 2).translate(s.x, y + JAR_H - 0.09, s.z));
+  }
+  const body = bag.add(mergeGeometries(parts, false)!);
+  for (const p of parts) p.dispose();
+  const mesh = new THREE.Mesh(body, toon(bag, '#ffffff', { vertexColors: true }));
+  mesh.name = 'lotus-jars';
+  const edge = new THREE.LineSegments(bag.add(new THREE.EdgesGeometry(body, 40)), bag.add(new THREE.LineBasicMaterial({ color: '#1b1916', transparent: true, opacity: 0.5 })));
+  const wg = bag.add(mergeGeometries(water, false)!);
+  for (const w of water) w.dispose();
+  const wmesh = new THREE.Mesh(wg, bag.add(new THREE.MeshBasicMaterial({ color: '#8f9186' })));
+  group.add(mesh, edge, wmesh);
+  return group;
 }

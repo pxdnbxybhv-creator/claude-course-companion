@@ -199,11 +199,12 @@ function overlayCanvas(slots: PlantSlot[], season: Season): HTMLCanvasElement {
   // 5. baked blob shadows (the light is mostly overhead; a hint toward the north)
   for (const s of slots) {
     if (s.inWater) continue;
-    blob(s.x, s.z - 0.15, SHADOW_R[s.kind], 0.32);
+    const sr = s.jar ? 0.78 : SHADOW_R[s.kind];
+    blob(s.x, s.z - 0.15, sr, s.jar ? 0.42 : 0.32);
     blob(s.tablet.x, s.tablet.z - 0.05, 0.38, 0.28);
     // moss dots at the foot
     for (let i = 0; i < 9; i++) {
-      const a = rng() * Math.PI * 2, d = rng.range(0.25, 0.9) * SHADOW_R[s.kind];
+      const a = rng() * Math.PI * 2, d = rng.range(0.25, 0.9) * sr;
       g.fillStyle = `rgba(22,20,18,${rng.range(0.35, 0.7)})`;
       g.beginPath();
       g.arc(P(s.x + Math.cos(a) * d), P(s.z + Math.sin(a) * d), rng.range(0.6, 1.6), 0, Math.PI * 2);

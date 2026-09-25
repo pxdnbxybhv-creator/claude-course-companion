@@ -1,11 +1,13 @@
-// 中秋 · Mid-Autumn: a huge golden moon over the hills and its glittering path on the pond, eight
-// mooncakes hidden round the garden (eat them all!), a jade rabbit on the lawn, osmanthus in the
-// air, red lanterns along the shore.
+// 中秋 · Mid-Autumn: a huge golden moon rising over the 问月亭 and its glittering path on the pond,
+// eight mooncakes hidden round the garden (eat them all!), a jade rabbit on the lawn, an ink-painted
+// osmanthus with a lantern in its branches, two more lanterns held out over the water.
+// Chosen 昼 (day) wins over the festival's night: a pale daytime moon, lanterns unlit.
 import type * as T from 'three';
 import type { WorldCtx } from '../types';
-import { Bag, BRUSH_FONT, canvasTexture, claims, distXZ, feature, findSpot, glowTexture, landmarks, loadBrush, pondDist, reducedMotion, shorePoint, tween, dayRng } from './kit';
+import { Bag, BRUSH_FONT, canvasTexture, claims, distXZ, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, outlineMat, loadBrush, pondDist, propMat, reducedMotion, reflects, shorePoint, tabletSpots, tween, dayRng } from './kit';
 import { merge, part } from './geo';
-import { aroundPond, burst, flatRock, glints, lanternRow, lotusPad, plate, stoneTable, teaSet } from './props';
+import { burst, flatRock, glints, hangLanterns, lotusPad, PAPER_APRICOT, PAPER_OCHRE, plate, shoreLanterns, stoneTable, teaSet } from './props';
+import { billboard, osmanthusDrawing, rabbitDrawing } from './painted';
 import * as sfx from './sfx';
 
 const TAU = Math.PI * 2;
@@ -89,7 +91,7 @@ function mooncakeTop(ctx: WorldCtx, f: Flavour): T.CanvasTexture {
   });
 }
 
-function mooncakeMesh(ctx: WorldCtx, f: Flavour, sideMat: T.Material): T.Mesh {
+function mooncakeMesh(ctx: WorldCtx, f: Flavour, side: string): T.Mesh {
   const { THREE } = ctx;
   const r = 0.19, h = 0.085;
   const geo = new THREE.CylinderGeometry(r, r * 1.03, h, 48, 1);
@@ -104,9 +106,13 @@ function mooncakeMesh(ctx: WorldCtx, f: Flavour, sideMat: T.Material): T.Mesh {
   }
   geo.computeVertexNormals();
   geo.translate(0, h / 2, 0);
+  const c = new THREE.Color(side), col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) col.set([c.r, c.g, c.b], i * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   const top = mooncakeTop(ctx, f);
-  const topMat = new THREE.MeshLambertMaterial({ map: top, bumpMap: top, bumpScale: 2.2 });
-  const mesh = new THREE.Mesh(geo, [sideMat, topMat, sideMat]);
+  // sides in the shared toon wash; the top a plain mapped Lambert (the relief is painted into it)
+  const mesh = new THREE.Mesh(geo, [propMat(ctx), new THREE.MeshLambertMaterial({ map: top }), propMat(ctx)]);
+  mesh.add(new THREE.Mesh(geo, outlineMat(ctx, 0.006)));
   return mesh;
 }
 
@@ -164,31 +170,50 @@ function moonPath(bag: Bag, moonDir: () => T.Vector3): T.Mesh {
     uniforms.uTime.value = still ? 0 : t;
     uniforms.uCam.value.copy(ctx.camera.position);
     uniforms.uMoon.value.copy(moonDir());
-    uniforms.uStrength.value = Math.min(1, uniforms.uStrength.value + 0.01);
+    const want = ctx.sky.isNight() ? 1 : 0.2;
+    uniforms.uStrength.value += (want - uniforms.uStrength.value) * 0.01;
   });
   return mesh;
 }
 
-// ───────────────────────────── jade rabbit ─────────────────────────────
+// ───────────────────────────── under a plant ─────────────────────────────
 
-function rabbitMesh(ctx: WorldCtx): T.Mesh {
-  const { THREE, palette: P } = ctx;
-  const w = '#f7f4ec', pink = '#e8b7b0';
-  const g = merge(THREE, [
-    part(THREE, new THREE.IcosahedronGeometry(0.16, 0), w, { p: [0, 0.14, 0], s: [0.85, 0.8, 1.1] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.1, 0), w, { p: [0, 0.27, 0.13] }),
-    part(THREE, new THREE.BoxGeometry(0.04, 0.2, 0.025), w, { p: [0.035, 0.42, 0.1], r: [-0.25, 0, -0.15] }),
-    part(THREE, new THREE.BoxGeometry(0.04, 0.2, 0.025), w, { p: [-0.035, 0.42, 0.1], r: [-0.25, 0, 0.15] }),
-    part(THREE, new THREE.BoxGeometry(0.02, 0.14, 0.01), pink, { p: [0.036, 0.42, 0.115], r: [-0.25, 0, -0.15] }),
-    part(THREE, new THREE.BoxGeometry(0.02, 0.14, 0.01), pink, { p: [-0.036, 0.42, 0.115], r: [-0.25, 0, 0.15] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.018, 0), P.rouge, { p: [0.06, 0.29, 0.19] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.018, 0), P.rouge, { p: [-0.06, 0.29, 0.19] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.012, 0), pink, { p: [0, 0.25, 0.225] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.05, 0), '#ffffff', { p: [0, 0.16, -0.17] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.045, 0), w, { p: [0.08, 0.04, 0.1], s: [0.8, 0.6, 1.3] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.045, 0), w, { p: [-0.08, 0.04, 0.1], s: [0.8, 0.6, 1.3] }),
-  ]);
-  return new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, emissive: new THREE.Color('#40403a') }));
+/**
+ * A spot at the foot of one of the user's plants for a mooncake: on the far side from the pond and
+ * the name tablet (the core stands the tablet between the plant and the path), on open ground, clear
+ * of the other plants and of what features have claimed. Returns null when nothing fits.
+ */
+function underPlant(ctx: WorldCtx, plant: { position: T.Vector3; radius: number }): T.Vector3 | null {
+  const { THREE, pond } = ctx;
+  const px = plant.position.x, pz = plant.position.z;
+  const tablets = tabletSpots(ctx);
+  const others = landmarks(ctx).filter((l) => l.kind === 'plant' && l.position.distanceToSquared(plant.position) > 0.01);
+  const list = claims(ctx).filter((c) => Math.hypot(c.x - px, c.z - pz) > 0.05); // not the plant's own claim
+  const near = tablets.filter((t) => Math.hypot(t.x - px, t.z - pz) < plant.radius + 2.5);
+  // face away from the pond and from this plant's tablet
+  let ax = px - pond.center.x, az = pz - pond.center.z;
+  const al = Math.hypot(ax, az) || 1;
+  ax /= al; az /= al;
+  for (const t of near) { const dx = px - t.x, dz = pz - t.z, d = Math.hypot(dx, dz) || 1; ax += (dx / d) * 1.5; az += (dz / d) * 1.5; }
+  const away = Math.atan2(az, ax);
+  let best: { x: number; z: number; score: number } | null = null;
+  for (let k = 0; k < 16; k++) {
+    const a = away + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 8);
+    for (const d of [plant.radius + 0.4, plant.radius + 0.65, plant.radius + 0.9]) {
+      const x = px + Math.cos(a) * d, z = pz + Math.sin(a) * d;
+      if (!ctx.isWalkable(x, z) || pondDist(ctx, x, z, 0.5) < 1) continue;
+      let clear = Infinity;
+      for (const t of tablets) clear = Math.min(clear, Math.hypot(t.x - x, t.z - z) - 0.85);
+      for (const o of others) clear = Math.min(clear, Math.hypot(o.position.x - x, o.position.z - z) - o.radius - 0.4);
+      for (const c of list) clear = Math.min(clear, Math.hypot(c.x - x, c.z - z) - c.r * 0.6);
+      // clear enough is enough: then prefer close under the branches, straight away from the tablet
+      const score = Math.min(clear, 0.5) - (d - plant.radius) * 0.4 - k * 0.02;
+      if (!best || score > best.score) best = { x, z, score };
+    }
+  }
+  if (!best || best.score < -0.2) return null;
+  claims(ctx).push({ x: best.x, z: best.z, r: 0.45 });
+  return new THREE.Vector3(best.x, ctx.groundY(best.x, best.z), best.z);
 }
 
 // ───────────────────────────── the feature ─────────────────────────────
@@ -201,38 +226,33 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   await loadBrush(FLAVOURS.map((f) => f.mark).join('') + '但愿人长久千里共婵娟团圆');
   if (bag.disposed) return;
 
-  // The moon: huge and golden, night falls for it. Features never own the sky, so we restore it.
-  ctx.sky.forceNight(true);
-  const spawn = ctx.player.position.clone();
-  // Where the moon rises: beyond the pond as seen from where we arrive (月映水), a little aside.
-  const across = new THREE.Vector3(pond.center.x - spawn.x, 0, pond.center.z - spawn.z);
-  if (across.lengthSq() < 1) across.set(0, 0, -1);
+  // Night falls for the moon — unless the visitor chose 昼. Features never own the sky: restore it.
+  const night = festivalNight(bag);
+  // Where the moon rises: across the pond from the way in, along the bridge toward the 问月亭 and a
+  // little to its right, low (about 7°) so it hangs framed over the pavilion inside the walking view.
+  const way = entry(ctx);
+  const across = new THREE.Vector3(-way.dx, 0, -way.dz);
+  if (across.lengthSq() < 1e-4) across.set(0, 0, -1);
   across.normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), -0.12);
-  const moonDirV = new THREE.Vector3(across.x, 0.3, across.z).normalize();
+  const EL = 0.125; // tan(elevation)
+  const moonDirV = new THREE.Vector3(across.x, EL, across.z).normalize();
   const rise = (k: number) => {
     const e = 1 - Math.pow(1 - k, 3);
-    moonDirV.set(across.x, 0.05 + 0.21 * e, across.z).normalize();
-    ctx.sky.setMoon({ visible: true, scale: 1.8 + 1.6 * e, glow: 1 + 0.8 * e, position: moonDirV.clone() });
+    moonDirV.set(across.x, 0.01 + (EL - 0.01) * e, across.z).normalize();
+    if (night) ctx.sky.setMoon({ visible: true, scale: 1.5 + 0.9 * e, glow: 1 + 0.8 * e, position: moonDirV.clone() });
+    else ctx.sky.setMoon({ visible: true, scale: 1.3 + 0.5 * e, glow: 0.6, position: moonDirV.clone() }); // a pale daytime moon
   };
   if (still) rise(1);
   else tween(bag, 10000, rise);
-  bag.onDispose(() => {
-    ctx.sky.setMoon({ scale: 1, glow: 1 });
-    ctx.sky.forceNight(false);
-  });
+  bag.onDispose(() => ctx.sky.setMoon({ scale: 1, glow: 1 }));
   const moonDir = () => moonDirV;
   moonPath(bag, moonDir);
 
-  // Red lanterns along the shore path.
-  lanternRow(bag, aroundPond(ctx, 8, 1.7, rng() * TAU), pond.center);
+  // Two paper lanterns held out over the water either side of the view (a third hangs in the osmanthus).
+  hangLanterns(bag, shoreLanterns(bag, 2), { colors: [PAPER_APRICOT, PAPER_OCHRE] });
 
   // ── eight mooncakes ──
-  const sideMats = {
-    baked: new THREE.MeshLambertMaterial({ color: '#b87632', flatShading: true }),
-    snow: new THREE.MeshLambertMaterial({ color: '#efdcd6', flatShading: true }),
-    su: new THREE.MeshLambertMaterial({ color: '#e9cf98', flatShading: true }),
-  };
-  Object.values(sideMats).forEach((m) => bag.own(m));
+  const sideCols = { baked: '#b87632', snow: '#efdcd6', su: '#e9cf98' };
   const spots: { at: T.Vector3; rot: number }[] = [];
   const holders: T.Object3D[] = [];
   const hold = (o: T.Object3D) => { holders.push(o); bag.add(o); return o; };
@@ -253,11 +273,9 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   // Under the plum (or whichever of the user's plants is there).
   const plants = landmarks(ctx).filter((l) => l.kind === 'plant');
   const plum = plants.find((l) => l.plant === 'plum') ?? plants[Math.floor(rng() * plants.length)];
-  if (plum) {
-    const a = Math.atan2(pond.center.z - plum.position.z, pond.center.x - plum.position.x) + 0.5;
-    const d = plum.radius + 0.35;
-    const x = plum.position.x + Math.cos(a) * d, z = plum.position.z + Math.sin(a) * d;
-    spots.push({ at: new THREE.Vector3(x, ctx.groundY(x, z), z), rot: 0.7 });
+  const under = plum && underPlant(ctx, plum);
+  if (under) {
+    spots.push({ at: under, rot: 0.7 });
   } else {
     spots.push({ at: findSpot(ctx, rng, { clear: 0.8 }), rot: 0.7 });
   }
@@ -267,7 +285,7 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   let rockAt = shorePoint(ctx, rockA, 0.35);
   for (let k = 0; k < 12 && !ctx.isWalkable(rockAt.x, rockAt.z); k++) rockAt = shorePoint(ctx, rockA + k * 0.5, 0.4);
   const rock = flatRock(ctx, rockAt, 0.6);
-  hold(rock.mesh);
+  hold(reflects(rock.mesh));
   claims(ctx).push({ x: rockAt.x, z: rockAt.z, r: 0.8 });
   spots.push({ at: new THREE.Vector3(rockAt.x, rock.top, rockAt.z), rot: 0 });
 
@@ -279,11 +297,11 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
     spots.push({ at: new THREE.Vector3(perch.position.x + (perch.kind === 'pavilion' ? 0.4 : 0.35), top, perch.position.z), rot: 1 });
   } else {
     const b = findSpot(ctx, rng, { clear: 1.2 });
-    const bench = new THREE.Mesh(merge(THREE, [
+    const bench = inked(ctx, merge(THREE, [
       part(THREE, new THREE.BoxGeometry(1.3, 0.1, 0.42), '#8f8b80', { p: [0, 0.45, 0] }),
       part(THREE, new THREE.BoxGeometry(0.16, 0.42, 0.34), '#77736a', { p: [0.48, 0.21, 0] }),
       part(THREE, new THREE.BoxGeometry(0.16, 0.42, 0.34), '#77736a', { p: [-0.48, 0.21, 0] }),
-    ]), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    ]), { width: 0.014 });
     bench.position.copy(b);
     bench.rotation.y = rng() * TAU;
     hold(bench);
@@ -314,7 +332,7 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
     const g = new THREE.Group();
     const withPlate = i <= 3 || i === 6; // the rock, the bridge / bench and the lotus leaf stay rustic
     if (withPlate) g.add(plate(ctx, 0.25));
-    const cake = mooncakeMesh(ctx, f, sideMats[f.kind]);
+    const cake = mooncakeMesh(ctx, f, sideCols[f.kind]);
     cake.position.y = withPlate ? 0.026 : 0;
     cake.rotation.y = s.rot;
     g.add(cake);
@@ -322,12 +340,13 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
     bag.add(g);
     cakes.push({ mesh: g, at: s.at.clone(), flavour: f, eaten: false });
   });
-  const glint = glints(bag, cakes.map((c) => c.at), '#ffd98a', 0.55);
+  const glint = glints(bag, cakes.map((c) => c.at.clone().setY(c.at.y + 0.12)), '#ffd98a', 0.55);
   let eaten = 0;
   const total = cakes.length;
   const label = { zh: '月饼', en: 'Mooncakes' };
   bag.counter('mooncakes', label, `0/${total}`);
-  ctx.hud.toast('中秋快乐！园中藏着八块月饼，去找找看', 'Happy Mid-Autumn! Eight mooncakes are hidden in the garden', 4200);
+  if (night) ctx.hud.toast('中秋快乐！园中藏着八块月饼，去找找看', 'Happy Mid-Autumn! Eight mooncakes are hidden in the garden', 4200);
+  else ctx.hud.toast('中秋快乐！白日里月亮淡淡的——园中藏着八块月饼', 'Happy Mid-Autumn! A pale moon by day, and eight mooncakes hidden in the garden', 4200);
 
   cakes.forEach((c, i) => {
     const off = bag.interact({
@@ -378,14 +397,15 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   });
 
   // ── the jade rabbit ──
-  const rabbit = rabbitMesh(ctx);
-  bag.add(rabbit);
+  const rb0 = billboard(bag, [rabbitDrawing()], 0.52, { px: 256 });
+  const rabbit = bag.add(rb0.mesh);
   const rGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(THREE, 64, 0.1), color: '#fff6dc', transparent: true, opacity: 0.35, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
   rGlow.scale.set(0.9, 0.9, 1);
   bag.add(rGlow);
   const rb = { x: lawn.x + 1.2, z: lawn.z + 0.4, h: rng() * TAU, hop: 0, hopDur: 0.34, hopLen: 0.3, fx: 0, fz: 0, tx: 0, tz: 0, idle: 1, fleeing: false };
   let tame = false;
   let petted = false;
+  let rbFlip = 1;
   const home = lawn.clone();
   const tryHop = (dirA: number, len: number) => {
     for (const da of [0, 0.6, -0.6, 1.2, -1.2, 2, -2, Math.PI]) {
@@ -430,9 +450,13 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
     const k = rb.hop > 0 ? Math.min(1, rb.hop) : 0;
     const y = ctx.groundY(rb.x, rb.z) + Math.sin(k * Math.PI) * (rb.fleeing ? 0.22 : 0.12);
     rabbit.position.set(rb.x, y, rb.z);
-    rabbit.rotation.set(rb.hop > 0 ? -Math.sin(k * TAU) * 0.25 : (still ? 0 : Math.max(0, Math.sin(t * 5)) * 0.08), rb.h, 0);
-    const sq = rb.hop > 0 ? 1 + Math.sin(k * Math.PI) * 0.12 : 1 + (still ? 0 : Math.sin(t * 2.2) * 0.02);
-    rabbit.scale.set(1.05 / Math.sqrt(sq), 1.05 * sq, 1.05 / Math.sqrt(sq));
+    // a painted flat: face the way it hops (mirror the painting), tilt into the hop, squash and stretch
+    const ry = rabbit.rotation.y;
+    const right = Math.sin(rb.h) * Math.cos(ry) - Math.cos(rb.h) * Math.sin(ry);
+    if (Math.abs(right) > 0.2) rbFlip = right > 0 ? 1 : -1;
+    rabbit.rotation.z = rb.hop > 0 ? -rbFlip * Math.sin(k * TAU) * 0.18 : 0;
+    const sq = rb.hop > 0 ? 1 + Math.sin(k * Math.PI) * 0.12 : 1 + (still ? 0 : Math.max(0, Math.sin(t * 5)) * 0.015);
+    rabbit.scale.set(rbFlip / Math.sqrt(sq), sq, 1);
     rGlow.position.set(rb.x, y + 0.2, rb.z);
     rGlow.visible = ctx.sky.isNight();
     if (tame && !petOff) {
@@ -457,33 +481,22 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
     if (petOff) petPos.set(rb.x, y, rb.z);
   });
 
-  // ── an osmanthus tree by table A, and its petals drifting everywhere ──
+  // ── an osmanthus by table A, painted in ink like the plants; a lantern in its branches, petals drifting ──
   const treeAt = findSpot(ctx, rng, { near: { x: tA.x, z: tA.z, r: 4, min: 2.6 }, clear: 1.2, pondMargin: 1.5 });
-  const tree = new THREE.Group();
-  const leaf = '#6f8a6c';
-  const treeParts = [
-    part(THREE, new THREE.CylinderGeometry(0.1, 0.16, 1.5, 6), '#4a3b2c', { p: [0, 0.75, 0], r: [0, 0, 0.06] }),
-    part(THREE, new THREE.CylinderGeometry(0.05, 0.08, 0.8, 5), '#4a3b2c', { p: [0.25, 1.5, 0], r: [0, 0, -0.6] }),
-  ];
-  const blobs: [number, number, number, number][] = [[0, 2.1, 0, 0.9], [0.6, 1.8, 0.2, 0.65], [-0.5, 1.9, -0.2, 0.7], [0.1, 2.6, 0.1, 0.6], [0.2, 1.7, -0.6, 0.55]];
-  for (const [x, y, z, r] of blobs) treeParts.push(part(THREE, new THREE.IcosahedronGeometry(r, 0), leaf, { p: [x, y, z], r: [x, y, z] }));
-  tree.add(new THREE.Mesh(merge(THREE, treeParts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
-  const flowerN = 90;
-  const flowers = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.035, 0), new THREE.MeshLambertMaterial({ color: '#f0c050', emissive: new THREE.Color('#8a6214') }), flowerN);
-  const fm = new THREE.Matrix4();
-  for (let i = 0; i < flowerN; i++) {
-    const [bx, by, bz, br] = blobs[i % blobs.length];
-    const d = new THREE.Vector3(rng() - 0.5, rng() - 0.5, rng() - 0.5).normalize().multiplyScalar(br * 0.92);
-    fm.makeTranslation(bx + d.x, by + d.y, bz + d.z);
-    flowers.setMatrixAt(i, fm);
-  }
-  tree.add(flowers);
-  tree.position.copy(treeAt);
-  tree.scale.setScalar(0.8);
-  bag.add(tree);
+  const osm = osmanthusDrawing(815);
+  const tree = billboard(bag, [osm.drawing], 3.4, { px: 640 });
+  tree.mesh.position.copy(treeAt).setY(treeAt.y - 0.03);
+  bag.add(tree.mesh);
+  const hookL = tree.local(osm.hook.x, osm.hook.y);
+  const branchHook = () => {
+    const ry = tree.mesh.rotation.y;
+    return { x: treeAt.x + Math.cos(ry) * hookL.x, y: treeAt.y + hookL.y, z: treeAt.z - Math.sin(ry) * hookL.x };
+  };
+  const treeLantern = hangLanterns(bag, [branchHook()], { colors: [ctx.palette.cinnabar], drop: 0.25, size: 0.9 });
+  bag.frame(() => treeLantern.setHook(0, branchHook()));
 
   const petalN = still ? 24 : 70;
-  const petals = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.03, 0.02), new THREE.MeshBasicMaterial({ color: '#f0bd45', side: THREE.DoubleSide, fog: false }), petalN);
+  const petals = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.03, 0.02), new THREE.MeshBasicMaterial({ color: '#e8b64a', side: THREE.DoubleSide }), petalN);
   petals.frustumCulled = false;
   bag.add(petals);
   const pet = Array.from({ length: petalN }, (_, i) => ({ x: 0, y: -1, z: 0, ph: rng() * TAU, sp: 0.18 + rng() * 0.2, nearTree: i % 2 === 0 }));

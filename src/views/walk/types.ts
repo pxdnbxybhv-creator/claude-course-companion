@@ -62,6 +62,11 @@ export interface Sky {
   forceNight(on: boolean): void;
 }
 
+/** A solid prop the player cannot walk through: an upright cylinder at (x, z). */
+export interface Collider { x: number; z: number; r: number; /** Height above the ground (m); tall props also keep the camera clear. */ h?: number }
+/** Something the camera must not sit behind: an upright cylinder from y0 to y1 (world metres). */
+export interface Occluder { x: number; z: number; r: number; y0: number; y1: number }
+
 export interface WorldCtx {
   /** The three.js namespace — import nothing else from 'three' at runtime in features. */
   THREE: typeof THREE_NS;
@@ -77,9 +82,18 @@ export interface WorldCtx {
   /** Rough bounds of the garden the player can roam. */
   bounds: { radius: number };
   player: Player;
-  env: SceneEnv & { date: Date; festivals: FestivalKey[] };
+  env: SceneEnv & {
+    date: Date;
+    festivals: FestivalKey[];
+    /** What the visitor chose in the time switch: the real clock, or forced day / night. */
+    timeMode?: 'now' | 'day' | 'night';
+  };
   /** Show a prompt when the player is near; returns an unregister function. */
   addInteractable(i: Interactable): () => void;
+  /** Make a prop solid; returns a remover. */
+  addCollider(c: Collider): () => void;
+  /** Keep the camera from hiding behind a prop; returns a remover. */
+  addOccluder(o: Occluder): () => void;
   hud: Hud;
   audio: AudioEngine;
   /** Deterministic randomness for this world (seeded from the date). */

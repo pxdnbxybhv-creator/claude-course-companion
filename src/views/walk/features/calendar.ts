@@ -41,6 +41,11 @@ export function festivalsOn(date: Date): FestivalKey[] {
   return out;
 }
 
+/** The year 元旦 greets: this one on January 1st itself, else (a preview) the coming one. */
+export function newYearOf(d: Date): number {
+  return d.getMonth() === 0 && d.getDate() === 1 ? d.getFullYear() : d.getFullYear() + 1;
+}
+
 /** Dev/preview override: ?fest=midautumn (or a comma list) replaces the real calendar. */
 export function festivalOverride(): FestivalKey[] | null {
   try {

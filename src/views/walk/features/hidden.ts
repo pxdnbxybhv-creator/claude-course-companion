@@ -1,9 +1,11 @@
 // Hidden delights, every day: a cat asleep under one of your plants, a little shrine where a bow
 // draws a fortune slip (签), and a guqin phrase that plays itself as you cross the water.
 import type * as T from 'three';
-import type { WorldCtx } from '../types';
-import { feature, findSpot, glowTexture, landmarks, pondDist, reducedMotion, dayRng } from './kit';
+import { feature, findSpot, glowTexture, inked, landmarks, pondDist, reducedMotion, dayRng } from './kit';
 import { merge, part } from './geo';
+import { billboard, catAsleepDrawing, catAwakeDrawing } from './painted';
+import { state, refreshToday } from '../../../app/store';
+import { statsFor } from '../../../core/habits';
 import * as sfx from './sfx';
 
 const TAU = Math.PI * 2;
@@ -12,32 +14,16 @@ const PLANT_EN: Record<string, string> = { plum: 'plum', orchid: 'orchid', bambo
 
 // ───────────────────────────── 大橘, the cat ─────────────────────────────
 
-function catMesh(ctx: WorldCtx): { body: T.Mesh; head: T.Mesh; group: T.Group } {
-  const { THREE, palette: P } = ctx;
-  const fur = '#d08a45', sock = '#f4efe4', pink = '#d9a3a0';
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-  const body = new THREE.Mesh(merge(THREE, [
-    part(THREE, new THREE.IcosahedronGeometry(0.2, 1), fur, { p: [0, 0.12, 0], s: [1.0, 0.6, 1.25] }),
-    part(THREE, new THREE.TorusGeometry(0.2, 0.035, 4, 10, Math.PI * 1.2), fur, { p: [0, 0.05, 0], r: [Math.PI / 2, 0, 0.6] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.04, 0), sock, { p: [0.12, 0.03, 0.2] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.04, 0), sock, { p: [0.03, 0.03, 0.24] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.04, 0), sock, { p: [-0.16, 0.03, -0.14] }),
-    part(THREE, new THREE.BoxGeometry(0.03, 0.02, 0.3), '#a8662c', { p: [0.06, 0.24, -0.02], r: [0, 0.3, 0] }),
-    part(THREE, new THREE.BoxGeometry(0.03, 0.02, 0.28), '#a8662c', { p: [-0.07, 0.235, 0.0], r: [0, -0.3, 0] }),
-  ]), mat);
-  const head = new THREE.Mesh(merge(THREE, [
-    part(THREE, new THREE.IcosahedronGeometry(0.1, 1), fur, { s: [1.1, 0.9, 1] }),
-    part(THREE, new THREE.ConeGeometry(0.035, 0.07, 3), fur, { p: [0.055, 0.09, 0], r: [0, 0, -0.3] }),
-    part(THREE, new THREE.ConeGeometry(0.035, 0.07, 3), fur, { p: [-0.055, 0.09, 0], r: [0, 0, 0.3] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.045, 0), sock, { p: [0, -0.03, 0.07], s: [1.2, 0.7, 0.8] }),
-    part(THREE, new THREE.IcosahedronGeometry(0.012, 0), pink, { p: [0, -0.005, 0.105] }),
-    part(THREE, new THREE.BoxGeometry(0.03, 0.004, 0.004), P.ink, { p: [0.04, 0.02, 0.09] }),
-    part(THREE, new THREE.BoxGeometry(0.03, 0.004, 0.004), P.ink, { p: [-0.04, 0.02, 0.09] }),
-  ]), mat);
-  head.position.set(0.02, 0.12, 0.24);
-  const group = new THREE.Group();
-  group.add(body, head);
-  return { body, head, group };
+/** How the cat's host plant is doing: tended lately, or waiting for its gardener. */
+function hostState(habitId: string | undefined): 'daily' | 'often' | 'waiting' | 'new' {
+  if (!habitId) return 'often';
+  const h = state.value.habits.find((x) => x.id === habitId);
+  if (!h) return 'often';
+  const st = statsFor(h, state.value.checkins[h.id] ?? [], refreshToday());
+  if (st.done === 0) return 'new';
+  if (st.streak >= 3) return 'daily';
+  if (st.freshness >= 0.6 || st.streak > 0) return 'often';
+  return 'waiting';
 }
 
 export const cat = feature('cat', (bag, ctx) => {
@@ -53,11 +39,10 @@ export const cat = feature('cat', (bag, ctx) => {
     if (!ctx.isWalkable(at.x, at.z)) at = findSpot(ctx, rng, { near: { x: host.position.x, z: host.position.z, r: 1.5, min: 0.5 }, clear: 0.4, noClaim: true });
     at.y = ctx.groundY(at.x, at.z);
   } else at = findSpot(ctx, rng, { clear: 0.8, minR: ctx.bounds.radius * 0.4 });
-  const { group, body, head } = catMesh(ctx);
-  group.position.copy(at);
-  group.rotation.y = rng() * TAU;
-  group.scale.setScalar(1.35); // a big ginger cat (十只橘猫九只胖)
-  bag.add(group);
+  // painted in ink like the plants: asleep in a curl, or sitting up when you come near
+  const pic = billboard(bag, [catAsleepDrawing(), catAwakeDrawing()], 0.78, { px: 320 });
+  pic.mesh.position.copy(at);
+  bag.add(pic.mesh);
   // Zzz
   const zTex = glowTexture(THREE, 32, 0.3);
   const z = new THREE.Sprite(new THREE.SpriteMaterial({ map: zTex, color: '#cfc8b8', transparent: true, opacity: 0, depthWrite: false }));
@@ -68,6 +53,10 @@ export const cat = feature('cat', (bag, ctx) => {
   const kindZh = PLANT_ZH[host?.plant ?? ''] ?? '', kindEn = PLANT_EN[host?.plant ?? ''] ?? 'plant';
   const whereZh = host ? (host.habitName ? `你的《${host.habitName}》这株${kindZh}下` : `这株${kindZh}下`) : '这里';
   const whereEn = host ? (host.habitName ? `under your ${kindEn}, “${host.habitName}”` : `under this ${kindEn}`) : 'here';
+  // why it sleeps here depends on how the plant is doing (never claim you come every day when you don't)
+  const why = hostState(host?.habitId);
+  const whyZh = { daily: '大概因为你每天都来。', often: '大概因为这里常有人来。', waiting: '这几天没人来浇水，它在等你回来。', new: '这株刚种下，它来给新邻居作伴。' }[why];
+  const whyEn = { daily: 'probably because you come every day.', often: 'probably because someone often comes by.', waiting: 'nobody has watered it for a while; it is waiting for you to come back.', new: 'the plant is new, and it came to keep its new neighbour company.' }[why];
   bag.interact({
     id: 'cat', position: at, radius: 1.3,
     labelZh: '大橘', labelEn: 'Big Ginger', actionZh: '摸摸', actionEn: 'Pet',
@@ -78,13 +67,12 @@ export const cat = feature('cat', (bag, ctx) => {
       if (petted === 1) {
         ctx.hud.showCard({
           titleZh: '大橘', titleEn: 'Big Ginger',
-          bodyZh: `一只橘猫，四只白爪，大家叫它大橘。（十只橘猫九只胖。）\n它总在${whereZh}睡觉——大概因为你每天都来。\n\n咕噜，咕噜……`,
-          bodyEn: `A ginger cat with four white paws. Everyone calls it Big Ginger (“nine ginger cats in ten are fat”).\nIt always sleeps ${whereEn} — probably because you come every day.\n\nPrrr, prrr…`,
+          bodyZh: `一只橘猫，四只白爪，大家叫它大橘。（十只橘猫九只胖。）\n它总在${whereZh}睡觉——${whyZh}\n\n咕噜，咕噜……`,
+          bodyEn: `A ginger cat with four white paws. Everyone calls it Big Ginger (“nine ginger cats in ten are fat”).\nIt always sleeps ${whereEn} — ${whyEn}\n\nPrrr, prrr…`,
         });
       } else ctx.hud.toast(petted % 3 === 0 ? '它翻了个身，露出肚皮' : '咕噜咕噜……', petted % 3 === 0 ? 'It rolls over, belly up' : 'Prrr… prrr…', 1800);
     },
   });
-  const base = { hy: head.position.y, hz: head.position.z };
   bag.frame((dt, t) => {
     const d = Math.hypot(ctx.player.position.x - at.x, ctx.player.position.z - at.z);
     if (d < 2.2 && awake <= 0) {
@@ -92,13 +80,11 @@ export const cat = feature('cat', (bag, ctx) => {
       if (!stretched) { stretched = true; sfx.purr(1.6, 0.5); ctx.hud.toast('喵～', 'Mrrow~', 1400); }
     }
     awake = Math.max(0, awake - dt);
-    const a = Math.min(1, awake);
-    const breath = still ? 0 : Math.sin(t * (awake > 0 ? 3 : 1.6)) * 0.03;
-    body.scale.set(1 + breath * 0.5, 1 + breath, 1 + a * (0.18 + (still ? 0 : Math.sin(t * 1.2) * 0.04)));
-    head.position.y = base.hy + a * 0.1;
-    head.position.z = base.hz + a * 0.05;
-    head.rotation.x = -a * 0.35;
-    head.rotation.z = still ? 0 : Math.sin(t * 0.5) * 0.05 * (1 - a);
+    const up = awake > 0;
+    pic.show(up ? 1 : 0);
+    const breath = still ? 0 : Math.sin(t * (up ? 3 : 1.6)) * 0.02;
+    pic.mesh.scale.set(1 + breath * 0.3, 1 + breath, 1);
+    pic.mesh.rotation.z = up || still ? 0 : Math.sin(t * 0.5) * 0.02;
     // a drowsy Zzz bubble rising when asleep
     const zk = (t * 0.35) % 1;
     z.position.set(at.x + 0.1 + zk * 0.15, at.y + 0.35 + zk * 0.45, at.z);
@@ -139,7 +125,7 @@ export const shrine = feature('shrine', (bag, ctx) => {
     part(THREE, new THREE.CylinderGeometry(0.004, 0.004, 0.22, 3), P.ochre, { p: [0, 0.5, 0.5] }),
     part(THREE, new THREE.CylinderGeometry(0.004, 0.004, 0.22, 3), P.ochre, { p: [0.025, 0.5, 0.5] }),
   ]);
-  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  const mesh = inked(ctx, g, { width: 0.014 });
   mesh.position.copy(at);
   mesh.rotation.y = face;
   bag.add(mesh);

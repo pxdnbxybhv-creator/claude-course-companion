@@ -2,7 +2,7 @@
 // the water, butterflies by day in spring and summer, fireflies on summer nights, a crane now and then.
 import type * as T from 'three';
 import type { WorldCtx, WorldFeature } from '../types';
-import { Bag, feature, findSpot, glowTexture, pondDist, reducedMotion, shorePoint, dayRng } from './kit';
+import { Bag, feature, findSpot, glowTexture, pondDist, reducedMotion, reflects, shorePoint, dayRng } from './kit';
 import { birdGeometry, butterflyGeometry, dragonflyGeometry, instanceAttrs, koiGeometry, merge, part, poly, swimMaterial, wingMaterial } from './geo';
 import * as sfx from './sfx';
 
@@ -413,7 +413,7 @@ export const crane: WorldFeature = feature('crane', (bag, ctx) => {
   const geo = merge(THREE, parts);
   const attrs = instanceAttrs(THREE, geo, 1, () => 0);
   const anim = wingMaterial(THREE, { rate: 3.2, angle: 0.55, lift: 0.05, fold: 1 });
-  const mesh = bag.add(new THREE.InstancedMesh(geo, anim.material, 1));
+  const mesh = bag.add(reflects(new THREE.InstancedMesh(geo, anim.material, 1))); // a crane flying over the pond
   mesh.frustumCulled = false;
   mesh.visible = false;
   const R = ctx.bounds.radius * 1.5;

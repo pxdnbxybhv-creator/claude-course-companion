@@ -171,7 +171,8 @@ export const ROCKS: Rock[] = (() => {
   });
 })();
 
-export const LANTERNS: Lantern[] = [{ x: -1.25, z: 12.4 }, { x: 2.15, z: 6.5 }, { x: -2.1, z: -11.0 }];
+// the first stands east of the way in, leaving the west side of the moon gate's frame to a plant
+export const LANTERNS: Lantern[] = [{ x: 1.4, z: 12.8 }, { x: 2.15, z: 6.5 }, { x: -2.1, z: -11.0 }];
 
 /** Pavilion columns (hexagon corners). */
 export const COLUMNS: Circle[] = Array.from({ length: 6 }, (_, i) => {
@@ -229,96 +230,178 @@ export interface PlantSlot {
   /** Where the tablet stands and which way it faces (radians around +Y; 0 = facing +z). */
   tablet: { x: number; z: number; rot: number };
   inWater: boolean;
+  /** A lotus the pond had no room for grows in a glazed water jar (荷缸) beside the path. */
+  jar?: boolean;
 }
 
 export interface LayoutItem { key: string; kind: PlantKind }
 
+/** Height of a 荷缸 water jar's rim (the lotus floats on the water inside). */
+export const JAR_H = 0.62;
+export const JAR_R = 0.46;
+
+/** Through the moon gate, the first thing you see: 框景, a plant framed by the round opening. */
+const FRAME_SPOTS: [number, number][] = [[-1.5, 10.1], [-1.35, 9.3], [-1.9, 10.3], [-2.2, 9.6], [-2.6, 10.0], [2.3, 9.4], [2.6, 10.4]];
+
 /**
- * Lay plants along the loop in order (first planted = first met after the gate), alternating
- * sides; tall trees stand back from the path, small plants lean close. Lotus goes into the pond.
- * The order is by the caller (sorted by creation), the small variations are seeded by the key.
+ * Lay plants out in order (first planted = first met): the first land plant stands in the moon
+ * gate's frame, the rest go along the loop alternating west and east of the gate, tall trees
+ * standing back, small plants leaning close. Lotus floats in the pond; when the pond is full,
+ * more lotus grow in water jars by the path. Every item gets a slot — never fewer.
+ * The order is by the caller (sorted by creation); the small variations are seeded by the key.
  */
 export function layoutPlants(items: LayoutItem[]): PlantSlot[] {
   const out: PlantSlot[] = [];
   const blockers: Circle[] = staticColliders();
   const taken: Circle[] = [];
-  const clear = (x: number, z: number, r: number) => {
+  const clear = (x: number, z: number, r: number, relax = 0) => {
     if (Math.hypot(x, z) > BOUNDS_R - 2.5) return false;
     if (pondQ(x, z) < 1.0 + (r + 0.5) / Math.min(POND.rx, POND.rz)) return false;
     if (Math.abs(z - GATE.z) < r + 0.8 && Math.abs(x) < GATE.halfW + 0.5) return false;
     if (Math.hypot(x - PAVILION.x, z - PAVILION.z) < PAVILION.r + r + 0.4) return false;
-    for (const sp of SPURS) if (polyDist(sp, x, z) < r + 0.75) return false;
-    if (polyDist(LOOP, x, z) < r + 0.55) return false;
+    for (const sp of SPURS) if (polyDist(sp, x, z) < r + 0.75 - relax) return false;
+    if (polyDist(LOOP, x, z) < r + 0.55 - relax) return false;
     if (rawPolyDist(BRIDGE, x, z) < r + 1) return false;
     for (const b of blockers) if (Math.hypot(x - b.x, z - b.z) < b.r + r + 0.5) return false;
     for (const t of taken) if (Math.hypot(x - t.x, z - t.z) < t.r + r) return false;
     return true;
   };
+  const take = (s: PlantSlot, r: number) => {
+    out.push(s);
+    taken.push({ x: s.x, z: s.z, r });
+    taken.push({ x: s.tablet.x, z: s.tablet.z, r: 0.35 });
+  };
 
   const land = items.filter((i) => i.kind !== 'lotus');
   const water = items.filter((i) => i.kind === 'lotus');
 
-  // Alternate west and east of the gate so the first plants flank the way in, then work round.
-  const n = land.length;
-  const spacing = Math.max(3.4, Math.min(8.5, LOOP.length / Math.max(2, n + 1)));
+  // 1. 框景: the first land plant stands just beyond the moon gate, off the axis, in its frame.
+  let rest = land;
+  if (land.length) {
+    const it = land[0];
+    const r = KIND_R[it.kind] + 0.35;
+    for (const [fx, fz] of FRAME_SPOTS) {
+      const tall = TALL.has(it.kind);
+      // small plants lean closer to the path so they still show in the frame
+      const x = tall ? fx : fx * 0.72, z = tall ? fz : fz + 0.5;
+      if (!clear(x, z, r, 0.6)) continue;
+      const side = Math.sign(x) || -1;
+      const tx = tall ? x - side * 0.95 : x - side * 0.35, tz = tall ? z + 0.75 : z + 0.9;
+      take({ key: it.key, kind: it.kind, x, z, tablet: { x: tx, z: tz, rot: side * -0.45 }, inWater: false }, KIND_SPACE[it.kind]);
+      rest = land.slice(1);
+      break;
+    }
+  }
+
+  // 2. Along the loop: alternate west and east of the gate so the plants flank the way in, then
+  // work round toward the pavilion; the spacing spreads a small garden round to the north shore.
+  const perSide = Math.max(1, Math.ceil((rest.length + 1) / 2));
+  const spacing = Math.max(3.4, Math.min(13, (LOOP.length / 2 - 8.4) / Math.max(1, perSide - 1)));
   const cursor = [2.4, LOOP.length - 2.4]; // west-going, east-going
   let flip = 1;
-  land.forEach((it, idx) => {
+  let turn = 0;
+  const placeOnLoop = (it: LayoutItem, jar: boolean): boolean => {
     const r = makeRng(hashString(it.key) ^ 0x2c1b3c6d);
     const tall = TALL.has(it.kind);
-    const dir = idx % 2 === 0 ? 0 : 1;
+    const space = jar ? 1.0 : KIND_SPACE[it.kind];
+    const dir = turn++ % 2 === 0 ? 0 : 1;
     const sign = dir === 0 ? 1 : -1;
     let ring = 0;
-    let placed = false;
-    for (let tries = 0; tries < 300 && !placed; tries++) {
+    for (let tries = 0; tries < 300; tries++) {
       let s = cursor[dir];
       if (cursor[0] > cursor[1] - 1) { ring++; cursor[0] = 2 + ring; cursor[1] = LOOP.length - 2 - ring; s = cursor[dir]; }
       if (ring > 3) break;
       const p = polyAt(LOOP, s);
       const [nx, nz] = outward(p.x, p.z, p.tx, p.tz);
-      const baseOff = (tall ? 2.35 : 1.4) + ring * 3.1 + r.range(-0.15, 0.25);
+      const baseOff = (tall ? 2.35 : jar ? 1.25 : 1.4) + ring * 3.1 + r.range(-0.15, 0.25);
       const sides = tall || ring > 0 ? [1, -1] : [flip, -flip];
       for (const side of sides) {
         const off = side > 0 ? baseOff : (tall ? 2.1 : 1.35);
         const x = p.x + nx * side * off, z = p.z + nz * side * off;
-        if (!clear(x, z, KIND_SPACE[it.kind])) continue;
+        if (!clear(x, z, space)) continue;
         // the tablet: between the plant and the path, a little ahead along it
         const along = r.chance(0.5) ? 1 : -1;
-        let tx = p.x + nx * side * 0.95 + p.tx * along * (KIND_SPACE[it.kind] * 0.55 + 0.25);
-        let tz = p.z + nz * side * 0.95 + p.tz * along * (KIND_SPACE[it.kind] * 0.55 + 0.25);
+        let tx = p.x + nx * side * 0.95 + p.tx * along * (space * 0.55 + 0.25);
+        let tz = p.z + nz * side * 0.95 + p.tz * along * (space * 0.55 + 0.25);
         if (pondQ(tx, tz) < 1.15) { tx = p.x + nx * side * 0.95; tz = p.z + nz * side * 0.95; }
         const rot = Math.atan2(-nx * side, -nz * side);
-        out.push({ key: it.key, kind: it.kind, x, z, tablet: { x: tx, z: tz, rot }, inWater: false });
-        taken.push({ x, z, r: KIND_SPACE[it.kind] });
-        taken.push({ x: tx, z: tz, r: 0.35 });
-        placed = true;
+        take({ key: it.key, kind: it.kind, x, z, tablet: { x: tx, z: tz, rot }, inWater: false, ...(jar ? { jar: true } : {}) }, space);
         if (!tall) flip = -flip;
+        cursor[dir] += sign * spacing * r.range(0.85, 1.15);
+        return true;
+      }
+      cursor[dir] += sign * 0.6;
+    }
+    return false;
+  };
+  /** Last resort: any clear spot on the lawn, scanning outward rings round the pond. */
+  const placeAnywhere = (it: LayoutItem, jar: boolean) => {
+    const space = jar ? 1.0 : KIND_SPACE[it.kind];
+    for (const shrink of [1, 0.6, 0.35]) {
+      for (let q = 1.6; q < 3.6; q += 0.18) {
+        for (let k = 0; k < 48; k++) {
+          const a = (k / 48) * Math.PI * 2 + q * 1.7;
+          const x = POND.x + Math.cos(a) * POND.rx * q, z = POND.z + Math.sin(a) * POND.rz * q;
+          if (!clear(x, z, space * shrink)) continue;
+          const tx = x + (POND.x - x) * 0.08, tz = z + (POND.z - z) * 0.08 + 0.6;
+          take({ key: it.key, kind: it.kind, x, z, tablet: { x: tx, z: tz, rot: Math.atan2(POND.x - x, POND.z - z) }, inWater: false, ...(jar ? { jar: true } : {}) }, space * shrink);
+          return;
+        }
+      }
+    }
+    // the garden is truly full: stand it outside the loop anyway, never drop a habit
+    const a = hashString(it.key) % 628 / 100;
+    const x = Math.cos(a) * (BOUNDS_R - 4), z = Math.sin(a) * (BOUNDS_R - 4) * 0.8;
+    take({ key: it.key, kind: it.kind, x, z, tablet: { x: x * 0.95, z: z * 0.95, rot: Math.atan2(-x, -z) }, inWater: false, ...(jar ? { jar: true } : {}) }, 0.4);
+  };
+  for (const it of rest) if (!placeOnLoop(it, false)) placeAnywhere(it, false);
+
+  // 3. Lotus: floating in the pond, a tablet on the nearest shore. Wide spacing first, then closer,
+  // then an inner and an outer ring; what still does not fit goes into a water jar by the path.
+  const angles = [205, 330, 25, 150, 265, 95, 180, 300, 60, 235, 0, 120];
+  const cands: { a: number; q: number }[] = [];
+  for (let i = 0; i < angles.length * 2; i++) cands.push({ a: angles[i % angles.length] + (i >= angles.length ? 17 : 0), q: i >= angles.length ? 0.42 : 0.64 });
+  for (let i = 0; i < 18; i++) cands.push({ a: i * 20 + 8, q: 0.8 });
+  for (let i = 0; i < 12; i++) cands.push({ a: i * 30 + 21, q: 0.25 });
+  for (let i = 0; i < 18; i++) cands.push({ a: i * 20 + 2, q: 0.54 });
+  const passes = [{ gap: 1.2, bridge: 1.5 }, { gap: 0.55, bridge: 1.15 }];
+  const pondFree = (x: number, z: number, gap: number, bridge: number) =>
+    rawPolyDist(BRIDGE, x, z) >= bridge && !taken.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + gap);
+  const overflow: LayoutItem[] = [];
+  for (const it of water) {
+    let done = false;
+    for (const ps of passes) {
+      for (const c of cands) {
+        const a = c.a * (Math.PI / 180);
+        const x = POND.x + Math.cos(a) * POND.rx * c.q, z = POND.z + Math.sin(a) * POND.rz * c.q;
+        if (!pondFree(x, z, ps.gap, ps.bridge)) continue;
+        // the tablet on the shore, clear of the others and of the bridge's landings
+        let tx = 0, tz = 0, b = a, ok = false;
+        for (const da of [0, 9, -9, 18, -18, 27, -27]) {
+          b = a + da * (Math.PI / 180);
+          tx = POND.x + Math.cos(b) * POND.rx * 1.2; tz = POND.z + Math.sin(b) * POND.rz * 1.2;
+          if (rawPolyDist(BRIDGE, tx, tz) < 1.1 || polyDist(LOOP, tx, tz) < 0.5) continue;
+          if (taken.some((t) => Math.hypot(tx - t.x, tz - t.z) < t.r + 0.45)) continue;
+          ok = true;
+          break;
+        }
+        if (!ok) continue;
+        const rot = Math.atan2(Math.cos(b), Math.sin(b) * (POND.rx / POND.rz));
+        out.push({ key: it.key, kind: 'lotus', x, z, tablet: { x: tx, z: tz, rot }, inWater: true });
+        taken.push({ x, z, r: 0.9 });
+        taken.push({ x: tx, z: tz, r: 0.35 });
+        done = true;
         break;
       }
-      cursor[dir] += sign * (placed ? spacing * r.range(0.85, 1.15) : 0.6);
+      if (done) break;
     }
-  });
-
-  // Lotus: floating in the pond, a tablet on the nearest shore.
-  const angles = [205, 330, 25, 150, 265, 95, 180, 300, 60, 235, 0, 120];
-  let ai = 0;
-  for (const it of water) {
-    for (; ai < angles.length * 2; ai++) {
-      const a = (angles[ai % angles.length] + (ai >= angles.length ? 17 : 0)) * (Math.PI / 180);
-      const q = ai >= angles.length ? 0.42 : 0.64;
-      const x = POND.x + Math.cos(a) * POND.rx * q, z = POND.z + Math.sin(a) * POND.rz * q;
-      if (rawPolyDist(BRIDGE, x, z) < 1.5) continue;
-      if (taken.some((t) => Math.hypot(x - t.x, z - t.z) < t.r + 1.2)) continue;
-      const tq = 1.2;
-      const tx = POND.x + Math.cos(a) * POND.rx * tq, tz = POND.z + Math.sin(a) * POND.rz * tq;
-      const rot = Math.atan2(Math.cos(a), Math.sin(a) * (POND.rx / POND.rz));
-      out.push({ key: it.key, kind: 'lotus', x, z, tablet: { x: tx, z: tz, rot }, inWater: true });
-      taken.push({ x, z, r: 0.9 });
-      taken.push({ x: tx, z: tz, r: 0.35 });
-      ai++;
-      break;
-    }
+    if (!done) overflow.push(it);
   }
+  for (const it of overflow) if (!placeOnLoop(it, true)) placeAnywhere(it, true);
+
+  // keep the caller's order (first planted first)
+  const at = new Map(items.map((it, i) => [it.key, i]));
+  out.sort((a, b) => (at.get(a.key) ?? 0) - (at.get(b.key) ?? 0));
   return out;
 }
 

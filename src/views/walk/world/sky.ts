@@ -18,7 +18,9 @@ const PALETTES: Record<TimeOfDay, Palette> = {
   dawn: { top: '#d9d6d2', horizon: '#f1ddcb', fog: '#eddccc', hemiSky: '#f5ebe4', hemiGround: '#a89c8a', hemi: 2.1, sun: '#ffe2c8', sunI: 1.15, tint: '#f6ece2', glow: '#f3b98f' },
   day: { top: '#e2dccd', horizon: '#f3ede0', fog: '#efe9dc', hemiSky: '#fbf8f1', hemiGround: '#b0a898', hemi: 2.25, sun: '#fff8ec', sunI: 1.25, tint: '#ffffff', glow: '#fff4dc' },
   dusk: { top: '#d5c2a7', horizon: '#eecfa6', fog: '#e9d1b2', hemiSky: '#f4e0c8', hemiGround: '#9b8a74', hemi: 2.0, sun: '#ffcf9e', sunI: 1.2, tint: '#f5e4cc', glow: '#e89a62' },
-  night: { top: '#1a2230', horizon: '#46505e', fog: '#434d5a', hemiSky: '#8b9ab3', hemiGround: '#262a31', hemi: 1.25, sun: '#c9d6ec', sunI: 0.75, tint: '#9eabbf', glow: '#c9c6b8' },
+  // Night keeps the paper light — cool silver-blue moonlit xuan, value ≥ ~0.75 — and lets the dark
+  // gather in the upper sky and the far distance; the moon's glow and the lanterns carry the mood.
+  night: { top: '#121a28', horizon: '#6c7788', fog: '#65707f', hemiSky: '#cfd8e8', hemiGround: '#8f98a8', hemi: 2.75, sun: '#e2e9f6', sunI: 0.8, tint: '#c6cedb', glow: '#d8d4c4' },
 };
 
 const SKY_VS = /* glsl */`
@@ -223,6 +225,9 @@ export class SkySystem implements Sky {
     (u.uFog.value as THREE.Color).copy(c.fog);
     (u.uGlowColor.value as THREE.Color).copy(c.glow);
     this.fog.color.copy(c.fog);
+    // by night the near garden stays clear and the dark gathers further off
+    this.fog.near = 20 + 6 * this.night01;
+    this.fog.far = 115 - 30 * this.night01;
     this.fogColor.copy(c.fog);
     this.hemi.color.copy(c.hemiSky);
     this.hemi.groundColor.copy(c.hemiGround);

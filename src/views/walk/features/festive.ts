@@ -1,11 +1,14 @@
-// The new-year festivals: 春节 (red lanterns, 福 on posts — one upside down —, couplets, fireworks,
-// red envelopes to find), 元宵 (sky lanterns, lantern riddles, 汤圆), 元旦 (a countdown and fireworks).
+// The new-year festivals: 春节 (two lanterns over the water, 福 on posts — one upside down —,
+// couplets on the gate, fireworks, red envelopes to find), 元宵 (sky lanterns, a line of riddle
+// lanterns, 汤圆), 元旦 (a countdown and fireworks). An explicit 昼 keeps the day: lanterns stay
+// unlit and the fireworks wait for dark.
 import type * as T from 'three';
 import type { Interactable, WorldCtx } from '../types';
-import { BRUSH_FONT, canvasTexture, entry, feature, findSpot, glowTexture, landmarks, loadBrush, reducedMotion, tween, dayRng } from './kit';
+import { BRUSH_FONT, canvasTexture, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, loadBrush, propMat, reducedMotion, reflects, tween, dayRng, type Bag } from './kit';
 import { merge, part } from './geo';
-import { aroundPond, bowl, burst, glints, lanternRow, stoneTable } from './props';
+import { bowl, burst, glints, hangLanterns, PAPER_APRICOT, PAPER_OCHRE, shoreLanterns, stoneTable, type Hook } from './props';
 import { fireworks } from './fireworks';
+import { newYearOf } from './calendar';
 import * as sfx from './sfx';
 
 const TAU = Math.PI * 2;
@@ -70,27 +73,27 @@ const WISHES: { zh: string; en: string; amount: string }[] = [
 
 export const spring = feature('spring', async (bag, ctx) => {
   if (!ctx.env.festivals.includes('spring')) return;
-  const { THREE, pond, palette: P } = ctx;
+  const { THREE, palette: P } = ctx;
   const rng = dayRng(ctx, '101');
   await loadBrush('福天增岁月人寿春满乾坤门万象更新恭喜发财');
   if (bag.disposed) return;
-  ctx.sky.forceNight(true);
-  bag.onDispose(() => ctx.sky.forceNight(false));
-  lanternRow(bag, aroundPond(ctx, 12, 1.7, rng() * TAU), pond.center);
+  const night = festivalNight(bag);
+  // Two lanterns held out over the water: one cinnabar (the accent), one warm ochre paper.
+  hangLanterns(bag, shoreLanterns(bag, 2), { colors: [P.cinnabar, PAPER_OCHRE] });
   const fw = fireworks(bag, { onlyAtNight: true });
-  bag.later(2500, () => fw.salvo(3)); // a welcome
+  if (night) bag.later(2500, () => fw.salvo(3)); // a welcome
   ctx.hud.toast('新春快乐！园子里藏着六个红包', 'Happy Spring Festival! Six red envelopes are hidden in the garden', 4200);
 
   // 福 on posts, one of them upside down (倒福 → 福到).
   const fuTex = redPaper(ctx, '福', { diamond: true, w: 256, h: 256 });
   bag.own(fuTex);
-  const postMat = new THREE.MeshLambertMaterial({ color: '#4a3c2b', flatShading: true });
-  const postGeo = new THREE.CylinderGeometry(0.06, 0.07, 1.6, 6);
-  postGeo.translate(0, 0.8, 0);
-  const upside = Math.floor(rng() * 5);
-  for (let i = 0; i < 5; i++) {
+  const postGeo = merge(THREE, [part(THREE, new THREE.CylinderGeometry(0.06, 0.07, 1.6, 6), '#4a3c2b', { p: [0, 0.8, 0] })]);
+  bag.own(postGeo);
+  // three, not a crowd: the seal red is an accent
+  const upside = Math.floor(rng() * 3);
+  for (let i = 0; i < 3; i++) {
     const at = findSpot(ctx, rng, { clear: 0.8, pondMargin: 1.5, maxR: ctx.bounds.radius * 0.75 });
-    const post = new THREE.Mesh(postGeo, postMat);
+    const post = inked(ctx, postGeo, { width: 0.01 });
     post.position.copy(at);
     bag.add(post);
     const face = Math.atan2(-at.x, -at.z);
@@ -142,12 +145,12 @@ export const spring = feature('spring', async (bag, ctx) => {
     gx = at.x; gz = at.z; gy = at.y;
     face = Math.atan2(-at.x, -at.z);
     half = 0.85; top = 2.5;
-    const frame = new THREE.Mesh(merge(THREE, [
+    const frame = inked(ctx, merge(THREE, [
       part(THREE, new THREE.BoxGeometry(0.16, 2.8, 0.16), '#3a2f24', { p: [half, 1.4, -0.1] }),
       part(THREE, new THREE.BoxGeometry(0.16, 2.8, 0.16), '#3a2f24', { p: [-half, 1.4, -0.1] }),
       part(THREE, new THREE.BoxGeometry(2.2, 0.18, 0.2), '#3a2f24', { p: [0, 2.75, -0.1] }),
       part(THREE, new THREE.ConeGeometry(1.55, 0.45, 4), P.ink, { p: [0, 3.05, -0.1], r: [0, Math.PI / 4, 0], s: [1, 1, 0.35] }),
-    ]), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+    ]), { width: 0.016 });
     frame.position.set(gx, gy, gz);
     frame.rotation.y = face;
     bag.add(frame);
@@ -250,16 +253,50 @@ const RIDDLES: { qZh: string; qEn: string; aZh: string; aEn: string }[] = [
   { qZh: '有面无口，有脚无手，\n虽不好吃，家家都有。\n（打一物）', qEn: 'A face (top) but no mouth, legs but no hands;\nnot good to eat, yet every home has one.\n(A thing)', aZh: '桌子', aEn: 'A table' },
 ];
 
+/** Two bamboo posts with a sagging cord between them; returns `n` evenly spaced hooks along the cord. */
+function riddleLine(bag: Bag, n: number, rng: () => number): Hook[] {
+  const ctx = bag.ctx;
+  const { THREE, palette: P } = ctx;
+  const half = (n + 1) * 0.55;
+  const H = 2.25, SAG = 0.28;
+  let a = 0, b = 0;
+  let c = findSpot(ctx, rng, { clear: half + 0.6, pondMargin: 2.2 });
+  // along the shore (perpendicular to the way to the pond), both posts on open ground
+  let dir = Math.atan2(c.z - ctx.pond.center.z, c.x - ctx.pond.center.x) + Math.PI / 2;
+  for (let k = 0; k < 12; k++) {
+    const d = dir + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.25;
+    const ok = [-1, 1].every((s) => ctx.isWalkable(c.x + Math.cos(d) * half * s, c.z + Math.sin(d) * half * s));
+    if (ok) { dir = d; break; }
+    if (k === 11) c = findSpot(ctx, rng, { clear: half + 0.6, pondMargin: 2.2 });
+  }
+  a = Math.cos(dir); b = Math.sin(dir);
+  const postGeo = merge(THREE, [
+    part(THREE, new THREE.CylinderGeometry(0.035, 0.05, H, 6), '#6b5a3e', { p: [0, H / 2, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.045, 0.045, 0.03, 6), '#4a3c2b', { p: [0, H * 0.45, 0] }),
+    part(THREE, new THREE.SphereGeometry(0.05, 6, 4), '#4a3c2b', { p: [0, H, 0] }),
+  ]);
+  bag.own(postGeo);
+  const ends = [-1, 1].map((s) => {
+    const x = c.x + a * half * s, z = c.z + b * half * s, y = ctx.groundY(x, z);
+    const post = inked(ctx, postGeo, { width: 0.01 });
+    post.position.set(x, y, z);
+    bag.add(post);
+    return new THREE.Vector3(x, y + H - 0.04, z);
+  });
+  const at = (t: number) => new THREE.Vector3().lerpVectors(ends[0], ends[1], t).setY(ends[0].y + (ends[1].y - ends[0].y) * t - SAG * Math.sin(Math.PI * t));
+  const cord = new THREE.BufferGeometry().setFromPoints(Array.from({ length: 17 }, (_, i) => at(i / 16)));
+  bag.add(new THREE.Line(cord, new THREE.LineBasicMaterial({ color: P.ink, transparent: true, opacity: 0.75 })));
+  return Array.from({ length: n }, (_, i) => { const p = at((i + 1) / (n + 1)); return { x: p.x, y: p.y, z: p.z }; });
+}
+
 export const lantern = feature('lantern', async (bag, ctx) => {
   if (!ctx.env.festivals.includes('lantern')) return;
-  const { THREE, pond } = ctx;
+  const { THREE, pond, palette: P } = ctx;
   const rng = dayRng(ctx, '115');
   await loadBrush('元宵灯谜汤圆');
   if (bag.disposed) return;
-  ctx.sky.forceNight(true);
-  bag.onDispose(() => ctx.sky.forceNight(false));
+  festivalNight(bag);
   ctx.hud.toast('元宵快乐！去猜灯谜吧', 'Happy Lantern Festival! Go and guess the lantern riddles', 4000);
-  lanternRow(bag, aroundPond(ctx, 10, 1.7, rng() * TAU), pond.center);
 
   // Sky lanterns (孔明灯) rising in a slow, endless stream.
   const still = reducedMotion();
@@ -273,13 +310,14 @@ export const lantern = feature('lantern', async (bag, ctx) => {
     geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
   }
   const skyMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false });
-  const sky = bag.add(new THREE.InstancedMesh(geo, skyMat, n));
+  const sky = bag.add(reflects(new THREE.InstancedMesh(geo, skyMat, n)));
   sky.frustumCulled = false;
   const glowPos = new Float32Array(n * 3);
   const gGeo = new THREE.BufferGeometry();
   gGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3).setUsage(THREE.DynamicDrawUsage));
-  const glow = bag.add(new THREE.Points(gGeo, new THREE.PointsMaterial({ size: 2.2, map: glowTexture(THREE, 64, 0.1), color: '#ff9a40', transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+  const glow = bag.add(reflects(new THREE.Points(gGeo, new THREE.PointsMaterial({ size: 1.8, map: glowTexture(THREE, 64, 0.1), color: '#ffb060', transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }))));
   glow.frustumCulled = false;
+  bag.frame(() => { glow.visible = ctx.sky.isNight(); });
   // Half rise from round the pond, half far off across it, so the stream is in view as you walk.
   const way = entry(ctx);
   const origin = (i: number): [number, number] => {
@@ -311,11 +349,9 @@ export const lantern = feature('lantern', async (bag, ctx) => {
     gGeo.attributes.position.needsUpdate = true;
   });
 
-  // Riddle lanterns: five red lanterns, each with a slip of paper.
-  const spots: T.Vector3[] = [];
-  const centre = findSpot(ctx, rng, { clear: 3, pondMargin: 2.2, noClaim: true });
-  for (let i = 0; i < RIDDLES.length; i++) spots.push(findSpot(ctx, rng, { near: { x: centre.x, z: centre.z, r: 4.5, min: 1 }, clear: 0.9, pondMargin: 1.8 }));
-  const { lanterns } = lanternRow(bag, spots, centre, { alwaysLit: true, size: 1.2 });
+  // Riddle lanterns: five paper lanterns on a cord between two bamboo posts, each with a slip of paper.
+  const hooks = riddleLine(bag, RIDDLES.length, rng);
+  const { lanterns } = hangLanterns(bag, hooks, { colors: [PAPER_APRICOT, PAPER_OCHRE, P.cinnabar, PAPER_OCHRE, PAPER_APRICOT], size: 1.1, drop: 0.12 });
   const slipTex = canvasTexture(THREE, 32, 128, (g, w, h) => { g.fillStyle = '#f1e2b8'; g.fillRect(0, 0, w, h); g.fillStyle = '#b9302a'; g.fillRect(3, 3, w - 6, 8); });
   const slipMat = new THREE.MeshLambertMaterial({ map: slipTex, side: THREE.DoubleSide });
   const slipGeo = new THREE.PlaneGeometry(0.07, 0.3);
@@ -324,7 +360,7 @@ export const lantern = feature('lantern', async (bag, ctx) => {
   bag.counter('riddles', label, `0/${RIDDLES.length}`);
   lanterns.forEach((c, i) => {
     const slip = new THREE.Mesh(slipGeo, slipMat);
-    slip.position.set(c.x, c.y - 0.72, c.z);
+    slip.position.set(c.x, c.y - 0.5, c.z);
     bag.add(slip);
     const r = RIDDLES[i];
     let stage = 0;
@@ -357,7 +393,7 @@ export const lantern = feature('lantern', async (bag, ctx) => {
   const b = bowl(ctx, '#e9e0cc', 0.16);
   b.position.set(tAt.x, table.top, tAt.z);
   bag.add(b);
-  const balls = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.035, 1), new THREE.MeshLambertMaterial({ color: '#fbf8f0' }), 5);
+  const balls = new THREE.InstancedMesh(merge(THREE, [part(THREE, new THREE.IcosahedronGeometry(0.035, 1), '#fbf8f0')]), propMat(ctx), 5);
   for (let i = 0; i < 5; i++) {
     const a = (i / 5) * TAU;
     m.makeTranslation(tAt.x + Math.cos(a) * 0.055, table.top + 0.1, tAt.z + Math.sin(a) * 0.055);
@@ -383,17 +419,16 @@ export const lantern = feature('lantern', async (bag, ctx) => {
 
 export const newyear = feature('newyear', (bag, ctx) => {
   if (!ctx.env.festivals.includes('newyear')) return;
-  ctx.sky.forceNight(true);
-  bag.onDispose(() => ctx.sky.forceNight(false));
-  const fw = fireworks(bag, { every: [2.5, 5] });
-  const year = ctx.env.date.getFullYear();
+  const night = festivalNight(bag);
+  const fw = fireworks(bag, { every: [2.5, 5], onlyAtNight: true });
+  const year = newYearOf(ctx.env.date);
   const beat = (n: number) => bag.later(1500 + (3 - n) * 1000, () => {
     ctx.hud.toast(String(n), String(n), 900);
     ctx.audio.pluck(n === 1 ? 4 : n === 2 ? 2 : 0, 0.6);
   });
   beat(3); beat(2); beat(1);
   bag.later(4500, () => {
-    fw.salvo(6);
+    if (night) fw.salvo(6);
     ctx.audio.bell();
     ctx.hud.showCard({
       titleZh: `元旦快乐 · ${year}`, titleEn: `Happy New Year ${year}`,

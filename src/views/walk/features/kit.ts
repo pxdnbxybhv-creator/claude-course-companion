@@ -36,10 +36,16 @@ export class Bag {
 
   constructor(readonly ctx: WorldCtx) {}
 
-  /** Add to the scene (or a parent) and remember it for disposal. */
+  /**
+   * Add to the scene (or a parent) and remember it for disposal. Feature props stay out of the pond's
+   * reflection pass unless marked with reflects() (things by or on the water): every object that is
+   * reflected costs a second draw and a second compiled GL program.
+   */
   add<O extends T.Object3D>(o: O, parent?: T.Object3D): O {
     (parent ?? this.ctx.scene).add(o);
     this.roots.push(o);
+    const layer = noReflectLayer(this.ctx);
+    if (layer !== null) o.traverse((c) => { if (!c.userData.reflect) c.layers.set(layer); });
     return o;
   }
   /** Something with dispose() that is not reachable from a scene object (a shared texture…). */
@@ -72,6 +78,9 @@ export class Bag {
   }
   counter(id: string, label: { zh: string; en: string }, value: string): void {
     this.counters.add(id);
+    const stack = (counterStack.get(id) ?? []).filter((e) => e.bag !== this);
+    stack.push({ bag: this, label, value });
+    counterStack.set(id, stack);
     this.ctx.hud.setCounter(id, label, value);
   }
   later(ms: number, fn: () => void): void {
@@ -97,7 +106,20 @@ export class Bag {
     for (const f of this.offs.splice(0).reverse()) {
       try { f(); } catch (e) { console.warn('[walk] dispose', e); }
     }
-    for (const id of this.counters) this.ctx.hud.setCounter(id, null);
+    // The HUD outlives worlds: a world torn down late (abandoned while starting up) must not wipe the
+    // counter a newer world set under the same id — hand the counter back to whoever set it before.
+    for (const id of this.counters) {
+      const stack = counterStack.get(id) ?? [];
+      const i = stack.findIndex((e) => e.bag === this);
+      if (i < 0) continue;
+      const top = i === stack.length - 1;
+      stack.splice(i, 1);
+      if (!stack.length) counterStack.delete(id);
+      if (!top) continue;
+      const prev = stack[stack.length - 1];
+      if (prev) prev.bag.ctx.hud.setCounter(id, prev.label, prev.value);
+      else this.ctx.hud.setCounter(id, null);
+    }
     const seen = new Set<unknown>();
     for (const r of this.roots.splice(0)) {
       r.removeFromParent();
@@ -110,6 +132,25 @@ export class Bag {
 
 type Disposable = { dispose(): void };
 
+/**
+ * The layer the core draws on screen but not into the pond's reflection. Not in the contract yet:
+ * inferred from the camera, which enables layer 0 plus exactly that one (else we don't guess).
+ */
+function noReflectLayer(ctx: WorldCtx): number | null {
+  const extra = (ctx.camera.layers.mask & ~1) >>> 0;
+  if (!extra || (extra & (extra - 1))) return null;
+  return 31 - Math.clz32(extra);
+}
+
+/** Mark an object (and what is already under it) to be mirrored in the pond: lanterns by the water, a boat on it. */
+export function reflects<O extends T.Object3D>(o: O): O {
+  o.traverse((c) => { c.userData.reflect = true; });
+  return o;
+}
+
+/** Live bags that set each HUD counter, oldest first (the last one is showing). */
+const counterStack = new Map<string, { bag: Bag; label: { zh: string; en: string }; value: string }[]>();
+
 /** DEV only: every live feature interactable, for scripted tests (window.__walkFeatures). */
 function devList(): Map<string, Interactable> {
   const w = window as unknown as { __walkFeatures?: Map<string, Interactable> };
@@ -117,7 +158,7 @@ function devList(): Map<string, Interactable> {
 }
 
 function freeMaterial(m: T.Material, seen: Set<unknown>) {
-  if (seen.has(m)) return;
+  if (seen.has(m) || m.userData.shared) return; // world-wide materials are freed with the world
   seen.add(m);
   for (const v of Object.values(m as unknown as Record<string, unknown>)) {
     if (v && typeof v === 'object' && (v as { isTexture?: boolean }).isTexture && !seen.has(v)) {
@@ -148,27 +189,74 @@ export function freeTree(root: T.Object3D, seen = new Set<unknown>()): void {
   });
 }
 
-/** A feature whose whole lifetime lives in one Bag. `build` may be async (fonts). */
-export function feature(id: string, build: (bag: Bag, ctx: WorldCtx) => void | Promise<void>): WorldFeature {
-  let bag: Bag | null = null;
-  return {
-    id,
-    async init(ctx) {
-      bag?.dispose();
-      const b = new Bag(ctx);
-      bag = b;
-      try {
-        await build(b, ctx);
-      } catch (e) {
-        console.warn(`[walk] feature ${id} failed`, e);
-        b.dispose();
-      }
-    },
-    dispose() {
-      bag?.dispose();
-      bag = null;
-    },
+/** A world feature that can hand out a fresh, independent copy of itself (one per world). */
+export interface FreshFeature extends WorldFeature {
+  fresh(): WorldFeature;
+}
+
+/**
+ * A feature whose whole lifetime lives in one Bag per world. `build` may be async (fonts).
+ * Bags are keyed by the world: when the view is rebuilt while the old world is still starting up,
+ * both worlds run init() side by side, and neither may dispose the other's props. `fresh()` makes
+ * an independent instance (FEATURES hands out fresh ones on every pass, see ./index.ts).
+ */
+export function feature(id: string, build: (bag: Bag, ctx: WorldCtx) => void | Promise<void>): FreshFeature {
+  const make = (): FreshFeature => {
+    const bags = new Map<WorldCtx, Bag>();
+    return {
+      id,
+      async init(ctx) {
+        bags.get(ctx)?.dispose(); // the same world starting this feature twice
+        const b = new Bag(ctx);
+        bags.set(ctx, b);
+        try {
+          await build(b, ctx);
+        } catch (e) {
+          console.warn(`[walk] feature ${id} failed`, e);
+          b.dispose();
+        }
+      },
+      dispose() {
+        for (const b of bags.values()) b.dispose();
+        bags.clear();
+      },
+      fresh: make,
+    };
   };
+  return make();
+}
+
+// ───────────────────────────── day or night ─────────────────────────────
+
+export type TimeChoice = 'now' | 'day' | 'night';
+
+/**
+ * What the visitor chose with the 时 switch: 'now' (the real clock, and a festival may bring on its
+ * night) or an explicit 'day' / 'night'. Read from `env.timeMode` once the core provides it; until
+ * then from the hours the core pins an explicit choice to (昼 = 11:00, 夜 = 21:30), which the real
+ * clock only shows for one minute a day.
+ */
+export function timeChoice(ctx: WorldCtx): TimeChoice {
+  const env = ctx.env as WorldCtx['env'] & { timeMode?: TimeChoice };
+  if (env.timeMode === 'now' || env.timeMode === 'day' || env.timeMode === 'night') return env.timeMode;
+  const d = env.date;
+  const clock = d.getHours() + d.getMinutes() / 60;
+  if (env.tod === 'day' && env.hour === 11 && clock !== 11) return 'day';
+  if (env.tod === 'night' && env.hour === 21.5 && clock !== 21.5) return 'night';
+  return 'now';
+}
+
+/**
+ * A festival that belongs to the night (the moon, lanterns, fireworks) brings night on — unless the
+ * visitor explicitly chose 昼, which always wins: the festival then shows its daytime face.
+ * Returns true when the world is (now) at night.
+ */
+export function festivalNight(bag: Bag): boolean {
+  const ctx = bag.ctx;
+  if (timeChoice(ctx) === 'day') return ctx.sky.isNight();
+  ctx.sky.forceNight(true);
+  bag.onDispose(() => ctx.sky.forceNight(false));
+  return true;
 }
 
 // ───────────────────────────── colour & materials ─────────────────────────────
@@ -178,9 +266,88 @@ export function mix(THREE: Three, a: string, b: string, t: number): T.Color {
   return new THREE.Color(a).lerp(new THREE.Color(b), t);
 }
 
-/** Flat-shaded, matte material — the default look of every little thing in the garden. */
-export function flat(THREE: Three, color: T.ColorRepresentation, o: Partial<T.MeshLambertMaterialParameters> = {}): T.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial({ color, flatShading: true, ...o });
+interface Shared {
+  gradient: T.DataTexture;
+  toon: T.MeshToonMaterial;
+  toonGlow: T.MeshToonMaterial;
+  outlines: Map<number, T.MeshBasicMaterial>;
+}
+const sharedMats = new WeakMap<WorldCtx, Shared>();
+
+function shared(ctx: WorldCtx): Shared {
+  let s = sharedMats.get(ctx);
+  if (s) return s;
+  const { THREE } = ctx;
+  // Three soft bands — shade, half-light, light — the same flat washes as the core's scholar and pavilion.
+  const gradient = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat);
+  gradient.minFilter = gradient.magFilter = THREE.NearestFilter;
+  gradient.generateMipmaps = false;
+  gradient.needsUpdate = true;
+  const toon = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: gradient, vertexColors: true });
+  // the same program (emissive is a uniform): for paper that is lit from inside at night
+  const toonGlow = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: gradient, vertexColors: true, emissive: new THREE.Color('#ffb466'), emissiveIntensity: 0 });
+  toon.userData.shared = toonGlow.userData.shared = true;
+  s = { gradient, toon, toonGlow, outlines: new Map() };
+  sharedMats.set(ctx, s);
+  return s;
+}
+
+/**
+ * The one material for solid props (tables, rocks, pots, the shrine…): the core's toon washes,
+ * coloured per vertex. Shared by every feature, so they all compile to one GL program.
+ */
+export function propMat(ctx: WorldCtx): T.MeshToonMaterial {
+  return shared(ctx).toon;
+}
+
+/** Like propMat, for paper lanterns: set `emissiveIntensity` (0 by day) to light them from inside. */
+export function lanternMat(ctx: WorldCtx): T.MeshToonMaterial {
+  return shared(ctx).toonGlow;
+}
+
+/** Inverted-hull ink outline (勾勒), `width` metres: back faces pushed out along the normal. */
+export function outlineMat(ctx: WorldCtx, width = 0.012): T.MeshBasicMaterial {
+  const s = shared(ctx);
+  const key = Math.round(width * 1000);
+  let m = s.outlines.get(key);
+  if (m) return m;
+  const { THREE } = ctx;
+  m = new THREE.MeshBasicMaterial({ color: ctx.palette.ink, side: THREE.BackSide });
+  const w = key / 1000;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uOutline = { value: w };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uOutline;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize(normal) * uOutline;');
+  };
+  m.customProgramCacheKey = () => 'fx-outline';
+  m.userData.shared = true;
+  s.outlines.set(key, m);
+  return m;
+}
+
+/** A prop painted like the core's buildings: toon washes plus an ink outline hull. */
+export function inked(ctx: WorldCtx, geo: T.BufferGeometry, o: { width?: number; mat?: T.Material } = {}): T.Mesh {
+  const { THREE } = ctx;
+  const mesh = new THREE.Mesh(geo, o.mat ?? propMat(ctx));
+  if (o.width !== 0) {
+    const hull = new THREE.Mesh(geo, outlineMat(ctx, o.width ?? 0.012));
+    hull.name = 'outline';
+    hull.raycast = () => {};
+    mesh.add(hull);
+  }
+  return mesh;
+}
+
+/** Free the world-wide materials (after every feature has let go of them). */
+export function disposeShared(ctx: WorldCtx): void {
+  const s = sharedMats.get(ctx);
+  if (!s) return;
+  sharedMats.delete(ctx);
+  s.toon.dispose();
+  s.toonGlow.dispose();
+  for (const m of s.outlines.values()) m.dispose();
+  s.gradient.dispose();
 }
 
 /** Unlit, for things that glow (lantern paper at night, the moon path, fireflies). */
@@ -343,6 +510,22 @@ export function shorePoint(ctx: WorldCtx, a: number, out: number): T.Vector3 {
 }
 
 export const distXZ = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
+
+/** Where the core's name tablets stand (read from its 'tablets' group; empty if it has none). */
+export function tabletSpots(ctx: WorldCtx): { x: number; z: number }[] {
+  const out: { x: number; z: number }[] = [];
+  const g = ctx.scene.getObjectByName('tablets');
+  if (!g) return out;
+  const v = new ctx.THREE.Vector3();
+  g.updateMatrixWorld(true);
+  for (const c of g.children) {
+    const m = (c as T.Mesh).material as T.MeshBasicMaterial | undefined;
+    if (!m || Array.isArray(m) || !m.map) continue; // the faces, one per tablet
+    c.getWorldPosition(v);
+    out.push({ x: v.x, z: v.z });
+  }
+  return out;
+}
 
 // ───────────────────────────── landmarks ─────────────────────────────
 

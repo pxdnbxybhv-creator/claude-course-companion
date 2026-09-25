@@ -1,8 +1,9 @@
-// Fireworks (烟花): one pooled Points cloud, shells launched in front of the viewer, gold / red /
-// white peonies and slow golden willows. Cheap: a few hundred particles, one draw call.
+// Fireworks (烟花): one pooled Points cloud, shells launched far out in front of the viewer and
+// bursting low, inside the walking view — gold / red / white peonies and slow golden willows.
+// Cheap: a few hundred particles, one draw call.
 import type * as T from 'three';
 import type { Bag } from './kit';
-import { glowTexture, reducedMotion } from './kit';
+import { glowTexture, reducedMotion, reflects } from './kit';
 import * as sfx from './sfx';
 
 const TAU = Math.PI * 2;
@@ -26,8 +27,8 @@ export function fireworks(bag: Bag, o: { every?: [number, number]; onlyAtNight?:
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4).setUsage(THREE.DynamicDrawUsage));
   // Normal blending with per-point alpha: the night sky here is moonlit paper, not black, so sparks
   // must read as colour on a light ground (additive light would vanish into it).
-  const mat = new THREE.PointsMaterial({ size: 1.1, map: glowTexture(THREE, 64, 0.35), vertexColors: true, transparent: true, depthWrite: false, fog: false, sizeAttenuation: true });
-  const pts = bag.add(new THREE.Points(geo, mat));
+  const mat = new THREE.PointsMaterial({ size: 1.5, map: glowTexture(THREE, 64, 0.35), vertexColors: true, transparent: true, depthWrite: false, fog: false, sizeAttenuation: true });
+  const pts = bag.add(reflects(new THREE.Points(geo, mat)));
   pts.frustumCulled = false;
   let head = 0;
   const colours = [P.gamboge, '#f0b030', P.cinnabar, P.vermilion, P.rouge, '#e8c060'].map((c) => new THREE.Color(c));
@@ -49,19 +50,34 @@ export function fireworks(bag: Bag, o: { every?: [number, number]; onlyAtNight?:
     if (f.lengthSq() < 1e-4) f.set(0, 0, -1);
     f.normalize();
     const side = new THREE.Vector3(-f.z, 0, f.x);
-    const d = 30 + Math.random() * 16, s = (Math.random() - 0.5) * 36;
+    const d = 50 + Math.random() * 18, s = (Math.random() - 0.5) * 50;
     return new THREE.Vector3(cam.position.x + f.x * d + side.x * s, 0, cam.position.z + f.z * d + side.z * s);
+  };
+  /**
+   * Burst height: the walking camera looks down at the scholar, so the top of the frame is only a
+   * few degrees above the horizon (≈ +11° on a wide screen, more on a phone). Bloom in the band
+   * between the horizon and that edge — far out and low — so shells never hide under the HUD.
+   */
+  const fwd = new THREE.Vector3();
+  const burstY = (x: number, z: number): number => {
+    const cam = ctx.camera;
+    cam.getWorldDirection(fwd);
+    const pitch = Math.asin(Math.max(-1, Math.min(1, fwd.y)));
+    const topEl = pitch + ((cam.fov * Math.PI) / 180) / 2; // elevation of the frame's top edge
+    const el = Math.max(0.045, Math.min(0.13, topEl * 0.4)) * (0.85 + Math.random() * 0.3);
+    const d = Math.hypot(x - cam.position.x, z - cam.position.z);
+    return cam.position.y + Math.tan(el) * d;
   };
   const launch = (at?: T.Vector3) => {
     const p = at ?? target();
-    // low enough to bloom inside the walking camera's view (it looks slightly down at the scholar)
-    const top = 7 + Math.random() * 6;
-    const g = Math.min(top - 5, Math.max(0, ctx.groundY(p.x, p.z)));
-    rockets.push({ x: p.x, y: g + 0.5, z: p.z, vy: 15 + Math.random() * 3, top, c: colours[Math.floor(Math.random() * colours.length)], willow: Math.random() < 0.3 });
+    const top = Math.max(5, burstY(p.x, p.z));
+    const g = Math.min(top - 4, Math.max(0, ctx.groundY(p.x, p.z)));
+    const vy = Math.sqrt(2 * 9 * (top - g)) + 2; // just enough to get there
+    rockets.push({ x: p.x, y: g + 0.5, z: p.z, vy, top, c: colours[Math.floor(Math.random() * colours.length)], willow: Math.random() < 0.3 });
   };
   const explode = (r: Rocket) => {
     const n = still ? 40 : r.willow ? 70 : 90;
-    const sp = r.willow ? 5 : 8 + Math.random() * 3;
+    const sp = r.willow ? 5 : 8.5 + Math.random() * 2.5;
     const second = Math.random() < 0.4 ? colours[Math.floor(Math.random() * colours.length)] : r.c;
     for (let i = 0; i < n; i++) {
       const u = Math.random() * 2 - 1, a = Math.random() * TAU, s = Math.sqrt(1 - u * u);
