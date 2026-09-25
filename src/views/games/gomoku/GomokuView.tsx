@@ -11,6 +11,7 @@ import type { Level } from './ai';
 import { AiClient, type Pending } from './aiClient';
 import { BoardPainter, hitTest, type Ghost } from './board';
 import { loadSaved, writeSaved, statText, LEVEL_NAMES, type Mode, type Saved } from './save';
+import { record as playRecord } from '../../../app/play';
 import './gomoku.css';
 
 type T = (zh: string, en: string) => string;
@@ -120,9 +121,19 @@ export function GomokuView() {
     };
   }, [aiTurn, moves, level]);
 
+  /** Did this game end while we watched (not restored already finished)? — play events count once. */
+  const liveGame = useRef(!over);
   // game end: stroke, seal, sound, stats
   useEffect(() => {
-    if (!over) return;
+    if (!over) {
+      liveGame.current = true;
+      return;
+    }
+    if (liveGame.current) {
+      liveGame.current = false;
+      playRecord('boardgame');
+      if (vsAi && res.winner === human && level !== 'beginner') playRecord('win:club');
+    }
     winAt.current = performance.now() + (reducedMotion() ? 0 : 260);
     if (vsAi && res.winner === human) audio.chime(5);
     else if (vsAi && res.winner) audio.bell();

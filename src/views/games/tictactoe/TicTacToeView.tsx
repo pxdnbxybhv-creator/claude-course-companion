@@ -8,6 +8,7 @@ import { audio } from '../../../audio/engine';
 import { aiMove, emptyBoard, outcome, play, toMove, winner, type Board, type Level, type Mark } from './logic';
 import { TttBoard } from './board';
 import { LEVEL_NAMES, loadStats, saveStats, type TttStats } from './store';
+import { record as playRecord } from '../../../app/play';
 import './ttt.css';
 
 type Mode = 'ai' | 'pvp';
@@ -102,6 +103,7 @@ export function TicTacToeView() {
   };
 
   const settle = (nb: Board, o: Mark | 'draw') => {
+    playRecord('boardgame');
     const w = winner(nb);
     if (w) boardRef.current?.win(w.line[0], w.line[2]);
     if (mode === 'ai') {
