@@ -111,8 +111,14 @@ export class Stage {
     end(this.ctx, 'qiyu');
   }
 
+  /** The scene's prompts that are up now (the dev hook lists them). */
+  readonly prompts: Interactable[] = [];
   /** A prompt in the world (removed when the scene goes). */
-  prompt(i: Interactable): () => void { return this.bag.interact(i); }
+  prompt(i: Interactable): () => void {
+    const off = this.bag.interact(i);
+    this.prompts.push(i);
+    return () => { off(); const k = this.prompts.indexOf(i); if (k >= 0) this.prompts.splice(k, 1); };
+  }
 
   /** Wait (in real time; the scene may be gone when it resolves — check `alive`). */
   wait(ms: number): Promise<void> {

@@ -157,6 +157,7 @@ export const encounters = feature('encounters', (bag, ctx) => {
     (window as unknown as { __qiyu?: unknown }).__qiyu = {
       start: (id: string) => { takeDown(); const d = ENCOUNTERS.find((e) => e.id === id); if (d) void start(d); },
       active: () => (active ? { id: active.def.id, finished: active.stage.finished, engaged: active.stage.engaged, scene: active.scene } : null),
+      prompts: () => (active ? active.stage.prompts.map((i) => ({ id: i.id, x: +i.position.x.toFixed(2), y: +i.position.y.toFixed(2), z: +i.position.z.toFixed(2), r: i.radius })) : []),
       memory: () => mem,
       moment,
       stop: takeDown,
