@@ -36,71 +36,73 @@
    The blot is four soft radial gradients a little off-centre from one another, each growing at its
    own pace, so the edge is organic rather than a perfect circle.
    ------------------------------------------------------------------------------------------------ */
-@property --ink-r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --ink-p { syntax: '<number>'; inherits: false; initial-value: 0; }
 
 :root { --vt-x: 50vw; --vt-y: 50vh; --vt-reach: 150vmax; }
 
 :root[data-vt-seq='0']::view-transition-new(root),
 :root[data-vt-seq='0'][data-vt-fallback] .view {
   -webkit-mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.18 * var(--ink-r)) calc(var(--vt-y) + -0.12 * var(--ink-r)), #000 calc(var(--ink-r) * 0.72), transparent calc(var(--ink-r) * 0.86)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.16 * var(--ink-r)) calc(var(--vt-y) + 0.1 * var(--ink-r)), #000 calc(var(--ink-r) * 0.68), transparent calc(var(--ink-r) * 0.84)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.05 * var(--ink-r)) calc(var(--vt-y) + 0.2 * var(--ink-r)), #000 calc(var(--ink-r) * 0.62), transparent calc(var(--ink-r) * 0.8));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.72), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.16 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.1 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.68), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.05 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8));
   mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.18 * var(--ink-r)) calc(var(--vt-y) + -0.12 * var(--ink-r)), #000 calc(var(--ink-r) * 0.72), transparent calc(var(--ink-r) * 0.86)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.16 * var(--ink-r)) calc(var(--vt-y) + 0.1 * var(--ink-r)), #000 calc(var(--ink-r) * 0.68), transparent calc(var(--ink-r) * 0.84)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.05 * var(--ink-r)) calc(var(--vt-y) + 0.2 * var(--ink-r)), #000 calc(var(--ink-r) * 0.62), transparent calc(var(--ink-r) * 0.8));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.72), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.16 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.1 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.68), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.05 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8));
 }
 
 :root[data-vt-seq='1']::view-transition-new(root),
 :root[data-vt-seq='1'][data-vt-fallback] .view {
   -webkit-mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.2 * var(--ink-r)) calc(var(--vt-y) + -0.08 * var(--ink-r)), #000 calc(var(--ink-r) * 0.7), transparent calc(var(--ink-r) * 0.85)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.12 * var(--ink-r)) calc(var(--vt-y) + 0.16 * var(--ink-r)), #000 calc(var(--ink-r) * 0.66), transparent calc(var(--ink-r) * 0.82));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.2 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.08 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.85)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.12 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.16 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82));
   mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.2 * var(--ink-r)) calc(var(--vt-y) + -0.08 * var(--ink-r)), #000 calc(var(--ink-r) * 0.7), transparent calc(var(--ink-r) * 0.85)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.12 * var(--ink-r)) calc(var(--vt-y) + 0.16 * var(--ink-r)), #000 calc(var(--ink-r) * 0.66), transparent calc(var(--ink-r) * 0.82));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.2 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.08 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.85)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.12 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.16 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82));
 }
 
 :root[data-vt-seq='2']::view-transition-new(root),
 :root[data-vt-seq='2'][data-vt-fallback] .view {
   -webkit-mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.88), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.1 * var(--ink-r)) calc(var(--vt-y) + -0.2 * var(--ink-r)), #000 calc(var(--ink-r) * 0.64), transparent calc(var(--ink-r) * 0.82)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.14 * var(--ink-r)) calc(var(--vt-y) + 0.14 * var(--ink-r)), #000 calc(var(--ink-r) * 0.7), transparent calc(var(--ink-r) * 0.86));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.88), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.1 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.64), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.14 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.14 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86));
   mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.88), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.1 * var(--ink-r)) calc(var(--vt-y) + -0.2 * var(--ink-r)), #000 calc(var(--ink-r) * 0.64), transparent calc(var(--ink-r) * 0.82)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.14 * var(--ink-r)) calc(var(--vt-y) + 0.14 * var(--ink-r)), #000 calc(var(--ink-r) * 0.7), transparent calc(var(--ink-r) * 0.86));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.88), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.1 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.64), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.14 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.14 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86));
 }
 
 :root[data-vt-seq='3']::view-transition-new(root),
 :root[data-vt-seq='3'][data-vt-fallback] .view {
   -webkit-mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.22 * var(--ink-r)) calc(var(--vt-y) + 0.06 * var(--ink-r)), #000 calc(var(--ink-r) * 0.62), transparent calc(var(--ink-r) * 0.8)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.08 * var(--ink-r)) calc(var(--vt-y) + -0.18 * var(--ink-r)), #000 calc(var(--ink-r) * 0.66), transparent calc(var(--ink-r) * 0.84)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.18 * var(--ink-r)) calc(var(--vt-y) + 0.12 * var(--ink-r)), #000 calc(var(--ink-r) * 0.6), transparent calc(var(--ink-r) * 0.78));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.22 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.06 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.08 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.18 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.6), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.78));
   mask-image:
-    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc(var(--ink-r) * 0.9), transparent calc(var(--ink-r) * 1.0)),
-    radial-gradient(circle at calc(var(--vt-x) + 0.22 * var(--ink-r)) calc(var(--vt-y) + 0.06 * var(--ink-r)), #000 calc(var(--ink-r) * 0.62), transparent calc(var(--ink-r) * 0.8)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.08 * var(--ink-r)) calc(var(--vt-y) + -0.18 * var(--ink-r)), #000 calc(var(--ink-r) * 0.66), transparent calc(var(--ink-r) * 0.84)),
-    radial-gradient(circle at calc(var(--vt-x) + -0.18 * var(--ink-r)) calc(var(--vt-y) + 0.12 * var(--ink-r)), #000 calc(var(--ink-r) * 0.6), transparent calc(var(--ink-r) * 0.78));
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.22 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.06 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.08 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.18 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.6), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.78));
 }
 
-@keyframes ink-spread { from { --ink-r: 0px; } to { --ink-r: var(--vt-reach); } }
+@keyframes ink-spread { from { --ink-p: 0; } to { --ink-p: 1; } }
 @keyframes page-settle { from { transform: scale(1.012); } to { transform: none; } }
+/* Freshly spread ink is a little darker, then dries into the paper. */
+@keyframes ink-dry { from { filter: brightness(0.8) saturate(0.8); } 55% { filter: brightness(0.95); } to { filter: none; } }
 @keyframes page-recede { from { opacity: 1; transform: none; } to { opacity: 0.35; transform: scale(0.992); } }
 @keyframes vt-fade-in { from { opacity: 0; } }
 @keyframes vt-fade-out { to { opacity: 0; } }
 
 ::view-transition-old(root) { animation: page-recede 640ms cubic-bezier(0.4, 0, 0.2, 1) both; }
 ::view-transition-new(root) {
-  animation: ink-spread 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, page-settle 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  animation: ink-spread 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, page-settle 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, ink-dry 760ms ease-out both;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
 }
