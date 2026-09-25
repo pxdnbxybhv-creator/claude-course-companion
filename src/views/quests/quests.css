@@ -170,7 +170,8 @@
 .qb-q-name small { font-size: 13.5px; font-style: italic; color: var(--ink-3); font-weight: 400; }
 .qb-q-desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; }
 .qb-q-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; margin: 3px 0 1px; min-height: 26px; }
-.qb-q-meta .qb-bar { flex: 1 1 110px; }
+.qb-q-prog { flex: 1 1 140px; min-width: 0; display: flex; align-items: center; gap: 10px; }
+.qb-q-prog .qb-bar { flex: 1 1 auto; min-width: 60px; }
 .qb-q-reward { flex: none; display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.04em; white-space: nowrap; }
 .qb-q-mini { box-shadow: 0 0 0 1px var(--line); }
 .qb-q-mini.is-empty {

@@ -43,6 +43,7 @@ export const gardener: CharacterFactory = (THREE) => {
   const dropM = kit.basic('#8fb4c8', { opacity: 0.85 });
   const drops = [0, 1, 2].map(() => { const d = new THREE.Mesh(kit.sphere(0.012, 1, 1.5, 1), dropM); can.add(d); d.visible = false; return d; });
   const swing = new Spring(40, 5);
+  kit.keep(...drops);
   h.handProps.push(can);
   const want = new THREE.Quaternion(), tmpQ = new THREE.Quaternion(), eul = new THREE.Euler();
 

@@ -57,17 +57,36 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
   let yaw = 0.5, spinV = 0;
   let t = 0, last = performance.now(), raf = 0;
   let pop = 1;
+  // reduced motion: the figure holds still (no breathing, no fluttering, no programme); it is
+  // stepped and drawn only while something the viewer did is playing out (a drag, a choice)
+  let settle = 0.2;
   // a little programme: idle, a showcase emote, idle, walk on the spot
   let cue = 0, cueT = 0;
   let emote: EmoteKind | null = null, emoteT = 0, emoteDur = 2.2, walking = false;
   const showcase = () => SHOWCASE[current ?? 'scholar'] ?? ['wave'];
 
+  // frame what is really there: the figure plus its hair loops, hat, hover and long props (a
+  // glaive, a rod), measured once it has settled into its idle pose. A long prop may widen the
+  // view, but never shrink the figure below ~60% of the frame.
+  const box = new THREE.Box3(), part = new THREE.Box3();
+  const measure = (root: THREE.Object3D) => {
+    box.makeEmpty();
+    root.updateWorldMatrix(true, true);
+    root.traverseVisible((ob) => {
+      const m = ob as THREE.Mesh;
+      if (!m.isMesh || ob.name === 'outline') return; // sprites (a glow) and ink hulls don't count
+      m.geometry.computeBoundingBox();
+      if (m.geometry.boundingBox) box.union(part.copy(m.geometry.boundingBox).applyMatrix4(m.matrixWorld));
+    });
+  };
   const frame = (h: number) => {
-    // small creatures are long rather than tall: frame at least a metre so tails fit
-    const hf = Math.max(h, 1.1);
-    const target = new THREE.Vector3(0, Math.max(h * 0.5, hf * 0.36), 0);
-    const d = (hf * 0.62) / Math.tan((camera.fov * Math.PI) / 360) + 0.4;
-    camera.position.set(0, hf * 0.6, d);
+    const top = box.isEmpty() ? h : Math.min(Math.max(box.max.y, h), h * 1.65);
+    // small creatures are long rather than tall: frame at least 1.35 m so tails fit as they turn
+    // (a tail swung toward the camera reaches low in the frame)
+    const span = Math.max(top * 1.12 + 0.1, 1.35);
+    const target = new THREE.Vector3(0, Math.min(span * 0.46, top * 0.5 + 0.2), 0);
+    const d = (span * 0.5) / Math.tan((camera.fov * Math.PI) / 360) + 0.45;
+    camera.position.set(0, target.y + span * 0.14, d);
     camera.lookAt(target);
     shadow.scale.setScalar(Math.max(0.9, h * 0.6));
   };
@@ -77,6 +96,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     renderer.setSize(w, hh, false);
     camera.aspect = w / hh;
     camera.updateProjectionMatrix();
+    settle = 0.2;
   };
 
   const show = (id: CharacterId) => {
@@ -86,12 +106,19 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     const f = FACTORIES[id];
     model = f(THREE, { palette: {} });
     scene.add(model.root);
+    // settle into the idle pose before the first frame (and before measuring)
+    model.root.rotation.y = Math.PI + yaw;
+    const idle: MotionState = { speed: 0, running: false, grounded: true, vy: 0, emote: null, emoteT: 0, t, riding: false };
+    for (let i = 0; i < 60; i++) { idle.t = o.reduced ? t : t + i / 30; model.update(1 / 30, idle); }
+    if (!o.reduced) t += 2;
+    measure(model.root);
     frame(model.height);
     pop = o.reduced ? 1 : 0;
     cue = 0; cueT = 0; emote = null; walking = false;
+    settle = 0.2;
   };
 
-  const doEmote = (k: EmoteKind) => { emote = k; emoteT = 0; emoteDur = k === 'play' ? 3 : 2.2; };
+  const doEmote = (k: EmoteKind) => { emote = k; emoteT = 0; emoteDur = k === 'play' ? 3 : 2.2; settle = 0.2; };
 
   // drag to turn
   let dragX: number | null = null;
@@ -101,7 +128,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     const dx = e.clientX - dragX;
     dragX = e.clientX;
     yaw += dx * 0.012;
-    spinV = dx * 0.6;
+    spinV = o.reduced ? 0 : dx * 0.6;
   };
   const up = () => { dragX = null; };
   canvas.addEventListener('pointerdown', down);
@@ -112,10 +139,15 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
   const loop = (now: number) => {
     raf = requestAnimationFrame(loop);
     if (document.hidden || !visible) { last = now; return; }
-    const dt = Math.min(0.05, (now - last) / 1000);
+    // (the first rAF stamp can precede the request: never step backwards)
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
-    t += dt;
     if (!model) return;
+    if (o.reduced) {
+      if (dragX !== null || emote) settle = 0.6;
+      else if (settle <= 0) return; // nothing changes: the canvas keeps the last frame
+      settle -= dt;
+    } else t += dt;
     // the programme
     if (!o.reduced && !emote) {
       cueT += dt;
@@ -145,7 +177,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     show,
     emote: (k) => doEmote(k),
     resize,
-    setVisible(v) { visible = v; },
+    setVisible(v) { visible = v; settle = 0.2; },
     dispose() {
       cancelAnimationFrame(raf);
       canvas.removeEventListener('pointerdown', down);

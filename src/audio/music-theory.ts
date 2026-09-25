@@ -50,14 +50,23 @@ export function halfCadence(final: number): number {
   return modeSteps(final)[3] === 7 ? 3 : 2;
 }
 
-/** Another mode on the same 宫 (同宫转调), with its tonic placed within a fifth of the old one. */
-export function relatedMode(mode: Mode, final: number): Mode {
+/**
+ * Another mode on the same 宫 (同宫转调), its tonic placed within a tritone of `ref` — the piece's
+ * home tonic, so that modulating again and again never random-walks the key out of range.
+ */
+export function relatedMode(mode: Mode, final: number, ref = mode.tonic): Mode {
   const gong = mode.tonic - PENT[mode.final];
   let tonic = gong + PENT[((final % 5) + 5) % 5];
-  while (tonic - mode.tonic > 6) tonic -= 12;
-  while (mode.tonic - tonic > 6) tonic += 12;
+  while (tonic - ref > 6) tonic -= 12;
+  while (ref - tonic > 6) tonic += 12;
   return { tonic, final: ((final % 5) + 5) % 5 };
 }
+
+/**
+ * The music's 宫 is F, the same as every sound effect (voices.ts: GONG = F3), so a check-in chime or
+ * a pluck always lands inside the scale that is playing. Every theme's modes are on it.
+ */
+export const MUSIC_GONG_PC = 5;
 
 // ---------------------------------------------------------------------------
 // Styles and phrases
@@ -308,6 +317,8 @@ export function daySeed(theme: string, day = dayKey()): number {
  */
 export class Composer {
   readonly style: Style;
+  /** The day's mode: modulations stay near its tonic. */
+  readonly home: Mode;
   mode: Mode;
   bpm: number;
   private rng: Rng;
@@ -321,6 +332,7 @@ export class Composer {
     this.style = style;
     const day = makeRng(seed);
     this.mode = day.pick(style.modes);
+    this.home = { ...this.mode };
     this.baseBpm = Math.round(day.range(style.bpm[0], style.bpm[1]));
     this.bpm = this.baseBpm;
     this.motif = makeMotif(style, day);
@@ -337,7 +349,7 @@ export class Composer {
       this.motif = developMotif(this.motif, s, r);
       if (r.chance(s.modulate)) {
         const finals = [0, 3, 4, 1].filter((f) => f !== this.mode.final);
-        this.mode = relatedMode(this.mode, r.pick(finals));
+        this.mode = relatedMode(this.mode, r.pick(finals), this.home.tonic);
         this.last = 0;
       }
       this.bpm = Math.round(this.baseBpm * r.range(0.96, 1.04));

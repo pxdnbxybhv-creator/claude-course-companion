@@ -47,6 +47,7 @@ export const musician: CharacterFactory = (THREE) => {
   for (let i = 0; i < 13; i++) put(qin, new THREE.Mesh(kit.sphere(0.005, 1, 1, 0.5, 6, 4), strM), 0.068, -0.35 + i * 0.055, 0.028); // 徽 markers
   const qinTassel = put(qin, kit.mesh(kit.cyl(0.004, 0.018, 0.12, 6, 'top'), kit.toon('#b93a2b'), OL * 0.5), 0, -0.47, 0.0);
   const qinSpring = new Spring(28, 4);
+  kit.keep(qinTassel);
   h.back.add(qin);
   const onBack = () => { qin.position.set(0, -0.08, -0.04); qin.rotation.set(0.12, Math.PI, 0.72); h.back.add(qin); };
   const onLap = () => { qin.position.set(0, 0.5, 0.37); qin.rotation.set(-Math.PI / 2 + 0.12, 0, Math.PI / 2); h.body.add(qin); };

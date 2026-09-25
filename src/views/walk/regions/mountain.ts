@@ -9,9 +9,10 @@ import type { RegionModule, WorldCtx } from '../types';
 import { ANCHORS, REGION, RIVER, type XZ } from '../map';
 import { makeRng } from '../../../core/rng';
 import {
-  Batch, COL, Hill, TAU, canvas, clamp, glowCanvas, hipRoof, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
-  puffCanvas, rect, rockGeometry, roof, stairs, three, windCards, xform,
+  Batch, COL, Hill, TAU, canvas, clamp, footing, glowCanvas, hipRoof, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
+  polyDist, puffCanvas, rect, rockGeometry, roof, stairs, three, windCards, wind, xform,
 } from './hill-kit';
+import { segmentDeck, type Clearing, type Deck } from './water-decks';
 import { pineTree } from './hill-trees';
 
 const R = REGION.mountain;
@@ -29,7 +30,6 @@ const AX = (() => {
 })();
 /** Facing of buildings on the axis (their fronts look back down toward the gate). */
 const FACE = Math.atan2(-AX.dx, -AX.dz);
-const onAxis = (t: number): XZ => ({ x: GATE.x + AX.dx * t, z: GATE.z + AX.dz * t });
 
 // ───────────────────────────── textures ─────────────────────────────
 
@@ -176,22 +176,138 @@ function build(ctx: WorldCtx): void {
   };
 
   // ── levels ─────────────────────────────────────────────────────────
+  // The precinct climbs in three terraces along the axis (gate-local lz runs from the gate toward
+  // the front; the hall sits at lz = −AX.len): the gate and its forecourt on the ground, the paved
+  // courtyard raised a storey of stairs (≈1.6 m), the hall on its own tall base (≈1.5 m more).
+  const G = frame(GATE.x, GATE.z, FACE);
+  const C_GATE = 2.0; // the gate's half depth
+  const HL = -AX.len; // the hall's centre, gate-local lz
   const gateY = h.y(GATE.x, GATE.z);
-  const courtC = onAxis(AX.len - 9.5);
-  // the courtyard is paved in slabs that follow the slope (the walker stays on the stone);
-  // its front edge sets where the long stairs arrive
-  const courtFront = onAxis(AX.len - 14.2);
-  const courtTop = h.y(courtFront.x, courtFront.z) + 0.12;
-  const porch = onAxis(AX.len - 5.4);
-  const hallTop = h.y(porch.x, porch.z) + 0.45;
+  const COURT = { lx: 9, z0: -8.0, z1: -19.6 }; // terrace body (reaches under the hall's base)
+  const HALLBASE = { lx: 7.4, hd: 5.1 };
+  let groundHi = gateY;
+  for (const [lx, lz] of [[-9, -8], [9, -8], [-9, -19.6], [9, -19.6], [0, -14], [-7.4, -29.3], [7.4, -29.3]]) {
+    const p = G(lx, lz);
+    groundHi = Math.max(groundHi, h.y(p.x, p.z));
+  }
+  const courtTop = groundHi + 1.6;
+  const hallTop = courtTop + 1.5;
+  const decks: Deck[] = [];
+  const rects: Clearing[] = [];
+  /** An oriented rectangle (for decks, clearings, tuft tests) in a frame at (x, z) facing ry. */
+  const orect = (x: number, z: number, ry: number, hl: number, hw: number): Clearing => ({ cx: x, cz: z, ax: Math.cos(ry), az: -Math.sin(ry), hl, hw });
+  const gRect = (lx0: number, lx1: number, lz0: number, lz1: number): Clearing => {
+    const c = G((lx0 + lx1) / 2, (lz0 + lz1) / 2);
+    return orect(c.x, c.z, FACE, Math.abs(lx1 - lx0) / 2, Math.abs(lz1 - lz0) / 2);
+  };
+  /** A walkable run from a to b (world), rising linearly from ya to yb. */
+  const ramp = (id: string, a: XZ, c: XZ, hw: number, ya: number, yb: number) => {
+    const L = Math.hypot(c.x - a.x, c.z - a.z) || 1;
+    decks.push(segmentDeck(`mountain:${id}`, a, c, hw, (s) => ya + ((yb - ya) * (s + L / 2)) / L));
+  };
+  /** Small colliders every `step` m along a line (walls, rails, cheeks). */
+  const colLine = (a: XZ, c: XZ, r: number, hgt: number, step = 0.5) => {
+    const L = Math.hypot(c.x - a.x, c.z - a.z);
+    const n = Math.max(1, Math.round(L / step));
+    for (let i = 0; i <= n; i++) h.collide({ x: a.x + ((c.x - a.x) * i) / n, z: a.z + ((c.z - a.z) * i) / n, r, h: hgt });
+  };
+  /** Stone courses (ink lines) on a vertical face from a to b (world), between y0 and y1. */
+  const courses = (a: XZ, c: XZ, y0: number, y1: number, seed: number) => {
+    const r = makeRng(seed);
+    const segs: number[] = [];
+    const L = Math.hypot(c.x - a.x, c.z - a.z);
+    const rows = Math.max(1, Math.round((y1 - y0) / 0.55));
+    for (let k = 1; k < rows; k++) {
+      const y = y0 + ((y1 - y0) * k) / rows;
+      segs.push(a.x, y, a.z, c.x, y, c.z);
+    }
+    for (let k = 0; k < rows; k++) {
+      const ya = y0 + ((y1 - y0) * k) / rows, yb = y0 + ((y1 - y0) * (k + 1)) / rows;
+      for (let u = (k % 2) * 0.6 + r() * 0.3; u < L; u += 1.1 + r() * 0.4) {
+        const t = u / L;
+        const x = a.x + (c.x - a.x) * t, z = a.z + (c.z - a.z) * t;
+        segs.push(x, ya, z, x, yb, z);
+      }
+    }
+    b.segs(segs);
+  };
+  /** A stone balustrade (栏杆) along local points of frame F at height y, with colliders. */
+  const rail = (F: (lx: number, lz: number) => XZ, pts: [number, number][], y: number) => {
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, az] = pts[i - 1], [cx, cz] = pts[i];
+      const L = Math.hypot(cx - ax, cz - az);
+      const n = Math.max(1, Math.round(L / 1.3));
+      const A = F(ax, az), C = F(cx, cz);
+      const dir = Math.atan2(C.x - A.x, C.z - A.z) + Math.PI / 2;
+      for (let k = 0; k <= n; k++) {
+        if (k === 0 && i > 1) continue;
+        const p = F(ax + ((cx - ax) * k) / n, az + ((cz - az) * k) / n);
+        b.add(place(new THREE.BoxGeometry(0.2, 0.8, 0.2), p.x, y + 0.4, p.z, dir), COL.stone, { edge: 40 });
+        b.add(place(new THREE.BoxGeometry(0.24, 0.1, 0.24), p.x, y + 0.84, p.z, dir), COL.stoneMid);
+        if (k < n) {
+          const q = F(ax + ((cx - ax) * (k + 0.5)) / n, az + ((cz - az) * (k + 0.5)) / n);
+          const sl = L / n - 0.2;
+          b.add(place(new THREE.BoxGeometry(sl, 0.12, 0.12), q.x, y + 0.66, q.z, dir), COL.stone, { edge: 40 });
+          b.add(place(new THREE.BoxGeometry(sl, 0.36, 0.06), q.x, y + 0.3, q.z, dir), COL.stoneMid, { edge: 40 });
+        }
+      }
+      colLine(A, C, 0.2, 1);
+    }
+  };
+  /** A flight of stone stairs from local (lx, lz0) at y0 to (lx, lz1) at y1 in frame F, with a deck and cheek colliders. */
+  const flight = (id: string, F: (lx: number, lz: number) => XZ, lx: number, lz0: number, lz1: number, y0: number, y1: number, width: number, seed: number, alongX = false) => {
+    const pa = alongX ? F(lz0, lx) : F(lx, lz0), pc = alongX ? F(lz1, lx) : F(lx, lz1);
+    stairs(b, h, new THREE.Vector3(pa.x, y0, pa.z), new THREE.Vector3(pc.x, y1, pc.z), width, { rise: 0.155, seed });
+    ramp(id, pa, pc, width / 2 + 0.05, y0, y1);
+    const L = Math.hypot(pc.x - pa.x, pc.z - pa.z), ux = (pc.x - pa.x) / L, uz = (pc.z - pa.z) / L;
+    for (const s of [-1, 1]) {
+      const ox = -uz * s * (width / 2 + 0.16), oz = ux * s * (width / 2 + 0.16);
+      colLine({ x: pa.x + ox, z: pa.z + oz }, { x: pc.x + ox, z: pc.z + oz }, 0.2, 1);
+    }
+    rects.push({ cx: (pa.x + pc.x) / 2, cz: (pa.z + pc.z) / 2, ax: ux, az: uz, hl: L / 2, hw: width / 2 + 0.35 });
+  };
+  const WALL_UMBER = '#7b6552', DOOR = '#6d5a4a', DOOR_DARK = '#3a2e28';
+  /** A stone lion (石狮) seated on a plinth at p, looking out from the gate: s = +1 the lion with his
+   *  ball (east), −1 the lioness with her cub (west). */
+  const lion = (p: XZ, s: number) => {
+    const L = frame(p.x, p.z, FACE);
+    const gy = h.y(p.x, p.z);
+    const stone = '#b5afa1', dark = '#8f897c';
+    footing(b, h, p.x, p.z, 0.6, 0.72, FACE, gy + 0.2, COL.stoneMid);
+    footing(b, h, p.x, p.z, 0.46, 0.6, FACE, gy + 0.74, stone);
+    const y0 = gy + 0.74;
+    const at = (lx: number, y: number, lz: number, g: T.BufferGeometry, col: string, o: { hull?: boolean; edge?: number } = {}) => {
+      const q = L(lx, lz);
+      b.add(place(g, q.x, y0 + y, q.z, FACE), col, o);
+    };
+    at(0, 0.3, -0.2, new THREE.SphereGeometry(0.34, 8, 6).scale(1.05, 0.85, 1.15), stone, { hull: true }); // haunches
+    at(0, 0.62, 0.05, new THREE.SphereGeometry(0.28, 8, 6).scale(1, 1.35, 0.9), stone, { hull: true }); // chest
+    for (const k of [-1, 1]) at(k * 0.15, 0.28, 0.3, new THREE.CylinderGeometry(0.075, 0.09, 0.56, 6), stone, { edge: 40 });
+    at(0, 1.0, 0.08, new THREE.IcosahedronGeometry(0.35, 0), dark, { hull: true }); // curled mane
+    at(0, 1.02, 0.24, new THREE.SphereGeometry(0.24, 8, 6), stone, { hull: true }); // head
+    at(0, 0.95, 0.46, new THREE.BoxGeometry(0.22, 0.15, 0.14), stone, { edge: 40 }); // muzzle
+    for (const k of [-1, 1]) at(k * 0.1, 1.1, 0.43, new THREE.SphereGeometry(0.035, 5, 4), COL.ink);
+    at(0, 0.55, -0.52, new THREE.SphereGeometry(0.12, 6, 5).scale(1, 1.6, 1), dark, { hull: true }); // tail
+    // a paw on the embroidered ball, or on the cub
+    at(s * 0.2, 0.13, 0.36, new THREE.SphereGeometry(0.13, 8, 6), s > 0 ? dark : stone, { hull: true });
+    if (s < 0) at(-0.2, 0.3, 0.34, new THREE.SphereGeometry(0.08, 6, 5), stone);
+    h.collide({ x: p.x, z: p.z, r: 0.75, h: 2 });
+    rects.push(orect(p.x, p.z, FACE, 0.8, 0.9));
+  };
 
   // ── 山门: the mountain gate between ochre walls ──────────────────────
   {
-    const F = frame(GATE.x, GATE.z, FACE);
-    const top = gateY + 0.25;
-    const lo = h.span(GATE.x, GATE.z, 4.5).lo - 0.5;
-    const A = 4.2, C = 2.0;
-    b.add(place(new THREE.BoxGeometry(A * 2 + 0.6, top - lo, C * 2 + 0.6), GATE.x, (top + lo) / 2, GATE.z, FACE), COL.stone, { edge: 30, jitter: 0.04 });
+    const F = G;
+    const top = gateY + 0.2;
+    const A = 4.2, C = C_GATE;
+    footing(b, h, GATE.x, GATE.z, A + 0.3, C + 0.3, FACE, top, COL.stone);
+    // a low step before and behind the open middle bay
+    for (const s of [-1, 1]) {
+      const p = F(0, s * (C + 0.55));
+      footing(b, h, p.x, p.z, 1.5, 0.25, FACE, gateY + 0.1, COL.stoneMid);
+    }
+    decks.push(segmentDeck('mountain:gate', F(0, C + 0.85), F(0, -C - 0.85), 1.25, (s) => gateY + 0.2 * clamp((C + 0.85 - Math.abs(s)) / 0.6, 0, 1)));
+    rects.push(gRect(-A - 0.3, A + 0.3, -C - 0.9, C + 0.9));
     const colH = 3.9;
     for (const lx of [-A + 0.3, -1.4, 1.4, A - 0.3]) for (const lz of [-C + 0.3, C - 0.3]) {
       const p = F(lx, lz);
@@ -200,7 +316,7 @@ function build(ctx: WorldCtx): void {
     }
     // side bays walled, round windows painted dark
     for (const s of [-1, 1]) {
-      panel(F, FACE, s * 1.55, 0, s * (A - 0.45), 0, top, colH - 0.5, 0.35, '#6f4638');
+      panel(F, FACE, s * 1.55, 0, s * (A - 0.45), 0, top, colH - 0.5, 0.35, WALL_UMBER);
       const w = F(s * (A / 2 + 0.7), 0.19);
       const win = new THREE.CircleGeometry(0.62, 20);
       place(win, w.x, top + 2.0, w.z, FACE);
@@ -214,12 +330,12 @@ function build(ctx: WorldCtx): void {
         bars.push(pa.x, top + 2.0 - hh, pa.z, pa.x, top + 2.0 + hh, pa.z);
       }
       b.segs(bars);
-      h.collide({ x: F(s * 2.8, 0).x, z: F(s * 2.8, 0).z, r: 1.3, h: colH });
+      colLine(F(s * 1.6, 0), F(s * (A - 0.2), 0), 0.3, colH);
     }
     // the central doors stand open against the walls
     for (const s of [-1, 1]) {
       const p = F(s * 1.3, -0.35);
-      b.add(place(new THREE.BoxGeometry(0.08, 3.1, 1.2), p.x, top + 1.55, p.z, FACE), '#6a4034', { edge: 30 });
+      b.add(place(new THREE.BoxGeometry(0.08, 3.1, 1.2), p.x, top + 1.55, p.z, FACE), DOOR, { edge: 30 });
       // door studs
       for (let i = 0; i < 5; i++) for (let j = 0; j < 3; j++) {
         const q = F(s * 1.25, -0.75 + j * 0.35);
@@ -230,18 +346,32 @@ function build(ctx: WorldCtx): void {
     b.add(place(new THREE.BoxGeometry(A * 2, 0.34, C * 2), GATE.x, beamY + 0.1, GATE.z, FACE), COL.wood, { edge: 30 });
     b.add(place(new THREE.BoxGeometry(A * 2 + 0.3, 0.3, C * 2 + 0.3), GATE.x, beamY + 0.42, GATE.z, FACE), '#3f5553', { edge: 30 });
     hipRoof(b, GATE.x, GATE.z, FACE, A + 1.4, C + 1.3, beamY + 0.55, 2.0, { curl: 0.5, flare: 0.35 });
-    const pf = F(0, C + 0.02);
-    plaque('云深寺', pf, beamY + 0.12, FACE, 1.8, 0.62);
+    // the name board hangs below the painted band, clear of it
+    plaque('云深寺', F(0, C + 0.19), beamY - 0.2, FACE, 1.8, 0.62);
     // red lanterns under the eave
     for (const s of [-1, 1]) {
       const p = F(s * 1.0, C + 0.5);
       redLanterns.push(new THREE.Vector3(p.x, beamY - 0.55, p.z));
     }
     h.occlude({ x: GATE.x, z: GATE.z, r: 2.5, y0: top, y1: beamY + 2.6 });
-    // ochre temple walls running out from the gate and back up the slope
+
+    // a paved walk out in front of the gate (the front plaza), stone lions either side (山门石狮)
+    {
+      const prng = makeRng(91);
+      for (let lz = C + 1.3; lz < 9; lz += 1.1) for (const lx of [-1.05, 0, 1.05]) {
+        const p = F(lx + prng.range(-0.04, 0.04), lz);
+        b.add(place(new THREE.BoxGeometry(1.0, 0.12, 1.0), p.x, h.y(p.x, p.z) + 0.02, p.z, FACE + prng.range(-0.03, 0.03)), new THREE.Color(COL.stoneWarm).multiplyScalar(prng.range(0.9, 1.04)), { edge: 50 });
+      }
+      rects.push(gRect(-1.6, 1.6, C + 0.9, 9));
+      for (const s of [-1, 1]) lion(F(s * 3.0, 3.6), s);
+    }
+
+    // ochre walls running out from the gate and back to the courtyard terrace. The east return
+    // is open where the path up from the lake arrives (a side way in: 角门).
     const wallRun: [number, number][][] = [
-      [[-A - 0.3, 0], [-A - 6.5, 0], [-A - 6.5, -6]],
-      [[A + 0.3, 0], [A + 6.5, 0], [A + 6.5, -6]],
+      [[-A - 0.6, 0], [-9.6, 0], [-9.6, -7.9]],
+      [[A + 0.6, 0], [9.6, 0], [9.6, -1.3]],
+      [[9.6, -4.7], [9.6, -7.9]],
     ];
     for (const run of wallRun) {
       for (let i = 1; i < run.length; i++) {
@@ -252,7 +382,7 @@ function build(ctx: WorldCtx): void {
           const t0 = k / n, t1 = (k + 1) / n;
           const p0 = F(ax + (cx - ax) * t0, az + (cz - az) * t0), p1 = F(ax + (cx - ax) * t1, az + (cz - az) * t1);
           const mx = (p0.x + p1.x) / 2, mz = (p0.z + p1.z) / 2;
-          if (pathDist(mx, mz) < 2.2 || ctx.waterAt(mx, mz) !== null) continue;
+          if (ctx.waterAt(mx, mz) !== null) continue;
           const wy = h.y(mx, mz);
           const sl = Math.hypot(p1.x - p0.x, p1.z - p0.z) + 0.02;
           const dir = Math.atan2(p1.x - p0.x, p1.z - p0.z) + Math.PI / 2;
@@ -260,64 +390,81 @@ function build(ctx: WorldCtx): void {
           b.add(place(new THREE.BoxGeometry(sl, 0.45, 0.52), mx, wy - 0.4, mz, dir), '#8e7d64', { edge: 30 });
           b.add(place(new THREE.BoxGeometry(sl + 0.04, 0.16, 0.9), mx, wy + 2.62, mz, dir), COL.tile, { edge: 30 });
           b.add(place(new THREE.BoxGeometry(sl + 0.04, 0.12, 0.2), mx, wy + 2.76, mz, dir), COL.tileDark);
-          h.collide({ x: mx, z: mz, r: 0.9, h: 2.6 });
         }
+        colLine(F(ax, az), F(cx, cz), 0.35, 2.6);
       }
     }
-  }
-
-  // ── the long stairs, with stone lanterns ─────────────────────────────
-  const s0 = onAxis(2.6), s1 = onAxis(AX.len - 14.2);
-  const a3 = new THREE.Vector3(s0.x, gateY + 0.22, s0.z);
-  const c3 = new THREE.Vector3(s1.x, courtTop, s1.z);
-  stairs(b, h, a3, c3, 3.2, { rise: 0.16, seed: 21 });
-  for (const t of [0.15, 0.5, 0.85]) {
-    for (const s of [-1, 1]) {
-      const p = { x: a3.x + (c3.x - a3.x) * t + Math.cos(FACE) * s * 2.6, z: a3.z + (c3.z - a3.z) * t - Math.sin(FACE) * s * 2.6 };
-      const y = h.y(p.x, p.z);
-      b.add(place(new THREE.CylinderGeometry(0.26, 0.3, 0.18, 6), p.x, y + 0.09, p.z), '#a6a092', { edge: 40 });
-      b.add(place(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), p.x, y + 0.5, p.z), '#b1ab9e', { rim: true });
-      b.add(place(new THREE.BoxGeometry(0.34, 0.3, 0.34), p.x, y + 1.0, p.z), '#b8b2a5', { edge: 40 });
-      b.add(place(new THREE.BoxGeometry(0.35, 0.14, 0.35), p.x, y + 1.0, p.z), '#4a4540');
-      b.add(place(new THREE.ConeGeometry(0.38, 0.28, 6), p.x, y + 1.29, p.z), '#8f8a80', { edge: 40 });
-      b.add(place(new THREE.SphereGeometry(0.07, 8, 6), p.x, y + 1.46, p.z), '#8f8a80');
-      addGlow(new THREE.Vector3(p.x, y + 1.0, p.z), 1.5);
-      h.collide({ x: p.x, z: p.z, r: 0.3, h: 1.5 });
+    // piers either side of the side way, and at the wall ends
+    for (const [lx, lz] of [[9.6, -1.3], [9.6, -4.7], [-9.6, 0], [9.6, 0]] as [number, number][]) {
+      const p = F(lx, lz);
+      const wy = h.y(p.x, p.z);
+      b.add(place(new THREE.BoxGeometry(0.8, 3.3, 0.8), p.x, wy + 1.0, p.z, FACE), COL.templeWall, { edge: 30, jitter: 0.04 });
+      b.add(place(new THREE.BoxGeometry(1.05, 0.2, 1.05), p.x, wy + 2.74, p.z, FACE), COL.tile, { edge: 30 });
+      b.add(place(new THREE.ConeGeometry(0.62, 0.4, 4), p.x, wy + 3.04, p.z, FACE + Math.PI / 4), COL.tileDark, { edge: 30 });
+      h.collide({ x: p.x, z: p.z, r: 0.55, h: 3 });
     }
   }
 
-  // ── the courtyard and the great censer ───────────────────────────────
+  // ── the stairs up to the courtyard, stone lanterns at the foot and the top ────
+  flight('stairs', G, 0, -C_GATE - 2.2, COURT.z0, gateY, courtTop, 4.2, 21);
+  rects.push(gRect(-9.6, 9.6, -C_GATE - 0.9, -C_GATE - 2.2));
+  const stoneLantern = (p: XZ, y: number) => {
+    b.add(place(new THREE.CylinderGeometry(0.26, 0.3, 0.18, 6), p.x, y + 0.09, p.z), '#a6a092', { edge: 40 });
+    b.add(place(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), p.x, y + 0.5, p.z), '#b1ab9e', { rim: true });
+    b.add(place(new THREE.BoxGeometry(0.34, 0.3, 0.34), p.x, y + 1.0, p.z), '#b8b2a5', { edge: 40 });
+    b.add(place(new THREE.BoxGeometry(0.35, 0.14, 0.35), p.x, y + 1.0, p.z), '#4a4540');
+    b.add(place(new THREE.ConeGeometry(0.38, 0.28, 6), p.x, y + 1.29, p.z), '#8f8a80', { edge: 40 });
+    b.add(place(new THREE.SphereGeometry(0.07, 8, 6), p.x, y + 1.46, p.z), '#8f8a80');
+    addGlow(new THREE.Vector3(p.x, y + 1.0, p.z), 1.5);
+    h.collide({ x: p.x, z: p.z, r: 0.3, h: 1.5 });
+  };
+  for (const s of [-1, 1]) {
+    const p = G(s * 3.2, -C_GATE - 3.0);
+    stoneLantern(p, h.y(p.x, p.z));
+    stoneLantern(G(s * 3.4, COURT.z0 - 1.2), courtTop);
+  }
+
+  // ── the courtyard terrace and the great censer ─────────────────────────
   {
-    const F = frame(courtC.x, courtC.z, FACE);
-    const hw = 8.5, hd = 5.8, cell = 1.42;
+    const F = G;
+    const zc = (COURT.z0 + COURT.z1) / 2, hd = (COURT.z0 - COURT.z1) / 2;
+    const cc = F(0, zc);
+    footing(b, h, cc.x, cc.z, COURT.lx, hd, FACE, courtTop - 0.12, COL.stone, { jitter: 0.03 });
+    b.add(place(new THREE.BoxGeometry(COURT.lx * 2 + 0.3, 0.2, hd * 2 + 0.3), cc.x, courtTop - 0.2, cc.z, FACE), COL.stoneMid, { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(COURT.lx * 2 + 0.24, 0.32, hd * 2 + 0.24), cc.x, groundHi + 0.02, cc.z, FACE), COL.stoneDark, { edge: 30 });
+    // masonry courses on the three faces you see
+    const cy0 = groundHi + 0.18, cy1 = courtTop - 0.3;
+    courses(F(-COURT.lx - 0.01, COURT.z0 + 0.01), F(-2.45, COURT.z0 + 0.01), cy0, cy1, 1);
+    courses(F(2.45, COURT.z0 + 0.01), F(COURT.lx + 0.01, COURT.z0 + 0.01), cy0, cy1, 2);
+    for (const s of [-1, 1]) {
+      courses(F(s * (COURT.lx + 0.01), COURT.z0), F(s * (COURT.lx + 0.01), -10.4), cy0, cy1, 3 + s);
+      courses(F(s * (COURT.lx + 0.01), -13.6), F(s * (COURT.lx + 0.01), COURT.z1), cy0, cy1, 5 + s);
+    }
+    // paving
+    const cell = 1.5;
     const prng = makeRng(77);
-    for (let i = -hw + cell / 2; i < hw; i += cell) {
-      for (let j = -hd + cell / 2; j < hd; j += cell) {
+    for (let i = -COURT.lx + cell / 2; i < COURT.lx; i += cell) {
+      for (let j = COURT.z0 - cell / 2; j > -AX.len + HALLBASE.hd; j -= cell) {
         const p = F(i, j);
-        const gy = h.y(p.x, p.z);
-        const top = gy + 0.1;
         const col = new THREE.Color(COL.stoneWarm).multiplyScalar(prng.range(0.9, 1.04));
-        b.add(place(new THREE.BoxGeometry(cell - 0.03, 0.9, cell - 0.03), p.x, top - 0.45, p.z, FACE), col, { edge: 40 });
+        b.add(place(new THREE.BoxGeometry(cell - 0.04, 0.14, cell - 0.04), p.x, courtTop - 0.07, p.z, FACE + prng.range(-0.01, 0.01)), col, { edge: 40 });
       }
     }
-    // balustrade along the front edge, open in the middle for the stairs
+    decks.push(segmentDeck('mountain:court', F(0, COURT.z0), F(0, COURT.z1), COURT.lx, courtTop));
+    rects.push(gRect(-COURT.lx - 0.3, COURT.lx + 0.3, COURT.z0 + 0.3, COURT.z1));
+    // balustrades round the edges: open for the front stairs and the side stairs
+    rail(F, [[-COURT.lx + 0.2, COURT.z0 - 0.2], [-2.5, COURT.z0 - 0.2]], courtTop);
+    rail(F, [[2.5, COURT.z0 - 0.2], [COURT.lx - 0.2, COURT.z0 - 0.2]], courtTop);
     for (const s of [-1, 1]) {
-      for (let k = 0; k < 5; k++) {
-        const lx = s * (2.2 + k * 1.3);
-        const p = F(lx, hd - 0.2);
-        const by = h.y(p.x, p.z) + 0.1;
-        b.add(place(new THREE.BoxGeometry(0.18, 0.75, 0.18), p.x, by + 0.37, p.z, FACE), COL.stone, { edge: 40 });
-        if (k < 4) {
-          const q = F(lx + s * 0.65, hd - 0.2);
-          const qy = h.y(q.x, q.z) + 0.1;
-          b.add(place(new THREE.BoxGeometry(1.15, 0.12, 0.12), q.x, qy + 0.62, q.z, FACE), COL.stone, { edge: 40 });
-          b.add(place(new THREE.BoxGeometry(1.15, 0.35, 0.06), q.x, qy + 0.3, q.z, FACE), COL.stoneMid, { edge: 40 });
-        }
-      }
+      rail(F, [[s * (COURT.lx - 0.2), COURT.z0 - 0.2], [s * (COURT.lx - 0.2), -10.35]], courtTop);
+      rail(F, [[s * (COURT.lx - 0.2), -13.65], [s * (COURT.lx - 0.2), COURT.z1 + 0.15], [s * (HALLBASE.lx + 0.05), COURT.z1 + 0.15]], courtTop);
+      // side stairs down to the ground: the ridge path arrives at the west one
+      const foot = F(s * (COURT.lx + 4.4), -12);
+      flight(s < 0 ? 'stairs-w' : 'stairs-e', F, -12, s * (COURT.lx + 4.4), s * COURT.lx, h.y(foot.x, foot.z), courtTop, 2.4, 30 + s, true);
     }
     // the censer (香炉): a bronze 鼎 on three legs, with a little roofed lid
-    const cp = F(0, 0.8);
-    const cy = h.y(cp.x, cp.z) + 0.1;
+    const cp = F(0, -11.9);
+    const cy = courtTop;
     const prof: T.Vector2[] = [
       [0.0, 0.0], [0.5, 0.0], [0.72, 0.1], [0.82, 0.35], [0.8, 0.62], [0.9, 0.7], [0.92, 0.78], [0.78, 0.8], [0.7, 0.78],
     ].map(([r, y]) => new THREE.Vector2(r, y));
@@ -329,10 +476,9 @@ function build(ctx: WorldCtx): void {
       b.add(place(new THREE.CylinderGeometry(0.1, 0.07, 0.62, 6), cp.x + Math.cos(a) * 0.5, cy + 0.31, cp.z + Math.sin(a) * 0.5, 0, 1, 1, 1, Math.sin(a) * 0.15, -Math.cos(a) * 0.15), COL.bronzeDark, { rim: true });
     }
     for (const s of [-1, 1]) {
-      const e = F(s * 0.95, 0.8);
+      const e = F(s * 0.95, -11.9);
       b.add(place(new THREE.TorusGeometry(0.16, 0.045, 5, 10, Math.PI), e.x, cy + 1.36, e.z, FACE + Math.PI / 2), COL.bronzeDark, { rim: true });
     }
-    // lid: a small hexagonal roof on posts
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * TAU;
       b.add(place(new THREE.CylinderGeometry(0.035, 0.035, 0.5, 5), cp.x + Math.cos(a) * 0.42, cy + 1.6, cp.z + Math.sin(a) * 0.42), COL.bronzeDark);
@@ -364,38 +510,49 @@ function build(ctx: WorldCtx): void {
         ctx.hud.toast('一炷清香，心随烟上。', 'A stick of incense; the heart rises with the smoke.');
       },
     });
-    // stairs from the courtyard up to the hall platform
-    const hs0 = onAxis(AX.len - 7.2), hs1 = onAxis(AX.len - 5.4);
-    stairs(b, h, new THREE.Vector3(hs0.x, h.y(hs0.x, hs0.z) + 0.1, hs0.z), new THREE.Vector3(hs1.x, hallTop, hs1.z), 3.4, { rise: 0.15, seed: 23, cheeks: false });
+    // stairs from the courtyard up to the hall's base
+    flight('stairs-hall', F, 0, HL + HALLBASE.hd + 3.5, HL + HALLBASE.hd, courtTop, hallTop, 3.6, 23);
   }
 
   // ── 大雄宝殿: the main hall, double-eaved ───────────────────────────
   {
     const F = frame(HALL.x, HALL.z, FACE);
     const A = 6.6, C = 4.2;
-    const lo = h.span(HALL.x, HALL.z, 7.5).lo - 0.6;
-    b.add(place(new THREE.BoxGeometry(A * 2 + 1.6, hallTop - lo, C * 2 + 1.8), HALL.x, (hallTop + lo) / 2, HALL.z, FACE), COL.stone, { edge: 30, jitter: 0.04 });
-    b.add(place(new THREE.BoxGeometry(A * 2 + 1.7, 0.12, C * 2 + 1.9), HALL.x, hallTop - 0.04, HALL.z, FACE), COL.stoneMid, { edge: 30 });
+    footing(b, h, HALL.x, HALL.z, HALLBASE.lx, HALLBASE.hd, FACE, hallTop, COL.stone);
+    b.add(place(new THREE.BoxGeometry(HALLBASE.lx * 2 + 0.2, 0.16, HALLBASE.hd * 2 + 0.2), HALL.x, hallTop - 0.06, HALL.z, FACE), COL.stoneMid, { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(HALLBASE.lx * 2 + 0.16, 0.26, HALLBASE.hd * 2 + 0.16), HALL.x, hallTop - 0.55, HALL.z, FACE), COL.stoneDark, { edge: 30 });
+    courses(F(-HALLBASE.lx - 0.01, HALLBASE.hd + 0.01), F(-2.2, HALLBASE.hd + 0.01), courtTop, hallTop - 0.7, 11);
+    courses(F(2.2, HALLBASE.hd + 0.01), F(HALLBASE.lx + 0.01, HALLBASE.hd + 0.01), courtTop, hallTop - 0.7, 12);
+    for (const s of [-1, 1]) courses(F(s * (HALLBASE.lx + 0.01), HALLBASE.hd - 0.6), F(s * (HALLBASE.lx + 0.01), -HALLBASE.hd), groundHi + 0.1, hallTop - 0.7, 13 + s);
+    decks.push(segmentDeck('mountain:hall', F(0, HALLBASE.hd), F(0, -HALLBASE.hd), HALLBASE.lx, hallTop));
+    rects.push(orect(HALL.x, HALL.z, FACE, HALLBASE.lx + 0.3, HALLBASE.hd + 0.3));
+    // a railing along the porch's front and ends, open at the stairs
+    for (const s of [-1, 1]) rail(F, [[s * 2.15, HALLBASE.hd - 0.2], [s * (HALLBASE.lx - 0.2), HALLBASE.hd - 0.2], [s * (HALLBASE.lx - 0.2), C - 1.75]], hallTop);
     const colH = 4.3;
     const xs = [-A, -A * 0.6, -A * 0.2, A * 0.2, A * 0.6, A];
-    // porch columns in front, wall columns behind
+    // porch columns in front (lacquered), wall columns behind (weathered umber)
     for (const lx of xs) {
       const p = F(lx, C);
       column(p, hallTop, colH, 0.2);
       h.collide({ x: p.x, z: p.z, r: 0.28, h: colH });
     }
     const wallZ = C - 1.6;
-    for (const lx of xs) column(F(lx, -C), hallTop, colH, 0.2);
-    for (const lz of [wallZ, 0, -C]) { column(F(-A, lz), hallTop, colH, 0.2); column(F(A, lz), hallTop, colH, 0.2); }
+    for (const lx of xs) column(F(lx, -C), hallTop, colH, 0.2, WALL_UMBER);
+    for (const lz of [wallZ, 0, -C]) { column(F(-A, lz), hallTop, colH, 0.2, WALL_UMBER); column(F(A, lz), hallTop, colH, 0.2, WALL_UMBER); }
     // walls: back and sides solid, the front a row of lattice doors
-    panel(F, FACE, -A, -C, A, -C, hallTop, colH - 0.3, 0.4, '#6f4638');
-    panel(F, FACE, -A, -C, -A, wallZ, hallTop, colH - 0.3, 0.4, '#6f4638');
-    panel(F, FACE, A, -C, A, wallZ, hallTop, colH - 0.3, 0.4, '#6f4638');
+    panel(F, FACE, -A, -C, A, -C, hallTop, colH - 0.3, 0.4, WALL_UMBER);
+    panel(F, FACE, -A, -C, -A, wallZ, hallTop, colH - 0.3, 0.4, WALL_UMBER);
+    panel(F, FACE, A, -C, A, wallZ, hallTop, colH - 0.3, 0.4, WALL_UMBER);
     for (let i = 0; i < xs.length - 1; i++) {
       const l0 = xs[i] + 0.22, l1 = xs[i + 1] - 0.22;
-      panel(F, FACE, l0, wallZ, l1, wallZ, hallTop, colH - 0.6, 0.12, i === 2 ? '#3a2a24' : '#6a4034');
+      panel(F, FACE, l0, wallZ, l1, wallZ, hallTop, colH - 0.6, 0.12, i === 2 ? DOOR_DARK : DOOR);
       lattice(F, l0, l1, wallZ + 0.07, hallTop + 0.1, colH - 0.8, 4);
     }
+    // colliders along every wall face and the door line (the player stops ~0.3 m short of them)
+    colLine(F(-A, -C), F(A, -C), 0.3, colH, 0.55);
+    for (const s of [-1, 1]) colLine(F(s * A, -C), F(s * A, wallZ), 0.3, colH, 0.55);
+    colLine(F(-A, wallZ), F(A, wallZ), 0.3, colH, 0.55);
+    for (const lx of [-3.3, 0, 3.3]) h.collide({ x: F(lx, -0.8).x, z: F(lx, -0.8).z, r: 2.2, h: colH });
     // dark interior glimpse through the open middle door, a golden glow of the altar at night
     const inner = F(0, wallZ - 1.2);
     addGlow(new THREE.Vector3(inner.x, hallTop + 1.6, inner.z), 3.5);
@@ -416,7 +573,7 @@ function build(ctx: WorldCtx): void {
     roof(b, outer1, inner1, e1, e1 + 1.35, { curl: 0.6, flare: 0.5, U: 12, V: 6 });
     // upper storey (a clerestory band) and the upper hip roof
     const dY = e1 + 1.1;
-    b.add(place(new THREE.BoxGeometry((A - 0.55) * 2, 1.5, (C - 0.55) * 2), HALL.x, dY + 0.75, HALL.z, FACE), '#6f4638', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry((A - 0.55) * 2, 1.5, (C - 0.55) * 2), HALL.x, dY + 0.75, HALL.z, FACE), WALL_UMBER, { edge: 30 });
     const win: number[] = [];
     for (let i = 0; i <= 20; i++) {
       const p = F(-A + 0.6 + (i / 20) * (A - 0.6) * 2, C - 0.53);
@@ -427,10 +584,8 @@ function build(ctx: WorldCtx): void {
     hipRoof(b, HALL.x, HALL.z, FACE, A + 1.3, C + 1.2, dY + 1.78, 3.1, { curl: 0.65, flare: 0.5 });
     const pf = F(0, C - 0.52);
     plaque('大雄宝殿', pf, dY + 0.78, FACE, 2.6, 0.9);
-    // collider & occluder covering the hall
     for (let i = -2; i <= 2; i++) {
       const p = F(i * 2.6, -0.6);
-      h.collide({ x: p.x, z: p.z, r: 2.6, h: colH });
       h.occlude({ x: p.x, z: p.z, r: 2.4, y0: hallTop, y1: dY + 4.5 });
     }
     // red lanterns under the front eave
@@ -440,18 +595,31 @@ function build(ctx: WorldCtx): void {
     }
   }
 
-  // ── the bell pavilion: a big bronze bell hanging free, a striker log beside it ──
-  let bellMesh: T.Mesh, striker: T.Mesh;
+  // ── the bell pavilion: a big bronze bell hanging free (the bell mini-game hangs the striker log) ──
+  let bellMesh: T.Mesh;
   {
     const ry = Math.atan2(HALL.x - BELL.x, HALL.z - BELL.z) - Math.PI / 2; // side faces the courtyard
     const F = frame(BELL.x, BELL.z, ry);
-    const top = h.y(BELL.x, BELL.z) + 0.22;
-    const lo = h.span(BELL.x, BELL.z, 3.4).lo - 0.6;
-    b.add(place(new THREE.BoxGeometry(6.4, top - lo, 6.4), BELL.x, (top + lo) / 2, BELL.z, ry), COL.stone, { edge: 30, jitter: 0.04 });
+    const gy = h.y(BELL.x, BELL.z);
+    const top = gy + 0.3;
+    const HB = 3.2;
+    footing(b, h, BELL.x, BELL.z, HB, HB, ry, top, COL.stone);
+    // a step in the middle of every side, and walkable ramps up them
+    for (let k = 0; k < 4; k++) {
+      const a = (k * Math.PI) / 2;
+      const p = F(Math.cos(a) * (HB + 0.3), Math.sin(a) * (HB + 0.3));
+      footing(b, h, p.x, p.z, 0.3, 0.9, ry + a, gy + 0.15, COL.stoneMid);
+    }
+    for (const a of [0, Math.PI / 2]) {
+      const p0 = F(Math.cos(a) * (HB + 0.7), Math.sin(a) * (HB + 0.7)), p1 = F(-Math.cos(a) * (HB + 0.7), -Math.sin(a) * (HB + 0.7));
+      decks.push(segmentDeck(`mountain:bell${a ? 'z' : 'x'}`, p0, p1, 0.9, (s) => gy + 0.3 * clamp((HB + 0.7 - Math.abs(s)) / 0.7, 0, 1)));
+    }
+    decks.push(segmentDeck('mountain:bell', F(-HB, 0), F(HB, 0), HB, top));
+    rects.push(orect(BELL.x, BELL.z, ry, HB + 0.8, HB + 0.8));
     const colH = 5.0;
     for (const [lx, lz] of [[-2.7, -2.7], [2.7, -2.7], [2.7, 2.7], [-2.7, 2.7]]) {
       const p = F(lx, lz);
-      column(p, top, colH, 0.2);
+      column(p, top, colH, 0.2, WALL_UMBER);
       h.collide({ x: p.x, z: p.z, r: 0.3, h: colH });
     }
     const beamY = top + colH;
@@ -463,13 +631,13 @@ function build(ctx: WorldCtx): void {
     // double roof: a skirt, a short drum, a pyramidal top (攒尖)
     const e1 = beamY + 0.5;
     roof(b, xform(rect(4.2, 4.2), BELL.x, BELL.z, ry), xform(rect(2.3, 2.3), BELL.x, BELL.z, ry), e1, e1 + 0.95, { curl: 0.5, flare: 0.4 });
-    b.add(place(new THREE.BoxGeometry(4.5, 1.0, 4.5), BELL.x, e1 + 1.25, BELL.z, ry), '#6f4638', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(4.5, 1.0, 4.5), BELL.x, e1 + 1.25, BELL.z, ry), WALL_UMBER, { edge: 30 });
     const e2 = e1 + 1.75;
     roof(b, xform(rect(3.3, 3.3), BELL.x, BELL.z, ry), xform(rect(0.001, 0.001), BELL.x, BELL.z, ry), e2, e2 + 2.1, { curl: 0.5, flare: 0.35 });
     b.add(place(new THREE.SphereGeometry(0.22, 10, 8), BELL.x, e2 + 2.2, BELL.z), '#3c3c3e', { hull: true });
     b.add(place(new THREE.ConeGeometry(0.09, 0.5, 8), BELL.x, e2 + 2.55, BELL.z), '#3c3c3e');
-    const pf = F(0, 2.72);
-    plaque('钟', pf, beamY - 0.15, ry, 0.9, 0.9, { bg: '#26394a' });
+    // the 钟 board hangs below the beam box, in front of its face
+    plaque('钟', F(0, 3.02), beamY - 0.62, ry, 0.8, 0.8, { bg: '#26394a' });
     h.occlude({ x: BELL.x, z: BELL.z, r: 3, y0: beamY - 0.3, y1: e2 + 2.3 });
 
     // the bell (梵钟): lathe body with raised bands, a 蒲牢 loop on top. Origin = the hanging point.
@@ -503,29 +671,22 @@ function build(ctx: WorldCtx): void {
     bellMesh.rotation.y = ry;
     h.add(bellMesh);
     h.collide({ x: BELL.x, z: BELL.z, r: 0.85, h: 3 });
-
-    // the striker (撞木): a log hung on two ropes, pointing at the bell's boss. Origin = its pivot.
-    const sy = hang.y - 0.35 - 1.35; // boss height
-    const pivotY = beamY - 0.72;
-    const sGeo: T.BufferGeometry[] = [];
-    const logLen = 1.9, gap = 0.78, mid = gap + logLen / 2;
-    // local x runs from the pivot (above the log's middle) toward the far end; -x points at the bell
-    sGeo.push(tintGeo(THREE, place(new THREE.CylinderGeometry(0.13, 0.13, logLen, 8).rotateZ(Math.PI / 2), 0, sy - pivotY, 0), '#6d5039'));
-    sGeo.push(tintGeo(THREE, place(new THREE.CylinderGeometry(0.135, 0.135, 0.06, 8).rotateZ(Math.PI / 2), gap + 0.05 - mid, sy - pivotY, 0), '#2c2019'));
-    for (const u of [0.35, 1.5]) {
-      sGeo.push(tintGeo(THREE, place(new THREE.CylinderGeometry(0.018, 0.018, pivotY - sy, 4), gap + u - mid, (sy - pivotY) / 2, 0), '#8a6f4e'));
+    // The striker log itself belongs to the bell mini-game (features/minigames/bell.ts), which hangs
+    // it toward the hall at ≈ bell radius + 0.95 m from a pivot 1.5 m above the strike point. We only
+    // hang the timber it swings from, under the cross beam, where its ropes meet it.
+    {
+      const radius = 0.8, bottom = hang.y - 0.35 - Hb, centreY = (bottom + hang.y + 0.31) / 2;
+      const pivotY = bottom + (centreY - bottom) * 0.55 + 1.5;
+      const restD = radius + 0.95;
+      const q = F(restD, 0);
+      b.add(place(new THREE.BoxGeometry(1.5, 0.16, 0.16), q.x, pivotY + 0.08, q.z, ry), COL.wood, { edge: 30 });
+      for (const u of [-0.6, 0.6]) {
+        const r2 = F(restD + u, 0);
+        const y0 = pivotY + 0.16, y1 = beamY - 0.72;
+        if (y1 > y0 + 0.02) b.add(place(new THREE.CylinderGeometry(0.03, 0.03, y1 - y0, 5), r2.x, (y0 + y1) / 2, r2.z), '#3b2a21');
+      }
     }
-    striker = new THREE.Mesh(mergeColored(THREE, sGeo), h.toon('#ffffff', { vc: true, rim: 0.5 }));
-    striker.name = 'bellStriker';
-    striker.userData.role = 'bell-striker';
-    const sp = F(mid, 0);
-    striker.position.set(sp.x, pivotY, sp.z);
-    striker.userData.swing = 'rotation.z'; // a pendulum on its ropes: negative z-rotation swings the log's head into the bell
-    striker.rotation.y = ry;
-    h.add(striker);
-    b.add(place(new THREE.BoxGeometry(2.0, 0.16, 0.16), F(gap + 0.95, 0).x, pivotY + 0.08, F(gap + 0.95, 0).z, ry), COL.wood);
     h.group.userData.bell = bellMesh;
-    h.group.userData.bellStriker = striker;
   }
 
   // ── the pagoda: seven storeys, octagonal, wind-bells at every corner ────
@@ -544,28 +705,26 @@ function build(ctx: WorldCtx): void {
       const r = 2.55 - 1.05 * k;
       const hs = s === 0 ? 3.6 : 2.55 - 0.5 * k;
       b.add(place(new THREE.CylinderGeometry(r, r * 1.02, hs, 8, 1, false, Math.PI / 8), x, y + hs / 2, z), '#e6dfd1', { edge: 30, jitter: 0.03 });
-      // corner posts and a door on alternate faces
+      // corner posts (ink lines down the real corners, which sit at odd multiples of π/8) and a door
+      // on alternate faces, set just proud of the face
       const segs: number[] = [];
-      const cs = ngon(8, r * 1.02 / Math.cos(Math.PI / 8) * Math.cos(Math.PI / 8), -Math.PI / 8 + Math.PI / 2);
-      for (let i = 0; i < 8; i++) {
-        const cc = ngon(8, r / Math.cos(Math.PI / 8), 0)[i];
-        segs.push(x + cc[0], y, z + cc[1], x + cc[0], y + hs, z + cc[1]);
-      }
+      for (const [cx, cz] of ngon(8, r * 1.012, Math.PI / 8)) segs.push(x + cx, y, z + cz, x + cx, y + hs, z + cz);
       b.segs(segs);
-      void cs;
+      const apo = r * Math.cos(Math.PI / 8);
       for (let i = 0; i < 8; i += 2) {
-        const a = ((i + (s % 2)) / 8) * TAU + Math.PI / 8 - Math.PI / 8;
-        const fx = x + Math.cos(a) * (r * 0.99), fz = z + Math.sin(a) * (r * 0.99);
+        const a = ((i + (s % 2)) / 8) * TAU;
+        const fx = x + Math.cos(a) * (apo + 0.05), fz = z + Math.sin(a) * (apo + 0.05);
         const dh = Math.min(hs * 0.62, 2.2);
-        b.add(place(new THREE.BoxGeometry(r * 0.42, dh, 0.1), fx, y + hs * 0.08 + dh / 2, fz, Math.atan2(Math.cos(a), Math.sin(a)) + 0 * Math.PI), s === 0 && i === 0 ? '#2e2622' : '#6a4034', { edge: 30 });
+        b.add(place(new THREE.BoxGeometry(r * 0.4, dh, 0.08), fx, y + hs * 0.08 + dh / 2, fz, Math.atan2(Math.cos(a), Math.sin(a))), s === 0 && i === 0 ? '#2e2622' : '#6d5a4a', { edge: 30 });
       }
       // brackets band, then the eave
       y += hs;
       b.add(place(new THREE.CylinderGeometry(r + 0.25, r, 0.3, 8, 1, false, Math.PI / 8), x, y + 0.15, z), '#3f5553', { edge: 30 });
       const eo = r + 1.35 - 0.3 * k;
       const eaveY = y + 0.25;
-      roof(b, ngon(8, eo / Math.cos(Math.PI / 8), 0).map(([a, c]) => [x + a, z + c]), ngon(8, (r * 0.92) / Math.cos(Math.PI / 8), 0).map(([a, c]) => [x + a, z + c]), eaveY, eaveY + 0.75, { curl: 0.42, flare: 0.3, U: 6, V: 4 });
-      for (const [cx, cz] of ngon(8, (eo + 0.3) / Math.cos(Math.PI / 8), 0)) windBells.push({ p: new THREE.Vector3(x + cx, eaveY + 0.3, z + cz), ph: rng() * TAU });
+      // the eave's corners over the body's corners, a wind-bell under each flying corner
+      roof(b, ngon(8, eo / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), ngon(8, (r * 0.92) / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), eaveY, eaveY + 0.75, { curl: 0.42, flare: 0.3, U: 6, V: 4 });
+      for (const [cx, cz] of ngon(8, (eo + 0.3) / Math.cos(Math.PI / 8), Math.PI / 8)) windBells.push({ p: new THREE.Vector3(x + cx, eaveY + 0.3, z + cz), ph: rng() * TAU });
       y = eaveY + 0.55;
     }
     // the spire (塔刹): a lotus base, stacked rings, a vase and a pearl
@@ -581,33 +740,105 @@ function build(ctx: WorldCtx): void {
   }
 
   // ── the waterfall ───────────────────────────────────────────────────
+  // The stream crosses the terrace in a stone-lined runnel from behind the pagoda and pours over the
+  // terrace's own edge, down a face of stacked slab rock (斧劈皴) whose tops lie flush with the
+  // terrace, into the pool where the river begins.
   const waterY = ctx.waterAt(POOL.x, POOL.z) ?? h.y(POOL.x, POOL.z) - 0.25;
-  const foot = { x: FALL.x, z: FALL.z + 3.4 };
-  const lipY = Math.max(h.y(FALL.x, FALL.z - 3) + 6, waterY + 9.5);
-  const lip = { x: FALL.x, z: FALL.z - 0.4 };
+  const terraceY = h.y(FALL.x, FALL.z - 9);
+  /** Where the terrace breaks off above the pool, along x (found in the ground, it curves round the pool). */
+  const edgeAt = (x: number): number => {
+    for (let z = POOL.z - 2; z > POOL.z - 18; z -= 0.25) if (h.y(x, z) > terraceY - 0.4) return z;
+    return POOL.z - 8;
+  };
+  const edgeZ = edgeAt(FALL.x);
+  const lipY = terraceY - 0.06;
+  const lip = { x: FALL.x, z: edgeZ + 0.55 };
+  const foot = { x: FALL.x, z: edgeZ + 5.4 };
+  // the runnel's course, from behind the pagoda round to the lip
+  const runnel = wind([
+    { x: PAGODA.x + 4.5, z: PAGODA.z - 5.5 }, { x: PAGODA.x + 6, z: PAGODA.z + 2 }, { x: PAGODA.x + 3.5, z: PAGODA.z + 9 },
+    { x: FALL.x + 1.2, z: edgeZ - 4 }, { x: lip.x, z: lip.z },
+  ], 0.8);
   {
-    // the cliff: a back wall of rock rising above the lip, two flanks, a ledge the water leaves from
-    const cliff: [number, number, number, number, number, number][] = [
-      // x, z, width, height, seed, baseY-offset
-      [FALL.x, FALL.z - 3.2, 11, lipY - waterY + 5, 4101, -1],
-      [FALL.x - 5.6, FALL.z - 1.6, 5.5, lipY - waterY + 1.5, 4102, -1],
-      [FALL.x + 5.8, FALL.z - 1.8, 6, lipY - waterY + 0.5, 4103, -1],
-      [FALL.x - 7.5, FALL.z - 4.5, 7, lipY - waterY - 2, 4104, -1],
-      [FALL.x + 8, FALL.z - 4, 7, lipY - waterY - 3, 4105, -1],
-    ];
-    for (const [cx, cz, w, hh, seed] of cliff) {
-      const base = Math.min(waterY - 0.8, h.y(cx, cz) - 1);
-      const g = rockGeometry(seed, w, hh, { base: '#a9a496', dark: '#403e39', lean: 0.08, detail: 1 });
-      g.rotateY(rng() * 0.6 - 0.3);
-      g.translate(cx, base, cz);
-      b.colored(g, { hull: true });
-      h.collide({ x: cx, z: cz, r: w * 0.42, h: hh });
-      h.occlude({ x: cx, z: cz, r: w * 0.35, y0: base, y1: base + hh });
+    // the face: layers of slab rock standing out in front of the ground's own drop, the lower ones
+    // further out, following the edge round the pool; the top layer is the rim rock the water leaves
+    const lr = makeRng(4101);
+    const yb = waterY - 0.7;
+    const top0 = terraceY - 0.08;
+    const layers = Math.max(3, Math.round((top0 - yb) / 1.2));
+    const lh = (top0 - yb) / layers;
+    for (let k = 0; k < layers; k++) {
+      const y0 = yb + k * lh;
+      const out = (1 - k / (layers - 1)) * 1.2;
+      let xx = FALL.x - 7.5 + lr() * 0.6;
+      while (xx < FALL.x + 7.5) {
+        const w = 1.6 + lr() * 2.0;
+        const cx = Math.min(xx + w / 2, FALL.x + 7.5);
+        // the notch the water has worn: the middle stands back a little
+        const notch = Math.abs(cx - FALL.x) < 1.3 && k < layers - 1 ? -0.3 : 0;
+        const front = edgeAt(cx) + 0.5 + out + notch + (k === layers - 1 ? lr.range(-0.1, 0.15) : lr.range(-0.25, 0.25));
+        const depth = 3.0 + lr() * 1.2;
+        const top = k === layers - 1 ? top0 : y0 + lh * lr.range(0.94, 1.1);
+        const bot = y0 - 0.3;
+        const g = new THREE.BoxGeometry(w + 0.1, top - bot, depth);
+        const tilt = k === layers - 1 ? 0 : 1;
+        const ry = lr.range(-0.06, 0.06) + Math.atan2(edgeAt(cx + 1) - edgeAt(cx - 1), 2) * -1;
+        place(g, cx, (top + bot) / 2, front - depth / 2, ry, 1, 1, 1, lr.range(-0.03, 0.03) * tilt, lr.range(-0.04, 0.04) * tilt);
+        const tone = new THREE.Color(k % 2 ? '#a7a295' : '#9b968a').multiplyScalar(lr.range(0.88, 1.05)).lerp(new THREE.Color('#5f5b53'), (1 - k / layers) * 0.35);
+        b.add(g, tone, { edge: 25, jitter: 0.05, seed: 4100 + k });
+        xx += w;
+      }
     }
-    // the ledge (a flat slab of rock jutting out at the lip)
-    const ledge = rockGeometry(4110, 4.2, 1.2, { base: '#a39e90', dark: '#45423d', lean: 0 });
-    ledge.translate(lip.x, lipY - 0.9, lip.z - 0.7);
-    b.colored(ledge, { hull: true });
+    h.occlude({ x: FALL.x, z: edgeZ + 0.5, r: 5, y0: yb, y1: terraceY });
+    // a curb of low stones along the edge either side of the lip, so no one walks off the cliff
+    for (const s of [-1, 1]) {
+      for (let i = 0; i < 8; i++) {
+        const x = FALL.x + s * (1.4 + i * 0.85), z = edgeAt(x) - 0.35;
+        const g = rockGeometry(4300 + i + (s > 0 ? 10 : 0), 0.9 + lr() * 0.4, 0.38 + lr() * 0.2, { base: '#aaa598', dark: '#57544d', lean: 0.05, flat: 0.4 });
+        g.rotateY(lr() * TAU);
+        g.translate(x, terraceY - 0.05, z);
+        b.colored(g, { hull: true });
+        h.collide({ x, z, r: 0.45, h: 1 });
+        h.collide({ x: x + s * 0.42, z: edgeAt(x + s * 0.42) - 0.35, r: 0.4, h: 1 });
+      }
+    }
+    // the runnel: a pale water strip between two low curbs of stone
+    {
+      const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+      let v = 0;
+      for (let i = 0; i < runnel.length; i++) {
+        const p = runnel[i], q = runnel[Math.min(runnel.length - 1, i + 1)], o = runnel[Math.max(0, i - 1)];
+        const tx = q.x - o.x, tz = q.z - o.z, tl = Math.hypot(tx, tz) || 1;
+        const nx = -tz / tl, nz = tx / tl;
+        if (i > 0) v += Math.hypot(p.x - runnel[i - 1].x, p.z - runnel[i - 1].z);
+        const y = Math.max(h.y(p.x, p.z), lipY) + 0.05;
+        for (const s of [-1, 1]) { pos.push(p.x + nx * s * 0.45, y, p.z + nz * s * 0.45); uv.push(s < 0 ? 0 : 1, v / 3); }
+        if (i < runnel.length - 1) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+        if (i % 2 === 0 && i < runnel.length - 1) {
+          for (const s of [-1, 1]) {
+            const cx = p.x + nx * s * 0.62, cz = p.z + nz * s * 0.62;
+            b.add(place(new THREE.BoxGeometry(0.28, 0.22, 1.5), cx, h.y(cx, cz) + 0.06, cz, Math.atan2(tx, tz) + lr.range(-0.08, 0.08)), new THREE.Color(COL.stoneMid).multiplyScalar(lr.range(0.85, 1.02)), { edge: 40 });
+          }
+        }
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const tex = h.tex(streakCanvas(73), { repeat: true });
+      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color: '#b7c4c2', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+      const mesh = new THREE.Mesh(g, m);
+      mesh.name = 'mountain:runnel';
+      mesh.renderOrder = 2;
+      h.add(mesh);
+      const base = new THREE.Color('#b7c4c2');
+      h.frame((dt) => {
+        if (!h.reduced) tex.offset.y = (tex.offset.y - dt * 0.5) % 1;
+        m.color.copy(base).multiply(h.paper);
+      });
+      for (let i = 0; i < runnel.length; i += 3) rects.push(orect(runnel[i].x, runnel[i].z, 0, 1.2, 1.2));
+    }
     // rocks round the pool, leaving the river's way out open
     const out = RIVER[1];
     const outA = Math.atan2(out.z - POOL.z, out.x - POOL.x);
@@ -616,7 +847,7 @@ function build(ctx: WorldCtx): void {
       if (Math.abs(Math.atan2(Math.sin(a - outA), Math.cos(a - outA))) < 0.55) continue;
       const d = 4.4 + rng() * 0.8;
       const x = POOL.x + Math.cos(a) * d, z = POOL.z + Math.sin(a) * d;
-      if (z < FALL.z - 1) continue;
+      if (z < edgeAt(x) + 2.2) continue;
       const s = 0.8 + rng() * 0.9;
       const g = rockGeometry(4200 + i, s * 1.6, s * 1.0, { base: '#aeab9e', dark: '#4a4843', lean: 0.1 });
       g.rotateY(rng() * TAU);
@@ -634,7 +865,7 @@ function build(ctx: WorldCtx): void {
   }
   {
     // the falling water: a ribbon that leaves the lip, arcs out, and drops into the pool
-    const topW = 1.9, botW = 3.0;
+    const topW = 1.2, botW = 2.6;
     const ribbon = (width0: number, width1: number, push: number): T.BufferGeometry => {
       const N = 14;
       const pos: number[] = [], uv: number[] = [], idx: number[] = [];
@@ -708,19 +939,26 @@ function build(ctx: WorldCtx): void {
   }
 
   // ── ancient pines, one hung with prayer ribbons ─────────────────────────
+  // nothing grows on what is built: the terraces, stairs, platforms, walls (tested as rectangles)
+  rects.push(gRect(-9.9, -4.5, -0.35, 0.35), gRect(4.5, 9.9, -0.35, 0.35), gRect(-9.9, -9.3, 0.3, -8), gRect(9.3, 9.9, 0.3, -8));
+  const built = (x: number, z: number, m: number) => rects.some((c) => {
+    const dx = x - c.cx, dz = z - c.cz;
+    return Math.abs(dx * c.ax + dz * c.az) <= c.hl + m && Math.abs(-dx * c.az + dz * c.ax) <= c.hw + m;
+  });
+  const lakeEnd: XZ[] = [{ x: 46, z: -92 }, { x: 38, z: -93 }]; // the core grades the lake path on to here
   const clearOf = (x: number, z: number, pad = 0) =>
     pathDist(x, z) > 2.6 + pad &&
-    Math.hypot(x - GATE.x, z - GATE.z) > 7 + pad &&
-    Math.hypot(x - HALL.x, z - HALL.z) > 10 + pad &&
-    Math.hypot(x - courtC.x, z - courtC.z) > 9.5 + pad &&
-    Math.hypot(x - BELL.x, z - BELL.z) > 5.5 + pad &&
-    Math.hypot(x - PAGODA.x, z - PAGODA.z) > 6 + pad &&
-    Math.hypot(x - FALL.x, z - (FALL.z + 1)) > 9 + pad &&
-    distToSeg(x, z, GATE, onAxis(AX.len)) > 4 + pad &&
+    polyDist(lakeEnd, x, z) > 2.6 + pad &&
+    !built(x, z, Math.max(0.4, 2 + pad)) &&
+    Math.hypot(x - PAGODA.x, z - PAGODA.z) > Math.max(4.9, 6 + pad) &&
+    Math.hypot(x - FALL.x, z - (edgeZ + 3)) > Math.max(8.5, 9 + pad) &&
+    polyDist(runnel, x, z) > Math.max(0.9, 1.6 + pad) &&
+    distToSeg(x, z, G(0, 9), G(0, -AX.len)) > Math.max(1.8, 4 + pad) &&
     ctx.waterAt(x, z) === null;
+  const gp = (lx: number, lz: number, s: number): [number, number, number] => { const p = G(lx, lz); return [p.x, p.z, s]; };
   const pineSpots: [number, number, number][] = [
-    [GATE.x - 8, GATE.z + 3.5, 1.1], [GATE.x + 11, GATE.z - 2, 1.0],
-    [courtC.x - 12, courtC.z + 2, 1.15], [HALL.x + 12, HALL.z + 4, 1.0], [HALL.x - 4, HALL.z - 12, 1.2],
+    gp(-7.5, 6.5, 1.1), gp(13.5, 3, 1.0), gp(-12.5, -15.5, 1.15),
+    [HALL.x + 12, HALL.z + 4, 1.0], [HALL.x - 4, HALL.z - 12, 1.2],
     [PAGODA.x + 7, PAGODA.z + 5, 0.95], [BELL.x - 7, BELL.z + 4, 1.0], [BELL.x + 2, BELL.z - 8, 1.1],
   ];
   for (let tries = 0; tries < 400 && pineSpots.length < 16; tries++) {
@@ -822,22 +1060,33 @@ function build(ctx: WorldCtx): void {
 
   // ── lights: red lanterns, and glows that come on at night ──────────────
   {
-    const lanMat = h.toon('#b0473a', { emissive: '#000000' });
-    const capMat = h.toon('#2b2724');
-    const lg = new THREE.SphereGeometry(0.28, 12, 9);
-    const cg = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10);
-    const lanterns: T.Object3D[] = [];
-    for (const p of redLanterns) {
-      const g = new THREE.Group();
-      g.position.copy(p);
-      const body = new THREE.Mesh(lg, lanMat); body.scale.set(1, 1.25, 1);
-      const t1 = new THREE.Mesh(cg, capMat); t1.position.y = 0.34;
-      const t2 = new THREE.Mesh(cg, capMat); t2.position.y = -0.34;
-      g.add(body, t1, t2);
-      h.add(g);
-      lanterns.push(g);
-      addGlow(p.clone(), 3);
-    }
+    // the four red lanterns: one merged, vertex-coloured shape drawn as a single instanced mesh
+    const lanGeo = mergeColored(THREE, [
+      tintGeo(THREE, new THREE.SphereGeometry(0.28, 12, 9).scale(1, 1.25, 1), '#b0473a'),
+      tintGeo(THREE, new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10).translate(0, 0.34, 0), '#2b2724'),
+      tintGeo(THREE, new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10).translate(0, -0.34, 0), '#2b2724'),
+      tintGeo(THREE, new THREE.CylinderGeometry(0.012, 0.012, 0.3, 4).translate(0, 0.53, 0), '#2b2724'),
+    ]);
+    const lanMat = h.toon('#ffffff', { vc: true, emissive: '#000000' });
+    const lanterns = new THREE.InstancedMesh(lanGeo, lanMat, Math.max(1, redLanterns.length));
+    lanterns.count = redLanterns.length;
+    lanterns.name = 'mountain:lanterns';
+    const lm4 = new THREE.Matrix4(), lq = new THREE.Quaternion(), le = new THREE.Euler(), lone = new THREE.Vector3(1, 1, 1), lp = new THREE.Vector3();
+    const swayLanterns = (t: number) => {
+      redLanterns.forEach((p, i) => {
+        const a = h.reduced ? 0 : Math.sin(t * 0.8 + i * 1.7) * 0.04;
+        le.set(0, 0, a);
+        lq.setFromEuler(le);
+        // swing about the cord's top
+        lp.set(p.x + Math.sin(a) * 0.68, p.y + 0.68 - Math.cos(a) * 0.68, p.z);
+        lanterns.setMatrixAt(i, lm4.compose(lp, lq, lone));
+      });
+      lanterns.instanceMatrix.needsUpdate = true;
+    };
+    swayLanterns(0);
+    lanterns.computeBoundingSphere();
+    h.add(lanterns);
+    for (const p of redLanterns) addGlow(p.clone(), 3);
     const gg = new THREE.BufferGeometry();
     gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPts.flatMap((p) => [p.x, p.y, p.z]), 3));
     gg.setAttribute('aSize', new THREE.Float32BufferAttribute(glowSize, 1));
@@ -856,7 +1105,7 @@ function build(ctx: WorldCtx): void {
       gm.opacity = 0.6 * n * flick;
       glows.visible = n > 0.02;
       lanMat.emissive.setRGB(0.55 * n * flick, 0.2 * n * flick, 0.08 * n);
-      lanterns.forEach((l, i) => { l.rotation.z = Math.sin(t * 0.8 + i * 1.7) * 0.04; });
+      if (lanterns.visible && h.group.parent?.visible !== false) swayLanterns(t);
     });
   }
 
@@ -899,7 +1148,10 @@ function build(ctx: WorldCtx): void {
     h.add(cloud);
     h.frame(() => { (cloud.material as T.MeshBasicMaterial).color.set('#f4efe6').multiply(h.paper); });
   }
-  void clamp;
+  // the walkable terraces, stairs and platforms, and the built-over ground (registered last, so every
+  // height sampled above is the bare ground's)
+  for (const d of decks) h.deck(d);
+  for (const r of rects) h.clearing(r);
 }
 
 // ───────────────────────────── helpers ─────────────────────────────

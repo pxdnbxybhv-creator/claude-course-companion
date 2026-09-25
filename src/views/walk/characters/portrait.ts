@@ -233,9 +233,9 @@ const PAINT: Record<string, (p: P) => void> = {
     p.brush([[66, 106, 0.9], [60, 86, 0.8], [66, 80, 0.8], [76, 78, 0.8], [86, 82, 0.8], [90, 90, 0.8], [72, 108, 0.9]], 0.75);
   },
   poet(p) {
-    // the moon he is toasting
-    p.wash(PIGMENTS.indigo, ell(78, 26, 11, 11, 0, Math.PI * 2, 24), 0.1, true);
-    p.fill('#f8f3e6', ell(78, 26, 9, 9), 0.95, 0.5, true);
+    // the moon he is toasting: a pale wash up over his shoulder, well inside the fan
+    p.wash(PIGMENTS.indigo, ell(25, 29, 11, 11, 0, Math.PI * 2, 24), 0.07, true);
+    p.fill('#f8f3e6', ell(25, 29, 9, 9), 0.55, 0.5, true);
     // the gourd
     p.fill('#c08c45', ell(80, 108, 8, 9), 0.95, 0.4);
     p.fill('#c08c45', ell(80, 95, 5, 5.5), 0.95, 0.4);
@@ -338,7 +338,7 @@ const PAINT: Record<string, (p: P) => void> = {
 const cache = new Map<string, HTMLCanvasElement>();
 let sealCache: HTMLCanvasElement | null = null;
 
-function render(id: string, locked: boolean, W: number, H: number): HTMLCanvasElement {
+function render(id: string, locked: boolean, W: number, H: number, seal: boolean): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = W; c.height = H;
   const g = c.getContext('2d');
@@ -377,24 +377,29 @@ function render(id: string, locked: boolean, W: number, H: number): HTMLCanvasEl
   g.strokeStyle = 'rgba(27,25,22,0.28)';
   g.lineWidth = Math.max(1, R * 0.012);
   g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.stroke();
-  if (locked) {
+  if (locked && seal) {
+    // 未 — "not yet": cinnabar is rare, so only the large portrait carries it, never the tiles
     const size = Math.max(14, Math.round(R * 0.36));
     if (!sealCache || sealCache.width !== size * 2) {
-      try { sealCache = makeSeal('?', { size, dpr: 2, style: 'zhu', shape: 'square', color: SEAL_RED, wear: 0.35, seed: 7 }); } catch { sealCache = null; }
+      try { sealCache = makeSeal('未', { size, dpr: 2, style: 'zhu', shape: 'square', color: SEAL_RED, wear: 0.35, seed: 7 }); } catch { sealCache = null; }
     }
     if (sealCache) g.drawImage(sealCache, cx + R * 0.36, cy + R * 0.36, size, size);
   }
   return c;
 }
 
-/** A small painted portrait (2D canvas, ink style) for cards outside the 3D world. */
-export function paintPortrait(canvas: HTMLCanvasElement, id: string, locked: boolean): void {
+/**
+ * A small painted portrait (2D canvas, ink style) for cards outside the 3D world. A locked one
+ * carries a cinnabar 「未」 seal only when `seal` is set (default: large portraits, ≥ 160 px).
+ */
+export function paintPortrait(canvas: HTMLCanvasElement, id: string, locked: boolean, o: { seal?: boolean } = {}): void {
   const W = canvas.width, H = canvas.height;
   if (!W || !H) return;
-  const key = `${id}|${locked ? 1 : 0}|${W}x${H}`;
+  const seal = locked && (o.seal ?? Math.min(W, H) >= 160);
+  const key = `${id}|${locked ? 1 : 0}|${seal ? 1 : 0}|${W}x${H}`;
   let img = cache.get(key);
   if (!img) {
-    img = render(id, locked, W, H);
+    img = render(id, locked, W, H, seal);
     if (cache.size > 64) cache.delete(cache.keys().next().value as string);
     cache.set(key, img);
   }

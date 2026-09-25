@@ -3,7 +3,7 @@
 // bounds when running, sits down (tail swishing, ears twitching) when you stand still. Emotes:
 // eating, the play-bow stretch, a beckoning paw (招财猫), paw swipes, chasing his own tail.
 import type { CharacterFactory, CharacterModel, MotionState } from './types';
-import { Blinker, Kit, OL, Spring, clamp, damp, mix, put, smooth, type Group, type Mesh } from './rig';
+import { Blinker, Kit, OL, Spring, bake, clamp, damp, mix, put, smooth, type Group } from './rig';
 
 export const cat: CharacterFactory = (THREE) => {
   const kit = new Kit(THREE);
@@ -47,12 +47,13 @@ export const cat: CharacterFactory = (THREE) => {
   put(head, new THREE.Mesh(kit.sphere(0.017, 1.3, 0.8, 0.8), pink), 0, -0.025, 0.14);
   // forehead "M"
   for (const [x, rz, len] of [[0, 0, 0.05], [0.03, 0.25, 0.04], [-0.03, -0.25, 0.04]] as const) put(head, new THREE.Mesh(kit.box(0.012, len, 0.01), darkM), x, 0.075, 0.105, -0.55, 0, rz);
-  // eyes: smug half-lids
-  const eyes: Mesh[] = [];
+  // eyes: smug half-lids (one row, so they blink as one)
+  const eyes = kit.group(head, 0, 0.02, 0);
   for (const sx of [1, -1]) {
-    const e = put(head, new THREE.Mesh(kit.sphere(0.024, 1.1, 1, 0.5, 10, 8), ink), 0.058 * sx, 0.02, 0.118);
-    e.lookAt(0.058 * sx * 3, 0.02, 1);
-    eyes.push(e);
+    const e = new THREE.Mesh(kit.sphere(0.024, 1.1, 1, 0.5, 10, 8), ink);
+    e.position.set(0.058 * sx, 0, 0.118);
+    e.lookAt(0.058 * sx * 3, 0, 1);
+    eyes.add(e);
   }
   // ears (pyramids with pink insides)
   const ears: Group[] = [];
@@ -99,6 +100,9 @@ export const cat: CharacterFactory = (THREE) => {
   const tailSpring = new Spring(18, 5);
   let phase = 0, idleT = 0, twitchAt = 2, twitchSide = 0, twitch = 0, wasGrounded = true, landed = 0, spinA = 0;
   const cur = { tp: 0, ty: 0.25, tz: 0, fl: 0, fr: 0, bl: 0, br: 0, neck: 0, head: 0, headY: 0, tailUp: 1, lid: 0.55, sit: 0, stretch: 1 };
+
+  // fold the still parts into a few draws (every part of him moves only with its joint)
+  bake(kit, root);
 
   // the right fore-paw, for a prop a feature lends (a rod held between the paws as he sits)
   const hand = kit.group(FR, 0, -0.17, 0.05);
@@ -210,7 +214,7 @@ export const cat: CharacterFactory = (THREE) => {
       });
 
       const b = blink.at(t);
-      for (const eye of eyes) eye.scale.y = Math.min(b, cur.lid);
+      eyes.scale.y = Math.min(b, cur.lid);
     },
     dispose() {
       root.removeFromParent();

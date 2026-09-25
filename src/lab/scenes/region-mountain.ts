@@ -11,6 +11,8 @@ import { bambooRegion } from '../../views/walk/regions/bamboo';
 import { plumRegion } from '../../views/walk/regions/plum';
 import { mountainRegion } from '../../views/walk/regions/mountain';
 import { stats } from '../../views/walk/regions/hill-kit';
+import { terrain } from '../../views/walk/world/terrain';
+import { deckY as regionDeckY } from '../../views/walk/regions/water-decks';
 
 const MODULES: Record<string, RegionModule> = { bamboo: bambooRegion, plum: plumRegion, mountain: mountainRegion };
 
@@ -63,7 +65,15 @@ function riverInfo(x: number, z: number): { d: number; w: number; y: number } | 
 function inLake(x: number, z: number): number {
   return Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz);
 }
+// The world core's real terrain (pure numbers, no three.js) and the regions' walkable decks, so the
+// lab matches the world: ?terrain=stand-in brings back the old analytic stand-in.
+const REAL = new URLSearchParams(location.search).get('terrain') !== 'stand-in';
 function groundY(x: number, z: number): number {
+  if (REAL) {
+    const g = terrain().height(x, z);
+    const d = regionDeckY(x, z);
+    return d === null ? g : Math.max(g, d);
+  }
   let h = base(x, z);
   const lq = inLake(x, z);
   if (lq < 1.15) h = Math.min(h, LAKE.waterY - 1.4 * (1 - Math.max(0, (lq - 0.85) / 0.3)) + 0.2);
@@ -75,6 +85,7 @@ function groundY(x: number, z: number): number {
   return h;
 }
 function waterAt(x: number, z: number): number | null {
+  if (REAL) return terrain().waterAt(x, z);
   if (inLake(x, z) < 1) return LAKE.waterY;
   const r = riverInfo(x, z);
   if (r && r.d < r.w) return r.y;
@@ -121,6 +132,13 @@ const VIEWS: Record<string, () => View[]> = {
       V(w.x - 6, w.z + 12, 1.7, w.x, w.z, 5, 55),          // 5 waterfall
       V(hl.x - 3, hl.z + 9, 1.7, hl.x, hl.z, 3),           // 6 hall front, incense burner
       V(g.x - 30, g.z + 30, 12, hl.x, hl.z, 6, 45),        // 7 approach from the ridge path
+      V(g.x - 2.5, g.z + 16, 1.7, g.x, g.z, 2.5),          // 8 the gate straight on, lions
+      V(8, -100, 3, 28, -108, 3, 55),                      // 9 along the ridge path to the west stairs
+      V(50, -91, 1.7, 36, -102, 2.5, 55),                  // 10 arriving from the lake: the side way
+      V(35.5, -101.5, 3.6, 40, -112, 4, 55),               // 11 on the courtyard, looking at the hall
+      V(56, -112, 1.7, 56, -100, 0, 60),                   // 12 on the terrace, runnel to the lip
+      V(56, -88, 3, 56, -100, 3, 60),                      // 13 the fall from the pool
+      V(hl.x + 20, hl.z + 30, 26, hl.x - 2, hl.z + 6, 0, 45), // 14 terraces from above
     ];
   },
 };

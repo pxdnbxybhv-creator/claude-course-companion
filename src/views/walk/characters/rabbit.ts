@@ -3,7 +3,7 @@
 // streaming back), sits up tall to look round when idle, nose twitching, and when it "plays"
 // it pounds elixir in a tiny mortar, as on the moon.
 import type { CharacterFactory, CharacterModel, MotionState } from './types';
-import { Blinker, Kit, OL, Spring, clamp, damp, mix, put, smooth, type Group, type Mesh } from './rig';
+import { Blinker, Kit, OL, Spring, bake, clamp, damp, mix, put, smooth, type Group } from './rig';
 
 export const rabbit: CharacterFactory = (THREE) => {
   const kit = new Kit(THREE);
@@ -39,21 +39,24 @@ export const rabbit: CharacterFactory = (THREE) => {
     paws.push(pw);
   }
   // jade tag on a red cord
-  // (the body's surface is at z ≈ 0.14 there: the cord rings the neck, the tag hangs clear of it)
-  put(trunk, kit.mesh(kit.torus(0.092, 0.008, 5, 26).rotateX(Math.PI / 2 - 0.35), kit.toon('#b93a2b'), OL * 0.4), 0, 0.235, 0.03);
-  const tag = put(trunk, kit.mesh(kit.cyl(0.028, 0.028, 0.012, 16).rotateX(Math.PI / 2), kit.toon('#7fb39a'), OL * 0.5), 0, 0.195, 0.152, 0.3, 0, 0);
-  put(tag, new THREE.Mesh(kit.torus(0.011, 0.004, 4, 10), kit.toon('#5f8f78')), 0, 0, 0.008);
+  // jade tag on a red cord. The head hangs low over the chest, so the cord rings the body just
+  // under the chin (the body's cross-section there is ≈ 0.12 × 0.14) and the tag lies on the breast.
+  const cord = kit.torus(0.128, 0.009, 5, 30).rotateX(Math.PI / 2).scale(1, 1, 1.16);
+  put(trunk, new THREE.Mesh(cord, kit.toon('#b93a2b')), 0, 0.205, 0.0, 0.15, 0, 0);
+  const tag = put(trunk, kit.mesh(kit.cyl(0.028, 0.028, 0.012, 16).rotateX(Math.PI / 2), kit.toon('#7fb39a'), OL * 0.5), 0, 0.158, 0.158);
+  put(tag, new THREE.Mesh(kit.torus(0.011, 0.004, 4, 10), kit.toon('#5f8f78')), 0, 0, 0.007);
 
   // head
   const head = kit.group(trunk, 0, 0.29, 0.07);
   put(head, kit.mesh(kit.sphere(0.1, 1.06, 0.95, 1, 22, 16), white), 0, 0, 0);
   for (const sx of [1, -1]) put(head, new THREE.Mesh(kit.sphere(0.038, 1, 0.85, 0.8), shade), 0.03 * sx, -0.035, 0.07);
   const nose = put(head, new THREE.Mesh(kit.sphere(0.013, 1.3, 0.9, 0.8), pink), 0, -0.01, 0.1);
-  const eyes: Mesh[] = [];
+  const eyes = kit.group(head, 0, 0.018, 0);
   for (const sx of [1, -1]) {
-    const e = put(head, new THREE.Mesh(kit.sphere(0.018, 1, 1.15, 0.5, 10, 8), eyeM), 0.052 * sx, 0.018, 0.083);
-    e.lookAt(0.052 * sx * 3, 0.018, 1);
-    eyes.push(e);
+    const e = new THREE.Mesh(kit.sphere(0.018, 1, 1.15, 0.5, 10, 8), eyeM);
+    e.position.set(0.052 * sx, 0, 0.083);
+    e.lookAt(0.052 * sx * 3, 0, 1);
+    eyes.add(e);
     put(head, new THREE.Mesh(kit.sphere(0.016, 1.4, 0.7, 0.35), kit.basic('#eba0a0', { opacity: 0.5 })), 0.07 * sx, -0.022, 0.07);
   }
   // ears: long, pink-lined, on springs
@@ -79,6 +82,10 @@ export const rabbit: CharacterFactory = (THREE) => {
   const blink = new Blinker(13);
   let phase = 0, idleT = 0, wasGrounded = true, landed = 0, lookAt = 2, perk = 0;
   const cur = { y: 0, pitch: 0, sq: 1, feet: 0, paws: 0, head: 0, headY: 0, up: 0 };
+
+  // fold the still parts into a few draws; the nose twitches and the tail breathes on their own
+  kit.keep(nose, tail);
+  bake(kit, root);
 
   const hand = kit.group(paws[1], 0, -0.09, 0.03);
 
@@ -170,8 +177,7 @@ export const rabbit: CharacterFactory = (THREE) => {
       kitchen.visible = pestle.visible = pounding;
       if (pounding) pestle.position.y = 0.12 - Math.max(0, Math.sin(t * 9)) * 0.06;
 
-      const b = blink.at(t);
-      for (const eye of eyes) eye.scale.y = b;
+      eyes.scale.y = blink.at(t);
     },
     dispose() {
       root.removeFromParent();

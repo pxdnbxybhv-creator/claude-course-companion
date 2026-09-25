@@ -15,7 +15,27 @@ import './select.css';
 
 const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function Portrait(props: { id: CharacterId; locked: boolean; size: number }) {
+// Portraits paint through one queue with a small per-frame budget, so opening the sheet (13 tiles
+// and the stage, ~7 ms each uncached on a desktop, several times that on a phone) never lands as
+// one long frame during its slide-in. Cached ones (every later open) go through at once.
+type Job = { run: () => void; dead: boolean };
+const queue: Job[] = [];
+let pump = 0;
+const drain = () => {
+  pump = 0;
+  const t0 = performance.now();
+  while (queue.length && performance.now() - t0 < 6) {
+    const j = queue.shift();
+    if (j && !j.dead) j.run();
+  }
+  if (queue.length) pump = requestAnimationFrame(drain);
+};
+const schedule = (j: Job, first: boolean) => {
+  if (first) queue.unshift(j); else queue.push(j);
+  if (!pump) pump = requestAnimationFrame(drain);
+};
+
+function Portrait(props: { id: CharacterId; locked: boolean; size: number; seal?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;
@@ -23,12 +43,16 @@ function Portrait(props: { id: CharacterId; locked: boolean; size: number }) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const px = Math.round(props.size * dpr);
     c.width = px; c.height = px;
-    // paint on the next frame so opening the sheet stays smooth
-    const id = requestAnimationFrame(() => paintPortrait(c, props.id, props.locked));
-    return () => cancelAnimationFrame(id);
-  }, [props.id, props.locked, props.size]);
+    const job: Job = { run: () => paintPortrait(c, props.id, props.locked, { seal: !!props.seal }), dead: false };
+    schedule(job, props.size > 100);
+    return () => { job.dead = true; };
+  }, [props.id, props.locked, props.size, props.seal]);
   return <canvas ref={ref} class="cs-portrait" style={{ width: props.size + 'px', height: props.size + 'px' }} aria-hidden="true" />;
 }
+
+// English: names take no article ("Walk as Big Ginger"), roles do ("Walk as the Old Fisherman")
+const PROPER_NAMES = new Set<CharacterId>(['cat', 'guan', 'change']);
+const enWho = (id: CharacterId) => (PROPER_NAMES.has(id) ? CHARACTER[id].en : `the ${CHARACTER[id].en}`);
 
 export function CharacterSelect(props: { open: boolean; onClose: () => void }) {
   const t = useT();
@@ -97,7 +121,7 @@ function SelectBody(props: { onClose: () => void }) {
     if (selectCharacter(id)) {
       const c = CHARACTER[id];
       stage.current?.emote(id === 'cat' || id === 'rabbit' ? 'wave' : 'bow');
-      toast(t(`${c.zh}与你同行`, `Walking as the ${c.en}`));
+      toast(t(`${c.zh}与你同行`, `Walking as ${enWho(id)}`));
     }
   };
 
@@ -127,7 +151,7 @@ function SelectBody(props: { onClose: () => void }) {
         <canvas ref={stageRef} class="cs-canvas" style={{ visibility: isOpen && stageState === 'ready' ? 'visible' : 'hidden' }} aria-label={t(`${def.zh}的立像，可拖动旋转`, `${def.en}, drag to turn`)} role="img" />
         {(!isOpen || stageState !== 'ready') && (
           <div class="cs-still">
-            <Portrait id={focus} locked={!isOpen} size={188} />
+            <Portrait id={focus} locked={!isOpen} size={188} seal />
           </div>
         )}
         <div class="cs-count num" aria-label={t(`已结伴 ${count} / ${CHARACTERS.length}`, `${count} of ${CHARACTERS.length} companions`)}>
@@ -142,11 +166,11 @@ function SelectBody(props: { onClose: () => void }) {
         </div>
         {isOpen ? (
           <>
-            <p class="cs-title">「{t(def.titleZh, def.titleEn)}」</p>
+            <p class="cs-title">{t(`「${def.titleZh}」`, `“${def.titleEn}”`)}</p>
             <p class="cs-desc">{t(def.descZh, def.descEn)}</p>
             <p class="cs-ability"><span class="cs-tag">{t('身手', 'Knack')}</span>{t(def.abilityZh, def.abilityEn)}</p>
             <button type="button" class={'btn cs-go' + (focus === current ? '' : ' btn-primary')} disabled={focus === current} onClick={() => choose(focus)}>
-              {focus === current ? t('正与你同行', 'Walking together') : t(`与${def.zh}同行`, `Walk as the ${def.en}`)}
+              {focus === current ? t('正与你同行', 'Walking together') : t(`与${def.zh}同行`, `Walk as ${enWho(focus)}`)}
             </button>
           </>
         ) : quest && progress ? (

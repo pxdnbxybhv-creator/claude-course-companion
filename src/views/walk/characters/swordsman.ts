@@ -22,9 +22,23 @@ export const swordsman: CharacterFactory = (THREE) => {
   // hat and veil
   const hat = conicalHat(kit, 0.29, 0.12, '#b9a270', { knob: true });
   put(h.head, hat, 0, hc + 0.1, 0, -0.06, 0, 0);
-  const veilGeo = kit.add(new THREE.CylinderGeometry(0.28, 0.3, 0.2, 24, 1, true, Math.PI * 0.28, Math.PI * 1.44).translate(0, -0.1, 0));
-  const veil = put(hat, new THREE.Mesh(veilGeo, kit.toon('#e6e1d6', { double: true, opacity: 0.55 })), 0, -0.005, 0);
+  // the gauze: open across the face (±70°), faint, with soft folds, fading to nothing at the hem
+  const gap = (70 / 180) * Math.PI;
+  const veilGeo = kit.add(new THREE.CylinderGeometry(0.28, 0.31, 0.22, 28, 1, true, gap, Math.PI * 2 - gap * 2).translate(0, -0.11, 0));
+  const gauze = kit.tex(128, 64, (g, w, hh) => {
+    const v = g.createLinearGradient(0, 0, 0, hh);
+    v.addColorStop(0, 'rgba(236,231,221,0.62)'); v.addColorStop(0.45, 'rgba(236,231,221,0.34)'); v.addColorStop(1, 'rgba(236,231,221,0)');
+    g.fillStyle = v; g.fillRect(0, 0, w, hh);
+    // folds: faint vertical lines, and the edges by the face melt away
+    g.globalCompositeOperation = 'destination-out';
+    for (let x = 3; x < w; x += 9) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(x, 0, 3, hh); }
+    const e = g.createLinearGradient(0, 0, w, 0);
+    e.addColorStop(0, 'rgba(0,0,0,1)'); e.addColorStop(0.12, 'rgba(0,0,0,0)'); e.addColorStop(0.88, 'rgba(0,0,0,0)'); e.addColorStop(1, 'rgba(0,0,0,1)');
+    g.fillStyle = e; g.fillRect(0, 0, w, hh);
+  });
+  const veil = put(hat, new THREE.Mesh(veilGeo, kit.toon('#ffffff', { double: true, opacity: 0.7, map: gauze })), 0, -0.005, 0);
   const veilSpring = new Spring(30, 5);
+  kit.keep(veil);
 
   // sword on the back: scabbard, guard, grip, pommel, tassel
   const sword = kit.group(h.back, 0, -0.02, -0.03);

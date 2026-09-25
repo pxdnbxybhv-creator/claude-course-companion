@@ -41,11 +41,12 @@ export const scholar: CharacterFactory = (THREE) => {
   const scrollM = kit.toon('#efe6d0');
   put(box, kit.mesh(kit.cyl(0.025, 0.025, 0.16, 10), scrollM, OL * 0.7), -0.05, 0.19, 0.0, 0, 0, 0.12);
   put(box, kit.mesh(kit.cyl(0.022, 0.022, 0.14, 10), kit.toon('#b9c6c9'), OL * 0.7), 0.05, 0.18, -0.02, 0.1, 0, -0.2);
-  // two straps over the shoulders and down the chest, like a pack's
+  // two straps over the shoulders, following the robe from the breast to the box
   const strapM = kit.toon('#6b4a2a');
   for (const sx of [1, -1]) {
-    put(h.chest, kit.mesh(kit.box(0.028, 0.3, 0.012), strapM, OL * 0.5), 0.075 * sx, 0.14, 0.143, -0.12, 0, 0.1 * sx);
-    put(h.chest, new THREE.Mesh(kit.box(0.028, 0.012, 0.3), strapM), 0.085 * sx, 0.29, -0.0, 0, 0, 0.12 * sx);
+    const x = 0.085 * sx;
+    const pts: [number, number, number][] = [[x * 1.15, 0.07, 0.158], [x * 1.05, 0.17, 0.163], [x, 0.25, 0.142], [x, 0.303, 0.075], [x, 0.318, 0.0], [x, 0.3, -0.075], [x, 0.25, -0.142], [x * 1.05, 0.18, -0.163]];
+    put(h.chest, kit.mesh(kit.tube(pts, 0.012, 0.012, 20, 5), strapM, OL * 0.45), 0, 0, 0);
   }
 
   // an open book, only while reading

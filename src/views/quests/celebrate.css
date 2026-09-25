@@ -8,7 +8,9 @@
 .cel.is-out .cel-veil { animation: cel-fade-out 0.42s var(--ease) both; }
 
 .cel-leaf {
-  position: relative; width: min(100%, 360px); max-height: calc(100dvh - 32px); overflow: hidden;
+  position: relative; width: min(100%, 360px); max-height: calc(100dvh - 32px);
+  /* never clip the buttons: on a very short screen the leaf scrolls (decorations are clipped apart) */
+  overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: none;
   display: flex; flex-direction: column; align-items: center; text-align: center;
   padding: 26px 22px 16px; border-radius: 4px; background: #f1e9d8; color: #1b1916;
   box-shadow: 0 0 0 1px rgba(27, 25, 22, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.6);
@@ -41,7 +43,8 @@
 
 .cel-paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
 .cel-frame { position: absolute; inset: 9px; border: 1px solid rgba(27, 25, 22, 0.14); pointer-events: none; }
-.cel-leaf > :not(.cel-paper):not(.cel-frame):not(.cel-timer) { position: relative; }
+.cel-leaf::-webkit-scrollbar { display: none; }
+.cel-leaf > :not(.cel-paper):not(.cel-frame):not(.cel-timer):not(.cel-petals) { position: relative; }
 
 .cel-kicker { margin: 0; font-size: 12.5px; letter-spacing: 0.4em; color: #b93a2b; text-indent: 0.4em; }
 .cel-quest { margin: 2px 0 0; font-size: 26px; font-weight: 400; line-height: 1.25; color: #1b1916; }
@@ -57,7 +60,7 @@
 .cel-fan .qb-portrait { display: block; border-radius: 50%; }
 @keyframes cel-rise { from { opacity: 0; transform: translateY(10px) scale(0.94); } }
 
-.cel-petals { position: absolute; inset: -30px -60px auto; height: 420px; pointer-events: none; }
+.cel-petals { position: absolute; inset: 0; z-index: 1; overflow: hidden; pointer-events: none; }
 .cel-petals i {
   position: absolute; top: -12px; width: 9px; height: 7px; border-radius: 60% 40% 60% 40%; background: #b83a4b; opacity: 0;
   transform: scale(var(--s, 1)); animation: cel-petal 4s ease-in-out both;
@@ -99,7 +102,7 @@
 }
 .cel-ring.is-round { border-radius: 50%; }
 .cel-ring.is-oval { border-radius: 50%; width: 112px; margin-left: -56px; }
-.cel.is-stamped .cel-ring { animation: cel-ring 0.7s 0.3s ease-out both; }
+.cel.is-stamped .cel-ring { animation: cel-ring 0.7s 0.3s ease-out backwards; }
 @keyframes cel-ring { from { opacity: 0.7; transform: scale(0.8) rotate(-5deg); } to { opacity: 0; transform: scale(1.45) rotate(-5deg); } }
 .cel-sealnote { margin: 4px 0 0; font-size: 15px; color: #4a443c; line-height: 1.6; max-width: 26em; }
 
@@ -127,6 +130,32 @@
   .cel-stage { height: 170px; }
   .cel-fan .qb-portrait { width: 132px !important; height: 132px !important; }
   .cel-name.brush { font-size: 38px; }
+}
+
+/* a phone on its side (the natural way to walk the painting): two columns — the portrait or seal on
+   the left, the words and the buttons on the right — so everything fits without scrolling */
+@media (max-height: 500px) and (orientation: landscape) {
+  .cel { padding: 10px 16px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .cel-leaf {
+    width: min(100%, 560px); max-height: calc(100dvh - 20px);
+    display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 22px;
+    align-content: center; align-items: center; justify-items: center; padding: 20px 26px 16px 20px;
+  }
+  .cel-leaf > :not(.cel-paper):not(.cel-frame):not(.cel-timer):not(.cel-petals):not(.cel-stage) { grid-column: 2; }
+  .cel-leaf > .cel-stage { grid-column: 1; grid-row: 1 / span 6; align-self: center; width: 150px; height: 150px; margin: 0; }
+  .cel-leaf > .cel-stage.is-seal { height: 150px; }
+  .cel-fan .qb-portrait { width: 120px !important; height: 120px !important; }
+  .cel-bloom { width: 210px; height: 210px; margin: -105px 0 0 -105px; }
+  .cel-stamp .qb-seal { width: 108px !important; height: 108px !important; }
+  .cel-ring { width: 128px; height: 128px; margin: -64px 0 0 -64px; }
+  .cel-ring.is-oval { width: 96px; margin-left: -48px; }
+  .cel-new, .cel-dismiss { display: none; }
+  .cel-quest { font-size: 23px; }
+  .cel-quest.latin { font-size: 21px; }
+  .cel-name.brush { font-size: 34px; }
+  .cel-name.latin { font-size: 26px; }
+  .cel-sealnote { font-size: 14px; }
+  .cel-actions { margin-top: 12px; }
 }
 
 /* reduced motion: a quiet cross-fade, nothing slams or drifts */

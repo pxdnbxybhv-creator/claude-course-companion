@@ -112,16 +112,22 @@ export function paintSealOutline(canvas: HTMLCanvasElement, text: string): void 
  * fails, paints a simple ink silhouette with the name's first glyph.
  */
 export function paintCompanion(canvas: HTMLCanvasElement, id: string, locked: boolean): void {
-  if (typeof paintPortrait === 'function') {
+  const key = id + (locked ? '|locked' : '');
+  if (typeof paintPortrait === 'function' && inked.get(key) !== false) {
     try {
       paintPortrait(canvas, id, locked);
-      if (hasInk(canvas)) return;
+      // Checked once per portrait (a pixel readback on every repaint would push canvases off the GPU).
+      if (!inked.has(key)) inked.set(key, hasInk(canvas));
+      if (inked.get(key)) return;
     } catch (e) {
       console.warn('[quests] portrait failed, using fallback', e);
     }
   }
   paintFallbackPortrait(canvas, id, locked);
 }
+
+/** Whether the characters module's painter left ink for a portrait (per id and locked state). */
+const inked = new Map<string, boolean>();
 
 function hasInk(canvas: HTMLCanvasElement): boolean {
   try {

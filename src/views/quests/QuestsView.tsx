@@ -13,7 +13,7 @@ import { QUEST, QUESTS, type QuestDef } from '../../data/quests';
 import { CharacterSelect } from '../walk/characters/Select';
 import { BrushBar, PaperPage, Portrait, Seal, Tally } from './bits';
 import {
-  COMPANION_QUESTS, SEAL_QUESTS, albumRequest, cnCount, companionCount, dayHeading, doneDate, isUnlocked, questsDone,
+  COMPANION_QUESTS, SEAL_QUESTS, albumRequest, cnCount, companionCount, dayHeading, doneDate, isUnlocked,
   routeForKey, routeForQuest, sealCount, stampText,
 } from './helpers';
 import './quests.css';
@@ -25,7 +25,6 @@ export function QuestsView() {
   const p = play.value;
   const n = companionCount(p);
   const s = sealCount(p);
-  const d = questsDone(p);
   const [cast, setCast] = useState(false);
   useEffect(() => {
     if (!albumRequest.pending) return;
@@ -42,7 +41,7 @@ export function QuestsView() {
       class="qb"
       titleZh="任务簿"
       titleEn="Quest Book"
-      subtitle={t(`同伴 ${n}/${CHARACTERS.length} · 印 ${s}/${SEAL_QUESTS.length} · 已成 ${d}/${QUESTS.length}`, `Companions ${n}/${CHARACTERS.length} · Seals ${s}/${SEAL_QUESTS.length}`)}
+      subtitle={t(`同伴 ${n}/${CHARACTERS.length} · 印 ${s}/${SEAL_QUESTS.length}`, `Companions ${n}/${CHARACTERS.length} · Seals ${s}/${SEAL_QUESTS.length}`)}
     >
       <Daily t={t} />
       <Companions t={t} onCast={() => setCast(true)} />
@@ -91,7 +90,7 @@ function Daily(props: { t: T }) {
           {items.map((it) => {
             const r = routeForKey(it.def.key);
             return (
-              <li class={'qb-errand' + (it.done ? ' is-done' : '')}>
+              <li key={it.def.key} class={'qb-errand' + (it.done ? ' is-done' : '')}>
                 <Tally value={it.value} target={it.def.target} done={it.done} />
                 <span class="qb-errand-name">{t(it.def.zh, it.def.en)}</span>
                 <span class="qb-errand-n num">{it.value}/{it.def.target}</span>
@@ -141,7 +140,7 @@ function Companions(props: { t: T; onCast: () => void }) {
       </div>
       <div class="qb-gallery">
         <Hero c={current} t={t} />
-        {others.map((c) => <CompanionCard c={c} t={t} />)}
+        {others.map((c) => <CompanionCard key={c.id} c={c} t={t} />)}
       </div>
     </section>
   );
@@ -226,9 +225,9 @@ function Quests(props: { t: T }) {
     <section class="qb-sec" aria-labelledby="qb-q-h">
       <div id="qb-q-h"><SectionHead t={t} zh="任务" en="Quests" count={`${dc + ds} / ${QUESTS.length}`} /></div>
       <h3 class="qb-group"><span>{t('同伴之约', 'Companion quests')}</span><i class="num">{dc}/{COMPANION_QUESTS.length}</i></h3>
-      <ul class="qb-quests">{COMPANION_QUESTS.map((q) => <QuestItem q={q} t={t} />)}</ul>
+      <ul class="qb-quests">{COMPANION_QUESTS.map((q) => <QuestItem key={q.id} q={q} t={t} />)}</ul>
       <h3 class="qb-group"><span>{t('印章之约', 'Seal quests')}</span><i class="num">{ds}/{SEAL_QUESTS.length}</i></h3>
-      <ul class="qb-quests">{SEAL_QUESTS.map((q) => <QuestItem q={q} t={t} />)}</ul>
+      <ul class="qb-quests">{SEAL_QUESTS.map((q) => <QuestItem key={q.id} q={q} t={t} />)}</ul>
     </section>
   );
 }
@@ -261,10 +260,11 @@ function QuestItem(props: { q: QuestDef; t: T }) {
             ) : null}
           </p>
           {!doneOn && (
-            <>
+            // the bar and its count wrap as one
+            <span class="qb-q-prog">
               <BrushBar seed={q.id} frac={prog.frac} label={t(`进度 ${prog.value}/${prog.target}`, `Progress ${prog.value} of ${prog.target}`)} />
               <span class="qb-prog-n num">{prog.value}/{prog.target}</span>
-            </>
+            </span>
           )}
         </div>
         {doneOn ? (
@@ -309,7 +309,7 @@ function Album(props: { t: T }) {
             const text = 'seal' in q.reward ? q.reward.seal : stampText(q);
             const en = 'seal' in q.reward ? q.reward.sealEn : '';
             return (
-              <li class={'qb-album-item' + (earned ? ' is-earned' : '')}>
+              <li key={q.id} class={'qb-album-item' + (earned ? ' is-earned' : '')}>
                 <Seal text={text} size={76} earned={earned} />
                 <span class="qb-album-cap">
                   <b>{l === 'zh' ? text : en}</b>

@@ -52,6 +52,7 @@ export const fisher: CharacterFactory = (THREE) => {
   const float = put(line, new THREE.Mesh(kit.sphere(0.018, 1, 1.4, 1, 8, 6), kit.toon('#c0412f')), 0, -0.4, 0);
   void float;
   const lineSpring = new Spring(22, 3);
+  kit.keep(creel, line);
   // his own rod: on the shoulder, or slung across the back while both hands are busy (rowing, a
   // bow); hidden while a feature has lent him its rod (so there are never two)
   h.handProps.push(rod);
@@ -59,7 +60,7 @@ export const fisher: CharacterFactory = (THREE) => {
   const sling = (on: boolean) => {
     slung = on;
     // across the back: centred on the shoulder blades, the line wound up
-    if (on) { rod.rotation.set(0, 0, 0.9); rod.position.set(0.51, -0.4, -0.1); h.back.add(rod); }
+    if (on) { rod.rotation.set(0, 0, 0.5); rod.position.set(0.12, -0.15, -0.1); h.back.add(rod); }
     else { rod.position.set(0, -0.02, 0.02); h.armR.hand.add(rod); }
     line.visible = !on;
   };

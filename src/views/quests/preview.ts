@@ -7,7 +7,7 @@ import { makeSeal, sealReady, SEAL_RED } from '../../ink/seal';
 import { play } from '../../app/play';
 import { QUESTS } from '../../data/quests';
 import { paintCompanion } from './paint';
-import { SEAL_QUESTS, statText } from './helpers';
+import { SEAL_QUESTS, sealLook, statText } from './helpers';
 
 const TEXT_FONT = "'LXGW WenKai','Kaiti SC','STKaiti','KaiTi',serif";
 let sealImg: { key: string; c: HTMLCanvasElement } | null = null;
@@ -102,7 +102,9 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
   const key = `${text}|${size}|${dpr}`;
   if (ready) {
     try {
-      if (!sealImg || sealImg.key !== key) sealImg = { key, c: makeSeal(text, { size, dpr, style: 'bai', wear: 0.5, color: SEAL_RED, seed: 88 }) };
+      // the same look the album gives this seal (「任务」 itself stays a square 白文 seal)
+      const look = latest ? sealLook(text) : ({ style: 'bai', shape: 'square' } as const);
+      if (!sealImg || sealImg.key !== key) sealImg = { key, c: makeSeal(text, { size, dpr, style: look.style, shape: look.shape, wear: 0.5, color: SEAL_RED, seed: 88 }) };
       g.save();
       g.globalCompositeOperation = 'multiply';
       g.translate(W * 0.36 + 4 * u, H - 14 * u - 30 * u);

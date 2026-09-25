@@ -12,6 +12,7 @@ import { PATHS } from '../map';
 import { makeNoise2, makeRng, type Rng } from '../../../core/rng';
 import type { Drawing, Stroke, StrokeKind } from '../../../ink/types';
 import { rasterize } from '../../../ink/brush';
+import { registerClearing, registerDeck, type Clearing, type Deck } from './water-decks';
 
 export type Three = WorldCtx['THREE'];
 type BG = T.BufferGeometry;
@@ -109,6 +110,14 @@ export class Hill {
   }
   interact(i: Interactable): void {
     this.offs.push(this.ctx.addInteractable(i));
+  }
+  /** A walkable surface (terrace, stairs, platform) the core stands the player on; unregistered on dispose. */
+  deck(d: Deck): void {
+    this.offs.push(registerDeck(d));
+  }
+  /** Built-over ground where nothing should be scattered; unregistered on dispose. */
+  clearing(c: Clearing): void {
+    this.offs.push(registerClearing(c));
   }
   add<O extends T.Object3D>(o: O): O {
     this.group.add(o);

@@ -46,8 +46,8 @@ export class Kit {
     return x;
   }
 
-  toon(color: string, o: { double?: boolean; opacity?: number; emissive?: string; map?: THREE_NS.Texture } = {}): THREE_NS.MeshToonMaterial {
-    const key = `t|${color}|${o.double ? 1 : 0}|${o.opacity ?? 1}|${o.emissive ?? ''}|${o.map?.uuid ?? ''}`;
+  toon(color: string, o: { double?: boolean; opacity?: number; emissive?: string; map?: THREE_NS.Texture; vertexColors?: boolean } = {}): THREE_NS.MeshToonMaterial {
+    const key = `t|${color}|${o.double ? 1 : 0}|${o.opacity ?? 1}|${o.emissive ?? ''}|${o.map?.uuid ?? ''}|${o.vertexColors ? 1 : 0}`;
     const hit = this.mats.get(key);
     if (hit) return hit as THREE_NS.MeshToonMaterial;
     const T = this.THREE;
@@ -58,10 +58,16 @@ export class Kit {
       opacity: o.opacity ?? 1,
       ...(o.emissive ? { emissive: new T.Color(o.emissive) } : {}),
       ...(o.map ? { map: o.map } : {}),
+      ...(o.vertexColors ? { vertexColors: true } : {}),
     });
     if (m.transparent) m.depthWrite = false;
     this.mats.set(key, this.add(m));
     return m;
+  }
+
+  /** Mark objects the character animates on their own (moves, scales, shows/hides): bake() leaves them be. */
+  keep(...objs: Obj[]): void {
+    for (const o of objs) o.userData.keep = true;
   }
 
   basic(color: string, o: { opacity?: number; double?: boolean; additive?: boolean } = {}): THREE_NS.MeshBasicMaterial {
@@ -86,6 +92,8 @@ export class Kit {
     const hit = this.mats.get(key);
     if (hit) return hit as THREE_NS.MeshBasicMaterial;
     const m = new this.THREE.MeshBasicMaterial({ color, side: this.THREE.BackSide });
+    m.userData.outline = w;
+    if (w === 0) { this.mats.set(key, this.add(m)); return m; } // a baked hull: already pushed out
     m.onBeforeCompile = (sh) => {
       sh.uniforms.uOutline = { value: w };
       sh.vertexShader = sh.vertexShader
@@ -196,6 +204,105 @@ export class Kit {
   }
 }
 
+// ------------------------------------------------------------------------------------------ bake
+
+type Part = { geo: Geo; m: THREE_NS.Matrix4; color?: THREE_NS.Color; push?: number };
+
+/** Merge parts (already in their joint's space) into one indexed geometry. */
+function mergeParts(kit: Kit, parts: Part[], withColor: boolean, bare: boolean): Geo {
+  const T = kit.THREE;
+  let nv = 0, ni = 0;
+  for (const p of parts) { nv += p.geo.attributes.position.count; ni += p.geo.index ? p.geo.index.count : p.geo.attributes.position.count; }
+  const pos = new Float32Array(nv * 3), nor = bare ? null : new Float32Array(nv * 3), uv = bare ? null : new Float32Array(nv * 2);
+  const col = withColor ? new Float32Array(nv * 3) : null;
+  const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+  const v = new T.Vector3(), n = new T.Vector3(), nm = new T.Matrix3();
+  let ov = 0, oi = 0;
+  for (const p of parts) {
+    const g = p.geo, P = g.attributes.position, N = g.attributes.normal, U = g.attributes.uv;
+    nm.getNormalMatrix(p.m);
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i);
+      if (N) n.fromBufferAttribute(N, i);
+      // an ink hull: the outline shader's push along the normal, baked in (in the part's own space)
+      if (p.push && N) v.addScaledVector(n.lengthSq() > 0 ? n.normalize() : n, p.push);
+      v.applyMatrix4(p.m);
+      pos[(ov + i) * 3] = v.x; pos[(ov + i) * 3 + 1] = v.y; pos[(ov + i) * 3 + 2] = v.z;
+      if (nor) {
+        if (N) n.applyMatrix3(nm).normalize(); else n.set(0, 1, 0);
+        nor[(ov + i) * 3] = n.x; nor[(ov + i) * 3 + 1] = n.y; nor[(ov + i) * 3 + 2] = n.z;
+      }
+      if (uv) { uv[(ov + i) * 2] = U ? U.getX(i) : 0; uv[(ov + i) * 2 + 1] = U ? U.getY(i) : 0; }
+      if (col && p.color) { col[(ov + i) * 3] = p.color.r; col[(ov + i) * 3 + 1] = p.color.g; col[(ov + i) * 3 + 2] = p.color.b; }
+    }
+    if (g.index) for (let i = 0; i < g.index.count; i++) idx[oi + i] = g.index.getX(i) + ov;
+    else for (let i = 0; i < P.count; i++) idx[oi + i] = i + ov;
+    oi += g.index ? g.index.count : P.count;
+    ov += P.count;
+  }
+  const out = kit.add(new T.BufferGeometry());
+  out.setAttribute('position', new T.BufferAttribute(pos, 3));
+  if (nor) out.setAttribute('normal', new T.BufferAttribute(nor, 3));
+  if (uv) out.setAttribute('uv', new T.BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new T.BufferAttribute(col, 3));
+  out.setIndex(new T.BufferAttribute(idx, 1));
+  out.computeBoundingSphere();
+  return out;
+}
+
+/**
+ * Merge the still parts under each joint into a few meshes, so a figure costs a couple of dozen
+ * draw calls instead of ~80 (and twice that near the pond, where it is drawn again for the
+ * reflection). Under each joint (any non-mesh object) the meshes hanging from it are gathered:
+ * plain opaque toon parts become one vertex-coloured mesh (one per side mode), other materials one
+ * mesh each, and every ink hull one mesh with its push baked into the geometry. Objects marked with
+ * kit.keep() — and anything under them — are left alone, as are multi-material meshes.
+ */
+export function bake(kit: Kit, root: Obj): void {
+  const T = kit.THREE;
+  const isMesh = (o: Obj): o is Mesh => (o as Mesh).isMesh === true;
+  // a mesh can be folded in only if nothing under it is a joint or kept
+  const still = (o: Obj): boolean => isMesh(o) && !o.userData.keep && !Array.isArray(o.material) && o.children.every(still);
+  const joints: Obj[] = [];
+  root.traverse((o) => { if (!isMesh(o)) joints.push(o); });
+  const outlineM = kit.outline(0);
+  for (const j of joints) {
+    const buckets = new Map<string, { mat: Mat; parts: Part[]; color: boolean; outline: boolean }>();
+    const taken: Mesh[] = [];
+    const gather = (o: Mesh, parentM: THREE_NS.Matrix4 | null) => {
+      o.updateMatrix();
+      const m = parentM ? parentM.clone().multiply(o.matrix) : o.matrix.clone();
+      const mat = o.material as Mat;
+      const outline = o.name === 'outline';
+      let key: string, bmat: Mat, color = false;
+      const toon = mat as THREE_NS.MeshToonMaterial;
+      if (outline) {
+        key = 'outline'; bmat = outlineM;
+      } else if (toon.isMeshToonMaterial && !toon.map && !toon.transparent && !toon.vertexColors && toon.emissive.getHex() === 0) {
+        const dbl = toon.side === T.DoubleSide;
+        key = 'toon|' + (dbl ? 2 : 0); bmat = kit.toon('#ffffff', { double: dbl, vertexColors: true }); color = true;
+      } else {
+        key = 'm|' + mat.uuid; bmat = mat;
+      }
+      let b = buckets.get(key);
+      if (!b) buckets.set(key, (b = { mat: bmat, parts: [], color, outline }));
+      const push = outline ? (((mat as THREE_NS.MeshBasicMaterial).userData.outline as number | undefined) ?? 0) : 0;
+      b.parts.push({ geo: o.geometry, m, color: color ? toon.color : undefined, push });
+      for (const c of o.children) gather(c as Mesh, m);
+    };
+    for (const c of j.children) if (still(c)) { taken.push(c as Mesh); gather(c as Mesh, null); }
+    if (!taken.length) continue;
+    for (const c of taken) j.remove(c);
+    for (const b of buckets.values()) {
+      const mesh = new T.Mesh(mergeParts(kit, b.parts, b.color, b.outline), b.mat);
+      mesh.name = b.outline ? 'outline' : 'baked';
+      mesh.layers.mask = j.layers.mask; // (the world moves the walker between layers for the pond)
+      if (b.outline) mesh.raycast = () => {};
+      j.add(mesh);
+    }
+  }
+}
+
 /** Add obj to parent at a position / rotation; returns obj. */
 export function put<O extends Obj>(parent: Obj, obj: O, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0): O {
   obj.position.set(x, y, z);
@@ -238,6 +345,7 @@ export class Ribbon {
     this.geo.setIndex(idx);
     this.mesh = new T.Mesh(this.geo, kit.toon(color, { double: true, opacity }));
     this.mesh.frustumCulled = false;
+    kit.keep(this.mesh);
     this.c = new T.Vector3();
     this.s = new T.Vector3();
     this.cs = new Float32Array(n * 3);
@@ -420,7 +528,8 @@ export class Human implements CharacterModel {
   readonly armR: Arm;
   readonly legL: Leg;
   readonly legR: Leg;
-  readonly eyes: Mesh[] = [];
+  /** Both eyes, in one row that blinks as one (y at the eyes' centre). */
+  readonly eyes: Group;
   readonly style: Style;
   height: number;
   headR: number;
@@ -429,6 +538,7 @@ export class Human implements CharacterModel {
   onAfter?: (f: Frame) => void;
 
   private robed: boolean;
+  private baked = false;
   private cur = zeroPose();
   private tgt = zeroPose();
   private phase = 0;
@@ -571,15 +681,16 @@ export class Human implements CharacterModel {
       const capM = kit.mesh(kit.cap(hr + 0.009, Math.PI * 0.53, 24, 10), hair);
       put(this.head, capM, 0, H.headC, 0, -0.4, 0, 0);
     }
-    this.addFace(sp.eyes ?? 'dot', sp.blush ?? 0.5, sp.mouth ?? 'none', sp.brows ?? null);
+    this.eyes = this.addFace(sp.eyes ?? 'dot', sp.blush ?? 0.5, sp.mouth ?? 'none', sp.brows ?? null);
 
     this.height = (H.waist + H.neck + H.headC + hr + 0.02) * sp.scale;
   }
 
-  private addFace(kind: NonNullable<HumanSpec['eyes']>, blush: number, mouth: NonNullable<HumanSpec['mouth']>, brows: string | null): void {
+  private addFace(kind: NonNullable<HumanSpec['eyes']>, blush: number, mouth: NonNullable<HumanSpec['mouth']>, brows: string | null): Group {
     const kit = this.kit, T = kit.THREE, hr = this.headR;
     const ink = kit.toon('#221e1a');
     const y = H.headC - 0.015, z = hr * 0.9;
+    const row = kit.group(this.head, 0, y, 0);
     const eyeGeo = kind === 'lady' ? kit.sphere(0.017, 1.15, 1.25, 0.5, 10, 8) : kit.sphere(kind === 'old' ? 0.014 : 0.019, 1, 1.15, 0.5, 10, 8);
     const arcGeo = kit.torus(0.02, 0.006, 4, 10, Math.PI).rotateZ(0);
     for (const sx of [1, -1]) {
@@ -592,10 +703,9 @@ export class Human implements CharacterModel {
         this.head.add(a);
       } else {
         const e = new T.Mesh(eyeGeo, ink);
-        e.position.set(ex, y, z);
-        e.lookAt(ex * 2.5, y, z + 1);
-        this.eyes.push(e);
-        this.head.add(e);
+        e.position.set(ex, 0, z);
+        e.lookAt(ex * 2.5, 0, z + 1);
+        row.add(e);
         if (kind === 'lady') {
           const lash = new T.Mesh(kit.box(0.03, 0.005, 0.005), ink);
           lash.position.set(ex + 0.006 * sx, y + 0.016, z - 0.002);
@@ -625,6 +735,7 @@ export class Human implements CharacterModel {
       m.position.set(0, y - 0.07, z - 0.005);
       this.head.add(m);
     }
+    return row;
   }
 
   /** Where the skull's centre is, in head space. */
@@ -641,6 +752,8 @@ export class Human implements CharacterModel {
   update(dt: number, s: MotionState): void {
     // a negative step (a first rAF stamped before the request) would make every damp and spring explode
     dt = Math.max(0, Math.min(dt, 0.1));
+    // the character has finished dressing the rig by now: fold its still parts into a few draws
+    if (!this.baked) { this.baked = true; bake(this.kit, this.root); }
     const st = this.style;
     const t = s.t;
     const sc = this.spec.scale;
@@ -771,7 +884,7 @@ export class Human implements CharacterModel {
     this.skirt.rotation.set(c.skX, 0, c.skZ);
     this.skirt.scale.set(c.skF, c.skS, c.skF);
     const blink = this.blink.at(t);
-    for (const eye of this.eyes) eye.scale.y = blink;
+    this.eyes.scale.y = blink;
     this.onAfter?.(f);
     if (this.holding) for (const o of this.handProps) o.visible = false;
   }
