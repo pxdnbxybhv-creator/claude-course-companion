@@ -134,7 +134,7 @@ export interface InputState {
 
 export interface Sky {
   /** Adjust the moon (features may make it huge for 中秋). */
-  setMoon(o: { visible?: boolean; scale?: number; glow?: number; position?: THREE_NS.Vector3 }): void;
+  setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE_NS.Vector3 }): void;
   /** True between dusk and dawn (real clock, or forced by a feature/preview). */
   isNight(): boolean;
   /** Force night (e.g. fireworks, lanterns) while a feature is active. */

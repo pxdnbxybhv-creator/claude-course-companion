@@ -259,6 +259,7 @@ export class People {
 
   private drop(p: Person): void {
     p.off();
+    p.fig.dispose();
     this.bag.drop(p.fig.root);
     if (p.stove) this.bag.drop(p.stove);
   }
@@ -646,7 +647,7 @@ export class Visitor {
   private clear(): void {
     this.off?.();
     this.off = null;
-    if (this.fig) this.bag.drop(this.fig.root);
+    if (this.fig) { this.fig.dispose(); this.bag.drop(this.fig.root); }
     if (this.animal) { this.bag.drop(this.animal.m.root); this.animal.dispose(); }
     this.fig = null; this.animal = null; this.mark = null; this.who = null;
     this.state = 'away';
@@ -848,6 +849,7 @@ export class Seller {
     if (!this.walk.done) return;
     if (this.state === 'in') this.setDown();
     else {
+      fig.dispose();
       this.bag.drop(fig.root);
       if (this.cart) this.bag.drop(this.cart);
       this.fig = null; this.cart = null;

@@ -75,7 +75,7 @@ export function laoyue(s: Stage): Scene {
   // and hands it back when the scene goes (null: the sky's own reckoning again)
   if (Math.abs(ctx.env.moonPhase - 0.5) > 0.44) {
     ctx.sky.setMoon({ visible: true });
-    s.bag.onDispose(() => ctx.sky.setMoon({ visible: null } as unknown as { visible: boolean }));
+    s.bag.onDispose(() => ctx.sky.setMoon({ visible: null }));
   }
   const rip = ripples(s.bag, s.group, 6);
   // a willow leaning out from the bank beside the dock, and three monkeys hanging from it in a chain

@@ -36,3 +36,9 @@
 华容道七巧板飞花令曹操关羽张飞赵云黄忠卒
 # quests, companions, seals
 任务谱贺笺触讫伴解锁同游印
+# the walk's HUD: run, waypoints, travel, skills, the purse
+疾驿传送题网剑符笔喵酒奔琴弈马花月钱囊文
+# the homestead's build bar and ledger
+营出撤转置定罢移卖家园簿半亩山居
+# 奇遇
+奇遇录

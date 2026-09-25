@@ -51,7 +51,7 @@ function reaction(species: Species, who: CharacterId, name: string): Reaction | 
       if (who === 'fisher') return { zh: '喵？', en: 'Mew?', toastZh: `${n}盯上了渔翁的鱼篓。`, toastEn: `${n} has its eye on the fisherman’s creel.`, mode: 'sit', sound: () => snd.meow(0) };
       return null;
     case 'rabbit':
-      if (who === 'rabbit') return { zh: '蹦！', en: 'Hop!', toastZh: `${n}和玉兔一起蹦跶起来。`, toastEn: `${n} and the Jade Rabbit hop together.`, mode: 'beg' };
+      if (who === 'rabbit') return { zh: '蹦！', en: 'Hop!', toastZh: `${n}和玉兔一起蹦蹦跳跳。`, toastEn: `${n} and the Jade Rabbit hop together.`, mode: 'beg' };
       if (who === 'change') return { zh: '……', en: '…', toastZh: `${n}依偎在嫦娥脚边。`, toastEn: `${n} snuggles at Chang’e’s feet.`, mode: 'sleep' };
       if (who === 'gardener') return { zh: '嚼嚼', en: 'munch', toastZh: `${n}偷啃园丁篮子里的菜叶。`, toastEn: `${n} nibbles greens from the gardener’s basket.`, mode: 'eat', sound: () => snd.munch(0) };
       return null;

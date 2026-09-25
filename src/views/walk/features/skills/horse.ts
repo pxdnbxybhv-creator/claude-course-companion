@@ -42,6 +42,7 @@ function buildHorse(bag: Bag): Rig {
   const saddle = new THREE.Object3D();
   // a skill's own mount: while he sits on it, the skill key still reaches the skill (to get off)
   saddle.userData.skillRide = true;
+  saddle.userData.mount = 'horse'; // the rider sits astride (characters' riding pose)
   saddle.position.set(0, saddleY - 0.03, -0.04);
   body.add(saddle);
   // a soft shadow on the ground

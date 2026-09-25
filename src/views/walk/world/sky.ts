@@ -144,7 +144,7 @@ export class SkySystem implements Sky {
   private moonGlow: THREE.Sprite;
   private sun: THREE.Sprite;
   private forced = false;
-  private moonOverride: { visible?: boolean; scale: number; glow: number } = { scale: 1, glow: 1 };
+  private moonOverride: { visible?: boolean | null; scale: number; glow: number } = { scale: 1, glow: 1 };
   private moonDir = new THREE.Vector3(0.28, 0.3, -1).normalize();
   private sunDir = new THREE.Vector3();
   private cur: Record<keyof Palette, THREE.Color | number>;
@@ -231,7 +231,7 @@ export class SkySystem implements Sky {
     this.forced = on;
   }
 
-  setMoon(o: { visible?: boolean; scale?: number; glow?: number; position?: THREE.Vector3 }): void {
+  setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE.Vector3 }): void {
     if (o.visible !== undefined) this.moonOverride.visible = o.visible;
     if (o.scale !== undefined) this.moonOverride.scale = Math.max(0.1, o.scale);
     if (o.glow !== undefined) this.moonOverride.glow = Math.max(0, o.glow);

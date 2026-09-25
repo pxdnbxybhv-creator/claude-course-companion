@@ -545,6 +545,7 @@ export class PlayerController implements Player {
     m.emoteT = this.emoteKind ? Math.min(1, this.emoteT / EMOTE_DUR[this.emoteKind]) : 0;
     m.t = this.time;
     m.riding = this.riding !== null;
+    m.mount = (this.riding?.userData.mount as 'horse' | undefined) ?? null;
     try { this.model.update(dt, m); } catch (e) { console.error('[walk] character update failed', e); }
     // squash and stretch of the whole figure (feet stay planted: the holder scales from the origin)
     this.squashT += dt;
