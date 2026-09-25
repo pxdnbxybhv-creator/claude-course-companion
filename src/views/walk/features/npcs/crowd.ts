@@ -15,7 +15,7 @@
 // lord rides by ('banmu:bow') and sniff the air when flowers burst open ('banmu:bloom').
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
-import type { RegionId, XZ } from '../../map';
+import { REGION, type RegionId, type XZ } from '../../map';
 import type { CharacterId } from '../../../../data/characters';
 import { Bag, dayRng, feature, glowTexture, outlineMat, propMat, reducedMotion, tr } from '../kit';
 import { merge, part } from '../geo';
@@ -355,7 +355,13 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const outline = new THREE.InstancedMesh(geo, mats.outline, N);
   outline.instanceMatrix = body.instanceMatrix;
   body.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  body.frustumCulled = outline.frustumCulled = false;
+  // everyone stays within the place: one sphere round it lets the camera cull the whole crowd
+  // (behind the camera or far off, ~2k triangles a head, drawn twice with the outline, adds up)
+  const home = REGION[region];
+  const reach = new THREE.Sphere(new THREE.Vector3(home.center.x, home.elevation + 1, home.center.z), home.radius + 6);
+  body.boundingSphere = reach;
+  outline.boundingSphere = reach;
+  body.frustumCulled = outline.frustumCulled = true;
   body.name = `npc-crowd:${region}`;
   outline.name = `npc-crowd-outline:${region}`;
   const root = new THREE.Group();
@@ -375,7 +381,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     new THREE.MeshBasicMaterial({ map: shTex, color: '#2a1e14', transparent: true, opacity: 0.32, depthWrite: false }),
     N,
   );
-  shadows.frustumCulled = false;
+  shadows.boundingSphere = reach;
+  shadows.frustumCulled = true;
   shadows.renderOrder = 1;
   root.add(shadows);
 
@@ -467,7 +474,15 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   }
 
   let woodfishBeat = 0;
+  let farCheck = 0;
   function step(dt: number, t: number) {
+    // far off (the place is a smudge in the mist), the crowd is not drawn at all
+    if ((farCheck -= dt) <= 0) {
+      farCheck = 0.5;
+      const cam = ctx.camera.position;
+      const far = Math.hypot(cam.x - home.center.x, cam.z - home.center.z) > home.radius + 55;
+      if (root.visible === far) root.visible = !far;
+    }
     if (!anyOn || !group.visible || !root.visible) return;
     const pp = ctx.player.position;
     const cd = Math.hypot(pp.x - (people[0].x), pp.z - (people[0].z));

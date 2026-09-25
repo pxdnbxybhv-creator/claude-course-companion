@@ -55,17 +55,17 @@ export function crowdGeometry(THREE: Three): T.BufferGeometry {
     if (ng !== g) ng.dispose();
     g.dispose();
   };
-  const lathe = (pts: [number, number][], seg = 10) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
-  const sph = (r: number, w = 10, h = 7) => new THREE.SphereGeometry(r, w, h);
-  const cyl = (a: number, b: number, h: number, s = 7) => new THREE.CylinderGeometry(a, b, h, s);
+  const lathe = (pts: [number, number][], seg = 8) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+  const sph = (r: number, w = 8, h = 5) => new THREE.SphereGeometry(r, w, h);
+  const cyl = (a: number, b: number, h: number, s = 6) => new THREE.CylinderGeometry(a, b, h, s);
   const box = (x: number, y: number, z: number) => new THREE.BoxGeometry(x, y, z);
   const S = SLOT;
 
   // ── body: the robe's bell, the torso, sash and hem, a crossed collar
   add(lathe([[0, 0.02], [0.25, 0.02], [0.24, 0.1], [0.2, 0.34], [0.16, 0.56], [0.14, 0.62], [0, 0.62]]), ROLE.robe, RIG.lower, 0, 0, { p: [0, 0.08, 0] });
-  add(new THREE.TorusGeometry(0.24, 0.016, 4, 14), ROLE.trim, RIG.lower, 0, 0, { p: [0, 0.11, 0], r: [Math.PI / 2, 0, 0] });
+  add(new THREE.TorusGeometry(0.24, 0.016, 3, 10), ROLE.trim, RIG.lower, 0, 0, { p: [0, 0.11, 0], r: [Math.PI / 2, 0, 0] });
   add(lathe([[0, 0], [0.145, 0], [0.155, 0.12], [0.14, 0.24], [0.08, 0.3], [0, 0.31]]), ROLE.robe, RIG.upper, 0, 0, { p: [0, 0.66, 0] });
-  add(new THREE.TorusGeometry(0.15, 0.028, 4, 12), ROLE.trim, RIG.upper, 0, 0, { p: [0, 0.69, 0], r: [Math.PI / 2, 0, 0] });
+  add(new THREE.TorusGeometry(0.15, 0.028, 3, 10), ROLE.trim, RIG.upper, 0, 0, { p: [0, 0.69, 0], r: [Math.PI / 2, 0, 0] });
   add(box(0.03, 0.2, 0.02), ROLE.trim, RIG.upper, 0, 0, { p: [0.02, 0.87, 0.125], r: [-0.35, 0, -0.62] });
   add(box(0.03, 0.14, 0.02), ROLE.trim, RIG.upper, 0, 0, { p: [-0.035, 0.89, 0.115], r: [-0.4, 0, 0.55] });
   // an apron, or a straw rain cape (蓑衣)
@@ -82,12 +82,12 @@ export function crowdGeometry(THREE: Three): T.BufferGeometry {
   add(sph(0.018, 5, 4), ROLE.ink, RIG.head, 0, 0, { p: [0.058, HY, 0.155] });
   add(sph(0.03, 5, 4), ROLE.cheek, RIG.head, 0, 0, { p: [-0.095, HY - 0.05, 0.13], s: [1, 0.55, 0.4] });
   add(sph(0.03, 5, 4), ROLE.cheek, RIG.head, 0, 0, { p: [0.095, HY - 0.05, 0.13], s: [1, 0.55, 0.4] });
-  add(new THREE.SphereGeometry(0.175, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), ROLE.hair, RIG.head, 0, 0, { p: [0, HY + 0.01, -0.01] });
+  add(new THREE.SphereGeometry(0.175, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), ROLE.hair, RIG.head, 0, 0, { p: [0, HY + 0.01, -0.01] });
   // 斗笠 bamboo hat
   add(new THREE.ConeGeometry(0.4, 0.2, 14, 1, true), ROLE.hat, RIG.head, S.hat, HAT.bamboo, { p: [0, HY + 0.17, 0] });
   add(cyl(0.4, 0.4, 0.012, 14), ROLE.hat, RIG.head, S.hat, HAT.bamboo, { p: [0, HY + 0.07, 0] });
   // cloth cap
-  add(new THREE.SphereGeometry(0.182, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2.2), ROLE.hat, RIG.head, S.hat, HAT.cap, { p: [0, HY + 0.02, -0.01] });
+  add(new THREE.SphereGeometry(0.182, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2.2), ROLE.hat, RIG.head, S.hat, HAT.cap, { p: [0, HY + 0.02, -0.01] });
   // a child's two buns
   add(sph(0.07, 8, 6), ROLE.hair, RIG.head, S.hat, HAT.buns, { p: [-0.12, HY + 0.15, 0] });
   add(sph(0.07, 8, 6), ROLE.hair, RIG.head, S.hat, HAT.buns, { p: [0.12, HY + 0.15, 0] });
@@ -100,7 +100,7 @@ export function crowdGeometry(THREE: Three): T.BufferGeometry {
   add(sph(0.07, 8, 6), ROLE.hair, RIG.head, S.hat, HAT.bun, { p: [0, HY + 0.16, -0.03] });
   add(cyl(0.008, 0.008, 0.22, 4), ROLE.hat, RIG.head, S.hat, HAT.bun, { p: [0, HY + 0.17, -0.03], r: [0, 0, Math.PI / 2] });
   // a headscarf knotted at the back
-  add(new THREE.SphereGeometry(0.19, 12, 6, 0, Math.PI * 2, 0, Math.PI / 1.9), ROLE.hat, RIG.head, S.hat, HAT.scarf, { p: [0, HY + 0.005, -0.015] });
+  add(new THREE.SphereGeometry(0.19, 9, 5, 0, Math.PI * 2, 0, Math.PI / 1.9), ROLE.hat, RIG.head, S.hat, HAT.scarf, { p: [0, HY + 0.005, -0.015] });
   add(sph(0.05, 6, 5), ROLE.hat, RIG.head, S.hat, HAT.scarf, { p: [0, HY - 0.02, -0.19], s: [1.4, 0.8, 0.8] });
   // a beard
   add(new THREE.ConeGeometry(0.07, 0.2, 7), ROLE.hair, RIG.head, S.beard, 1, { p: [0, HY - 0.2, 0.1], r: [Math.PI + 0.25, 0, 0] });

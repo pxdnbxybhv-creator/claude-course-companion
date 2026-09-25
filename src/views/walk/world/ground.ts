@@ -26,7 +26,7 @@ function warp(u: number): number {
 }
 
 function terrainGeometry(bag: Bag): THREE.BufferGeometry {
-  const n = 168;
+  const n = 112;
   const verts = (n + 1) * (n + 1);
   const pos = new Float32Array(verts * 3);
   let k = 0;

@@ -84,7 +84,7 @@ export class CoinField {
     const h = 0.055;
     hole.moveTo(-h, -h); hole.lineTo(-h, h); hole.lineTo(h, h); hole.lineTo(h, -h); hole.lineTo(-h, -h);
     shape.holes.push(hole);
-    const geo = bag.own(new THREE.ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1, curveSegments: 18 }));
+    const geo = bag.own(new THREE.ExtrudeGeometry(shape, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1, curveSegments: 10 }));
     geo.translate(0, 0, -0.015);
     geo.computeVertexNormals();
     const mat = new THREE.MeshToonMaterial({ color: '#ffffff', emissive: new THREE.Color('#6b4712'), emissiveIntensity: 0.55 });
