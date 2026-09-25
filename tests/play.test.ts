@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { play, emptyPlay, record, recordMax, flag, visitRegion, unlocked, selectCharacter, dailyPicksFor, sanitizePlay, celebrations, questValue } from '../src/app/play';
+import { play, emptyPlay, record, recordMax, flag, visitRegion, unlocked, selectCharacter, dailyPicksFor, sanitizePlay, celebrations, questValue, redeemCode, revokeCode, codeActive, isUnlockedIn } from '../src/app/play';
 import { state, emptyState, exportJSON, importJSON } from '../src/app/store';
 import { QUESTS, QUEST } from '../src/data/quests';
 import { CHARACTERS } from '../src/data/characters';
@@ -69,6 +69,41 @@ describe('play progress', () => {
     play.value = p;
     record('noop');
     expect(unlocked.value).toContain('change');
+  });
+
+  it('the test code CZ opens every companion without finishing any quest', () => {
+    expect(redeemCode('nope')).toBe('invalid');
+    expect(redeemCode('')).toBe('invalid');
+    expect(unlocked.value).toEqual(['scholar']);
+    expect(redeemCode(' cz ')).toBe('unlocked');
+    expect(codeActive.value).toBe(true);
+    expect(unlocked.value).toEqual(CHARACTERS.map((c) => c.id));
+    expect(isUnlockedIn(play.value, 'change')).toBe(true);
+    expect(redeemCode('ＣＺ')).toBe('already');
+    // nothing was earned: no quest done, nothing to celebrate, 群贤毕至 still counts only earned ones
+    expect(play.value.done).toEqual({});
+    expect(celebrations.value).toEqual([]);
+    expect(questValue(QUEST['q-all'], play.value, state.value)).toBe(1);
+    expect(selectCharacter('guan')).toBe(true);
+    // and it survives a backup round trip
+    const json = exportJSON();
+    play.value = emptyPlay();
+    expect(importJSON(json)).toBe(true);
+    expect(codeActive.value).toBe(true);
+    expect(play.value.character).toBe('guan');
+    // taken back: companions you only borrowed go, and you walk as the scholar again
+    revokeCode();
+    expect(codeActive.value).toBe(false);
+    expect(unlocked.value).toEqual(['scholar']);
+    expect(play.value.character).toBe('scholar');
+  });
+
+  it('revoking the code keeps a companion you really earned', () => {
+    for (let i = 0; i < 7; i++) record('water');
+    redeemCode('CZ');
+    selectCharacter('gardener');
+    revokeCode();
+    expect(play.value.character).toBe('gardener');
   });
 
   it('daily errands are three, stable for the day, and vary by day', () => {

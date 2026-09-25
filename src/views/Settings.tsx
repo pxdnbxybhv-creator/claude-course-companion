@@ -9,6 +9,7 @@ import { go } from '../app/router';
 import { Segmented, Sheet, Toggle, toast } from '../ui/kit';
 import { audio } from '../audio/engine';
 import { music } from '../audio/music';
+import { codeActive, redeemCode, revokeCode } from '../app/play';
 import { makeSeal } from '../ink/seal';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
@@ -483,6 +484,7 @@ function DataSection() {
       <Row title={t('载入示例园', 'Load demo garden')} sub={t('六株花木与数月记录，便于一试', 'Six plants with a few months of history')} wrap>
         <button class="btn btn-small" onClick={() => setConfirm({ kind: 'demo' })}>{t('载入', 'Load')}</button>
       </Row>
+      <TestCodeRow />
       <Row title={<span class="set-danger-text">{t('清空一切', 'Erase everything')}</span>} sub={t('删除所有习惯与记录；设置保留', 'Deletes all habits and records; settings are kept')} wrap>
         <button class="btn btn-small set-danger" onClick={() => setConfirm({ kind: 'reset', step: 1 })}>{t('清空', 'Erase')}</button>
       </Row>
@@ -561,6 +563,53 @@ function DataSection() {
         )}
       </Sheet>
     </Section>
+  );
+}
+
+/** 测试码: one small row; a code opens every companion (see redeemCode in app/play.ts). */
+function TestCodeRow() {
+  const t = useT();
+  const [code, setCode] = useState('');
+  const on = codeActive.value;
+  const submit = (e: Event) => {
+    e.preventDefault();
+    const r = redeemCode(code);
+    if (r === 'invalid') return void toast(t('测试码无效', 'That code doesn’t work'));
+    setCode('');
+    toast(r === 'unlocked'
+      ? t('十三位同伴已全部解锁，可在「入画」中挑选', 'All thirteen companions unlocked — pick one in Into the Painting')
+      : t('同伴早已全部解锁', 'Every companion is already unlocked'), 3200);
+  };
+  const undo = () => {
+    revokeCode();
+    toast(t('测试码已撤销，同伴恢复为已结识的', 'Code removed — companions are back to the ones you’ve met'));
+  };
+  return (
+    <form class="row set-row set-row-wrap set-code" onSubmit={submit}>
+      <label class="row-main" for={on ? undefined : 'set-code'}>
+        <span class="row-title">{t('测试码', 'Test code')}</span>
+        <span class="row-sub">{on ? t('已生效：全部同伴可选', 'Active: every companion is open') : t('解锁全部同伴', 'Unlocks every companion')}</span>
+      </label>
+      {on ? (
+        <button type="button" class="btn btn-small btn-ghost" onClick={undo}>{t('撤销', 'Undo')}</button>
+      ) : (
+        <div class="set-code-field">
+          <input
+            id="set-code"
+            class="input"
+            value={code}
+            onInput={(e) => setCode(e.currentTarget.value)}
+            maxLength={16}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellcheck={false}
+            enterKeyHint="done"
+            placeholder={t('输入', 'Code')}
+          />
+          <button class="btn btn-small" type="submit" disabled={!code.trim()}>{t('兑换', 'Redeem')}</button>
+        </div>
+      )}
+    </form>
   );
 }
 

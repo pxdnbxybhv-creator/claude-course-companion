@@ -2,7 +2,7 @@
 // seal styles and the brush-stroke outline used by the progress bars.
 import { CHARACTER, CHARACTERS, type CharacterId } from '../../data/characters';
 import { QUESTS, type QuestDef } from '../../data/quests';
-import type { PlayState } from '../../app/play';
+import { isUnlockedIn, type PlayState } from '../../app/play';
 import type { Route } from '../../app/router';
 import type { DateKey } from '../../core/types';
 import { hashString, makeRng } from '../../core/rng';
@@ -15,8 +15,7 @@ export const COMPANION_QUESTS: QuestDef[] = QUESTS.filter((q) => 'character' in 
 export const SEAL_QUESTS: QuestDef[] = QUESTS.filter((q) => 'seal' in q.reward);
 
 export function isUnlocked(id: CharacterId, p: PlayState): boolean {
-  const c = CHARACTER[id];
-  return !!c && (c.unlock === 'default' || !!p.done[c.unlock]);
+  return isUnlockedIn(p, id);
 }
 
 export function companionCount(p: PlayState): number {

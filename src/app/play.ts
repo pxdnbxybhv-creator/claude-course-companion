@@ -149,7 +149,7 @@ export function questValue(q: QuestDef, p: PlayState, a: AppState, day: DateKey 
       return m;
     }
     case 'incense': return a.focus.filter((f) => f.completed).length;
-    case 'companions': return unlockedFrom(p).length;
+    case 'companions': return earnedFrom(p).length;
   }
 }
 
@@ -158,8 +158,24 @@ export function questTarget(q: QuestDef): number {
   return g.kind === 'flag' ? 1 : g.target;
 }
 
-function unlockedFrom(p: PlayState): CharacterId[] {
+/** The flag a test code sets: every companion can be chosen (their quests stay as they are). */
+export const ALL_COMPANIONS_FLAG = 'code:all';
+/** Test codes (Settings → 测试码): what each one switches on. */
+const TEST_CODES: Record<string, string> = { CZ: ALL_COMPANIONS_FLAG };
+
+/** Companions earned through their quests (what 群贤毕至 counts; a test code doesn't). */
+function earnedFrom(p: PlayState): CharacterId[] {
   return CHARACTERS.filter((c) => c.unlock === 'default' || p.done[c.unlock]).map((c) => c.id);
+}
+
+function unlockedFrom(p: PlayState): CharacterId[] {
+  return p.flags[ALL_COMPANIONS_FLAG] ? CHARACTERS.map((c) => c.id) : earnedFrom(p);
+}
+
+/** Can you walk as `id` with this progress (earned, or opened by a test code)? */
+export function isUnlockedIn(p: PlayState, id: CharacterId): boolean {
+  const c = CHARACTERS.find((x) => x.id === id);
+  return !!c && (!!p.flags[ALL_COMPANIONS_FLAG] || c.unlock === 'default' || !!p.done[c.unlock]);
 }
 
 /** Characters you can walk as. */
@@ -250,6 +266,32 @@ export function selectCharacter(id: CharacterId): boolean {
   if (!unlocked.value.includes(id)) return false;
   play.value = { ...play.value, character: id };
   return true;
+}
+
+/**
+ * A test code typed in Settings. 'CZ' opens every companion. Case, spaces and full-width letters
+ * don't matter. Nothing is marked as done: the quests and 群贤毕至 still wait to be earned.
+ */
+export function redeemCode(raw: string): 'unlocked' | 'already' | 'invalid' {
+  const code = raw.normalize('NFKC').replace(/\s+/g, '').toUpperCase();
+  const key = TEST_CODES[code];
+  if (!key) return 'invalid';
+  if (play.value.flags[key]) return 'already';
+  flag(key);
+  return 'unlocked';
+}
+
+/** Is a test code in effect (every companion open)? */
+export const codeActive = computed(() => !!play.value.flags[ALL_COMPANIONS_FLAG]);
+
+/** Take the test code back: companions go back to what was earned (walk as the scholar if yours was only borrowed). */
+export function revokeCode(): void {
+  const p = play.value;
+  if (!p.flags[ALL_COMPANIONS_FLAG]) return;
+  const flags = { ...p.flags };
+  delete flags[ALL_COMPANIONS_FLAG];
+  const next = { ...p, flags };
+  play.value = { ...next, character: earnedFrom(next).includes(p.character) ? p.character : 'scholar' };
 }
 
 /** Today's errands with progress. */
