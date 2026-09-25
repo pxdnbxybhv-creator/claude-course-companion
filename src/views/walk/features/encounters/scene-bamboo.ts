@@ -23,6 +23,7 @@ export function zhiyin(s: Stage): Scene {
   const m = mark(s, f);
   const name = C('樵夫', 'Woodcutter');
   let heard = false;
+  s.theme = 'quiet'; // the place's music hushes, so the qin can be heard
 
   // the musician plays nearby: he turns, comes closer, and says what he hears
   const onMusic = (e: Event) => {
@@ -75,14 +76,19 @@ export function zhiyin(s: Stage): Scene {
         if (who === 'poet') {
           await s.say(null, C('诗仙', 'Poet'), [L('欲取鸣琴弹，恨无知音赏。', 'I would take up the qin — but who is there to hear it?')]);
           s.words('知音世所稀', new THREE.Vector3(f.root.position.x, f.root.position.y + 2.2, f.root.position.z), { color: '#3d5a73', vertical: true, life: 4.5 });
-          await s.say(f, name, [
+          const k = await s.say(f, name, [
             L('先生何必恨？这竹林里，风是琴，竹是弦，我便是听的人。', 'Why regret it, sir? In this grove the wind is the qin, the bamboo its strings — and I am the one who listens.'),
             L('先生念一句诗，我便听出一片山水来。', 'Say me a line, and I will hear a whole landscape in it.', [C('「相看两不厌，只有敬亭山」', '“We never tire of each other — only Jingting Mountain and I”'), C('「孤帆远影碧空尽」', '“A lone sail’s far shadow fades into the blue”')]),
-          ]).then(async (k) => {
-            s.qin(k === 0 ? HIGH : WATER, 280, 0.6);
-            await s.say(f, name, [k === 0 ? L('我听见一座山，也听见一个人——两个都不说话。', 'I hear a mountain, and a man — neither saying a word.') : L('我听见一条江，流到天边，还没流完。', 'I hear a river running to the edge of the sky, and still running.')]);
-          });
-          s.finish({ zh: '诗仙以诗为琴，樵夫以耳为弦。原来知音不必是琴。', en: 'The poet played with verse, the woodcutter listened with his ears — a friend need not be a qin.', bonus: 50 });
+          ]);
+          if (k < 0) return;
+          const p = s.player();
+          s.words(k === 0 ? '相看两不厌' : '孤帆远影', new THREE.Vector3(p.x, p.y + 2.3, p.z), { color: '#3d5a73', vertical: true, life: 4.5 });
+          s.qin(k === 0 ? HIGH : WATER, 280, 0.6);
+          await s.wait(2200);
+          await s.say(f, name, [k === 0 ? L('我听见一座山，也听见一个人——两个都不说话。', 'I hear a mountain, and a man — neither saying a word.') : L('我听见一条江，流到天边，还没流完。', 'I hear a river running to the edge of the sky, and still running.')]);
+          ctx.player.emote('eat');
+          await s.say(null, C('诗仙', 'Poet'), [L('哈哈！千金易得，知音难求。樵哥，我敬你一杯！', 'Ha! Gold is easy to come by, a true listener hard to find. Woodcutter — a cup to you!')]);
+          s.finish({ zh: '诗仙以诗为琴，樵夫以耳为弦。原来知音不必是琴。', en: 'The poet played with verse, the woodcutter listened with his ears — a friend need not be a qin.', bonus: 50, seal: '音' });
           return;
         }
         if (who === 'cat') {
@@ -148,6 +154,7 @@ export function hujie(s: Stage): Scene {
   real.root.visible = false;
   s.bag.add(real.root, s.group);
   const m = mark(s, f);
+  s.theme = 'quiet';
   s.drizzle();
   s.glow(new THREE.Vector3(at.x, at.y + 1.1, at.z), '#dfe8f0', 1.6, 0.25);
   const name = C('白衣女子', 'Lady in White');
@@ -173,7 +180,7 @@ export function hujie(s: Stage): Scene {
     await vanish(s, r, '#f7f2e8', 900);
   };
 
-  talkPrompt(s, f, {
+  s.whenDone(talkPrompt(s, f, {
     labelZh: '雨中的白衣女子', labelEn: 'A lady in white, in the rain', actionZh: '上前', actionEn: 'Approach',
     async act() {
       if (s.finished || !s.claim()) return;
@@ -248,6 +255,6 @@ export function hujie(s: Stage): Scene {
         s.unclaim();
       }
     },
-  });
+  }));
   return { x: at.x, z: at.z, r: 14 };
 }

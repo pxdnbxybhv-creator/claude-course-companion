@@ -413,7 +413,7 @@ function Purse(props: { t: T }) {
   const { t } = props;
   const p = play.value;
   const l = lang.value;
-  const { rows, total } = ledgerToday(p, appState.value, today.value);
+  const { rows, total } = ledgerToday(p, today.value);
   const qMin = Math.min(...QUESTS.map(questCoins)), qMax = Math.max(...QUESTS.map(questCoins));
   const eMin = Math.min(...ENCOUNTERS.map((e) => e.coins)), eMax = Math.max(...ENCOUNTERS.map((e) => e.coins));
   const sources: [string, string, string][] = [
@@ -444,7 +444,10 @@ function Purse(props: { t: T }) {
         {rows.length > 0 && (
           <ul class="qb-ledger" aria-label={t('今日进账', "Today's takings")}>
             {rows.map((r) => (
-              <li key={r.key}><span>{t(r.zh, r.en)}</span><b class="num">+{fmtCoins(r.coins)}</b></li>
+              <li key={r.key} class={r.hintZh ? 'has-hint' : undefined}>
+                <span>{t(r.zh, r.en)}{r.hintZh && <small class="qb-ledger-hint">{t(r.hintZh, r.hintEn ?? '')}</small>}</span>
+                <b class="num">+{fmtCoins(r.coins)}</b>
+              </li>
             ))}
           </ul>
         )}

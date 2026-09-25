@@ -13,11 +13,11 @@ import { flag, play } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
 import { diffDays } from '../../../../../core/date';
 import { hashString } from '../../../../../core/rng';
-import { registerDeck, segmentDeck } from '../../../regions/water-decks';
+import { rectClearing, registerClearing, registerDeck, segmentDeck, type Clearing } from '../../../regions/water-decks';
 import { NIGHT_SHADE } from '../../../regions/water-kit';
 import { reducedMotion } from '../../kit';
-import { GRID, KIND, PLOT_X0, PLOT_Z0, STARTER, cellsOf, coupletLines, footprint, growStage, itemPose, itemText, type HomeKind } from '../catalog';
-import { HOME_PLOT } from '../../../map';
+import { GRID, KIND, PLOT_X0, PLOT_Z0, STARTER, coupletLines, footprint, growStage, itemPose, itemText, wetCells, type HomeKind } from '../catalog';
+import { HOME_PLOT, PATHS } from '../../../map';
 import { BUCKETS, bake, mergeChunks, mergeLines, type Baked, type Chunk, type LineChunk, type Three, type WorldLabel } from './brush';
 import { homeMats, type HomeMats } from './mats';
 import { TextAtlas, type Board } from './atlas';
@@ -55,6 +55,7 @@ export class HomeStage {
   private dirty = true;
   private offs: (() => void)[] = [];
   private wetOffs: (() => void)[] = [];
+  private wetCircles: { x: number; z: number; r: number }[] = [];
   private meshes: { solid: T.Mesh; soft: T.Mesh; softHull: T.Mesh; glow: T.Mesh; glowHull: T.Mesh; water: T.Mesh; lines: T.LineSegments; text: T.Mesh; halos: T.Points; smoke: T.Points };
   private base: Baked | null = null;
   private baseObjs: T.Object3D[] = [];
@@ -149,6 +150,9 @@ export class HomeStage {
       this.baseObjs.push(l);
     }
     for (const c of this.base.colliders) this.offs.push(ctx.addCollider(c));
+    for (const o of this.base.occluders) this.offs.push(ctx.addOccluder(o));
+    // nothing grows on the way in: the path from the garden and the slabs through the gate
+    for (const c of approachClearings()) this.offs.push(registerClearing(c));
     // the gate-house is a landmark: seen from afar
     for (const o of this.baseObjs) if (o.name === 'home:fence') o.userData.landmark = true;
 
@@ -254,6 +258,7 @@ export class HomeStage {
       const baked = bake(THREE, kind, { text: itemText(it), stage }, hashString(it.uid), { x: p.x, y: this.baseY(it), z: p.z, heading: p.heading }, slot);
       const e: Entry = { uid: it.uid, sig, slot, item: it, baked, offs: [] };
       for (const c of baked.colliders) e.offs.push(ctx.addCollider(c));
+      for (const o of baked.occluders) e.offs.push(ctx.addOccluder(o));
       baked.floors.forEach((f, k) => e.offs.push(registerDeck(segmentDeck(`home:${it.uid}:${k}`, f.a, f.b, f.hw, f.y))));
       const act = this.uses.interactable(e);
       if (act) e.offs.push(ctx.addInteractable(act));
@@ -352,20 +357,15 @@ export class HomeStage {
   /** Water is not for walking: the pond cells not under a bridge are solid. */
   private wet(items: HomeItem[]): void {
     for (const f of this.wetOffs.splice(0)) f();
-    const dry = new Set<number>();
-    for (const it of items) {
-      const k = KIND[it.kind];
-      if (!k?.over || it.uid === this.hidden) continue;
-      for (const [a, b] of cellsOf(k, it.i, it.j, it.rot)) dry.add(a * 1000 + b);
-    }
-    for (const it of items) {
-      const k = KIND[it.kind];
-      if (!k?.wet || it.uid === this.hidden) continue;
-      for (const [a, b] of cellsOf(k, it.i, it.j, it.rot)) {
-        if (dry.has(a * 1000 + b)) continue;
-        this.wetOffs.push(this.ctx.addCollider({ x: PLOT_X0 + a + 0.5, z: PLOT_Z0 + b + 0.5, r: 0.6, h: 0.3 }));
-      }
-    }
+    this.wetCircles = wetCells(items, this.hidden).map(([a, b]) => ({ x: PLOT_X0 + a + 0.5, z: PLOT_Z0 + b + 0.5, r: 0.6 }));
+    for (const c of this.wetCircles) this.wetOffs.push(this.ctx.addCollider({ ...c, h: 0.3 }));
+  }
+
+  /** Every round collider on and round the plot: the fence, the things, the water. */
+  circles(): { x: number; z: number; r: number }[] {
+    const out: { x: number; z: number; r: number }[] = [...(this.base?.colliders ?? []), ...this.wetCircles];
+    for (const e of this.entries.values()) for (const c of e.baked.colliders) out.push(c);
+    return out;
   }
 
   private release(e: Entry): void {
@@ -421,6 +421,24 @@ export class HomeStage {
 
 /** The centre of the plot at ground level. */
 export const PLOT_CENTRE = { x: HOME_PLOT.x, z: HOME_PLOT.z };
+
+/** The way in, kept clear of grass and stones: the path that ends at the gate, and the slabs through it. */
+function approachClearings(): Clearing[] {
+  const G = HOME_PLOT.gate, x1 = PLOT_X0 + GRID;
+  const out: Clearing[] = [rectClearing(x1 - 0.6, G.z - 1.3, x1 + 3.8, G.z + 1.3)];
+  const seg = (a: { x: number; z: number }, b: { x: number; z: number }, hw: number) => {
+    const L = Math.hypot(b.x - a.x, b.z - a.z);
+    if (L < 1e-3) return;
+    out.push({ cx: (a.x + b.x) / 2, cz: (a.z + b.z) / 2, ax: (b.x - a.x) / L, az: (b.z - a.z) / L, hl: L / 2 + hw * 0.5, hw });
+  };
+  for (const p of PATHS) {
+    const end = p[p.length - 1];
+    if (!end || Math.hypot(end.x - G.x, end.z - G.z) > 3) continue;
+    for (let k = 1; k < p.length; k++) seg(p[k - 1], p[k], 1.5);
+    seg(end, { x: x1 + 3, z: G.z }, 1.5);
+  }
+  return out;
+}
 
 function glowTexture(THREE: Three): T.CanvasTexture {
   const c = document.createElement('canvas');

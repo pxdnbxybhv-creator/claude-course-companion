@@ -25,8 +25,12 @@ export interface MoveInput {
 export interface Physics {
   /** The surface under (x, z) for this walker (includes water when it may walk on it). */
   floorY(x: number, z: number): number;
-  /** Push (x, z) out of obstacles and back onto walkable ground; returns the corrected position. */
-  resolve(x: number, z: number, r: number, fromX: number, fromZ: number): [number, number];
+  /**
+   * Push (x, z) out of obstacles and back onto walkable ground; returns the corrected position (the
+   * array may be reused by the next call: read it at once). `feetY`: a prop whose top is below the
+   * walker's feet is stepped over, not pushed against (walls and props can be walked along on top).
+   */
+  resolve(x: number, z: number, r: number, fromX: number, fromZ: number, feetY?: number): readonly [number, number];
   /** Is (x, z) on a built surface (a deck, stair or bridge) rather than bare terrain? Steps onto those are fine. */
   built?(x: number, z: number): boolean;
 }
@@ -459,6 +463,15 @@ export class PlayerController implements Player {
     if (!obj) { this.grounded = false; this.standY = this.position.y; }
   }
 
+  /**
+   * Riding something a skill brought (关公's Red Hare): the ridden object carries
+   * userData.skillRide = true. The skill key and the 技 button stay live then (to get off), while
+   * a mini-game's boat or a feature's freeze still holds them back.
+   */
+  get heldBySkill(): boolean {
+    return this.riding !== null && this.riding.userData.skillRide === true;
+  }
+
   get isFrozen(): boolean {
     return this.frozen || this.riding !== null;
   }
@@ -470,8 +483,13 @@ export class PlayerController implements Player {
   private dashT = 0;
 
   setMoveMods(m: MoveMods | null): void {
+    const had = this.mods?.airJumps ?? 0;
     this.mods = m ? { ...m } : null;
-    if (this.grounded) this.airLeft = this.mods?.airJumps ?? 0;
+    const now = this.mods?.airJumps ?? 0;
+    // on the ground the landing refills them anyway; in the air (a skill cast mid-jump, or right
+    // after its own leap) the new extra jumps arrive at once, and taken-away ones go at once
+    if (this.grounded) this.airLeft = now;
+    else this.airLeft = Math.max(0, Math.min(now, this.airLeft + Math.max(0, now - had)));
   }
 
   impulse(vx: number, vy: number, vz: number): void {
@@ -554,8 +572,17 @@ export class PlayerController implements Player {
     const ux = dx / l, uz = dz / l;
     const ft = phys.floorY(x, z);
     const built = phys.built?.(x, z) ?? false;
-    /** Does bare ground rise too steeply just beyond (x, z)? */
-    const faceAhead = () => phys.floorY(x + ux * LOOK, z + uz * LOOK) - ft > LOOK * MAX_GRADE;
+    /**
+     * Does the ground rise too steeply just beyond (x, z)? A built surface there (a deck, a rail, a
+     * stepping stone across a narrow gap) is no cliff: it is judged by its step up from where you
+     * stand, so you stride from one raised surface over a crack onto the next.
+     */
+    const faceAhead = () => {
+      const ax = x + ux * LOOK, az = z + uz * LOOK;
+      const fa = phys.floorY(ax, az);
+      if (phys.built?.(ax, az)) return fa - Math.max(ft, f0) > STEP_UP;
+      return fa - ft > LOOK * MAX_GRADE;
+    };
     let steep: boolean;
     if (built) {
       // onto a stair, a quay or a bridge deck: a stair-sized step is fine
@@ -582,7 +609,8 @@ export class PlayerController implements Player {
 
   private walk(dt: number, input: MoveInput, phys: Physics): number {
     const mag = Math.min(1, Math.hypot(input.x, input.z));
-    if (mag > 0.25 && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
+    // pushing the stick, or a jump, ends an emote (a skill's flourish, a bow, watering…) at once
+    if ((mag > 0.25 || input.jump) && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
     const busy = this.busy;
     const mods = this.mods;
     this.running = input.run && mag > 0.05;
@@ -596,7 +624,8 @@ export class PlayerController implements Player {
     this.vz = damp(this.vz, tz, acc, dt);
     const px = this.position.x, pz = this.position.z;
     let nx = px + this.vx * dt, nz = pz + this.vz * dt;
-    [nx, nz] = phys.resolve(nx, nz, 0.3, px, pz);
+    const rs = phys.resolve(nx, nz, 0.3, px, pz, this.position.y);
+    nx = rs[0]; nz = rs[1];
     const f0 = phys.floorY(px, pz);
     if (this.blocked(nx, nz, px, pz, f0, phys)) {
       // slide along what stopped you, one axis at a time
@@ -627,11 +656,10 @@ export class PlayerController implements Player {
     }
     const floor = phys.floorY(nx, nz);
     if (!this.grounded) {
-      if (mods?.hover) this.vy = damp(this.vy, 0, 1.6, dt); // held up: no gravity, a gentle settle
-      else this.vy -= (this.vy > 0 ? GRAVITY : FALL_GRAVITY) * dt;
-      // the jade rabbit drifts down
-      if ((this.gifts.glide || mods?.glide) && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
-      this.position.y += this.vy * dt;
+      if (mods?.hover) {
+        this.vy = damp(this.vy, 0, 1.6, dt); // held up: no gravity, a gentle settle
+        this.position.y += this.vy * dt;
+      } else this.fall(dt, this.gifts.glide || !!mods?.glide ? GLIDE_FALL : Infinity);
       if (this.position.y <= floor) {
         const impact = -this.vy;
         this.position.y = floor;
@@ -663,6 +691,32 @@ export class PlayerController implements Player {
       this.heading = dampAngle(this.heading, this.targetHeading, 8, dt);
     }
     return floor;
+  }
+
+  /**
+   * One step of flight under gravity, integrated exactly (so a jump rises as high at 20 fps as at
+   * 60): GRAVITY while rising, FALL_GRAVITY once past the top, and no faster fall than `cap` (the
+   * jade rabbit's drift).
+   */
+  private fall(dt: number, cap: number): void {
+    let y = this.position.y, v = this.vy, left = dt;
+    if (v > 0) {
+      const up = Math.min(left, v / GRAVITY);
+      y += v * up - 0.5 * GRAVITY * up * up;
+      v -= GRAVITY * up;
+      left -= up;
+      if (left <= 1e-9) { this.position.y = y; this.vy = v; return; }
+      v = Math.min(v, 0);
+    }
+    if (v < -cap) v = -cap;
+    // falling: speed up to the cap, then drift at it
+    const toCap = Math.min(left, Math.max(0, (v + cap) / FALL_GRAVITY));
+    y += v * toCap - 0.5 * FALL_GRAVITY * toCap * toCap;
+    v -= FALL_GRAVITY * toCap;
+    left -= toCap;
+    if (left > 0) y += v * left;
+    this.position.y = y;
+    this.vy = v;
   }
 
   /** Stretch (k > 0) or squash (k < 0) the figure for a moment. */

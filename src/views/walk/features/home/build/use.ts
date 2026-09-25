@@ -9,7 +9,7 @@ import { earn, record } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
 import { addDays, diffDays } from '../../../../../core/date';
 import { plop, rustle } from '../../sfx';
-import { HARVEST_COINS, KIND, SWING_RIG, coupletLines, growStage, itemPoint, itemPose, itemText, type HomeKind } from '../catalog';
+import { HARVEST_COINS, KIND, SWING_RIG, coupletLines, growStage, joinCouplet, itemPoint, itemPose, itemText, textLine, type HomeKind } from '../catalog';
 import type { Baked } from './brush';
 import { swingAngle } from './mats';
 import { askText } from './dialog';
@@ -78,7 +78,7 @@ export class HomeUses {
       case 'well':
         return { ...base, actionZh: '汲水', actionEn: 'Draw water', act: () => this.well() };
       case 'text':
-        return { ...base, labelZh: `${k.zh}「${itemText(e.item).replace('/', '，')}」`, labelEn: k.en, actionZh: '题字', actionEn: 'Write', act: () => void this.write(e.uid) };
+        return { ...base, labelZh: `${k.zh}「${textLine(e.item)}」`, labelEn: k.en, actionZh: '题字', actionEn: 'Write', act: () => void this.write(e.uid) };
       case 'farm': {
         const day = today.value;
         const st = growStage(e.item, day, diffDays);
@@ -229,7 +229,7 @@ export class HomeUses {
         fields: [{ labelZh: '上联', labelEn: 'First line', value: r, max: 7 }, { labelZh: '下联', labelEn: 'Second line', value: l, max: 7 }],
       });
       if (!v) return false;
-      setItemText(uid, v[0] || v[1] ? `${v[0]}/${v[1]}` : '');
+      setItemText(uid, joinCouplet(v[0], v[1]));
     } else {
       const v = await askText(this.ctx, {
         titleZh: '题匾', titleEn: 'Write the plaque', noteZh: '四到六字最好看。', noteEn: 'Four to six characters look best.',

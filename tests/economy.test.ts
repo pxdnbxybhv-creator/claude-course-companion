@@ -139,7 +139,7 @@ describe('economy · the daily soft cap', () => {
   });
 });
 
-import { emptyPlay, questCoins, ERRAND_COINS, ERRANDS_ALL_COINS, CHECKIN_COINS, INCENSE_COINS } from '../src/app/play';
+import { emptyPlay, questCoins, ERRAND_COINS, ERRANDS_ALL_COINS } from '../src/app/play';
 import { emptyState } from '../src/app/store';
 import { QUEST } from '../src/data/quests';
 import { ENCOUNTER } from '../src/data/encounters';
@@ -148,66 +148,63 @@ import { gamesLifetime, hallStat, ledgerToday, statText } from '../src/views/que
 describe('economy · the purse’s ledger', () => {
   const day = '2026-09-25';
 
-  it('adds up today’s takings by source, biggest first', () => {
+  it('breaks today’s takings down by source, biggest first', () => {
     const p = emptyPlay();
-    p.daily = { day, picks: [], counts: { 'coin:fish': 17, 'coin:gomoku': 25, 'pay:fish': 3 }, visited: [], paid: ['d-fish', 'all'] };
-    p.done = { 'q-water': day, 'q-lotus': '2026-09-20' };
-    const { rows, total } = ledgerToday(p, emptyState(), day);
     const errands = ERRAND_COINS + ERRANDS_ALL_COINS;
+    const named = 17 + 25 + errands + questCoins(QUEST['q-water']);
+    p.daily = { day, picks: [], counts: { 'coin:fish': 17, 'coin:gomoku': 25, 'pay:fish': 3, earned: named }, visited: [], paid: ['d-fish', 'all'] };
+    p.done = { 'q-water': day, 'q-lotus': '2026-09-20' };
+    const { rows, total } = ledgerToday(p, day);
     expect(questCoins(QUEST['q-water'])).toBeGreaterThan(errands);
     expect(rows.map((r) => r.key)).toEqual(['quests', 'errands', 'gomoku', 'fish']);
     expect(rows.find((r) => r.key === 'errands')?.coins).toBe(errands);
-    expect(total).toBe(17 + 25 + errands + questCoins(QUEST['q-water']));
+    expect(total).toBe(named);
   });
 
-  it('ignores yesterday’s counts, and counts real-life deeds once the purse has seen them', () => {
-    const p = emptyPlay();
-    p.daily = { day: '2026-09-24', picks: [], counts: { 'coin:snake': 9 }, visited: [], paid: ['d-fish'] };
-    const a = emptyState();
-    a.checkins = { h1: ['2026-09-24', day], h2: [day] };
-    a.focus = [{ start: new Date(2026, 8, 25, 9).getTime(), minutes: 25, completed: true }, { start: new Date(2026, 8, 25, 11).getTime(), minutes: 25, completed: false }];
-    expect(ledgerToday(p, a, day).total).toBe(0); // the purse has not seen the habit history yet
-    p.life = { checkins: 3, incense: 1 };
-    const { rows, total } = ledgerToday(p, a, day);
-    expect(total).toBe(2 * CHECKIN_COINS + INCENSE_COINS);
-    expect(rows.find((r) => r.key === 'snake')).toBeUndefined();
-  });
-
-  it('counts an encounter met today (when its day is kept) and the purse’s own tallies by source', () => {
+  it('totals what the purse counted as income, the rest in one 「其他」 row (last)', () => {
     const p = emptyPlay();
     p.flags = { 'qy:zhiyin': true, 'qy:lanke': true };
     (p.done as Record<string, string>)['qy:zhiyin'] = day;
-    p.daily = { day, picks: [], counts: { 'earn:finds': 7, 'earn:home': 20, 'earn:other': 3 }, visited: [], paid: [] };
-    const { rows, total } = ledgerToday(p, emptyState(), day);
+    (p.done as Record<string, string>)['qy:lanke'] = '2026-09-01';
+    // a lookout (20) and a coin spot (2) on top of the encounter and a snake run
+    p.daily = { day, picks: [], counts: { 'coin:snake': 3, earned: ENCOUNTER.zhiyin.coins + 3 + 22 }, visited: [], paid: [] };
+    const { rows, total } = ledgerToday(p, day);
+    expect(rows.map((r) => r.key)).toEqual(['qiyu', 'snake', 'other']);
     expect(rows.find((r) => r.key === 'qiyu')?.coins).toBe(ENCOUNTER.zhiyin.coins);
-    expect(rows.find((r) => r.key === 'finds')?.coins).toBe(7);
-    expect(rows.find((r) => r.key === 'home')?.coins).toBe(20);
-    expect(rows.find((r) => r.key === 'other')?.coins).toBe(3);
-    expect(total).toBe(ENCOUNTER.zhiyin.coins + 30);
+    const other = rows.find((r) => r.key === 'other')!;
+    expect(other.coins).toBe(22);
+    expect(other.hintZh).toContain('拾遗');
+    expect(total).toBe(ENCOUNTER.zhiyin.coins + 25);
   });
 
-  it('once the purse tallies real-life deeds, takes its word over the habit dates', () => {
+  it('never guesses real-life deeds from the habit data: only what was paid counts', () => {
     const p = emptyPlay();
-    p.life = { checkins: 3, incense: 0 };
-    const a = emptyState();
-    // a check-in for yesterday, made today, paid today; today's own check-in undone again
-    a.checkins = { h1: ['2026-09-24'] };
-    p.daily = { day, picks: [], counts: { 'earn:checkins': 2 * CHECKIN_COINS }, visited: [], paid: [] };
-    const { rows, total } = ledgerToday(p, a, day);
-    expect(rows).toEqual([{ key: 'checkins', zh: '打卡', en: 'Check-ins', coins: 2 * CHECKIN_COINS }]);
-    expect(total).toBe(2 * CHECKIN_COINS);
-    // a day with nothing tallied yet, on a purse that has tallied before: nothing is guessed
+    p.life = { checkins: 3, incense: 1 };
+    // today's check-ins arrived in bulk (an import, the demo garden): payDue paid nothing, so nothing shows
     p.daily = { day, picks: [], counts: {}, visited: [], paid: [] };
-    p.counters = { 'earn:checkins': 40 };
-    a.checkins = { h1: [day] };
-    expect(ledgerToday(p, a, day).total).toBe(0);
+    expect(ledgerToday(p, day)).toEqual({ rows: [], total: 0 });
+    // two check-ins paid today: income, in 「其他」
+    p.daily.counts = { earned: 10 };
+    expect(ledgerToday(p, day).rows).toEqual([expect.objectContaining({ key: 'other', coins: 10 })]);
+  });
+
+  it('ignores yesterday’s counts; the named rows are a floor for the total', () => {
+    const p = emptyPlay();
+    p.daily = { day: '2026-09-24', picks: [], counts: { 'coin:snake': 9, earned: 99 }, visited: [], paid: ['d-fish'] };
+    expect(ledgerToday(p, day)).toEqual({ rows: [], total: 0 });
+    // quests marked on a first load (before the purse counted them): shown, and the total follows
+    p.daily = { day, picks: [], counts: { earned: 0 }, visited: [], paid: [] };
+    p.done = { 'q-water': day };
+    const { rows, total } = ledgerToday(p, day);
+    expect(rows.map((r) => r.key)).toEqual(['quests']);
+    expect(total).toBe(questCoins(QUEST['q-water']));
   });
 
   it('the hall card adds the purse to its line; games’ lifetime takings add up', () => {
     const p = emptyPlay();
     p.coins = 12345;
     expect(hallStat(p, 'zh')).toBe(`${statText(p, 'zh')} · 铜\u2060钱\u00a012,345`);
-    expect(hallStat(p, 'en')).toBe(`${statText(p, 'en')} · 12,345\u00a0coins`);
+    expect(hallStat(p, 'en')).toBe(`${statText(p, 'en')}\u00a0· 12,345\u00a0coins`);
     p.counters = { 'coin:fish': 30, 'coin:snake': 12, fish: 9 };
     expect(gamesLifetime(p)).toBe(42);
   });

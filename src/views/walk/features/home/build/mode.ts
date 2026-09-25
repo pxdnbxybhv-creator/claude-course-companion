@@ -10,11 +10,11 @@ import type * as T from 'three';
 import { signal } from '@preact/signals';
 import { h, render } from 'preact';
 import { reducedMotion, type Bag } from '../../kit';
-import { home, moveItem, placeItem, removeItem, setHomeName, setItemText, tendItem, HOME_LIMITS, type HomeItem } from '../../../../../app/home';
-import { earn, flag, play, record, spend } from '../../../../../app/play';
+import { home, moveItem, placeItem, removeItem, restoreItem, setHomeName, setItemText, HOME_LIMITS, type HomeItem } from '../../../../../app/home';
+import { flag, play, record, refund, spend } from '../../../../../app/play';
 import { begin, end, modalOpen } from '../../minigames/ui';
 import { rustle } from '../../sfx';
-import { GATE_CELLS, GRID, KIND, PLOT_X0, PLOT_Z0, fits, footprint, itemPose, refund, type FitReason, type HomeCat, type Rot } from '../catalog';
+import { GATE_CELLS, GRID, KIND, PLOT_X0, PLOT_Z0, canWalkOut, fits, footprint, itemPose, onPlot, resale, type FitReason, type HomeCat, type Rot } from '../catalog';
 import { flatGeometry } from './brush';
 import { askText } from './dialog';
 import { makeThumbs } from './thumbs';
@@ -172,19 +172,16 @@ export class BuildMode {
     end(ctx, 'home-build');
   }
 
-  /** Something may now stand where the walker was: step out through the gate if so. */
+  /**
+   * Something may now stand where the walker was — a pond under their feet, a house built round
+   * them: if they can no longer walk out through the gate, they step out to it.
+   */
   private unstick(): void {
     this.stage.flush();
     const p = this.ctx.player.position;
-    for (const e of this.stage.allEntries()) {
-      for (const c of e.baked.colliders) {
-        if (Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.25) {
-          const [gi, gj] = GATE_CELLS[1];
-          this.ctx.player.teleport(PLOT_X0 + gi + 0.5, PLOT_Z0 + gj, -Math.PI / 2);
-          return;
-        }
-      }
-    }
+    if (!onPlot(p.x, p.z) || canWalkOut(this.stage.circles(), p.x, p.z)) return;
+    const [gi, gj] = GATE_CELLS[1];
+    this.ctx.player.teleport(PLOT_X0 + gi + 0.5, PLOT_Z0 + gj, -Math.PI / 2);
   }
 
   // ───────────────────────────── modes
@@ -287,7 +284,7 @@ export class BuildMode {
     if (home.value.items.length >= HOME_LIMITS.items) { ctx.hud.toast('地里放不下更多了。', 'The plot cannot hold any more.'); return; }
     if (!spend(k.price)) { this.nope('poor'); return; }
     const uid = placeItem(k.id, this.gi, this.gj, this.rot, this.text || undefined);
-    if (!uid) { earn(k.price); return; }
+    if (!uid) { refund(k.price); return; }
     if (k.use === 'farm') this.stage.uses.sow(uid);
     this.push({ t: 'place', uid, price: k.price });
     ctx.audio.knock();
@@ -304,6 +301,8 @@ export class BuildMode {
       this.gi = clamp(this.gi + dx * f.w, 0, GRID - f.w);
       this.gj = clamp(this.gj + dz * f.d, 0, GRID - f.d);
     }
+    // the ghost never waits on top of what was just set down: on to the nearest free spot
+    if (!fits(home.value.items, k.id, this.gi, this.gj, this.rot).ok) this.seekFree();
     this.refresh();
   }
 
@@ -312,9 +311,9 @@ export class BuildMode {
     const it = this.selItem();
     if (!it) return;
     const k = KIND[it.kind];
-    const got = refund(k?.price ?? 0);
-    removeItem(it.uid);
-    if (got) earn(got);
+    const got = resale(k?.price ?? 0);
+    if (!removeItem(it.uid)) return;
+    if (got) refund(got);
     this.push({ t: 'sell', item: it, got });
     rustle(0.5);
     this.ctx.hud.toast(got ? `拆了${k?.zh ?? ''}，收回 ${got} 文。（可撤回）` : `拆了${k?.zh ?? ''}。（可撤回）`, got ? `Sold back for ${got} coins. (Undo to keep it.)` : 'Taken down. (Undo to keep it.)', 2600);
@@ -353,13 +352,21 @@ export class BuildMode {
     this.set({ undo: this.undoStack.length });
     if (!u) return;
     const ctx = this.ctx;
+    const gone = () => ctx.hud.toast('那样东西已经不在了。', 'That thing is no longer there.', 1800);
     switch (u.t) {
-      case 'place': removeItem(u.uid); earn(u.price); break;
+      // coins come back only for a thing that was really taken away
+      case 'place': if (removeItem(u.uid)) refund(u.price); else { gone(); return; } break;
       case 'move': moveItem(u.uid, u.i, u.j, u.rot); break;
       case 'sell': {
-        if (u.got && !spend(u.got)) { ctx.hud.toast('铜钱不够赎回了。', 'Not enough coins to buy it back.'); return; }
-        const uid = placeItem(u.item.kind, u.item.i, u.item.j, u.item.rot, u.item.text);
-        if (uid && u.item.grow) tendItem(uid, u.item.grow);
+        if (home.value.items.some((x) => x.uid === u.item.uid)) break;
+        if (u.got && !spend(u.got)) {
+          // keep the step: it can be undone once there are coins enough
+          this.push(u);
+          ctx.hud.toast('铜钱不够赎回了。', 'Not enough coins to buy it back.');
+          return;
+        }
+        // back exactly as it was: the same uid (older steps name it), its words, its season
+        if (!fits(home.value.items, u.item.kind, u.item.i, u.item.j, u.item.rot).ok || !restoreItem(u.item)) { if (u.got) refund(u.got); gone(); return; }
         break;
       }
       case 'name': setHomeName(u.prev); break;
@@ -677,7 +684,7 @@ export class BuildMode {
 
   private onKey(e: KeyboardEvent): void {
     if (!this.active || e.altKey) return;
-    if (document.querySelector('.hb-dlg-wrap, .walk-card-wrap, .walk-say-wrap')) return;
+    if (document.querySelector('.hb-dlg-wrap, .walk-card-wrap, .walk-say-wrap, .walk-map-wrap')) return;
     const tgt = e.target as HTMLElement | null;
     if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA')) return;
     const onButton = !!tgt && (tgt.tagName === 'BUTTON' || !!tgt.closest?.('button'));
@@ -696,7 +703,8 @@ export class BuildMode {
       case 'KeyV': eat(); this.turnView(); return;
       case 'KeyZ': eat(); this.undo(); return;
       case 'KeyB': eat(); this.exit(); return;
-      case 'KeyM': if (s.mode === 'select') { eat(); this.startMove(); } return;
+      // M moves the picked thing; it never opens the map over the build mode
+      case 'KeyM': eat(); if (s.mode === 'select') this.startMove(); return;
       case 'Delete': case 'Backspace': if (s.mode === 'select') { eat(); this.sell(); } return;
       case 'Enter': case 'NumpadEnter': case 'Space': case 'KeyE':
         if (onButton && code !== 'KeyE') return;

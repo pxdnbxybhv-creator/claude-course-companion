@@ -4,7 +4,8 @@ import {
   settleDecay, SPECIES, SPECIES_DEF, stewardNews, strokeGain, tricksFor, visitGift, visitorFor, type Species,
 } from '../src/views/walk/features/home/life/logic';
 import { KIND, PET_HOUSE_KINDS } from '../src/views/walk/features/home/catalog';
-import type { Pet } from '../src/app/home';
+import type { HomeItem, Pet } from '../src/app/home';
+import { cellCentre, placeSpot, PLOT, route, solidCells } from '../src/views/walk/features/home/life/plot';
 import type { CharacterId } from '../src/data/characters';
 
 const item = (kind: string) => ({ kind });
@@ -211,5 +212,54 @@ describe('home life · species coverage', () => {
     const ids: Species[] = ['dog', 'cat', 'rabbit', 'crane', 'duck', 'koi', 'parrot', 'goat'];
     expect(SPECIES.map((s) => s.id).sort()).toEqual([...ids].sort());
     expect(SPECIES.filter((s) => !s.follows).map((s) => s.id)).toEqual(['koi']);
+  });
+});
+
+describe('home life · getting about the plot', () => {
+  const built = (kind: string, i: number, j: number): HomeItem => ({ uid: `${kind}-${i}-${j}`, kind, i, j, rot: 0 });
+
+  it('calls each pet home what the build catalog calls it', () => {
+    for (const s of SPECIES) {
+      expect(s.houseZh).toBe(KIND[s.house].zh);
+      expect(s.houseEn).toBe(KIND[s.house].en.toLowerCase());
+    }
+  });
+
+  it('walks round a house instead of through it, and straight across open ground', () => {
+    const items = [built('house', 8, 8)]; // 5 x 4 cells: i 8…12, j 8…11
+    const solid = solidCells(items);
+    const a = cellCentre(10, 5), b = cellCentre(10, 14);
+    const way = route(solid, a.x, a.z, b.x, b.z);
+    expect(way.length).toBeGreaterThan(1);
+    expect(way[way.length - 1]).toEqual(b);
+    // sample the whole polyline: never inside the house
+    let px = a.x, pz = a.z;
+    for (const p of way) {
+      for (let k = 0; k <= 20; k++) {
+        const x = px + ((p.x - px) * k) / 20, z = pz + ((p.z - pz) * k) / 20;
+        const i = Math.floor(x - PLOT.x0), j = Math.floor(z - PLOT.z0);
+        expect(solid.has(i * 256 + j)).toBe(false);
+      }
+      px = p.x; pz = p.z;
+    }
+    // nothing in the way: one straight step
+    const open = route(solid, cellCentre(2, 2).x, cellCentre(2, 2).z, cellCentre(20, 3).x, cellCentre(20, 3).z);
+    expect(open).toHaveLength(1);
+  });
+
+  it('lets people step over paving and the cat’s basket', () => {
+    const solid = solidCells([built('paving', 3, 3), built('catbed', 4, 4), built('doghouse', 5, 5)]);
+    expect(solid.has(3 * 256 + 3)).toBe(false);
+    expect(solid.has(4 * 256 + 4)).toBe(false);
+    expect(solid.has(5 * 256 + 5)).toBe(true);
+  });
+
+  it('gives the guard and the steward their own spots by the gate', () => {
+    const occ = new Set<number>();
+    const guard = placeSpot([], occ, 'gate', 0);
+    for (const salt of [1, 2, 3]) {
+      const other = placeSpot([], occ, 'gate', salt);
+      expect(Math.hypot(other.x - guard.x, other.z - guard.z)).toBeGreaterThan(1.2);
+    }
   });
 });

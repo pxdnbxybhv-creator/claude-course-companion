@@ -8,7 +8,7 @@
 // painter's paper crane leads to a place where a wonder is waiting (it happens there for sure).
 import type { WorldFeature } from '../../types';
 import { ENCOUNTERS, type EncounterDef } from '../../../../data/encounters';
-import { feature, type Bag } from '../kit';
+import { feature, loadBrush, type Bag } from '../kit';
 import { busy } from '../minigames/ui';
 import { toKey } from '../../../../core/date';
 import { encounterMet, play } from '../../../../app/play';
@@ -18,6 +18,9 @@ import { RULES, RUMOURS, doneToday, happensToday, misses, noteDone, noteMiss, no
 import { loadMemory, saveMemory } from './memory';
 import { SCENES } from './scenes';
 import { laterGifts } from './later';
+
+/** Every character the scenes brush into the air: fetched as a scene is set, so its words land in brush. */
+const BRUSHED = '奇巍乎若泰山洋江河知音世所稀一蓑烟雨任平生九十疏影横斜桂举杯邀明月碧海青天夜心我的钱袋嘿谁剑来二三温酒斗诗百篇醉里且贪欢笑但得中趣哈呵别有地非人间手可摘星辰杏花村牧童遥指不知周之梦为胡蝶与愿';
 
 /** Place-bound encounters first; the ones that can happen anywhere give way to them. */
 const ORDER: EncounterDef[] = [...ENCOUNTERS.filter((d) => d.region !== 'any'), ...ENCOUNTERS.filter((d) => d.region === 'any')];
@@ -57,6 +60,7 @@ export const encounters = feature('encounters', (bag, ctx) => {
   async function start(d: EncounterDef): Promise<void> {
     const build = SCENES[d.id];
     if (!build || active) return;
+    void loadBrush(BRUSHED);
     const parent = d.region === 'any' ? ctx.scene : ctx.regionGroup(d.region);
     const stage = new Stage(ctx, d, parent, day, (s) => {
       put(noteDone(mem, d.id, day));
@@ -83,7 +87,8 @@ export const encounters = feature('encounters', (bag, ctx) => {
       if (stage.abandoned && !stage.finished) { takeDown(); return; }
       const far = stage.dist(scene.x, scene.z);
       if (stage.finished) {
-        if (far > scene.r + 25 || (clock - active.at > 240 && far > 16)) takeDown();
+        const linger = scene.linger ?? 240;
+        if (far > scene.r + 25 || (clock - active.at > linger && (far > 16 || scene.linger !== undefined))) takeDown();
       } else if (scene.roaming) {
         if (!stage.engaged && far > scene.r + 60) takeDown();
       } else if (far > scene.r + (stage.engaged ? 90 : 45)) takeDown();

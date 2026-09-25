@@ -8,7 +8,7 @@ import type { Interactable, WorldCtx } from '../../../types';
 import type { Bag } from '../../kit';
 import { inked } from '../../kit';
 import { merge, part } from '../../geo';
-import { feedPet, home, petPet, type HomeItem, type Pet } from '../../../../../app/home';
+import { feedPet, home, petPet, setPetLine, type HomeItem, type Pet } from '../../../../../app/home';
 import { earn, record } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
 import { hashString, makeRng, type Rng } from '../../../../../core/rng';
@@ -19,7 +19,8 @@ import { Bubble, Fx } from './fx';
 import { arrivals, feed, renamePetFlow, toggleFollow } from './actions';
 import { book, countStroke, saveBook, strokesToday } from './book';
 import { nameCard } from './card';
-import { clampToPlot, doorOf, fencePoint, freeNear, houses, inPlot, occupancy, PLOT, type Placed, type Spot } from './plot';
+import { clampToPlot, doorOf, fencePoint, freeNear, houses, inPlot, occupancy, PLOT, solidCells, Way, type Placed, type Spot } from './plot';
+import { yieldPrompt } from './prompt';
 import { itemPoint, PERCH_Y as PERCH_BAR, POND_WATER_Y } from '../catalog';
 import { digCoins, FOOD_PRICE, hasTrick, hearts, isSpecies, LOVE, SPECIES_DEF, strokeGain, type SpeciesDef, type Species } from './logic';
 import { HOME_PLOT } from '../../../map';
@@ -41,7 +42,29 @@ const POEMS = [
 export const WORDS: Record<string, string> = {
   '汪！': 'Woof!', '汪汪！': 'Woof woof!', '哼': 'Hmph', '咕噜咕噜': 'Purr…', '嘎！': 'Quack!', '咚！': 'Thud!', '喵': 'Mew', '喵……': 'Mew…',
   '哈……哈……': 'Pant… pant…', '喵！': 'Meow!', '蹦！': 'Boing!', '唳！': 'Kroo!', '嘎嘎！': 'Quack quack!', '好！': 'Bravo!', '咩！': 'Baa!', '你好你好！': 'Hello hello!', '走走走！': 'Let’s go!', '欢迎回家！': 'Welcome home!',
+  // the lines one may teach a parrot
+  '恭喜发财': 'Prosperity to you!', '欢迎回家': 'Welcome home!', '你好你好': 'Hello hello!', '吃了吗': 'Eaten yet?', '好看好看': 'Pretty, pretty!', '主人万福': 'Blessings, master!',
 };
+
+/** The line this parrot was taught (kept with the pet; older ones in the life book). */
+export function learntLine(uid: string): string {
+  return home.value.pets.find((p) => p.uid === uid)?.line || book().lines[uid] || '';
+}
+
+/**
+ * What a parrot says, in the reader's language: 0 = the homestead's name (or what it learnt), 1 =
+ * what it learnt, 2 = a poem (by the minute), 3 = a call on the road.
+ */
+export function parrotSays(lang: 'zh' | 'en', learnt: string, which: number, minute: number): string {
+  const zh = lang === 'zh';
+  const name = home.value.name;
+  const taught = learnt ? (zh ? learnt : WORDS[learnt] ?? learnt) : '';
+  if (which === 2) { const p = POEMS[Math.floor(minute / 10) % POEMS.length]; return zh ? p[0] : p[1]; }
+  if (which === 1 && taught) return taught;
+  if (which === 3) return name ? (zh ? `「${name}」！「${name}」！` : `${name}! ${name}!`) : taught || (zh ? '走走走！' : 'Let’s go!');
+  if (name) return zh ? `「${name}」到了！` : `Welcome to ${name}!`;
+  return taught || (zh ? '欢迎回家！' : 'Welcome home!');
+}
 
 const TEACH = ['恭喜发财', '欢迎回家', '你好你好', '吃了吗', '好看好看', '主人万福'];
 
@@ -77,6 +100,10 @@ interface Brain {
   /** The goat's fence: the outward normal where it will butt, and whether it is charging. */
   fn: Spot;
   charging: boolean;
+  /** Its way round what is built. */
+  way: Way;
+  /** How near you must be for its prompt. */
+  reach: number;
 }
 
 const dist = (a: { x: number; z: number }, x: number, z: number) => Math.hypot(a.x - x, a.z - z);
@@ -97,7 +124,13 @@ export class HomePets {
   private dummy: T.Object3D;
   private ball: T.Mesh;
   private ballFly: { t: number; from: Spot & { y: number }; to: Spot; holder: Brain | null } | null = null;
+  private solid = new Set<number>();
   private ground = (x: number, z: number) => this.ctx.groundY(x, z);
+  /** The ground, a little raised on the cat's cushion. */
+  private bedGround = (x: number, z: number) => this.ctx.groundY(x, z) + (this.catbed && Math.hypot(x - this.catbed.x, z - this.catbed.z) < 0.35 ? 0.2 : 0);
+  /** The ground, or the pond's water for a duck. */
+  private duckGround = (x: number, z: number) => (this.inPond(x, z) ? this.ring!.y - 0.03 : this.ctx.groundY(x, z));
+  private scratch: Spot = { x: 0, z: 0 };
 
   constructor(private bag: Bag, private ctx: WorldCtx, private group: T.Group, private fx: Fx, private bubble: Bubble) {
     const { THREE } = ctx;
@@ -118,6 +151,8 @@ export class HomePets {
   sync(): void {
     const h = home.value;
     this.occ = occupancy(h.items, 0, (it) => it.kind === 'pond');
+    this.solid = solidCells(h.items);
+    for (const b of this.brains.values()) b.way.reset();
     this.ponds = houses(h.items, 'pond');
     const want = new Map<string, Pet>();
     for (const p of h.pets) if (!p.follow && isSpecies(p.species) && p.species !== 'koi') want.set(p.uid, p);
@@ -176,10 +211,11 @@ export class HomePets {
       uid: p.uid, pet: p, def: SPECIES_DEF[species], a, rng, anchor, target: null, wait: rng.range(0.5, 3), plan: 'wander', t: 0,
       speakCd: 3, greeted: false, timer: rng.range(20, 40), aux: null, label: '',
       it: null as unknown as Interactable, offIt: () => {}, trickMode: 'sit', fn: { x: 0, z: 0 }, charging: false, labelT: 0,
+      way: new Way(), reach: species === 'crane' ? 2.2 : species === 'parrot' ? 2.4 : species === 'goat' ? 2 : 1.7,
     };
-    const radius = species === 'crane' ? 2.2 : species === 'parrot' ? 2.4 : species === 'goat' ? 2 : 1.7;
+    // its prompt gives way to every other one (./prompt): placed every frame
     b.it = {
-      id: `home-pet:${p.uid}`, position: pos, radius,
+      id: `home-pet:${p.uid}`, position: pos, radius: 0,
       labelZh: '', labelEn: '', actionZh: '摸摸', actionEn: 'Pet',
       act: () => this.menu(b),
     };
@@ -291,7 +327,7 @@ export class HomePets {
       case 'rabbit': return { zh: `${n}竖起耳朵，鼻子一抽一抽的。`, en: `${n} pricks up its ears, nose twitching.` };
       case 'crane': return { zh: `${n}低头看你，丹顶在阳光下格外鲜红。`, en: `${n} looks down at you, its red crown bright in the sun.` };
       case 'duck': return { zh: `${n}嘎嘎两声，一摇一摆地凑过来。`, en: `${n} quacks twice and waddles over.` };
-      case 'parrot': return { zh: `${n}歪着头：「${this.parrotLine(b.uid, 0)}」`, en: `${n} cocks its head: “${this.parrotLine(b.uid, 0)}”` };
+      case 'parrot': return { zh: `${n}歪着头说：${this.parrotLine(b.uid, 0, 'zh')}`, en: `${n} cocks its head: “${this.parrotLine(b.uid, 0, 'en')}”` };
       case 'goat': return love >= 50 ? { zh: `${n}用角轻轻顶了顶你，算是打招呼。`, en: `${n} nudges you gently with its horns — hello.` } : { zh: `${n}嚼着草，斜眼看你。`, en: `${n} chews and eyes you sideways.` };
       default: return { zh: `${n}看着你。`, en: `${n} looks at you.` };
     }
@@ -385,19 +421,16 @@ export class HomePets {
   }
 
   private async teach(b: Brain): Promise<void> {
-    const line = await nameCard(this.ctx, { glyph: '鹦', titleZh: '教它一句话', titleEn: 'Teach it a line', noteZh: '说一遍，它就记住了。', noteEn: 'Say it once and it remembers.', suggestions: TEACH, value: book().lines[b.uid] ?? '' });
+    const line = await nameCard(this.ctx, { glyph: '鹦', titleZh: '教它一句话', titleEn: 'Teach it a line', noteZh: '说一遍，它就记住了。', noteEn: 'Say it once and it remembers.', suggestions: TEACH, value: learntLine(b.uid) });
     if (!line) return;
-    saveBook((x) => { x.lines[b.uid] = line; });
+    setPetLine(b.uid, line);
+    if (book().lines[b.uid]) saveBook((x) => { delete x.lines[b.uid]; });
     this.speak(b, 1);
   }
 
-  /** The parrot's line: 0 = the homestead's name (or what it learnt), 1 = what it learnt, 2 = a poem. */
-  private parrotLine(uid: string, which: number): string {
-    const learnt = book().lines[uid];
-    const name = home.value.name;
-    if (which === 2) return POEMS[Math.floor(this.ctx.env.date.getMinutes() / 10) % POEMS.length][0];
-    if (which === 1 && learnt) return learnt;
-    return name ? `「${name}」到了！` : learnt || '欢迎回家！';
+  /** The parrot's line (see parrotSays). */
+  private parrotLine(uid: string, which: number, lang = this.ctx.lang): string {
+    return parrotSays(lang, learntLine(uid), which, this.ctx.env.date.getMinutes());
   }
 
   private speak(b: Brain, which: number): void {
@@ -460,18 +493,31 @@ export class HomePets {
         }
       }
       b.a.animate(dt, t, env.still);
-      b.it.position.set(b.a.x, b.a.y, b.a.z);
+      yieldPrompt(b.it, pd < b.reach, env.px, env.py, env.pz, b.a.x, b.a.z, this.ctx.player.heading);
       b.labelT -= dt;
       if (b.labelT <= 0) { b.labelT = 1.5; this.relabel(b); }
     }
     this.updateKoi(dt, t, env);
   }
 
+  /**
+   * Walk toward (tx, tz) the way round what is built (see plot.route); the distance still to go.
+   * `slack`: how far the target may move before the way is planned afresh (a moving target).
+   */
+  private go(b: Brain, dt: number, tx: number, tz: number, v: number, ground: (x: number, z: number) => number = this.ground, stop = 0.15, slack = 0.3): number {
+    const a = b.a;
+    b.way.to(this.solid, a.x, a.z, tx, tz, slack);
+    const w = b.way.next(a.x, a.z);
+    if (w === b.way.pts[b.way.pts.length - 1]) return a.walk(dt, tx, tz, v, ground, stop);
+    a.walk(dt, w.x, w.z, v, ground, 0.02);
+    return Math.hypot(tx - a.x, tz - a.z);
+  }
+
   private wander(b: Brain, dt: number, R: number, speed: number, rest: 'idle' | 'sleep' | 'graze' | 'eat' | 'groom' = 'idle', restFor: [number, number] = [2, 6]): void {
     const a = b.a;
     if (b.target) {
       a.setMode('idle');
-      const left = a.walk(dt, b.target.x, b.target.z, speed, this.ground);
+      const left = this.go(b, dt, b.target.x, b.target.z, speed);
       if (left < 0.2 || b.t > 14) { b.target = null; b.wait = b.rng.range(restFor[0], restFor[1]); b.t = 0; a.setMode(rest); }
     } else {
       a.halt(dt);
@@ -496,7 +542,7 @@ export class HomePets {
     const bed = b.def.id === 'cat' ? this.catbed : null;
     const spot = b.aux ?? (bed ? { x: bed.x, z: bed.z } : { x: b.anchor.x, z: b.anchor.z });
     b.aux = spot;
-    const left = a.walk(dt, spot.x, spot.z, 1.1, (x, z) => this.ground(x, z) + (bed && Math.hypot(x - bed.x, z - bed.z) < 0.35 ? 0.2 : 0), 0.1);
+    const left = this.go(b, dt, spot.x, spot.z, 1.1, bed ? this.bedGround : this.ground, 0.1);
     if (left < 0.25) {
       a.setMode(pd < 2 && b.def.id === 'dog' ? 'idle' : 'sleep');
       if (!env.still && a.mode === 'sleep' && Math.sin(env.t * 0.9 + b.uid.length) > 0.995) this.fx.zzz(a.x, a.y + a.m.height * 0.8, a.z);
@@ -512,8 +558,9 @@ export class HomePets {
     if (env.inside && pd < 10) {
       if (!b.greeted) { b.greeted = true; snd.bark(pd); this.say(b, '汪汪！', 1300); }
       const dx = a.x - env.px, dz = a.z - env.pz, L = Math.hypot(dx, dz) || 1;
-      const want = { x: env.px + (dx / L) * 1.3, z: env.pz + (dz / L) * 1.3 };
-      if (pd > 2) { a.setMode('idle'); a.walk(dt, want.x, want.z, pd > 4 ? 3.8 : 2.2, this.ground); b.t = 0; }
+      const want = this.scratch;
+      want.x = env.px + (dx / L) * 1.3; want.z = env.pz + (dz / L) * 1.3;
+      if (pd > 2) { a.setMode('idle'); this.go(b, dt, want.x, want.z, pd > 4 ? 3.8 : 2.2, this.ground, 0.15, 1.2); b.t = 0; }
       else {
         a.halt(dt);
         a.happy = 1;
@@ -534,13 +581,13 @@ export class HomePets {
     if (f.t < 1 && !f.holder) { a.halt(dt); a.look = f.to; a.setMode('idle'); return; } // watching it fly
     if (!f.holder) {
       a.setMode('idle');
-      const left = a.walk(dt, f.to.x, f.to.z, 4.4, this.ground, 0.25);
+      const left = this.go(b, dt, f.to.x, f.to.z, 4.4, this.ground, 0.25);
       if (left < 0.3) { f.holder = b; snd.bark(0); }
       return;
     }
     // bring it back
     const dx = a.x - env.px, dz = a.z - env.pz, L = Math.hypot(dx, dz) || 1;
-    const left = a.walk(dt, env.px + (dx / L) * 0.9, env.pz + (dz / L) * 0.9, 3.4, this.ground, 0.2);
+    const left = this.go(b, dt, env.px + (dx / L) * 0.9, env.pz + (dz / L) * 0.9, 3.4, this.ground, 0.2, 1.2);
     if (left < 0.25 || b.t > 20) {
       f.holder = null;
       this.ballFly = null;
@@ -576,7 +623,7 @@ export class HomePets {
   private digStep(b: Brain, dt: number): void {
     const a = b.a;
     const spot = b.aux!;
-    if (dist(a, spot.x, spot.z) > 0.3 && b.t < 10) { a.setMode('idle'); a.walk(dt, spot.x, spot.z, 2.6, this.ground, 0.2); b.timer = 2.6; return; }
+    if (dist(a, spot.x, spot.z) > 0.3 && b.t < 10) { a.setMode('idle'); this.go(b, dt, spot.x, spot.z, 2.6, this.ground, 0.2); b.timer = 2.6; return; }
     a.halt(dt);
     a.setMode('dig');
     b.timer -= dt;
@@ -626,7 +673,7 @@ export class HomePets {
     }
     if (b.target) {
       a.setMode('idle');
-      const left = a.walk(dt, b.target.x, b.target.z, 0.8, this.ground);
+      const left = this.go(b, dt, b.target.x, b.target.z, 0.8);
       if (left < 0.2 || b.t > 25) { b.target = null; b.wait = b.rng.range(20, 40); b.t = 0; a.setMode('sleep'); }
     } else {
       a.halt(dt);
@@ -646,14 +693,24 @@ export class HomePets {
     return this.ring;
   }
 
+  private inPond(x: number, z: number): boolean {
+    const ring = this.ring;
+    return !!ring && Math.hypot(x - ring.x, z - ring.z) < ring.r - 0.25;
+  }
+
+  /** No pond: the crane paces round its own spot instead (reused, no allocation). */
+  private fakeRing = { x: 0, z: 0, r: 1, y: 0 };
+  private noRing(b: Brain): { x: number; z: number; r: number; y: number } {
+    this.fakeRing.x = b.anchor.x; this.fakeRing.z = b.anchor.z;
+    return this.fakeRing;
+  }
+
   private crane(b: Brain, dt: number, env: Env): void {
     const a = b.a;
-    const ring = this.pondRing();
-    const c = ring ?? { x: b.anchor.x, z: b.anchor.z, r: 1, y: 0 };
+    const c = this.pondRing() ?? this.noRing(b);
     if (env.night) {
       const ang = Math.atan2(HOME_PLOT.gate.z - c.z, HOME_PLOT.gate.x - c.x) + 0.6;
-      const spot = { x: c.x + Math.cos(ang) * (c.r + 0.6), z: c.z + Math.sin(ang) * (c.r + 0.6) };
-      if (a.walk(dt, spot.x, spot.z, 0.5, this.ground) < 0.2) a.setMode('sleep'); else a.setMode('idle');
+      if (a.walk(dt, c.x + Math.cos(ang) * (c.r + 0.6), c.z + Math.sin(ang) * (c.r + 0.6), 0.5, this.ground) < 0.2) a.setMode('sleep'); else a.setMode('idle');
       return;
     }
     b.timer -= dt;
@@ -679,9 +736,8 @@ export class HomePets {
     const a = b.a;
     const ring = this.pondRing();
     const water = ring ? ring.y - 0.03 : 0;
-    const inPond = (x: number, z: number) => !!ring && Math.hypot(x - ring.x, z - ring.z) < ring.r - 0.25;
-    const ground = (x: number, z: number) => (inPond(x, z) ? water : this.ground(x, z));
-    if (env.night) { b.aux = b.aux ?? freeNear(this.occ, b.anchor.x + 0.8 + idx * 0.35, b.anchor.z + 0.9, 3); if (a.walk(dt, b.aux.x, b.aux.z, 0.9, this.ground) < 0.2) a.setMode('sleep'); else a.setMode('idle'); return; }
+    const ground = this.duckGround;
+    if (env.night) { b.aux = b.aux ?? freeNear(this.occ, b.anchor.x + 0.8 + idx * 0.35, b.anchor.z + 0.9, 3); if (this.go(b, dt, b.aux.x, b.aux.z, 0.9) < 0.2) a.setMode('sleep'); else a.setMode('idle'); return; }
     b.aux = null;
     if (lead) {
       // fall in behind the one ahead
@@ -706,7 +762,7 @@ export class HomePets {
         if (b.timer <= 0) { b.plan = 'land'; b.timer = b.rng.range(15, 30); b.target = null; }
       }
     }
-    if (inPond(a.x, a.z)) { a.setMode('swim'); a.sink = 0.05; a.y = water; }
+    if (this.inPond(a.x, a.z)) { a.setMode('swim'); a.sink = 0.05; a.y = water; }
     else if (a.mode === 'swim') a.setMode('idle');
   }
 
@@ -722,7 +778,7 @@ export class HomePets {
     if (a.mode === 'sleep') a.setMode('idle');
     if (pd < 4.5 && b.speakCd <= 0 && !this.bubble.busy) {
       b.speakCd = 10 + b.rng() * 6;
-      const learnt = book().lines[b.uid];
+      const learnt = learntLine(b.uid);
       this.speak(b, learnt && b.rng() < 0.5 ? 1 : hasTrick('parrot', b.pet.love, 'poem') && b.rng() < 0.25 ? 2 : 0);
     }
   }
@@ -731,10 +787,9 @@ export class HomePets {
     const a = b.a;
     const pen = this.pen;
     // inside its pen (if it has one): wander, graze, and butt the back rail; else the plot's fence
-    const local = (lx: number, lz: number) => (pen ? itemPoint(pen, lx, lz) : { x: b.anchor.x + lx, z: b.anchor.z + lz });
     if (env.night) {
-      const bed = b.aux ?? (b.aux = local(0.6, -0.3));
-      if (a.walk(dt, bed.x, bed.z, 0.8, this.ground) < 0.2) a.setMode('sleep'); else a.setMode('idle');
+      const bed = b.aux ?? (b.aux = this.goatLocal(b, 0.6, -0.3));
+      if ((pen ? a.walk(dt, bed.x, bed.z, 0.8, this.ground) : this.go(b, dt, bed.x, bed.z, 0.8)) < 0.2) a.setMode('sleep'); else a.setMode('idle');
       return;
     }
     if (b.plan !== 'butt' && b.aux) b.aux = null;
@@ -743,8 +798,8 @@ export class HomePets {
       if (!b.aux) {
         if (pen) {
           const lx = b.rng.range(-0.2, 0.9);
-          b.aux = local(lx, -0.9);
-          const back = local(lx, 0.5), hit = local(lx, -0.5);
+          b.aux = this.goatLocal(b, lx, -0.9);
+          const back = this.goatLocal(b, lx, 0.5), hit = this.goatLocal(b, lx, -0.5);
           b.fn = { x: back.x, z: back.z };
           b.target = hit;
         } else {
@@ -783,13 +838,18 @@ export class HomePets {
     // wander (inside the pen) and graze
     if (b.target) {
       a.setMode('idle');
-      const left = a.walk(dt, b.target.x, b.target.z, 0.6, this.ground);
+      const left = pen ? a.walk(dt, b.target.x, b.target.z, 0.6, this.ground) : this.go(b, dt, b.target.x, b.target.z, 0.6);
       if (left < 0.15 || b.t > 12) { b.target = null; b.wait = b.rng.range(4, 9); b.t = 0; a.setMode('graze'); }
     } else {
       a.halt(dt);
       b.wait -= dt;
-      if (b.wait <= 0) { b.target = pen ? local(b.rng.range(-0.8, 1.0), b.rng.range(-0.3, 0.5)) : clampToPlot(local(b.rng.range(-2.5, 2.5), b.rng.range(-2.5, 2.5))); b.t = 0; }
+      if (b.wait <= 0) { b.target = pen ? this.goatLocal(b, b.rng.range(-0.8, 1.0), b.rng.range(-0.3, 0.5)) : clampToPlot(this.goatLocal(b, b.rng.range(-2.5, 2.5), b.rng.range(-2.5, 2.5))); b.t = 0; }
     }
+  }
+
+  /** A point in the goat's pen (its own frame), or round its spot when it has none. */
+  private goatLocal(b: Brain, lx: number, lz: number): Spot {
+    return this.pen ? itemPoint(this.pen, lx, lz) : { x: b.anchor.x + lx, z: b.anchor.z + lz };
   }
 
   private updateKoi(dt: number, t: number, env: Env): void {

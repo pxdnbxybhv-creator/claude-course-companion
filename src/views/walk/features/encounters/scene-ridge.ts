@@ -35,6 +35,7 @@ export function lanke(s: Stage): Scene {
   leaning.root.rotation.set(0.35, 0.3, 0);
   s.bag.add(leaning.root, s.group);
   const m = mark(s, boy);
+  s.theme = 'quiet'; // time stands still round the board
   // the stones go down, now and then
   let tick = 0, turn = 0;
   A.armR.userData.posed = B.armR.userData.posed = true;
@@ -182,6 +183,7 @@ export function xianhe(s: Stage): Scene {
   const end = way[way.length - 1];
   const bird = crane(ctx);
   bird.root.scale.setScalar(1.15);
+  bird.root.name = 'qiyu-crane';
   s.bag.add(bird.root, s.group);
   bird.root.position.copy(way[0]);
   let leg = 0;
@@ -212,6 +214,7 @@ export function xianhe(s: Stage): Scene {
   grove.visible = false;
   s.bag.add(grove, s.group);
   const beacon = s.glow(new THREE.Vector3(0, 2.1, 0), '#fff1c8', 0.9, 0.6, bird.root);
+  s.theme = 'quiet';
 
   s.frame((dt, t) => {
     const r = bird.root;

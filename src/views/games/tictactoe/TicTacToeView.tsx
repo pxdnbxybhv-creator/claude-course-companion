@@ -109,6 +109,8 @@ export function TicTacToeView() {
   };
 
   const settle = (nb: Board, o: Mark | 'draw') => {
+    // the game's own pay first, so its toast leads any errand the game finishes (as in gomoku)
+    if (mode === 'ai') setPaid(payToast(tictactoePay(o === ME ? 'win' : o === AI ? 'loss' : 'draw', level)));
     playRecord('boardgame');
     const w = winner(nb);
     if (w) boardRef.current?.win(w.line[0], w.line[2]);
@@ -119,7 +121,6 @@ export function TicTacToeView() {
       else tally.d++;
       persist({ ...stats, mode, level, first, ai: { ...stats.ai, [level]: tally } });
       setSession((s) => ({ a: s.a + (o === ME ? 1 : 0), d: s.d + (o === 'draw' ? 1 : 0), b: s.b + (o === AI ? 1 : 0) }));
-      setPaid(payToast(tictactoePay(o === ME ? 'win' : o === AI ? 'loss' : 'draw', level)));
       if (o === ME) audio.chime(3);
       else if (o === AI) setTimeout(() => audio.knock(), 250);
       setLive(o === ME ? t('你赢了', 'You win') : o === AI ? t('机器胜', 'The machine wins') : t('和棋', 'Draw'));

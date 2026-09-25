@@ -5,14 +5,17 @@ import { part } from '../geo';
 import { burst } from '../props';
 import * as snd from '../minigames/sound';
 import { C, L, type Scene, type Stage } from './stage';
-import { WEAR, faceMe, inHand, mark, sway, talkPrompt } from './scene-kit';
+import { WEAR, faceMe, flatSpot, inHand, mark, sway, talkPrompt } from './scene-kit';
 import { broom, mesh, scroll } from './models';
 
 export function hanshan(s: Stage): Scene {
   const { ctx, THREE } = s;
-  const g = ANCHORS.templeGate;
-  const at = s.spot(g.x + 3.5, g.z - 5, 6);
-  const at2 = s.spot(at.x + 1.8, at.z + 0.6, 3);
+  // on the paving before the gate, a little off the way up (寺前扫叶): out along the temple axis
+  const g = ANCHORS.templeGate, hall = ANCHORS.templeHall;
+  const ax = hall.x - g.x, az = hall.z - g.z, al = Math.hypot(ax, az) || 1;
+  const ux = ax / al, uz = az / al;
+  const at = flatSpot(s, g.x - ux * 4.5 + uz * 3.6, g.z - uz * 4.5 - ux * 3.6, 7);
+  const at2 = flatSpot(s, at.x - uz * 1.8, at.z + ux * 1.8, 2.5, 0.8);
   const shide = s.person(WEAR.monkBroom, at, at2);
   const hanshanF = s.person(WEAR.monkScroll, at2, at);
   const br = broom(ctx);

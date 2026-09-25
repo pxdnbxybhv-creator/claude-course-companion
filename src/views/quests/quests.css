@@ -307,6 +307,9 @@
   background: color-mix(in srgb, var(--paper) 70%, transparent); border: 1px solid var(--line); color: var(--ink-2);
 }
 .qb-ledger b { font-weight: 600; color: #8a5a1c; font-variant-numeric: lining-nums; }
+/* the catch-all row names what it holds, quietly */
+.qb-ledger li.has-hint { max-width: 100%; }
+.qb-ledger-hint { margin-left: 5px; font-size: 11px; color: var(--ink-3); }
 @media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-ledger b { color: #ecc77e; } }
 :root[data-theme='dark'] .qb-ledger b { color: #ecc77e; }
 

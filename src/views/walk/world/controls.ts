@@ -15,6 +15,9 @@ export interface InputState {
   skillQueued: boolean;
 }
 
+const MOVEMENT = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight']);
+const WALK_KEYS = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+
 /** The painted plants are upright flats: looking down on them from much above ~37° flattens them. */
 const MAX_PITCH = 0.65;
 
@@ -30,8 +33,16 @@ export class Controls {
   private target = new THREE.Vector3();
   private tmp = new THREE.Vector3();
   private listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = [];
-  /** Set by the world while a card or sheet is open: movement keys are ignored. */
-  paused = false;
+  private pausedNow = false;
+  /** Set by the world while a card or sheet is open: walking keys are ignored, and the ones held are let go. */
+  get paused(): boolean {
+    return this.pausedNow;
+  }
+  set paused(p: boolean) {
+    // the walking keys held when a card opens (or closes) are let go: press again to walk on
+    if (p !== this.pausedNow) for (const k of WALK_KEYS) this.keys.delete(k);
+    this.pausedNow = p;
+  }
   /** The 疾 switch: always run (Shift then walks). */
   runToggle = false;
   /** Shift is held (for the HUD's run chip). */
@@ -92,17 +103,19 @@ export class Controls {
   }
 
   private onKey(e: KeyboardEvent, down: boolean): void {
+    const code = e.code;
+    // a key let go always counts, wherever the focus is now (a card or the map may have taken it
+    // since the key went down): a held W must never keep walking on its own
+    if (!down) { this.keys.delete(code); return; }
     const t = e.target as HTMLElement | null;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.closest?.('.sheet, [aria-modal="true"]'))) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    const code = e.code;
-    const movement = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'];
-    if (movement.includes(code)) {
-      if (down) this.keys.add(code); else this.keys.delete(code);
+    if (MOVEMENT.has(code)) {
+      this.keys.add(code);
       if (code.startsWith('Arrow')) e.preventDefault();
       return;
     }
-    if (!down || e.repeat) return;
+    if (e.repeat) return;
     // A focused button or link keeps Enter for itself, and Space too when it was reached with the
     // keyboard (Tab): keyboard users can activate it. A button merely clicked with the mouse still
     // lets Space jump (it does not match :focus-visible). E never activates a button, so it acts.
@@ -128,8 +141,10 @@ export class Controls {
   /** The raw, camera-relative intent of the last move(): x strafe, y forward (−1..1). */
   readonly intent = { x: 0, y: 0, run: false };
 
-  /** The move vector in world space, and whether to run. */
-  move(): { x: number; z: number; run: boolean } {
+  private readonly moveOut = { x: 0, z: 0, run: false };
+
+  /** The move vector in world space, and whether to run (one object, reused every frame). */
+  move(): { readonly x: number; readonly z: number; readonly run: boolean } {
     let ix = this.input.stickX, iy = this.input.stickY;
     let run = this.input.stickRun;
     if (!this.paused) {
@@ -148,11 +163,13 @@ export class Controls {
     this.intent.x = ix; this.intent.y = iy; this.intent.run = run;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
-    return { x: fx * iy + rx * ix, z: fz * iy + rz * ix, run };
+    const o = this.moveOut;
+    o.x = fx * iy + rx * ix; o.z = fz * iy + rz * ix; o.run = run;
+    return o;
   }
 
   get moving(): boolean {
-    return Math.hypot(this.input.stickX, this.input.stickY) > 0.1 || ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].some((k) => this.keys.has(k));
+    return Math.hypot(this.input.stickX, this.input.stickY) > 0.1 || WALK_KEYS.some((k) => this.keys.has(k));
   }
 
   /** Follow the player: smooth target, gentle auto-turn behind them while walking, no ground clipping. */

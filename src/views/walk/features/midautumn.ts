@@ -5,7 +5,7 @@
 // rises at dusk (or when the visitor picks 夜, or previews the festival on another day).
 import type * as T from 'three';
 import type { WorldCtx } from '../types';
-import { Bag, BRUSH_FONT, canvasTexture, claims, distXZ, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, outlineMat, loadBrush, pondDist, propMat, reducedMotion, reflects, shorePoint, tabletSpots, tween, dayRng } from './kit';
+import { Bag, BRUSH_FONT, canvasTexture, claims, distXZ, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, outlineMat, loadBrush, pondDist, reducedMotion, reflects, shorePoint, tabletSpots, tween, dayRng } from './kit';
 import { merge, part } from './geo';
 import { burst, flatRock, glints, hangLanterns, lotusPad, PAPER_APRICOT, PAPER_OCHRE, plate, shoreLanterns, stoneTable, teaSet } from './props';
 import { billboard, osmanthusDrawing, rabbitDrawing } from './painted';
@@ -36,63 +36,67 @@ const FLAVOURS: Flavour[] = [
 
 // ───────────────────────────── mooncake ─────────────────────────────
 
-function mooncakeTop(ctx: WorldCtx, f: Flavour): T.CanvasTexture {
-  const { THREE } = ctx;
+/** Paint one mooncake's top into a w × w square at the origin. */
+function paintTop(g: CanvasRenderingContext2D, w: number, f: Flavour): void {
   const base = f.kind === 'snow' ? ['#f6ece8', '#ecd3cf', '#d7b3ad'] : f.kind === 'su' ? ['#f0dcae', '#e2c287', '#c9a262'] : ['#d9a152', '#c3843b', '#9c6128'];
-  return canvasTexture(THREE, 256, 256, (g, w) => {
-    const c = w / 2;
-    const grd = g.createRadialGradient(c, c, 10, c, c, c);
-    grd.addColorStop(0, base[0]);
-    grd.addColorStop(0.75, base[1]);
-    grd.addColorStop(1, base[2]);
-    g.fillStyle = grd;
-    g.fillRect(0, 0, w, w);
-    if (f.kind === 'su') {
-      // flaky layers and a red stamp
-      g.strokeStyle = 'rgba(160,110,50,0.35)';
-      for (let r = 30; r < c; r += 9) { g.lineWidth = 1.5; g.beginPath(); g.arc(c, c, r, 0, TAU); g.stroke(); }
-      g.fillStyle = '#c0412f';
-      g.font = `bold 58px ${BRUSH_FONT}`;
-      g.textAlign = 'center';
-      g.textBaseline = 'middle';
-      g.fillText('鲜肉', c, c + 2);
-      return;
-    }
-    const emboss = (fn: () => void) => {
-      g.save(); g.translate(3, 3); g.globalAlpha = 0.55; fn(); g.restore();
-    };
-    const dark = f.kind === 'snow' ? '#b88f88' : '#6e4119';
-    const light = f.kind === 'snow' ? '#fffaf6' : '#f1c374';
-    // scalloped rim: 12 petals
-    const petals = (col: string, lw: number) => {
-      g.strokeStyle = col;
-      g.lineWidth = lw;
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * TAU;
-        g.beginPath();
-        g.arc(c + Math.cos(a) * 96, c + Math.sin(a) * 96, 22, a - 1.7, a + 1.7);
-        g.stroke();
-      }
-      g.beginPath(); g.arc(c, c, 74, 0, TAU); g.stroke();
-      g.beginPath(); g.arc(c, c, 66, 0, TAU); g.stroke();
-      for (let i = 0; i < 24; i++) {
-        const a = (i / 24) * TAU;
-        g.beginPath(); g.arc(c + Math.cos(a) * 70, c + Math.sin(a) * 70, 2.2, 0, TAU); g.stroke();
-      }
-    };
-    emboss(() => petals(dark, 6));
-    g.save(); g.translate(-1.5, -1.5); petals(light, 3); g.restore();
-    petals(base[1], 3);
-    g.font = `${f.mark.length > 1 ? 50 : 84}px ${BRUSH_FONT}`;
+  const c = w / 2;
+  const grd = g.createRadialGradient(c, c, 10, c, c, c);
+  grd.addColorStop(0, base[0]);
+  grd.addColorStop(0.75, base[1]);
+  grd.addColorStop(1, base[2]);
+  g.fillStyle = grd;
+  g.fillRect(0, 0, w, w);
+  if (f.kind === 'su') {
+    // flaky layers and a red stamp
+    g.strokeStyle = 'rgba(160,110,50,0.35)';
+    for (let r = 30; r < c; r += 9) { g.lineWidth = 1.5; g.beginPath(); g.arc(c, c, r, 0, TAU); g.stroke(); }
+    g.fillStyle = '#c0412f';
+    g.font = `bold 58px ${BRUSH_FONT}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillStyle = dark; g.globalAlpha = 0.7; g.fillText(f.mark, c + 3, c + 5);
-    g.fillStyle = light; g.globalAlpha = 0.9; g.fillText(f.mark, c - 1.5, c + 0.5);
-    g.fillStyle = base[1]; g.globalAlpha = 1; g.fillText(f.mark, c, c + 2);
-  });
+    g.fillText('鲜肉', c, c + 2);
+    return;
+  }
+  const emboss = (fn: () => void) => {
+    g.save(); g.translate(3, 3); g.globalAlpha = 0.55; fn(); g.restore();
+  };
+  const dark = f.kind === 'snow' ? '#b88f88' : '#6e4119';
+  const light = f.kind === 'snow' ? '#fffaf6' : '#f1c374';
+  // scalloped rim: 12 petals
+  const petals = (col: string, lw: number) => {
+    g.strokeStyle = col;
+    g.lineWidth = lw;
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * TAU;
+      g.beginPath();
+      g.arc(c + Math.cos(a) * 96, c + Math.sin(a) * 96, 22, a - 1.7, a + 1.7);
+      g.stroke();
+    }
+    g.beginPath(); g.arc(c, c, 74, 0, TAU); g.stroke();
+    g.beginPath(); g.arc(c, c, 66, 0, TAU); g.stroke();
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * TAU;
+      g.beginPath(); g.arc(c + Math.cos(a) * 70, c + Math.sin(a) * 70, 2.2, 0, TAU); g.stroke();
+    }
+  };
+  emboss(() => petals(dark, 6));
+  g.save(); g.translate(-1.5, -1.5); petals(light, 3); g.restore();
+  petals(base[1], 3);
+  g.font = `${f.mark.length > 1 ? 50 : 84}px ${BRUSH_FONT}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillStyle = dark; g.globalAlpha = 0.7; g.fillText(f.mark, c + 3, c + 5);
+  g.fillStyle = light; g.globalAlpha = 0.9; g.fillText(f.mark, c - 1.5, c + 0.5);
+  g.fillStyle = base[1]; g.globalAlpha = 1; g.fillText(f.mark, c, c + 2);
+  g.globalAlpha = 1;
 }
 
-function mooncakeMesh(ctx: WorldCtx, f: Flavour, side: string): T.Mesh {
+const SIDE: Record<Flavour['kind'], string> = { baked: '#b87632', snow: '#efdcd6', su: '#e9cf98' };
+/** The atlas: 4 × 2 cells of 256 px, one per cake. Each cell's corners (never on the round top) hold the cake's side colour. */
+const CELL = 256, COLS = 4, ROWS = 2, CORNER = 30;
+
+/** A mooncake's body: the top's UVs inset into its atlas cell, sides and bottom on the cell's corner. */
+function mooncakeGeometry(ctx: WorldCtx, scalloped: boolean): T.BufferGeometry {
   const { THREE } = ctx;
   const r = 0.19, h = 0.085;
   const geo = new THREE.CylinderGeometry(r, r * 1.03, h, 48, 1);
@@ -101,20 +105,85 @@ function mooncakeMesh(ctx: WorldCtx, f: Flavour, side: string): T.Mesh {
     const x = pos.getX(i), z = pos.getZ(i), rr = Math.hypot(x, z);
     if (rr < 1e-4) continue;
     const a = Math.atan2(z, x);
-    const k = f.kind === 'baked' ? 1 + 0.045 * Math.abs(Math.cos(a * 6)) - 0.02 : 1;
+    const k = scalloped ? 1 + 0.045 * Math.abs(Math.cos(a * 6)) - 0.02 : 1;
     pos.setX(i, x * k);
     pos.setZ(i, z * k);
   }
   geo.computeVertexNormals();
   geo.translate(0, h / 2, 0);
-  const c = new THREE.Color(side), col = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) col.set([c.r, c.g, c.b], i * 3);
-  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  const top = mooncakeTop(ctx, f);
-  // sides in the shared toon wash; the top a plain mapped Lambert (the relief is painted into it)
-  const mesh = new THREE.Mesh(geo, [propMat(ctx), new THREE.MeshLambertMaterial({ map: top }), propMat(ctx)]);
-  mesh.add(new THREE.Mesh(geo, outlineMat(ctx, 0.006)));
-  return mesh;
+  // groups: 0 the side, 1 the top, 2 the bottom
+  const uv = geo.attributes.uv as T.BufferAttribute;
+  const index = geo.index!;
+  const top = new Set<number>();
+  for (const g of geo.groups) if (g.materialIndex === 1) for (let k = g.start; k < g.start + g.count; k++) top.add(index.getX(k));
+  const edge = CORNER / 2 / CELL;
+  for (let i = 0; i < uv.count; i++) {
+    if (top.has(i)) uv.setXY(i, 0.5 + (uv.getX(i) - 0.5) * 0.92, 0.5 + (uv.getY(i) - 0.5) * 0.92);
+    else uv.setXY(i, edge, edge);
+  }
+  geo.clearGroups();
+  return geo;
+}
+
+/**
+ * Eight mooncakes in four draws: the scalloped (baked) ones and the round ones (snow skin, Suzhou),
+ * each one instanced body (one material, the tops from one atlas) and one instanced ink outline.
+ */
+function mooncakes(bag: Bag, list: { f: Flavour; at: T.Vector3; rot: number }[]): { eat(i: number, k: number): void; hide(i: number): void } {
+  const ctx = bag.ctx;
+  const { THREE } = ctx;
+  const atlas = canvasTexture(THREE, CELL * COLS, CELL * ROWS, (g) => {
+    list.forEach((c, i) => {
+      g.save();
+      g.translate((i % COLS) * CELL, Math.floor(i / COLS) * CELL);
+      paintTop(g, CELL, c.f);
+      g.fillStyle = SIDE[c.f.kind];
+      for (const [x, y] of [[0, 0], [CELL - CORNER, 0], [0, CELL - CORNER], [CELL - CORNER, CELL - CORNER]]) g.fillRect(x, y, CORNER, CORNER);
+      g.restore();
+    });
+  });
+  const mat = new THREE.MeshLambertMaterial({ map: atlas });
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec2 aCell;')
+      .replace('#include <uv_vertex>', `#include <uv_vertex>\nvMapUv = vMapUv * vec2(${(1 / COLS).toFixed(4)}, ${(1 / ROWS).toFixed(4)}) + aCell;`);
+  };
+  mat.customProgramCacheKey = () => 'mooncake-atlas';
+  const slot: { mesh: T.InstancedMesh; ink: T.InstancedMesh; k: number }[] = [];
+  for (const scalloped of [true, false]) {
+    const ids = list.map((c, i) => ({ c, i })).filter(({ c }) => (c.f.kind === 'baked') === scalloped);
+    if (!ids.length) continue;
+    const geo = mooncakeGeometry(ctx, scalloped);
+    const cell = new Float32Array(ids.length * 2);
+    ids.forEach(({ i }, k) => { cell[k * 2] = (i % COLS) / COLS; cell[k * 2 + 1] = (ROWS - 1 - Math.floor(i / COLS)) / ROWS; });
+    geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 2));
+    const mesh = new THREE.InstancedMesh(geo, mat, ids.length);
+    const ink = new THREE.InstancedMesh(geo, outlineMat(ctx, 0.006), ids.length);
+    ink.raycast = () => {};
+    mesh.add(ink);
+    ids.forEach(({ i }, k) => { slot[i] = { mesh, ink, k }; });
+    bag.add(mesh);
+  }
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3();
+  const spin = list.map((c) => c.rot);
+  const put = (i: number, s: number) => {
+    const { mesh, ink, k } = slot[i];
+    q.setFromEuler(e.set(0, spin[i], 0));
+    m4.compose(list[i].at, q, sc.set(s, s > 0 ? 1 : 0, s));
+    mesh.setMatrixAt(k, m4);
+    ink.setMatrixAt(k, m4);
+    mesh.instanceMatrix.needsUpdate = ink.instanceMatrix.needsUpdate = true;
+  };
+  list.forEach((_, i) => put(i, 1));
+  for (const s of new Set(slot.map((x) => x.mesh))) { s.computeBoundingSphere(); (s.children[0] as T.InstancedMesh).computeBoundingSphere(); }
+  return {
+    /** Bitten: k 0 → 1 over the three bites. */
+    eat(i, k) {
+      spin[i] += 0.02;
+      put(i, 1 - Math.floor(k * 3) / 3 * 0.9);
+    },
+    hide(i) { put(i, 0); },
+  };
 }
 
 // ───────────────────────────── moon path on the water ─────────────────────────────
@@ -253,7 +322,6 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   hangLanterns(bag, shoreLanterns(bag, 2), { colors: [PAPER_APRICOT, PAPER_OCHRE] });
 
   // ── eight mooncakes ──
-  const sideCols = { baked: '#b87632', snow: '#efdcd6', su: '#e9cf98' };
   const spots: { at: T.Vector3; rot: number }[] = [];
   const holders: T.Object3D[] = [];
   const hold = (o: T.Object3D) => { holders.push(o); bag.add(o); return o; };
@@ -324,23 +392,32 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   hold(pad);
   spots.push({ at: new THREE.Vector3(padAt.x, padAt.y + 0.01, padAt.z), rot: 0 });
 
-  // Build the cakes on little plates (not on the lotus leaf, the rock or the lawn).
+  // Build the cakes on little plates (not on the lotus leaf, the rock or the lawn): all the plates in
+  // one instanced draw (and its ink), all the cakes in two (and theirs).
   const order = FLAVOURS.map((_, i) => i);
   for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  const cakes: { mesh: T.Object3D; at: T.Vector3; flavour: Flavour; eaten: boolean }[] = [];
+  const cakes: { at: T.Vector3; flavour: Flavour; eaten: boolean }[] = [];
+  const placed: { f: Flavour; at: T.Vector3; rot: number }[] = [];
+  const plated: T.Vector3[] = [];
   spots.slice(0, 8).forEach((s, i) => {
     const f = FLAVOURS[order[i]];
-    const g = new THREE.Group();
     const withPlate = i <= 3 || i === 6; // the rock, the bridge / bench and the lotus leaf stay rustic
-    if (withPlate) g.add(plate(ctx, 0.25));
-    const cake = mooncakeMesh(ctx, f, sideCols[f.kind]);
-    cake.position.y = withPlate ? 0.026 : 0;
-    cake.rotation.y = s.rot;
-    g.add(cake);
-    g.position.copy(s.at);
-    bag.add(g);
-    cakes.push({ mesh: g, at: s.at.clone(), flavour: f, eaten: false });
+    if (withPlate) plated.push(s.at.clone());
+    placed.push({ f, at: s.at.clone().setY(s.at.y + (withPlate ? 0.026 : 0)), rot: s.rot });
+    cakes.push({ at: s.at.clone(), flavour: f, eaten: false });
   });
+  if (plated.length) {
+    const one = plate(ctx, 0.25);
+    const plates = new THREE.InstancedMesh(one.geometry, one.material as T.Material, plated.length);
+    const plateInk = new THREE.InstancedMesh(one.geometry, outlineMat(ctx, 0.006), plated.length);
+    plateInk.raycast = () => {};
+    const pm4 = new THREE.Matrix4();
+    plated.forEach((p, k) => { pm4.makeTranslation(p.x, p.y, p.z); plates.setMatrixAt(k, pm4); plateInk.setMatrixAt(k, pm4); });
+    plates.computeBoundingSphere(); plateInk.computeBoundingSphere();
+    plates.add(plateInk);
+    bag.add(plates);
+  }
+  const cakeSet = mooncakes(bag, placed);
   const glint = glints(bag, cakes.map((c) => c.at.clone().setY(c.at.y + 0.12)), '#ffd98a', 0.55);
   let eaten = 0;
   const total = cakes.length;
@@ -365,13 +442,8 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
         sfx.bite();
         ctx.audio.chime(eaten);
         glint.hide(i);
-        const cake = c.mesh.children[c.mesh.children.length - 1];
         // three bites, then gone
-        tween(bag, 900, (k) => {
-          const s = 1 - Math.floor(k * 3) / 3 * 0.9;
-          cake.scale.set(s, 1, s);
-          cake.rotation.y += 0.02;
-        }, () => { cake.visible = false; });
+        tween(bag, 900, (k) => cakeSet.eat(i, k), () => cakeSet.hide(i));
         burst(bag, c.at.clone().add(new THREE.Vector3(0, 0.1, 0)), c.flavour.kind === 'snow' ? '#f1e2dc' : '#c98b43', 18, { speed: 0.9, size: 0.02 });
         bag.later(700, () => burst(bag, c.at.clone().add(new THREE.Vector3(0, 0.1, 0)), '#d9a152', 10, { speed: 0.7, size: 0.018 }));
         bag.counter('mooncakes', label, `${eaten}/${total}`);

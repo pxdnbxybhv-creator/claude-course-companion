@@ -43,42 +43,64 @@ function spriteCanvas(kind: AirKind | 'dot'): HTMLCanvasElement {
   return c;
 }
 
+// Two sets share one draw: the season's own (petals, fluff, leaves, snow) and the night's fireflies,
+// cross-faded on the sky's night at run time — so a night brought on by a festival or a preview gets
+// its fireflies, and the leaves do not drift on in the dark. Each point knows its set (aKind): its
+// motion and colours come from that set's uniforms (x: the season's, y: the fireflies').
 const AIR_VS = /* glsl */`
-uniform float uTime; uniform vec3 uCenter; uniform vec3 uBox; uniform float uFall; uniform float uWind; uniform float uSize; uniform float uPx; uniform float uSpin;
+uniform float uTime; uniform vec3 uCenter; uniform vec3 uBox; uniform vec2 uFall; uniform vec2 uWind; uniform vec2 uSize; uniform float uPx; uniform vec2 uSpin;
 attribute vec4 aSeed;
-varying float vAlpha; varying float vRot; varying float vTone;
+attribute float aKind;
+varying float vAlpha; varying float vRot; varying float vTone; varying float vKind;
 void main() {
   vec3 p = position;
   float t = uTime;
-  p.y -= t * uFall * (0.6 + aSeed.x * 0.8);
-  p.x += t * uWind * (0.4 + aSeed.y) + sin(t * (0.5 + aSeed.z) + aSeed.w * 6.283) * 0.7;
+  float fall = mix(uFall.x, uFall.y, aKind), wind = mix(uWind.x, uWind.y, aKind);
+  p.y -= t * fall * (0.6 + aSeed.x * 0.8);
+  p.x += t * wind * (0.4 + aSeed.y) + sin(t * (0.5 + aSeed.z) + aSeed.w * 6.283) * 0.7;
   p.z += sin(t * (0.4 + aSeed.y * 0.6) + aSeed.x * 6.283) * 0.6;
   vec3 rel = p - uCenter;
   rel.xz = mod(rel.xz + uBox.xz * 0.5, uBox.xz) - uBox.xz * 0.5;
   rel.y = mod(rel.y + 2.0, uBox.y) - 2.0;
+  // fireflies keep low, in the grass and under the eaves
+  rel.y *= mix(1.0, 0.4, aKind);
   vec3 wp = uCenter + rel;
   vec4 mv = modelViewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;
   float edge = 1.0 - smoothstep(0.35, 0.5, max(abs(rel.x) / uBox.x, abs(rel.z) / uBox.z));
   float top = 1.0 - smoothstep(uBox.y - 4.0, uBox.y - 2.0, rel.y);
   vAlpha = edge * top * (0.55 + 0.45 * aSeed.z);
-  vRot = aSeed.w * 6.283 + t * uSpin * (aSeed.x - 0.5) * 2.0;
+  vRot = aSeed.w * 6.283 + t * mix(uSpin.x, uSpin.y, aKind) * (aSeed.x - 0.5) * 2.0;
   vTone = aSeed.y;
-  gl_PointSize = uSize * (0.6 + aSeed.x * 0.7) * uPx / max(0.5, -mv.z);
+  vKind = aKind;
+  gl_PointSize = mix(uSize.x, uSize.y, aKind) * (0.6 + aSeed.x * 0.7) * uPx / max(0.5, -mv.z);
 }`;
+// Premultiplied output, blended ONE / ONE_MINUS_SRC_ALPHA: the season's sprites blend as usual
+// (alpha kept), the fireflies add their light (alpha 0).
 const AIR_FS = /* glsl */`
-uniform sampler2D uMap; uniform vec3 uColorA; uniform vec3 uColorB; uniform float uOpacity; uniform float uBlink; uniform float uTime;
-varying float vAlpha; varying float vRot; varying float vTone;
+uniform sampler2D uMap; uniform vec3 uColorA; uniform vec3 uColorB; uniform vec3 uFlyA; uniform vec3 uFlyB; uniform vec2 uOpacity; uniform float uTime;
+varying float vAlpha; varying float vRot; varying float vTone; varying float vKind;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
-  float cs = cos(vRot), sn = sin(vRot);
-  c = mat2(cs, -sn, sn, cs) * c;
-  vec4 tex = texture2D(uMap, c + 0.5);
-  float blink = uBlink > 0.5 ? (0.35 + 0.65 * pow(0.5 + 0.5 * sin(uTime * (1.5 + vTone * 2.0) + vRot * 3.0), 3.0)) : 1.0;
-  float a = tex.a * vAlpha * uOpacity * blink;
+  float a;
+  vec3 col;
+  if (vKind > 0.5) {
+    // a firefly: a soft glow with a bright heart, blinking
+    float r = length(c) * 2.0;
+    float glow = (1.0 - smoothstep(0.0, 1.0, r)) * 0.55 + (1.0 - smoothstep(0.0, 0.3, r)) * 0.45;
+    float blink = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(uTime * (1.5 + vTone * 2.0) + vRot * 3.0), 3.0);
+    a = glow * vAlpha * uOpacity.y * blink;
+    col = mix(uFlyA, uFlyB, vTone);
+  } else {
+    float cs = cos(vRot), sn = sin(vRot);
+    c = mat2(cs, -sn, sn, cs) * c;
+    a = texture2D(uMap, c + 0.5).a * vAlpha * uOpacity.x;
+    col = mix(uColorA, uColorB, vTone);
+  }
   if (a < 0.01) discard;
-  gl_FragColor = vec4(mix(uColorA, uColorB, vTone), a);
+  gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
+  gl_FragColor = vec4(gl_FragColor.rgb * a, vKind > 0.5 ? 0.0 : a);
 }`;
 
 export interface Air {
@@ -86,16 +108,15 @@ export interface Air {
   update(t: number, center: THREE.Vector3, night: number): void;
 }
 
-/** Seasonal particles. Returns null when the season has nothing in the air at this hour. */
+/**
+ * Seasonal particles, and fireflies for the night (none in winter: the snow goes on falling in the
+ * moonlight). `night` is only the hour the world was built at; update() follows the sky's night.
+ */
 export function buildAir(bag: Bag, season: Season, night: boolean, reduced: boolean, px: number): Air | null {
   let kind: AirKind;
   let colorA = '#b83a4b', colorB = '#e8b4b8';
   let fall = 0.35, wind = 0.25, size = 0.16, spin = 1.2, opacity = 0.85, count = 150;
-  let blending: THREE.Blending = THREE.NormalBlending;
-  if (night && season !== 'winter') {
-    // warm night: fireflies drifting low, amber like the lanterns
-    kind = 'firefly'; colorA = '#ffcf6e'; colorB = '#f4f0a0'; fall = -0.05; wind = 0.05; size = 0.12; spin = 0; count = season === 'summer' ? 110 : 70; blending = THREE.AdditiveBlending;
-  } else if (season === 'spring') {
+  if (season === 'spring') {
     kind = 'petal'; colorA = '#c8506a'; colorB = '#f0bcc4';
   } else if (season === 'summer') {
     kind = 'fluff'; colorA = '#ffffff'; colorB = '#f4eed8'; fall = 0.08; wind = 0.35; size = 0.12; spin = 0; count = 90; opacity = 0.75;
@@ -105,39 +126,62 @@ export function buildAir(bag: Bag, season: Season, night: boolean, reduced: bool
   } else {
     kind = 'snow'; colorA = '#ffffff'; colorB = '#f3f1ec'; fall = 0.6; wind = 0.15; size = 0.12; spin = 0; count = 260;
   }
-  if (reduced) count = Math.round(count * 0.35);
+  // warm nights: fireflies drifting low, amber like the lanterns
+  let flies = season === 'winter' ? 0 : season === 'summer' ? 110 : 70;
+  if (reduced) { count = Math.round(count * 0.35); flies = Math.round(flies * 0.35); }
   const rng = makeRng(606);
   const box = new THREE.Vector3(34, 13, 34);
-  const pos = new Float32Array(count * 3);
-  const seed = new Float32Array(count * 4);
-  for (let i = 0; i < count; i++) {
+  const total = count + flies;
+  const pos = new Float32Array(total * 3);
+  const seed = new Float32Array(total * 4);
+  const kindA = new Float32Array(total);
+  for (let i = 0; i < total; i++) {
     pos[i * 3] = rng.range(-box.x / 2, box.x / 2);
     pos[i * 3 + 1] = rng.range(0, box.y);
     pos[i * 3 + 2] = rng.range(-box.z / 2, box.z / 2);
     seed[i * 4] = rng(); seed[i * 4 + 1] = rng(); seed[i * 4 + 2] = rng(); seed[i * 4 + 3] = rng();
+    kindA[i] = i < count ? 0 : 1;
   }
   const geo = bag.add(new THREE.BufferGeometry());
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
+  geo.setAttribute('aKind', new THREE.BufferAttribute(kindA, 1));
   const mat = bag.add(new THREE.ShaderMaterial({
-    vertexShader: AIR_VS, fragmentShader: AIR_FS, transparent: true, depthWrite: false, blending,
+    vertexShader: AIR_VS, fragmentShader: AIR_FS, transparent: true, depthWrite: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+    blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     uniforms: {
-      uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uBox: { value: box }, uFall: { value: reduced ? fall * 0.5 : fall },
-      uWind: { value: wind }, uSize: { value: size }, uPx: { value: px }, uSpin: { value: reduced ? 0 : spin },
+      uTime: { value: 0 }, uCenter: { value: new THREE.Vector3() }, uBox: { value: box },
+      uFall: { value: new THREE.Vector2(reduced ? fall * 0.5 : fall, -0.025) },
+      uWind: { value: new THREE.Vector2(wind, 0.05) }, uSize: { value: new THREE.Vector2(size, 0.12) }, uPx: { value: px },
+      uSpin: { value: new THREE.Vector2(reduced ? 0 : spin, 0) },
       uMap: { value: canvasTexture(bag, spriteCanvas(kind)) }, uColorA: { value: new THREE.Color(colorA) }, uColorB: { value: new THREE.Color(colorB) },
-      uOpacity: { value: opacity }, uBlink: { value: kind === 'firefly' ? 1 : 0 },
+      uFlyA: { value: new THREE.Color('#ffcf6e') }, uFlyB: { value: new THREE.Color('#f4f0a0') },
+      uOpacity: { value: new THREE.Vector2(opacity, 0) },
     },
   }));
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
   points.layers.set(NO_REFLECT);
   points.renderOrder = 5;
+  const op = mat.uniforms.uOpacity.value as THREE.Vector2;
+  const setNight = (n: number) => {
+    // snow falls on through the night, a little dimmer; petals, fluff and leaves settle for the dark
+    const day = kind === 'snow' ? 1 - 0.3 * n : Math.max(0, 1 - n * 1.6);
+    op.set(opacity * day, flies ? Math.max(0, n * 1.4 - 0.4) : 0);
+    // nothing to draw: skip the draw
+    points.visible = op.x > 0.005 || op.y > 0.005;
+    const a = op.x > 0.005 ? 0 : count, b = op.y > 0.005 ? total : count;
+    geo.setDrawRange(a, b - a);
+  };
+  setNight(night ? 1 : 0);
   return {
     points,
     update(t, center, nightK) {
       mat.uniforms.uTime.value = t;
       (mat.uniforms.uCenter.value as THREE.Vector3).copy(center);
-      mat.uniforms.uOpacity.value = opacity * (kind === 'fluff' ? 1 - nightK : 1);
+      setNight(nightK);
     },
   };
 }

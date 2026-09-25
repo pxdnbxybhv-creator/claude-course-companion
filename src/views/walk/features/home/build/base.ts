@@ -42,6 +42,8 @@ export function buildBase(b: Brush, gy: (x: number, z: number) => number): void 
   b.box(0.08, 0.5, 1.5, '#2f2620', [gx, y + 2.02, gzc]);
   b.label('name', [gx + 0.045, y + 2.02, gzc], 1.4, 0.42, Math.PI / 2);
   b.label('name', [gx - 0.045, y + 2.02, gzc], 1.4, 0.42, -Math.PI / 2);
+  // walking in or out, the camera comes in under the lintel rather than sit behind the board
+  b.occlude(gx, gzc, 1.35, y + 1.62, y + 3.4);
   for (const z of [gz0 - 0.1, gz1 + 0.1]) {
     const lx = gx + 0.45, ly = y + 1.95;
     b.beam([gx + 0.1, y + 2.3, z], [lx, y + 2.3, z], 0.04, HC.woodDark, { edges: false });

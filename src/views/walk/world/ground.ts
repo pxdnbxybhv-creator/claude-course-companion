@@ -276,7 +276,9 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   const overlay = canvasTexture(bag, overlayCanvas(slots, season), { flipY: false });
   const grain = canvasTexture(bag, grainCanvas(), { repeat: true });
   const mat = bag.add(new THREE.MeshLambertMaterial({ color: GROUND_COLOR[season] }));
+  const nightU = { value: 0 };
   mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = nightU;
     sh.uniforms.uOverlay = { value: overlay };
     sh.uniforms.uGrain = { value: grain };
     sh.uniforms.uOv = { value: new THREE.Vector4(-OV, -OV, 2 * OV, 2 * OV) };
@@ -284,14 +286,18 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
       .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGxz = (modelMatrix * vec4(position, 1.0)).xz;\nvSlope = 1.0 - normal.y;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;')
+      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;\nuniform float uNight;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         vec2 ouv = (vGxz - uOv.xy) / uOv.zw;
         vec3 ov = texture2D(uOverlay, ouv).rgb;
+        // by night the lawn's washes and moss read deeper, and broad hollows of shade lie between
+        // the moonlit swells (the grain's soft blotches, large), so the dark has a shape
+        ov = mix(ov, ov * ov, uNight * 0.4);
+        float nb = clamp((texture2D(uGrain, vGxz / 23.0 + 0.61).r - 0.87) / 0.13, 0.0, 1.0);
         float g1 = texture2D(uGrain, vGxz / 7.0).r;
         float g2 = texture2D(uGrain, vGxz / 29.0 + 0.37).r;
         float ink = smoothstep(0.06, 0.4, vSlope) * 0.3;
-        diffuseColor.rgb *= ov * (0.82 + 0.18 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink);`);
+        diffuseColor.rgb *= ov * (0.82 + 0.18 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink) * (1.0 + uNight * (0.45 * nb - 0.3));`);
   };
   mat.customProgramCacheKey = () => 'ground';
   const mesh = new THREE.Mesh(terrainGeometry(bag), mat);
@@ -302,7 +308,8 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   const geo = bag.add(new THREE.CylinderGeometry(1, 1.06, 0.08, 11));
   geo.translate(0, 0.01, 0);
   const smat = toon(bag, '#ddd1bb');
-  const stoneDay = smat.color.clone(), stoneNight = stoneDay.clone().multiply(new THREE.Color('#9ba2c4'));
+  // by night the stones are the palest things on the lawn: moonlit, silver, not lavender
+  const stoneDay = smat.color.clone(), stoneNight = stoneDay.clone().multiply(new THREE.Color('#a2aab8'));
   const stones = new THREE.InstancedMesh(geo, smat, list.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
   const col = new THREE.Color();
@@ -321,18 +328,30 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
   stones.name = 'stones';
 
-  // by night, warm pools of light on the lawn round the stone lanterns
+  // by night, warm pools of light on the lawn round the stone lanterns — and the lit garden's glow
+  // spilling out through the moon gate onto the lawn where one arrives (the first thing one sees)
+  const spill = [
+    { x: 0, z: GATE.z + 1.5, sx: 2.3, sz: 1.7, k: 0.62 },
+    { x: 0, z: GATE.z - 1.2, sx: 1.8, sz: 1.5, k: 0.5 },
+  ];
   const pgeo = bag.add(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2));
   const pmat = bag.add(new THREE.MeshBasicMaterial({
     map: glowTexture(bag, 64, 0.8), color: '#ffb86b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0,
     polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
   }));
-  const pools = new THREE.InstancedMesh(pgeo, pmat, LANTERNS.length);
+  const pools = new THREE.InstancedMesh(pgeo, pmat, LANTERNS.length + spill.length);
   LANTERNS.forEach((l, i) => {
     v.set(l.x, terrainY(l.x, l.z) + 0.03, l.z);
-    pools.setMatrixAt(i, m4.compose(v, q.identity(), sc.set(1.9, 1, 1.9)));
+    pools.setMatrixAt(i, m4.compose(v, q.identity(), sc.set(2.1, 1, 2.1)));
+    pools.setColorAt(i, col.setRGB(1, 1, 1));
+  });
+  spill.forEach((p, k) => {
+    v.set(p.x, terrainY(p.x, p.z) + 0.03, p.z);
+    pools.setMatrixAt(LANTERNS.length + k, m4.compose(v, q.identity(), sc.set(p.sx, 1, p.sz)));
+    pools.setColorAt(LANTERNS.length + k, col.setRGB(p.k, p.k, p.k));
   });
   pools.instanceMatrix.needsUpdate = true;
+  if (pools.instanceColor) pools.instanceColor.needsUpdate = true;
   pools.computeBoundingSphere();
   pools.name = 'lamp-pools';
   pools.visible = false;
@@ -345,9 +364,9 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   mesh.onBeforeRender = () => {
     const n = skyNow.night;
     pools.visible = n > 0.02;
-    pmat.opacity = 0.5 * n;
-    // the lawn goes down to moonlit indigo by night (the pools and lanterns keep their warmth)
-    if (Math.abs(n - lastN) > 1e-3) { lastN = n; mat.color.copy(day).lerp(moonlit, n); smat.color.copy(stoneDay).lerp(stoneNight, n); }
+    pmat.opacity = 0.62 * n;
+    // the lawn goes down to a moonlit blue-green dark by night (the pools and lanterns keep their warmth)
+    if (Math.abs(n - lastN) > 1e-3) { lastN = n; nightU.value = n; mat.color.copy(day).lerp(moonlit, n); smat.color.copy(stoneDay).lerp(stoneNight, n); }
   };
   return { mesh, stones };
 }

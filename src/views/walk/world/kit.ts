@@ -45,15 +45,18 @@ export const WARM = {
 
 /**
  * The meadow by season — the garden's lawn and the open country around it share it, so they meet
- * without a seam. Painted grass: yellow-green, a little ochre in autumn, snow-pale in winter.
+ * without a seam. Painted grass: tender yellow-green leaning to jade (the golden light and the
+ * ochre washes on it warm it enough — start it any yellower and it reads olive), snow-pale in winter.
  */
-export const LAWN: Record<Season, string> = { spring: '#b0cda0', summer: '#a3c597', autumn: '#b7c59d', winter: '#e8e8e2' };
+export const LAWN: Record<Season, string> = { spring: '#a4cf9c', summer: '#9ac595', autumn: '#a7c89f', winter: '#e8e8e2' };
 
 /**
- * What the night does to the land (a multiplier on the lit ground): a deep moonlit indigo, so the
- * paths and lawns go quiet and the lanterns' pools and the lit windows carry the warmth.
+ * What the night does to the land (a multiplier on the lit ground): deep and dark, but keeping the
+ * grass's own hue (a moonlit 黛 blue-green, not a flat slate), so the lanterns' amber pools and the
+ * lit windows carry the warmth. The land and the lawn also darken their hollows by night (land.ts,
+ * ground.ts), so the moonlit ground has a shape.
  */
-export const NIGHT_LAND = '#848cb4';
+export const NIGHT_LAND = '#7790a0';
 
 /** Everything the world allocates goes in here so unmounting frees all GPU memory. */
 export class Bag {

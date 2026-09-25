@@ -831,7 +831,7 @@ function build(ctx: WorldCtx): void {
       g.setIndex(idx);
       g.computeVertexNormals();
       const tex = h.tex(streakCanvas(73), { repeat: true });
-      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color: '#bcc3b5', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color: '#bcc3b5', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
       const mesh = new THREE.Mesh(g, m);
       mesh.name = 'mountain:runnel';
       mesh.renderOrder = 2;
@@ -895,7 +895,7 @@ function build(ctx: WorldCtx): void {
     };
     const mk = (seed: number, color: string, opacity: number, w0: number, w1: number, push: number, speed: number, order: number) => {
       const tex = h.tex(streakCanvas(seed), { repeat: true });
-      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide }));
+      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true }));
       const mesh = new THREE.Mesh(ribbon(w0, w1, push), m);
       mesh.renderOrder = order;
       mesh.name = 'mountain:waterfall';
@@ -907,7 +907,7 @@ function build(ctx: WorldCtx): void {
       });
     };
     // a pale body behind, bright streaks in front
-    const body = new THREE.Mesh(ribbon(topW * 0.95, botW * 0.9, 0.95), h.own(new THREE.MeshBasicMaterial({ color: '#ced1c2', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })));
+    const body = new THREE.Mesh(ribbon(topW * 0.95, botW * 0.9, 0.95), h.own(new THREE.MeshBasicMaterial({ color: '#ced1c2', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true })));
     body.renderOrder = 3;
     h.add(body);
     lit(h, body.material as T.MeshBasicMaterial, '#ced1c2');

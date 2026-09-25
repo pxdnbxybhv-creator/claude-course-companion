@@ -85,6 +85,7 @@ export function laoyue(s: Stage): Scene {
     moon.scale.set(k, k, 1);
     if (!s.still && Math.sin(t * 0.37) > 0.995) rip.spawn(mx, wy, mz, 1.1, 0.3);
   });
+  s.theme = 'night';
   const standX = endX - dx * 0.4, standZ = endZ - dz * 0.4;
   const standY = s.y(standX, standZ);
   const name = C('猴儿', 'Monkeys');
@@ -248,6 +249,7 @@ export function yuelao(s: Stage): Scene {
     tgeo.attributes.position.needsUpdate = true;
   });
   const m = mark(s, f);
+  s.theme = 'night';
   const name = C('月下老人', 'Old Man Under the Moon');
   talkPrompt(s, f, {
     labelZh: '理红线的老人', labelEn: 'An old man sorting red threads', actionZh: '请教', actionEn: 'Ask',

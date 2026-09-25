@@ -8,7 +8,8 @@ import type { WorldCtx } from '../../../types';
 import { home, HOME_LIMITS } from '../../../../../app/home';
 import { play } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
-import { fmtCoins } from '../../../../../ui/coins';
+import { CoinIcon, fmtCoins } from '../../../../../ui/coins';
+import { KIND } from '../catalog';
 import '../../../../../ui/coins.css';
 import './life.css';
 import { adoptCheck, FOOD_PRICE, hearts, isRole, isSpecies, nextTrick, ROLE_DEF, ROLES, routineAt, SPECIES, SPECIES_DEF, tricksFor, type Activity, type Role, type Species } from './logic';
@@ -233,7 +234,7 @@ function Ledger(props: { ctx: WorldCtx; api: LedgerApi; close: () => void; start
   } else if (tab === 'adopt') {
     body = (
       <div>
-        <p class="hl-note">{t('每种宠物都要先在家园里建好它的窝（建造里找）。鹤与锦鲤住池塘。', 'Every pet needs its own home built first (see Build). The crane and the koi live in a pond.')}</p>
+        <p class="hl-note">{t(`每种宠物都要先在家园里建好它的窝（在「营造」的宠居里）。鹤与锦鲤住${KIND.pond?.zh ?? '水池'}。`, `Every pet needs its own home built first (under Pet homes in Build). The crane and the koi live in a ${(KIND.pond?.en ?? 'pond').toLowerCase()}.`)}</p>
         {SPECIES.map((d) => {
           const chk = adoptCheck(d.id, h.items, h.pets, { coins, limit: HOME_LIMITS.pets });
           const why = chk.block === 'house' ? t(`需要${d.houseZh}`, `needs a ${d.houseEn}`) : chk.block === 'full' ? t(`${d.houseZh}已满`, `${d.houseEn} full`) : chk.block === 'limit' ? t('养不下了', 'no room') : chk.block === 'coins' ? t('铜钱不够', 'not enough coins') : '';
@@ -281,7 +282,7 @@ function Ledger(props: { ctx: WorldCtx; api: LedgerApi; close: () => void; start
           <span class="hl-seal">家</span>
           <div class="hl-title">
             <h2 class={ctx.lang === 'zh' ? '' : 'latin'}>{title}</h2>
-            <p><span class="hl-purse"><Coin />{fmtCoins(coins)}</span></p>
+            <p><span class="hl-purse"><CoinIcon size={15} />{fmtCoins(coins)}</span></p>
           </div>
           <button type="button" class="hl-x" onClick={close} aria-label={t('合上', 'Close')}>×</button>
         </div>

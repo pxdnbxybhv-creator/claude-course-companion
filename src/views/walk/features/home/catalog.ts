@@ -2,7 +2,7 @@
 // called, which shelf it sits on, how many cells it covers, what it costs — and how to build it in
 // low-poly toon-and-ink (warm 青绿 palette: vermilion pillars, indigo-teal tiles, jade leaves, ochre
 // earth, rouge blossoms). Also the plot's grid logic (footprints, rotation, what fits where, the
-// refund), shared by the builder (./build), the homestead's life (./life) and the tests.
+// resale), shared by the builder (./build), the homestead's life (./life) and the tests.
 //
 // Pure: no DOM and no three.js at runtime. A builder draws through a Brush (./build/brush.ts), in
 // the thing's own frame: origin at the centre of its footprint on the ground, +x across its width,
@@ -82,7 +82,7 @@ export function fits(items: readonly Pick<HomeItem, 'uid' | 'kind' | 'i' | 'j' |
 }
 
 /** What selling a thing back gives: half its price, rounded down. */
-export const refund = (price: number) => Math.max(0, Math.floor(price * 0.5));
+export const resale = (price: number) => Math.max(0, Math.floor(price * 0.5));
 
 /** Where a placed thing stands in the world: its centre, its heading (radians about +Y), its turned footprint. */
 export function itemPose(it: Pick<HomeItem, 'kind' | 'i' | 'j' | 'rot'>): { x: number; z: number; heading: number; w: number; d: number } {
@@ -107,6 +107,75 @@ export function cellAt(x: number, z: number): { i: number; j: number } | null {
 /** Is a world point on the plot (inside the fence)? */
 export const onPlot = (x: number, z: number, margin = 0) =>
   x > PLOT_X0 - margin && x < PLOT_X0 + GRID * CELL + margin && z > PLOT_Z0 - margin && z < PLOT_Z0 + GRID * CELL + margin;
+
+/** The water cells nobody can walk on: every pond cell not under a bridge (`skip`: a thing left out). */
+export function wetCells(items: readonly Pick<HomeItem, 'uid' | 'kind' | 'i' | 'j' | 'rot'>[], skip?: string | null): [number, number][] {
+  const dry = new Set<number>();
+  for (const it of items) {
+    const k = KIND[it.kind];
+    if (!k?.over || it.uid === skip) continue;
+    for (const [a, b] of cellsOf(k, it.i, it.j, it.rot)) dry.add(a * 1000 + b);
+  }
+  const out: [number, number][] = [];
+  for (const it of items) {
+    const k = KIND[it.kind];
+    if (!k?.wet || it.uid === skip) continue;
+    for (const c of cellsOf(k, it.i, it.j, it.rot)) if (!dry.has(c[0] * 1000 + c[1])) out.push(c);
+  }
+  return out;
+}
+
+const STEP = 0.25;
+const NS = Math.round((GRID * CELL) / STEP);
+let walkGrid: Uint8Array | null = null;
+let walkQueue: Int32Array | null = null;
+
+/**
+ * Can a walker of radius `pr` standing at (x, z) on the plot get out through the gate, going round
+ * these round colliders (walls, posts, water)? A flood over a 25 cm lattice of the plot, from where
+ * they stand to the cells kept clear inside the gate. Off the plot: always true.
+ */
+export function canWalkOut(circles: readonly { x: number; z: number; r: number }[], x: number, z: number, pr = 0.28): boolean {
+  if (!onPlot(x, z)) return true;
+  const N = NS * NS;
+  const g = (walkGrid ??= new Uint8Array(N));
+  const q = (walkQueue ??= new Int32Array(N));
+  g.fill(0);
+  // 1 = blocked
+  for (const c of circles) {
+    const R = c.r + pr;
+    const a0 = Math.max(0, Math.floor((c.x - R - PLOT_X0) / STEP)), a1 = Math.min(NS - 1, Math.ceil((c.x + R - PLOT_X0) / STEP));
+    const b0 = Math.max(0, Math.floor((c.z - R - PLOT_Z0) / STEP)), b1 = Math.min(NS - 1, Math.ceil((c.z + R - PLOT_Z0) / STEP));
+    for (let a = a0; a <= a1; a++) {
+      const sx = PLOT_X0 + (a + 0.5) * STEP - c.x;
+      for (let b = b0; b <= b1; b++) {
+        const sz = PLOT_Z0 + (b + 0.5) * STEP - c.z;
+        if (sx * sx + sz * sz < R * R) g[a * NS + b] = 1;
+      }
+    }
+  }
+  // seeds: the open lattice points within reach of where the walker stands (2 = reached)
+  let head = 0, tail = 0;
+  const ax = Math.floor((x - PLOT_X0) / STEP), bz = Math.floor((z - PLOT_Z0) / STEP);
+  for (let a = ax - 2; a <= ax + 2; a++) for (let b = bz - 2; b <= bz + 2; b++) {
+    if (a < 0 || b < 0 || a >= NS || b >= NS || g[a * NS + b]) continue;
+    const sx = PLOT_X0 + (a + 0.5) * STEP - x, sz = PLOT_Z0 + (b + 0.5) * STEP - z;
+    if (sx * sx + sz * sz > 0.45 * 0.45) continue;
+    g[a * NS + b] = 2;
+    q[tail++] = a * NS + b;
+  }
+  const gi0 = Math.round(((GRID - 3) * CELL) / STEP), gj0 = Math.round((GATE_J[0] * CELL) / STEP), gj1 = Math.round(((GATE_J[1] + 1) * CELL) / STEP);
+  while (head < tail) {
+    const s = q[head++];
+    const a = (s / NS) | 0, b = s - a * NS;
+    if (a >= gi0 && b >= gj0 && b < gj1) return true;
+    if (a > 0 && !g[s - NS]) { g[s - NS] = 2; q[tail++] = s - NS; }
+    if (a < NS - 1 && !g[s + NS]) { g[s + NS] = 2; q[tail++] = s + NS; }
+    if (b > 0 && !g[s - 1]) { g[s - 1] = 2; q[tail++] = s - 1; }
+    if (b < NS - 1 && !g[s + 1]) { g[s + 1] = 2; q[tail++] = s + 1; }
+  }
+  return false;
+}
 
 /** How ripe a vegetable plot is: 0 sown … 3 ripe. */
 export function growStage(it: Pick<HomeItem, 'grow'>, today: string, diffDays: (a: string, b: string) => number): number {
@@ -194,6 +263,8 @@ export interface Brush {
   solid(x: number, z: number, r: number, h?: number): void;
   /** A solid rectangle (walls), filled with round colliders. */
   solidRect(x0: number, z0: number, x1: number, z1: number, h?: number): void;
+  /** Keep the walking camera out of a band (a lintel, a sign board): a vertical cylinder from y0 to y1. Roofs add their own. */
+  occlude(x: number, z: number, r: number, y0: number, y1: number): void;
   /** A walkable floor along a → b (half width hw) at height y (or a profile over −L/2 … L/2). */
   floor(a: readonly [number, number], b: readonly [number, number], hw: number, y: number | ((s: number) => number)): void;
   /** Somewhere to sit, facing `heading`; `stand` is where you get up to. */
@@ -1148,13 +1219,31 @@ export function itemText(it: Pick<HomeItem, 'kind' | 'text'>): string {
   return it.text || KIND[it.kind]?.defaultText || '';
 }
 
-/** A couplet's two lines. */
+/**
+ * A couplet's two lines. Stored as "上联/下联": split at the first slash and keep both halves as
+ * they are (either may be empty; commas and spaces belong inside a line). Words without a slash
+ * (older saves) are halved.
+ */
 export function coupletLines(text: string): [string, string] {
   const t = text.trim();
-  const m = t.split(/[/|｜／,，、\s]+/).filter(Boolean);
-  if (m.length >= 2) return [m[0], m.slice(1).join('')];
+  const k = t.search(/[/／]/);
+  if (k >= 0) return [t.slice(0, k).trim(), t.slice(k + 1).replace(/[/／]/g, '').trim()];
   const h = Math.ceil(t.length / 2);
   return [t.slice(0, h), t.slice(h)];
+}
+
+/** A thing's words as one line to show (a couplet's two lines joined by a comma, a lone line alone). */
+export function textLine(it: Pick<HomeItem, 'kind' | 'text'>): string {
+  const t = itemText(it);
+  if (KIND[it.kind]?.text !== 'couplet') return t;
+  return coupletLines(t).filter(Boolean).join('，');
+}
+
+/** Put a couplet's two lines together for storing (slashes typed into a line are dropped). */
+export function joinCouplet(a: string, b: string): string {
+  const c = (s: string) => s.replace(/[/／]/g, '').trim();
+  const x = c(a), y = c(b);
+  return x || y ? `${x}/${y}` : '';
 }
 
 /** The starter things placed on the first visit: [kind, i, j, rot]. */

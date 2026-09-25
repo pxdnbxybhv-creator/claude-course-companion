@@ -828,7 +828,7 @@ export function lampPools(h: Hill, at: T.Vector3[], name: string): void {
   h.add(pools);
   h.frame((_dt, t) => {
     const n = h.night;
-    mat.opacity = 0.42 * n * (0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1));
+    mat.opacity = 0.56 * n * (0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1));
     pools.visible = n > 0.02;
   });
 }

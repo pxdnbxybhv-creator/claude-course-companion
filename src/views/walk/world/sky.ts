@@ -15,14 +15,16 @@ interface Palette {
 }
 
 // A warm living painting: golden paper light by day under a pale 花青 (indigo-teal) wash of sky,
-// rose-gold at dawn, amber at dusk; warm ink-brown from below (never blue-grey). Night is deep
-// indigo with silver moonlight on things, dark enough near the ground that the lanterns and the
-// lit windows glow amber against it — cosy, never a flat grey-blue wash.
+// rose-gold at dawn, amber at dusk (a bright bounce from below, so white walls glow apricot, not
+// tan); warm ink-brown from below (never blue-grey). Night is deep indigo with silver moonlight on
+// things — more moon and less flat sky fill, so the land has a lit side and a shaded one — and a
+// warm-brown bounce from below; dark enough near the ground that the lanterns and the lit windows
+// glow amber against it — cosy, never a flat grey-blue wash.
 const PALETTES: Record<TimeOfDay, Palette> = {
   dawn: { top: '#a0bccb', horizon: '#f4d9ba', fog: '#ecdcc8', hemiSky: '#fbeee2', hemiGround: '#8f7866', hemi: 2.0, sun: '#ffdcb4', sunI: 1.25, tint: '#faefe4', glow: '#f7a468' },
   day: { top: '#97bfcc', horizon: '#efebdf', fog: '#e7e6d8', hemiSky: '#fff8ee', hemiGround: '#a88a68', hemi: 2.05, sun: '#fff3de', sunI: 1.4, tint: '#fffaf2', glow: '#fff0c8' },
-  dusk: { top: '#7b8db5', horizon: '#f2c59a', fog: '#e8cfb6', hemiSky: '#f4e3d2', hemiGround: '#7c6962', hemi: 1.9, sun: '#ffcc98', sunI: 1.25, tint: '#f6e5d3', glow: '#f2844a' },
-  night: { top: '#0b1130', horizon: '#2c3766', fog: '#303c68', hemiSky: '#aab6e2', hemiGround: '#5e4c50', hemi: 1.3, sun: '#dfe6fa', sunI: 0.6, tint: '#9ca5cb', glow: '#efe2bc' },
+  dusk: { top: '#7b8db5', horizon: '#f2c59a', fog: '#e8cfb6', hemiSky: '#f6e9dc', hemiGround: '#957866', hemi: 2.15, sun: '#ffd3a6', sunI: 1.25, tint: '#f6e5d3', glow: '#f2844a' },
+  night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#a0b0d6', hemiGround: '#6a4f3c', hemi: 1.2, sun: '#e4eaff', sunI: 0.9, tint: '#a0a7c8', glow: '#efe2bc' },
 };
 
 /** Fog distances by day and by night: a light warm haze, a closer indigo dark. */
@@ -198,6 +200,9 @@ export class SkySystem implements Sky {
     return c;
   }
   private lightDir = new THREE.Vector3();
+  private glowDir = new THREE.Vector3();
+  private moonLight = new THREE.Vector3();
+  private sunLightDir = new THREE.Vector3();
 
   private target(): Palette {
     return PALETTES[this.forced ? 'night' : this.tod];
@@ -265,10 +270,21 @@ export class SkySystem implements Sky {
     this.tint.copy(c.tint);
 
     // light direction: the sun by day, the moon by night
-    const lightDir = this.lightDir.copy(this.sunDir).lerp(this.moonDir, this.night01).normalize();
+    // (moonlight falls from higher than the moon's disc sits: there are no cast shadows to betray
+    // it, and a grazing light would leave the land one flat dark — this way the moonlit side of
+    // every swell and roof reads silver, the far side stays in shade)
+    const moonLight = this.moonLight.copy(this.moonDir);
+    moonLight.y = Math.max(moonLight.y, 0.62);
+    moonLight.normalize();
+    // (and a low sun lights from a little higher than its disc, so dawn and dusk rake the land gold
+    // rather than leaving it to the sky's fill alone)
+    const sunLight = this.sunLightDir.copy(this.sunDir);
+    sunLight.y = Math.max(sunLight.y, 0.24);
+    sunLight.normalize();
+    const lightDir = this.lightDir.copy(sunLight).lerp(moonLight, this.night01).normalize();
     this.sunLight.position.copy(lightDir).multiplyScalar(50);
     this.sunLight.target.position.set(0, 0, 0);
-    (u.uSunDir.value as THREE.Vector3).copy(lightDir);
+    (u.uSunDir.value as THREE.Vector3).copy(this.glowDir.copy(this.sunDir).lerp(this.moonDir, this.night01).normalize());
     u.uGlow.value = this.night01 > 0.5 ? 0.9 * this.moonOverride.glow : 1;
     u.uNight.value = this.night01;
 

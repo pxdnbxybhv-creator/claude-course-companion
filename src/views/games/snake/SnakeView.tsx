@@ -156,6 +156,11 @@ export function SnakeView() {
     };
     window.addEventListener('keydown', onKey);
     return () => {
+      // leaving mid-run still counts the run and pays for it (the board is not kept)
+      if (eng.inProgress) {
+        settle(eng.state);
+        payToast(snakePay(eng.state.score));
+      }
       eng.stop();
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVis);
@@ -222,6 +227,8 @@ export function SnakeView() {
       const s = eng.state;
       const rec = settle(s);
       toast(t(`上一局 ${s.score} 分已记下${rec ? ' · 新纪录' : ''}`, `Last run's ${s.score} is saved${rec ? ' · a new best' : ''}`));
+      // a run cut short still pays for what it ate, as a finished one would
+      payToast(snakePay(s.score));
     }
     eng.reset();
     setRecord(false);

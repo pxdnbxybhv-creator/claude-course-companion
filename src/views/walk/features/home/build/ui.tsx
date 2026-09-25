@@ -5,7 +5,7 @@ import './build.css';
 import { home } from '../../../../../app/home';
 import { coins } from '../../../../../app/play';
 import { CoinBadge } from '../../../../../ui/coins';
-import { CATALOG, HOME_CATS, KIND, refund, itemText } from '../catalog';
+import { CATALOG, HOME_CATS, KIND, resale, textLine } from '../catalog';
 import { thumbOf } from './thumbs';
 import type { BuildMode } from './mode';
 
@@ -112,7 +112,7 @@ export function BuildUI(props: { ctrl: BuildMode }) {
           <div class="hb-bar-head">
             <Thumb kind={k.id} v={s.thumbs} />
             <div class="hb-bar-title">
-              <b>{t(k.zh, k.en)}{k.text && <>「{itemText(it).replace('/', '，')}」</>}</b>
+              <b>{t(k.zh, k.en)}{k.text && <>「{textLine(it)}」</>}</b>
               <small>{t(k.noteZh, k.noteEn)}</small>
             </div>
           </div>
@@ -130,7 +130,7 @@ export function BuildUI(props: { ctrl: BuildMode }) {
             )}
             <button type="button" class="hb-act is-red" onClick={() => c.sell()}>
               <span class="brush" aria-hidden="true">卖</span>
-              <small>{refund(k.price) ? <>+<CoinBadge value={refund(k.price)} size={11} /></> : t('拆除', 'Remove')}</small>
+              <small>{resale(k.price) ? <>+<CoinBadge value={resale(k.price)} size={11} /></> : t('拆除', 'Remove')}</small>
             </button>
             <button type="button" class="hb-act" onClick={() => c.back()}>
               <span class="brush" aria-hidden="true">罢</span><small>{t('返回', 'Back')}{kb && <kbd>Esc</kbd>}</small>

@@ -43,7 +43,7 @@
 .qy-wish {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 132px);
+  bottom: calc(env(safe-area-inset-bottom) + 236px);
   transform: translateX(-50%);
   pointer-events: auto;
   display: grid;

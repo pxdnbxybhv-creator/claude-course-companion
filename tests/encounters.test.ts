@@ -2,6 +2,9 @@
 // due and did not happen (so each can be found within a few days of trying), the right companion
 // gets their own version, rumours are told once a day, and the memory survives bad data.
 import { describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ENCOUNTERS, ENCOUNTER } from '../src/data/encounters';
 import { CHARACTERS } from '../src/data/characters';
 import {
@@ -151,6 +154,28 @@ describe('who gets their own version', () => {
     expect(variantFor(ENCOUNTER.laoyue, 'change')).toBe('change');
     expect(variantFor(ENCOUNTER.shijin, 'scholar')).toBeNull();
     expect(variantFor(ENCOUNTER.taohua, 'cat')).toBeNull();
+  });
+});
+
+describe('each special companion has a version of their own in the scene', () => {
+  // the scenes' sources, cut into one piece per encounter (export function <id>(…) … up to the next)
+  const dir = fileURLToPath(new URL('../src/views/walk/features/encounters/', import.meta.url));
+  const src = readdirSync(dir).filter((f) => f.startsWith('scene-') && f !== 'scene-kit.ts').map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
+  const body = (id: string): string => {
+    const at = src.indexOf(`export function ${id}(`);
+    if (at < 0) return '';
+    const next = src.indexOf('\nexport function ', at + 10);
+    return src.slice(at, next < 0 ? undefined : next);
+  };
+  it('branches on every companion the encounter names (and only real ones)', () => {
+    for (const e of ENCOUNTERS) {
+      const b = body(e.id);
+      expect(b.length, e.id).toBeGreaterThan(200);
+      for (const c of e.special) expect(b.includes(`'${c}'`), `${e.id} has no branch for ${c}`).toBe(true);
+    }
+  });
+  it('closes with the card that remembers it, for everyone', () => {
+    for (const e of ENCOUNTERS) expect(body(e.id).includes('finish('), e.id).toBe(true);
   });
 });
 

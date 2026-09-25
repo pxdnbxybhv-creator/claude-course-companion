@@ -6,7 +6,7 @@ import type * as T from 'three';
 import type { WorldFeature, WorldCtx } from '../../../types';
 import { canvasTexture, feature, inked, loadBrush, reducedMotion, timeChoice, BRUSH_FONT, type Bag } from '../../kit';
 import { merge, part } from '../../geo';
-import { home, petPet } from '../../../../../app/home';
+import { home, setPetLine, setPetLove } from '../../../../../app/home';
 import { today } from '../../../../../app/store';
 import { HOME_PLOT } from '../../../map';
 import { Bubble, Fx } from './fx';
@@ -28,10 +28,18 @@ function settle(): void {
   const before = home.value.pets;
   const after = settleDecay(before, b.marker, t);
   for (let i = 0; i < before.length; i++) {
-    const loss = before[i].love - after[i].love;
-    if (loss > 0) petPet(before[i].uid, -loss);
+    if (after[i].love < before[i].love) setPetLove(before[i].uid, after[i].love);
   }
   saveBook((x) => { x.marker = t; });
+}
+
+/** Lines taught to parrots used to live in the life book; they now ride with the pet itself. */
+function moveTaughtLines(): void {
+  const lines = book().lines;
+  const keys = Object.keys(lines);
+  if (!keys.length) return;
+  for (const p of home.value.pets) if (lines[p.uid] && !p.line) setPetLine(p.uid, lines[p.uid]);
+  saveBook((x) => { x.lines = {}; });
 }
 
 /** The ledger board by the gate: two posts, a little roof, a paper sheet brushed 「家园簿」. */
@@ -73,6 +81,7 @@ export const homeLife = feature('home-life', async (bag, ctx) => {
   await loadBrush('家园簿');
   if (bag.disposed) return;
   settle();
+  moveTaughtLines();
   tidyBook(new Set(home.value.pets.map((p) => p.uid)));
   const group = ctx.regionGroup('home');
   const still = reducedMotion();
@@ -124,17 +133,21 @@ export const homeLife = feature('home-life', async (bag, ctx) => {
   sync();
   let pending = false;
   bag.onDispose(home.subscribe(() => { if (!pending) { pending = true; queueMicrotask(() => { pending = false; sync(); }); } }));
-  visitor.arrive();
-  seller.arrive();
+  visitor.check(true);
+  seller.check(true);
   bag.onDispose(() => { closeAllCards(); pets.dispose(); people.dispose(); visitor.dispose(); seller.dispose(); follower.dispose(); closeSound(); });
 
-  if (import.meta.env.DEV) (window as unknown as { __homeLife?: unknown }).__homeLife = { pets, people, follower, visitor, seller };
+  if (import.meta.env.DEV) {
+    const w = window as unknown as { __homeLife?: unknown };
+    w.__homeLife = { pets, people, follower, visitor, seller, hour };
+    bag.onDispose(() => { if (w.__homeLife && (w.__homeLife as { pets: unknown }).pets === pets) delete w.__homeLife; });
+  }
   const wp = new ctx.THREE.Vector3();
   let tick = 0;
   const env = { px: 0, pz: 0, py: 0, inside: false, night: false, still, t: 0 };
   bag.frame((dt, t) => {
     tick += dt;
-    if (tick > 1) { tick = 0; clock(); }
+    if (tick > 1) { tick = 0; clock(); visitor.check(); seller.check(); }
     const P = ctx.player.position;
     follower.update(dt, t, still);
     if (Math.hypot(P.x - HOME_PLOT.x, P.z - HOME_PLOT.z) > HOME_PLOT.size + 30) return; // far away: nobody to see
@@ -145,6 +158,7 @@ export const homeLife = feature('home-life', async (bag, ctx) => {
     pets.update(dt, t, env);
     people.update(dt, t, still, P.x, P.z, env.night);
     visitor.update(dt, t, still);
+    seller.update(dt);
     fx.update(dt);
     bubble.update(dt, wp);
   });

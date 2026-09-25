@@ -2,11 +2,11 @@
 // seal styles and the brush-stroke outline used by the progress bars.
 import { CHARACTER, CHARACTERS, type CharacterId } from '../../data/characters';
 import { QUESTS, type QuestDef } from '../../data/quests';
-import { CHECKIN_COINS, ERRAND_COINS, ERRANDS_ALL_COINS, INCENSE_COINS, isUnlockedIn, questCoins, type PlayState } from '../../app/play';
+import { ERRAND_COINS, ERRANDS_ALL_COINS, isUnlockedIn, questCoins, type PlayState } from '../../app/play';
 import type { Route } from '../../app/router';
-import type { AppState, DateKey } from '../../core/types';
+import type { DateKey } from '../../core/types';
 import { hashString, makeRng } from '../../core/rng';
-import { fromKey, toKey } from '../../core/date';
+import { fromKey } from '../../core/date';
 import { toLunar } from '../../core/lunar';
 import { ENCOUNTERS } from '../../data/encounters';
 import { PAY_RULES, PAY_SOURCES, coinKey } from '../games/economy';
@@ -186,8 +186,8 @@ export const albumRequest = { pending: false };
 
 // ------------------------------------------------------------------------------------ purse
 
-/** One line of today's takings: where the coins came from. */
-export interface LedgerRow { key: string; zh: string; en: string; coins: number }
+/** One line of today's takings: where the coins came from (and, for the catch-all row, what it holds). */
+export interface LedgerRow { key: string; zh: string; en: string; coins: number; hintZh?: string; hintEn?: string }
 
 /** The day an encounter was met, if the play record keeps it (done['qy:<id>']). */
 export function encounterDay(p: PlayState, id: string): DateKey | undefined {
@@ -196,50 +196,35 @@ export function encounterDay(p: PlayState, id: string): DateKey | undefined {
 }
 
 /**
- * Other income the play record tallies for the day, by where it came from (daily count
- * `earn:<source>`, kept by app/play.ts's earn(n, source) and payDue). Refunds and codes are not income
- * and are never tallied. Until those counts exist, check-ins and incense are worked out from the
- * habit data (see ledgerToday).
+ * Today's takings. The total is what app/play.ts counted as income today (daily count `earned`:
+ * every rise in the purse, but never a refund or a code). The rows break it down where the play
+ * record can tell: the games (what each paid today), today's errands and quests, 奇遇 met today —
+ * biggest first — and then one 「其他」 row for the rest (real-life check-ins and incense, finds on
+ * roofs and poles, the neighbours' tips, the homestead, the companions' skills, 奇遇 bonuses).
+ * Should the named rows ever add up to more than `earned`, the total follows the rows.
  */
-export const EARN_ROWS: { source: string; zh: string; en: string }[] = [
-  { source: 'checkins', zh: '打卡', en: 'Check-ins' },
-  { source: 'incense', zh: '燃香', en: 'Incense' },
-  { source: 'finds', zh: '拾遗', en: 'Finds' },
-  { source: 'folk', zh: '乡邻', en: 'Neighbours' },
-  { source: 'home', zh: '家园', en: 'Homestead' },
-  { source: 'other', zh: '其他', en: 'Other' },
-];
-export const earnKey = (source: string) => `earn:${source}`;
-
-/**
- * Today's takings, by source, biggest first: the games (what they paid today), today's errands and
- * quests, 奇遇 met today, and whatever else the play record tallied for the day (EARN_ROWS: real-life
- * check-ins and incense, finds on the roofs, the neighbours' tips, the homestead…).
- */
-export function ledgerToday(p: PlayState, a: AppState, day: DateKey): { rows: LedgerRow[]; total: number } {
+export function ledgerToday(p: PlayState, day: DateKey): { rows: LedgerRow[]; total: number } {
   const rows: LedgerRow[] = [];
-  const counts = p.daily.day === day ? p.daily.counts : {};
+  const isToday = p.daily.day === day;
+  const counts = isToday ? p.daily.counts : {};
   const push = (key: string, zh: string, en: string, coins: number) => { if (coins > 0) rows.push({ key, zh, en, coins }); };
   for (const s of PAY_SOURCES) push(s, PAY_RULES[s].zh, PAY_RULES[s].en, counts[coinKey(s)] ?? 0);
-  if (p.daily.day === day) {
+  if (isToday) {
     const errands = p.daily.paid.filter((x) => x !== 'all').length * ERRAND_COINS + (p.daily.paid.includes('all') ? ERRANDS_ALL_COINS : 0);
     push('errands', '日课', 'Errands', errands);
   }
   push('quests', '任务', 'Quests', QUESTS.filter((q) => p.done[q.id] === day).reduce((n, q) => n + questCoins(q), 0));
   push('qiyu', '奇遇', 'Encounters', ENCOUNTERS.filter((e) => p.flags[`qy:${e.id}`] && encounterDay(p, e.id) === day).reduce((n, e) => n + e.coins, 0));
-  // the purse's own tally of what it paid today, when it keeps one
-  const tallied = EARN_ROWS.some((r) => counts[earnKey(r.source)] !== undefined || p.counters[earnKey(r.source)] !== undefined);
-  for (const r of EARN_ROWS) push(r.source, r.zh, r.en, counts[earnKey(r.source)] ?? 0);
-  if (!tallied && p.life) {
-    // older play records: work the real-life deeds out from today's habit data
-    let checkins = 0;
-    for (const days of Object.values(a.checkins)) if (days.includes(day)) checkins++;
-    push('checkins', '打卡', 'Check-ins', checkins * CHECKIN_COINS);
-    const incense = a.focus.filter((f) => f.completed && toKey(new Date(f.start)) === day).length;
-    push('incense', '燃香', 'Incense', incense * INCENSE_COINS);
-  }
   rows.sort((x, y) => y.coins - x.coins);
-  return { rows, total: rows.reduce((n, r) => n + r.coins, 0) };
+  const named = rows.reduce((n, r) => n + r.coins, 0);
+  const earned = Math.max(0, Math.floor(counts.earned ?? 0));
+  if (earned > named) {
+    rows.push({
+      key: 'other', zh: '其他', en: 'Other', coins: earned - named,
+      hintZh: '打卡 · 拾遗 · 乡邻 · 家园 · 技艺', hintEn: 'check-ins, finds, neighbours, homestead, skills',
+    });
+  }
+  return { rows, total: Math.max(earned, named) };
 }
 
 /**
@@ -247,12 +232,13 @@ export function ledgerToday(p: PlayState, a: AppState, day: DateKey): { rows: Le
  * amounts live with the walk's features; kept here in rough so the quest book need not load them):
  * finds on roofs, stepping stones, the pole run and the lookouts (1–4 a coin spot, 20 a lookout, 30 a
  * first pole run); the neighbours' tips and thanks (5–25); the homestead (a harvest 8, a dog's dig
- * 12–30, a visitor's gift 20–60).
+ * 12–30, a visitor's gift 20–60); the companions' skills (coins tangled in the fisher's net, 2–8).
  */
 export const OTHER_SOURCES: [string, string, string][] = [
   ['拾遗', 'Finds', '1–30'],
   ['乡邻', 'Neighbours', '5–25'],
   ['家园', 'Homestead', '8–60'],
+  ['技艺', 'Skills', '2–8'],
 ];
 
 /** Coins the games have paid, all time. */
@@ -264,6 +250,7 @@ export function gamesLifetime(p: PlayState): number {
 export function hallStat(p: PlayState, lang: Lang): string {
   const n = Math.max(0, Math.floor(p.coins)).toLocaleString('en-US');
   // no break inside 铜钱 (a word joiner: CJK may otherwise break between any two characters) nor
-  // between the word and the number
-  return statText(p, lang) + (lang === 'zh' ? ` · 铜\u2060钱\u00a0${n}` : ` · ${n}\u00a0coins`);
+  // between the word and the number; in English the dot stays with the text before it, so a wrapped
+  // line never starts with 「·」
+  return statText(p, lang) + (lang === 'zh' ? ` · 铜\u2060钱\u00a0${n}` : `\u00a0· ${n}\u00a0coins`);
 }

@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
-  CATALOG, GATE_CELLS, GRID, HOME_CATS, KIND, PET_HOUSE_KINDS, PLOT_X0, PLOT_Z0, STARTER, cellAt, cellsOf, coupletLines, fits, footprint,
-  growStage, inPlot, isGateCell, itemPoint, itemPose, itemText, refund,
+  CATALOG, GATE_CELLS, GRID, HOME_CATS, KIND, PET_HOUSE_KINDS, PLOT_X0, PLOT_Z0, STARTER, canWalkOut, cellAt, cellsOf, coupletLines, fits, footprint,
+  growStage, inPlot, isGateCell, itemPoint, itemPose, itemText, joinCouplet, resale, textLine, wetCells,
 } from '../src/views/walk/features/home/catalog';
 import { bake, flatGeometry, mergeChunks } from '../src/views/walk/features/home/build/brush';
 import { HOME_PLOT } from '../src/views/walk/map';
 import { diffDays } from '../src/core/date';
-import { sanitizeHome } from '../src/app/home';
+import { home, placeItem, removeItem, resetHome, restoreItem, sanitizeHome, setItemText, setPetLine, adoptPet } from '../src/app/home';
 
 const item = (uid: string, kind: string, i: number, j: number, rot: 0 | 1 | 2 | 3 = 0) => ({ uid, kind, i, j, rot });
 
@@ -62,6 +62,19 @@ describe('homestead catalog', () => {
     expect(itemText({ kind: 'plaque', text: '耕读' })).toBe('耕读');
     expect(coupletLines('春风得意/花好月圆')).toEqual(['春风得意', '花好月圆']);
     expect(coupletLines('一二三四')).toEqual(['一二', '三四']);
+    // one line left empty, commas inside a line: kept as written
+    expect(coupletLines('春眠不觉晓/')).toEqual(['春眠不觉晓', '']);
+    expect(coupletLines('/花香不在多')).toEqual(['', '花香不在多']);
+    expect(coupletLines('春风，得意/马蹄疾')).toEqual(['春风，得意', '马蹄疾']);
+    expect(coupletLines('一 二/三/四')).toEqual(['一 二', '三四']);
+    expect(joinCouplet('春眠不觉晓', '')).toBe('春眠不觉晓/');
+    expect(joinCouplet('', '花香')).toBe('/花香');
+    expect(joinCouplet('a/b', 'c')).toBe('ab/c');
+    expect(joinCouplet(' ', '')).toBe('');
+    expect(textLine({ kind: 'couplets', text: '春眠不觉晓/' })).toBe('春眠不觉晓');
+    expect(textLine({ kind: 'couplets', text: '春风/秋月' })).toBe('春风，秋月');
+    expect(textLine({ kind: 'plaque', text: '耕/读' })).toBe('耕/读');
+    for (const [a, b] of [['春风得意', '马蹄疾'], ['', '只下联'], ['只上联', ''], ['有，逗号', '有 空格']]) expect(coupletLines(joinCouplet(a, b))).toEqual([a, b]);
   });
 });
 
@@ -130,12 +143,61 @@ describe('the plot grid', () => {
     expect(f.z).toBeCloseTo(p.z);
   });
 
-  it('refunds half, rounded down', () => {
-    expect(refund(0)).toBe(0);
-    expect(refund(1)).toBe(0);
-    expect(refund(45)).toBe(22);
-    expect(refund(520)).toBe(260);
-    for (const k of CATALOG) expect(refund(k.price)).toBeLessThanOrEqual(k.price / 2);
+  it('sells back for half, rounded down', () => {
+    expect(resale(0)).toBe(0);
+    expect(resale(1)).toBe(0);
+    expect(resale(45)).toBe(22);
+    expect(resale(520)).toBe(260);
+    for (const k of CATALOG) expect(resale(k.price)).toBeLessThanOrEqual(k.price / 2);
+  });
+
+  it('knows when a walker is shut in (a house built round them, a pond under their feet)', () => {
+    const at = (i: number, j: number) => ({ x: PLOT_X0 + i + 0.5, z: PLOT_Z0 + j + 0.5 });
+    const mid = at(10, 10);
+    expect(canWalkOut([], mid.x, mid.z)).toBe(true);
+    expect(canWalkOut([], PLOT_X0 - 5, PLOT_Z0 - 5)).toBe(true); // off the plot
+    // a tiled house round the walker: walls all round (the door is painted, not open)
+    const h = item('h', 'house', 8, 8);
+    const p = itemPose(h);
+    const walls = bake(THREE, KIND.house, { text: '', stage: 0 }, 1, { x: p.x, y: 0, z: p.z, heading: p.heading }, 0).colliders;
+    expect(canWalkOut(walls, p.x, p.z)).toBe(false);
+    expect(canWalkOut(walls, p.x, p.z + 4)).toBe(true);
+    // a pond under the walker; beside it they are free; a bridge across makes a way out
+    const pond = item('p', 'pond', 9, 9);
+    const wet = (items: ReturnType<typeof item>[]) => wetCells(items).map(([a, b]) => ({ x: PLOT_X0 + a + 0.5, z: PLOT_Z0 + b + 0.5, r: 0.6 }));
+    expect(wetCells([pond]).length).toBe(9);
+    expect(canWalkOut(wet([pond]), mid.x, mid.z)).toBe(false);
+    const side = at(10, 13);
+    expect(canWalkOut(wet([pond]), side.x, side.z)).toBe(true);
+    const bridge = item('b', 'bridge', 8, 10);
+    expect(wetCells([pond, bridge]).length).toBe(6);
+    expect(canWalkOut(wet([pond, bridge]), mid.x, mid.z)).toBe(true);
+    // the fence round the plot does not shut anyone in: the gate is open
+    const k = GATE_CELLS[0];
+    const posts = [];
+    for (let a = 0; a <= GRID; a += 0.42) posts.push({ x: PLOT_X0 + a, z: PLOT_Z0, r: 0.24 }, { x: PLOT_X0 + a, z: PLOT_Z0 + GRID, r: 0.24 }, { x: PLOT_X0, z: PLOT_Z0 + a, r: 0.24 });
+    expect(canWalkOut(posts, at(2, 2).x, at(2, 2).z)).toBe(true);
+    expect(canWalkOut(posts, at(k[0], k[1]).x, at(k[0], k[1]).z)).toBe(true);
+  });
+
+  it('puts a thing sold back exactly as it was (the same uid), once', () => {
+    resetHome();
+    const uid = placeItem('couplets', 3, 4, 1, '春风/秋月')!;
+    const it = home.value.items.find((x) => x.uid === uid)!;
+    expect(removeItem(uid)).toBeTruthy();
+    expect(removeItem(uid)).toBe(null);
+    expect(restoreItem(it)).toBe(true);
+    expect(home.value.items).toEqual([it]);
+    expect(restoreItem(it)).toBe(false);
+    setItemText(uid, '');
+    expect(home.value.items[0].text).toBeUndefined();
+    const pet = adoptPet('parrot', '翠翠')!;
+    setPetLine(pet, '恭喜发财');
+    expect(home.value.pets[0].line).toBe('恭喜发财');
+    expect(sanitizeHome(JSON.parse(JSON.stringify(home.value))).pets[0].line).toBe('恭喜发财');
+    setPetLine(pet, '');
+    expect('line' in home.value.pets[0]).toBe(false);
+    resetHome();
   });
 
   it('vegetables ripen over days, faster when watered', () => {

@@ -293,7 +293,8 @@ if (typeof window !== 'undefined') {
       first = false;
       // Don't announce quests already satisfied by old data on the very first load; just mark them.
       const before = celebrations.value;
-      play.value = evaluate(rollDaily(play.value, day), a, day);
+      const r = rollDaily(play.value, day);
+      play.value = tracked(r, evaluate(r, a, day));
       celebrations.value = before;
       return;
     }

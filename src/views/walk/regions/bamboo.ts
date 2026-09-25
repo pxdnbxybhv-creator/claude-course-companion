@@ -615,7 +615,7 @@ function build(ctx: WorldCtx): void {
 
   // ── light: shafts through the canopy, motes, incense smoke ────────
   const shaftTex = h.tex(shaftCanvas());
-  const shaftMat = h.own(new THREE.MeshBasicMaterial({ map: shaftTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, opacity: 0.2, color: '#fff3d6' }));
+  const shaftMat = h.own(new THREE.MeshBasicMaterial({ map: shaftTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, forceSinglePass: true, opacity: 0.2, color: '#fff3d6' }));
   const shaftGeos: T.BufferGeometry[] = [];
   const shaftSpots: XZ[] = [CLEAR, { x: CLEAR.x + 3, z: CLEAR.z - 2 }, { x: -72, z: 29 }, { x: -64, z: 30 }, { x: -89, z: 35 }, { x: -85, z: 17 }, { x: -76, z: 35 }];
   shaftSpots.forEach((sp, i) => {

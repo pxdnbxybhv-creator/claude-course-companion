@@ -37,6 +37,8 @@ export class PartBrush implements Brush {
   readonly seats: { x: number; y: number; z: number; heading: number; stand: readonly [number, number] }[] = [];
   readonly lights: [number, number, number, number][] = [];
   readonly smokes: V3[] = [];
+  /** Bands the walking camera keeps out of (roofs, lintels): cylinders in the thing's frame. */
+  readonly occluders: { x: number; z: number; r: number; y0: number; y1: number }[] = [];
   readonly rng: () => number;
   private m4: T.Matrix4;
   private q: T.Quaternion;
@@ -148,6 +150,9 @@ export class PartBrush implements Brush {
   floor(a: readonly [number, number], b: readonly [number, number], hw: number, y: number | ((s: number) => number)): void {
     this.floors.push({ a, b, hw, y });
   }
+  occlude(x: number, z: number, r: number, y0: number, y1: number): void {
+    this.occluders.push({ x, z, r, y0, y1 });
+  }
   seat(x: number, y: number, z: number, heading: number, stand: readonly [number, number]): void {
     this.seats.push({ x, y, z, heading, stand });
   }
@@ -168,6 +173,8 @@ export class PartBrush implements Brush {
     const raw0 = this.raw.length;
     const R = Math.min(W, Math.max(0, r.ridge));
     const curve = r.curve ?? 1.4, curl = r.curl ?? 0, th = r.thick ?? 0.12;
+    // a roof you could walk under or behind: the camera stays out of it (not a doghouse's)
+    if (r.w * r.d >= 4 && !o.anim) this.occlude(r.cx ?? 0, r.cz ?? 0, (Math.max(r.w, r.d) / 2) * 0.92, r.y - th - 0.12, r.y + r.rise + 0.1);
     const top = new THREE.Color(r.color), under = new THREE.Color(r.under ?? r.color);
     const pos: number[] = [], col: number[] = [];
     const jit = r.jitter ?? 0.06;
@@ -260,6 +267,8 @@ export interface Baked {
   seats: { x: number; y: number; z: number; heading: number; sx: number; sz: number }[];
   lights: [number, number, number, number][];
   smokes: [number, number, number][];
+  /** Camera occluders in the world (roofs, the gate's lintel). */
+  occluders: { x: number; z: number; r: number; y0: number; y1: number }[];
   /** World bounds of everything drawn. */
   box: { x0: number; x1: number; y0: number; y1: number; z0: number; z1: number };
   verts: number;
@@ -367,6 +376,7 @@ export function bake(THREE: Three, kind: HomeKind | { build: HomeKind['build'] }
     seats: br.seats.map((q) => { const w = toW(q.x, q.y, q.z), st = toW(q.stand[0], 0, q.stand[1]); return { x: w[0], y: w[1], z: w[2], heading: q.heading + pose.heading, sx: st[0], sz: st[2] }; }),
     lights: br.lights.map(([x, y, z, k]) => { const w = toW(x, y, z); return [w[0], w[1], w[2], k]; }),
     smokes: br.smokes.map(([x, y, z]) => toW(x, y, z)),
+    occluders: br.occluders.map((k) => { const w = toW(k.x, 0, k.z); return { x: w[0], z: w[2], r: k.r, y0: pose.y + k.y0, y1: pose.y + k.y1 }; }),
     box,
   };
 }

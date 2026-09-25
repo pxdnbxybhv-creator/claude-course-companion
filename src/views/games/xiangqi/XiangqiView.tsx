@@ -258,6 +258,8 @@ export function XiangqiView() {
     setHint(0);
     setSel(-1);
     setSlide(null);
+    // a taken-back game has no result card to pay on (a replayed win pays nothing again: `recorded`)
+    setPaid(null);
     setMoves(m);
     audio.pluck(-2, 0.4);
   };

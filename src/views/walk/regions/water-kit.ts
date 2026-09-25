@@ -314,7 +314,7 @@ export function lampPools(kit: Kit, at: [number, number, number][], tex: T.Textu
   pools.renderOrder = 1;
   kit.add(pools);
   return (night, flick) => {
-    mat.opacity = 0.42 * night * flick;
+    mat.opacity = 0.56 * night * flick;
     pools.visible = night > 0.02;
   };
 }
@@ -433,6 +433,7 @@ export function flatsMesh(kit: Kit, tex: T.Texture, flats: Flat[], name: string)
   g.boundingBox = new THREE.Box3(new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, maxY, maxZ));
   g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere());
   const m = kit.own(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: 0.04, side: THREE.DoubleSide }));
+  m.forceSinglePass = true; // flat cards: one draw for both faces, not a back pass and a front pass
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = kit.time;
     sh.vertexShader = sh.vertexShader

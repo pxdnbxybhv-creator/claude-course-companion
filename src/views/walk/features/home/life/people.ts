@@ -21,7 +21,7 @@ import { Actor } from './actor';
 import { Bubble, Fx } from './fx';
 import { adopt, renameResidentFlow } from './actions';
 import { book, saveBook } from './book';
-import { occupancy, placeSpot, type Spot } from './plot';
+import { occupancy, placeSpot, route, solidCells, Way, type Spot } from './plot';
 import { isRole, LOVE, present, ROLE_DEF, routineAt, SPECIES, visitGift, visitorFor, VISIT_HOURS, type Activity, type Role, type Slot, type Species } from './logic';
 import { petPet } from '../../../../../app/home';
 import * as snd from './sound';
@@ -166,6 +166,8 @@ interface Person {
   stoveSet: boolean;
   patrol: number;
   stove: T.Mesh | null;
+  /** The way round what is built to `spot`. */
+  way: Way;
 }
 
 const GUARD_HAIL: Partial<Record<CharacterId, string>> = { guan: '关二爷！', change: '仙子回来了！', cat: '大橘回来啦', rabbit: '玉兔回来啦', swordsman: '大侠！' };
@@ -187,6 +189,8 @@ const READING = [
 export class People {
   private list = new Map<string, Person>();
   private occ = new Set<number>();
+  private solid = new Set<number>();
+  private ground = (x: number, z: number) => this.ctx.groundY(x, z);
   private smoke: Fx;
   private bubble: Bubble;
   private wp: T.Vector3;
@@ -200,11 +204,12 @@ export class People {
   sync(): void {
     const h = home.value;
     this.occ = occupancy(h.items, 0);
+    this.solid = solidCells(h.items);
     const want = new Map(h.residents.map((m) => [m.uid, m]));
     for (const [uid, p] of this.list) if (!want.has(uid)) { this.drop(p); this.list.delete(uid); }
     for (const m of want.values()) {
       const p = this.list.get(m.uid);
-      if (p) { p.res = m; this.label(p); p.slot = null; continue; }
+      if (p) { p.res = m; this.label(p); p.slot = null; p.way.reset(); continue; }
       this.list.set(m.uid, this.make(m));
     }
   }
@@ -238,7 +243,7 @@ export class People {
     const it: Interactable = { id: `home-res:${m.uid}`, position: new THREE.Vector3(start.x, fig.root.position.y, start.z), radius: 1.9, labelZh: '', labelEn: '', actionZh: '说话', actionEn: 'Talk', act: () => this.talkTo(p) };
     const p: Person = {
       res: m, role, fig, props, prop: null, slot: null, spot: start, x: start.x, z: start.z, walking: false, it, off: () => {},
-      mark: speechMark(this.bag, fig, role === 'cook' ? '食' : '闻'), t: 0, cd: 2 + (m.look % 5), saluted: false, salT: -1, hailed: false, face: { x: 0, z: 0 }, slotT: 0, stoveSet: false, patrol: m.look % 7, stove,
+      mark: speechMark(this.bag, fig, role === 'cook' ? '食' : '闻'), t: 0, cd: 2 + (m.look % 5), saluted: false, salT: -1, hailed: false, face: { x: 0, z: 0 }, slotT: 0, stoveSet: false, patrol: m.look % 7, stove, way: new Way(),
     };
     p.mark.set(false);
     this.label(p);
@@ -270,7 +275,7 @@ export class People {
 
   update(dt: number, t: number, still: boolean, px: number, pz: number, night: boolean): void {
     const hour = this.hour();
-    const g = (x: number, z: number) => this.ctx.groundY(x, z);
+    const g = this.ground;
     const items = home.value.items;
     let k = 0;
     for (const p of this.list.values()) {
@@ -283,7 +288,9 @@ export class People {
       if (slot !== p.slot) {
         const first = p.slot === null && p.t < 1;
         p.slot = slot;
-        p.spot = slot.act === 'patrol' ? placeSpot(items, this.occ, 'fence', p.patrol) : placeSpot(items, this.occ, slot.at, k);
+        // (by the gate the guard has the post; the rest stand to one side)
+        const salt = slot.at === 'gate' ? (p.role === 'guard' ? 0 : 1 + (k % 3)) : k;
+        p.spot = slot.act === 'patrol' ? placeSpot(items, this.occ, 'fence', p.patrol) : placeSpot(items, this.occ, slot.at, salt);
         p.walking = true;
         p.stoveSet = false;
         this.hold(p, null);
@@ -297,12 +304,15 @@ export class People {
       if (!shown) { p.mark.set(false); continue; }
       const f = p.fig;
       const pd = Math.hypot(px - p.x, pz - p.z);
-      // walk to where the hour wants them (the patrol goes round the fence)
-      const dx = p.spot.x - p.x, dz = p.spot.z - p.z, d = Math.hypot(dx, dz);
+      // walk to where the hour wants them (the patrol goes round the fence), round what is built
+      const d = Math.hypot(p.spot.x - p.x, p.spot.z - p.z);
       if (d > 0.08) {
-        const v = Math.min(d, (slot.act === 'play' ? 2.2 : 1.25) * dt);
-        p.x += (dx / d) * v; p.z += (dz / d) * v;
-        p.face.x = p.spot.x; p.face.z = p.spot.z; f.faceTo = p.face;
+        p.way.to(this.solid, p.x, p.z, p.spot.x, p.spot.z, 0.05);
+        const w = p.way.next(p.x, p.z);
+        const dx = w.x - p.x, dz = w.z - p.z, dw = Math.hypot(dx, dz) || 1;
+        const v = Math.min(dw, (slot.act === 'play' ? 2.2 : 1.25) * dt);
+        p.x += (dx / dw) * v; p.z += (dz / dw) * v;
+        p.face.x = w.x; p.face.z = w.z; f.faceTo = p.face;
         f.root.position.set(p.x, g(p.x, p.z) + (still ? 0 : Math.abs(Math.sin(p.t * 7)) * 0.03), p.z);
         this.hold(p, slot.act === 'patrol' ? 'lantern' : null);
         f.armL.rotation.x = still ? 0 : Math.sin(p.t * 7) * 0.3;
@@ -458,7 +468,7 @@ export class People {
         break;
       }
       case 'gardener':
-        out.push(home.value.items.some((it) => /veg|field|crop|flower|bed|菜/.test(it.kind) && !/catbed/.test(it.kind))
+        out.push(home.value.items.some((it) => /^(farm|flowers|mums)$/.test(it.kind))
           ? { zh: '花圃菜畦我天天照看着，缺水我就浇。', en: 'I see to the beds every day, and water them when they’re dry.' }
           : { zh: '院里要是有块菜畦就好了，我给你种点青菜。', en: 'If there were a vegetable bed here I’d grow you some greens.' });
         break;
@@ -514,9 +524,40 @@ const GREET: Partial<Record<Role, Partial<Record<CharacterId, [string, string]>>
   guard: { guan: ['关……关二爷！小的给您磕头了！', 'L-Lord Guan! Your humble servant bows!'], swordsman: ['阁下好身手，改日切磋切磋？', 'Fine moves, sir — a friendly bout some day?'], taoist: ['小道长，门口的符是您贴的？', 'Little master, did you put the talisman on the gate?'] },
 };
 
+// ───────────────────────────── comings and goings ─────────────────────────────
+
+/** Along the path from the garden (off in the distance), up to the gate, just inside it. */
+const OFFSTAGE: Spot = { x: -34.6, z: -14 };
+const PATH_BEND: Spot = { x: -35.2, z: -16.8 };
+const GATE_OUT: Spot = { x: HOME_PLOT.gate.x + 1.3, z: HOME_PLOT.gate.z + 0.2 };
+const GATE_IN: Spot = { x: HOME_PLOT.gate.x - 1.1, z: HOME_PLOT.gate.z };
+
+/** A figure walking a list of points (in or out through the gate). */
+class Stroll {
+  pts: Spot[] = [];
+  k = 0;
+  get done(): boolean { return this.k >= this.pts.length; }
+  set(pts: Spot[]): void { this.pts = pts; this.k = 0; }
+  /** Step (x, z) along at `v` m/s; writes the new position into `at`, returns the point headed for. */
+  step(at: { x: number; z: number }, v: number, dt: number): Spot | null {
+    let left = v * dt;
+    while (this.k < this.pts.length && left > 0) {
+      const p = this.pts[this.k];
+      const dx = p.x - at.x, dz = p.z - at.z, d = Math.hypot(dx, dz);
+      if (d <= left) { at.x = p.x; at.z = p.z; left -= d; this.k++; continue; }
+      at.x += (dx / d) * left; at.z += (dz / d) * left;
+      left = 0;
+    }
+    return this.pts[this.k] ?? null;
+  }
+}
+
 // ───────────────────────────── the visitor ─────────────────────────────
 
-/** Today's visitor: one of your companions drops by, chats about their skill, leaves a gift. */
+/**
+ * Today's visitor: one of your companions drops by (8:00–20:00), chats about their skill, leaves a
+ * gift. They walk in through the gate when the hour comes, and out again when it is over.
+ */
 export class Visitor {
   private fig: Figure | null = null;
   private animal: Actor | null = null;
@@ -526,38 +567,89 @@ export class Visitor {
   private leaving = false;
   private pos: T.Vector3;
   private at: Spot;
+  private state: 'away' | 'in' | 'here' | 'out' = 'away';
+  /** The day they came (they come once a day). */
+  private came = '';
+  private walk = new Stroll();
+  private me = { x: 0, z: 0 };
+  private face = { x: 0, z: 0 };
 
   constructor(private bag: Bag, private ctx: WorldCtx, private group: T.Group, private fx: Fx, private hour: () => number) {
     this.pos = new ctx.THREE.Vector3();
     this.at = { x: HOME_PLOT.x + 4.5, z: HOME_PLOT.z + 2.2 };
   }
 
-  /** Come (or not) for today. */
-  arrive(): void {
+  /** Come or go as the hour says (called once a second; `first` when the world opens: already here). */
+  check(first = false): void {
     const h = this.hour();
-    const who = visitorFor(visitDay(), unlocked.value, this.ctx.player.character);
-    if (!who || h < VISIT_HOURS.from || h >= VISIT_HOURS.to) return;
+    const open = h >= VISIT_HOURS.from && h < VISIT_HOURS.to;
+    if (open && this.state === 'away' && this.came !== visitDay()) this.come(first);
+    else if (!open && (this.state === 'here' || this.state === 'in')) this.go();
+  }
+
+  private come(first: boolean): void {
+    const day = visitDay();
+    const who = visitorFor(day, unlocked.value, this.ctx.player.character);
+    this.came = day;
+    if (!who) return;
+    this.clear();
     const occ = occupancy(home.value.items, 1);
-    this.at = placeSpotFree(occ, this.at);
+    this.at = placeSpotFree(occ, { x: HOME_PLOT.x + 4.5, z: HOME_PLOT.z + 2.2 });
     this.who = who;
-    const y = this.ctx.groundY(this.at.x, this.at.z);
-    this.pos.set(this.at.x, y, this.at.z);
+    this.leaving = false;
+    const start = first ? this.at : OFFSTAGE;
+    const y = this.ctx.groundY(start.x, start.z);
+    this.me.x = start.x; this.me.z = start.z;
+    this.pos.set(start.x, y, start.z);
     if (who === 'cat' || who === 'rabbit') {
       const a = new Actor(this.bag, who === 'cat' ? 'cat' : 'rabbit', `visitor:${who}`, this.group, who === 'cat' ? 3 : 0);
-      a.place(this.at.x, y, this.at.z, Math.PI / 2);
-      a.setMode(who === 'cat' ? 'sleep' : 'eat');
+      a.place(start.x, y, start.z, Math.PI / 2);
       this.animal = a;
     } else {
       const spec = VISITOR_LOOK[who] ?? VISITOR_LOOK.scholar!;
       this.fig = figure(this.bag, this.group, spec, this.pos.clone(), Math.PI / 2);
       this.mark = speechMark(this.bag, this.fig, '礼');
-      this.mark.set(book().gift !== today.value);
+      this.mark.set(false);
     }
+    if (first) { this.arrived(); return; }
+    this.state = 'in';
+    this.walk.set([OFFSTAGE, PATH_BEND, GATE_OUT, GATE_IN, ...route(solidCells(home.value.items), GATE_IN.x, GATE_IN.z, this.at.x, this.at.z)]);
+  }
+
+  private arrived(): void {
+    this.state = 'here';
+    const who = this.who!;
+    if (this.animal) { this.animal.setMode(who === 'cat' ? 'sleep' : 'eat'); this.animal.heading = Math.PI / 2; }
+    if (this.fig) { this.fig.walking = 0; this.face.x = this.at.x + 1; this.face.z = this.at.z; this.fig.faceTo = this.face; }
+    this.mark?.set(book().gift !== today.value);
     const c = CHARACTER[who];
+    this.pos.set(this.me.x, this.ctx.groundY(this.me.x, this.me.z), this.me.z);
     this.off = this.bag.interact({
       id: 'home-visitor', position: this.pos, radius: 2, labelZh: `${c.zh} · 来访`, labelEn: `${c.en} · visiting`, actionZh: '寒暄', actionEn: 'Chat',
       act: () => this.chat(),
     });
+  }
+
+  /** Time to go: out through the gate and away down the path. */
+  private go(): void {
+    this.off?.();
+    this.off = null;
+    this.mark?.set(false);
+    this.leaving = true;
+    this.state = 'out';
+    const back = route(solidCells(home.value.items), this.me.x, this.me.z, GATE_IN.x, GATE_IN.z);
+    this.walk.set([...back, GATE_OUT, PATH_BEND, OFFSTAGE]);
+    if (this.fig) this.fig.wave();
+  }
+
+  /** Take the figure (or the animal) away. */
+  private clear(): void {
+    this.off?.();
+    this.off = null;
+    if (this.fig) this.bag.drop(this.fig.root);
+    if (this.animal) { this.bag.drop(this.animal.m.root); this.animal.dispose(); }
+    this.fig = null; this.animal = null; this.mark = null; this.who = null;
+    this.state = 'away';
   }
 
   private async chat(): Promise<void> {
@@ -604,8 +696,31 @@ export class Visitor {
   }
 
   update(dt: number, t: number, still: boolean): void {
+    if (this.state === 'in' || this.state === 'out') {
+      const next = this.walk.step(this.me, this.animal ? 1.6 : 1.3, dt);
+      const y = this.ctx.groundY(this.me.x, this.me.z);
+      if (this.fig) {
+        this.fig.root.position.set(this.me.x, y, this.me.z);
+        this.fig.walking = next ? 1 : 0;
+        if (next) { this.face.x = next.x; this.face.z = next.z; this.fig.faceTo = this.face; }
+      }
+      if (this.animal) {
+        const a = this.animal;
+        const ox = a.x, oz = a.z;
+        a.x = this.me.x; a.z = this.me.z; a.y = y;
+        a.speed = Math.hypot(a.x - ox, a.z - oz) / Math.max(1e-4, dt);
+        if (a.speed > 0.1) a.heading = Math.atan2(a.x - ox, a.z - oz);
+        a.setMode('idle');
+      }
+      if (this.walk.done) {
+        if (this.state === 'in') this.arrived();
+        else { this.fx.puff(this.me.x, y, this.me.z, '#f0e6d2', 4, 0.5); this.clear(); }
+      }
+    }
     if (this.animal) this.animal.animate(dt, t, still);
   }
+
+  get present(): string | null { return this.state === 'away' ? null : `${this.who}:${this.state}`; }
 
   dispose(): void {
     this.off?.();
@@ -623,17 +738,27 @@ function placeSpotFree(occ: Set<number>, s: Spot): Spot {
 
 // ───────────────────────────── the pet seller ─────────────────────────────
 
-/** On market days a pet seller waits by the gate with a cart of baskets; today one kind is cheaper. */
+/**
+ * On market days (7:00–19:00) a pet seller comes up the path with a carrying pole of baskets, sets
+ * down by the gate, and goes home again when the market is over; today one kind is cheaper.
+ */
 export class Seller {
   private fig: Figure | null = null;
+  private cart: T.Mesh | null = null;
   private off: (() => void) | null = null;
   readonly at: Spot;
-  private special: Species;
+  private special: Species = 'dog';
+  private state: 'away' | 'in' | 'here' | 'out' = 'away';
+  private walk = new Stroll();
+  private me = { x: 0, z: 0 };
+  private face = { x: 0, z: 0 };
+  private pos: T.Vector3;
 
   constructor(private bag: Bag, private ctx: WorldCtx, private group: T.Group, private hour: () => number) {
-    this.at = { x: HOME_PLOT.gate.x + 4.1, z: HOME_PLOT.gate.z + 3.3 };
-    const r = makeRng(hashString(`seller:${visitDay()}`));
-    this.special = SPECIES[Math.floor(r() * SPECIES.length)].id;
+    // by the fence beside the path, a few steps short of the gate (clear of the ledger board, the
+    // old farmer and the stele), his baskets set out at the path's edge
+    this.at = { x: HOME_PLOT.gate.x + 1.3, z: HOME_PLOT.gate.z + 5.2 };
+    this.pos = new ctx.THREE.Vector3();
   }
 
   /** Market days: two in three, 7:00–19:00. */
@@ -641,14 +766,24 @@ export class Seller {
     return makeRng(hashString(`market:${day}`))() < 0.67 && hour >= 7 && hour < 19;
   }
 
-  arrive(): void {
-    if (!Seller.comes(visitDay(), this.hour())) return;
+  /** Come or go as the hour says (called once a second; `first` when the world opens: already here). */
+  check(first = false): void {
+    const open = Seller.comes(visitDay(), this.hour());
+    if (open && this.state === 'away') this.come(first);
+    else if (!open && (this.state === 'here' || this.state === 'in')) this.go();
+  }
+
+  private come(first: boolean): void {
     const { THREE } = this.ctx;
-    const y = this.ctx.groundY(this.at.x, this.at.z);
-    this.fig = figure(this.bag, this.group, { robe: '#b8793f', trim: '#5a3a24', apron: '#d8c79a', hat: 'bamboo', hatColor: '#d8b870', beard: '#3a322a' }, new THREE.Vector3(this.at.x, y, this.at.z), Math.PI * 0.85);
+    const r = makeRng(hashString(`seller:${visitDay()}`));
+    this.special = SPECIES[Math.floor(r() * SPECIES.length)].id;
+    const start = first ? this.at : OFFSTAGE;
+    this.me.x = start.x; this.me.z = start.z;
+    const y = this.ctx.groundY(start.x, start.z);
+    this.fig = figure(this.bag, this.group, { robe: '#b8793f', trim: '#5a3a24', apron: '#d8c79a', hat: 'bamboo', hatColor: '#d8b870', beard: '#3a322a' }, new THREE.Vector3(start.x, y, start.z), Math.PI * 0.85);
     speechMark(this.bag, this.fig, '宠');
     // a carrying pole with two baskets, one with a pup peeping out
-    const cart = inked(this.ctx, merge(THREE, [
+    this.cart = inked(this.ctx, merge(THREE, [
       part(THREE, new THREE.CylinderGeometry(0.26, 0.2, 0.34, 10), '#c9a45a', { p: [-0.7, 0.17, 0.3] }),
       part(THREE, new THREE.CylinderGeometry(0.26, 0.2, 0.34, 10), '#c9a45a', { p: [0.7, 0.17, 0.3] }),
       part(THREE, new THREE.TorusGeometry(0.2, 0.02, 4, 12), '#8a6b4a', { p: [-0.7, 0.45, 0.3], r: [0, 0, 0] }),
@@ -661,16 +796,70 @@ export class Seller {
       part(THREE, new THREE.SphereGeometry(0.025, 5, 5), '#f5f1e8', { p: [0.66, 0.46, 0.3], s: [0.8, 3, 0.5] }),
       part(THREE, new THREE.SphereGeometry(0.025, 5, 5), '#f5f1e8', { p: [0.74, 0.46, 0.3], s: [0.8, 3, 0.5] }),
     ]), { width: 0.01 });
-    cart.position.set(this.at.x - 0.2, y, this.at.z - 0.2);
-    cart.rotation.y = Math.PI * 0.85;
-    this.bag.add(cart, this.group);
-    const pos = new THREE.Vector3(this.at.x, y, this.at.z);
-    this.off = this.bag.interact({ id: 'home-seller', position: pos, radius: 2.2, labelZh: '宠物贩', labelEn: 'Pet seller', actionZh: '看看', actionEn: 'Browse', act: () => this.browse() });
+    this.bag.add(this.cart, this.group);
+    if (first) { this.setDown(); return; }
+    this.shoulder();
+    this.state = 'in';
+    this.walk.set([OFFSTAGE, PATH_BEND, { x: this.at.x + 1.2, z: this.at.z - 0.6 }, this.at]);
   }
+
+  /** The pole on his shoulder (walking). */
+  private shoulder(): void {
+    if (!this.cart || !this.fig) return;
+    this.fig.root.add(this.cart);
+    this.cart.position.set(0, this.fig.height * 0.8 - 0.64, -0.3);
+    this.cart.rotation.set(0, 0, 0);
+  }
+
+  /** Set the baskets down beside him and open for business. */
+  private setDown(): void {
+    const fig = this.fig!, cart = this.cart!;
+    this.group.add(cart);
+    const y = this.ctx.groundY(this.at.x, this.at.z);
+    cart.position.set(this.at.x + 0.75, this.ctx.groundY(this.at.x + 0.75, this.at.z), this.at.z);
+    cart.rotation.set(0, Math.PI / 2, 0);
+    fig.root.position.set(this.at.x, y, this.at.z);
+    fig.walking = 0;
+    this.face.x = this.at.x + 3; this.face.z = this.at.z - 0.8; // toward the path
+    fig.faceTo = this.face;
+    this.state = 'here';
+    this.pos.set(this.at.x, y, this.at.z);
+    this.off = this.bag.interact({ id: 'home-seller', position: this.pos, radius: 2.2, labelZh: '宠物贩', labelEn: 'Pet seller', actionZh: '看看', actionEn: 'Browse', act: () => this.browse() });
+  }
+
+  /** The market is over: pole up, and off home. */
+  private go(): void {
+    this.off?.();
+    this.off = null;
+    this.shoulder();
+    this.me.x = this.at.x; this.me.z = this.at.z;
+    this.state = 'out';
+    this.walk.set([{ x: this.at.x + 1.2, z: this.at.z - 0.6 }, PATH_BEND, OFFSTAGE]);
+  }
+
+  update(dt: number): void {
+    if (this.state !== 'in' && this.state !== 'out') return;
+    const fig = this.fig;
+    if (!fig) return;
+    const next = this.walk.step(this.me, 1.2, dt);
+    fig.root.position.set(this.me.x, this.ctx.groundY(this.me.x, this.me.z), this.me.z);
+    fig.walking = next ? 0.8 : 0;
+    if (next) { this.face.x = next.x; this.face.z = next.z; fig.faceTo = this.face; }
+    if (!this.walk.done) return;
+    if (this.state === 'in') this.setDown();
+    else {
+      this.bag.drop(fig.root);
+      if (this.cart) this.bag.drop(this.cart);
+      this.fig = null; this.cart = null;
+      this.state = 'away';
+    }
+  }
+
+  get present(): string | null { return this.state === 'away' ? null : this.state; }
 
   private async browse(): Promise<void> {
     const ctx = this.ctx;
-    if (!this.fig || !begin(ctx, 'talk')) return;
+    if (!this.fig || this.state !== 'here' || !begin(ctx, 'talk')) return;
     let pick: Species | null = null;
     let price = 0;
     try {
@@ -685,7 +874,7 @@ export class Seller {
     } finally {
       end(ctx, 'talk');
     }
-    if (pick) await adopt(ctx, pick, price, { x: this.at.x - 0.6, z: this.at.z - 0.6 });
+    if (pick) await adopt(ctx, pick, price, { x: GATE_IN.x - 0.2, z: GATE_IN.z + 0.8 }); // in through the gate
   }
 
   dispose(): void {

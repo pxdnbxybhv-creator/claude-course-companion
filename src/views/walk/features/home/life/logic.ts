@@ -6,6 +6,7 @@ import type { DateKey } from '../../../../../core/types';
 import type { CharacterId } from '../../../../../data/characters';
 import { diffDays } from '../../../../../core/date';
 import { hashString, makeRng } from '../../../../../core/rng';
+import { KIND } from '../catalog';
 
 // ───────────────────────────── pets ─────────────────────────────
 
@@ -53,6 +54,12 @@ export const SPECIES: SpeciesDef[] = [
   { id: 'goat', zh: '山羊', en: 'Goat', glyph: '羊', house: 'pen', houseZh: '羊圈', houseEn: 'goat pen', perHouse: 2, price: 150, decay: 3, follows: true,
     names: ['咩咩', '犟犟', '阿角', '白须', '顶顶', '山羊胡'], traitZh: '啃草，犯倔，时不时去顶篱笆。', traitEn: 'Grazes, sulks, headbutts the fence now and then.' },
 ];
+
+// a pet's home is called what the builder's catalog calls it (兔笼, 鸡鸭舍, 水池, 鹦鹉架…)
+for (const s of SPECIES) {
+  const k = KIND[s.house];
+  if (k) { s.houseZh = k.zh; s.houseEn = k.en.toLowerCase(); }
+}
 
 export const SPECIES_DEF: Record<Species, SpeciesDef> = Object.fromEntries(SPECIES.map((s) => [s.id, s])) as Record<Species, SpeciesDef>;
 

@@ -27,6 +27,33 @@ export const WEAR = {
   herdBoy: { robe: '#6f9a5a', trim: '#e0c07a', hat: 'buns', scale: 0.7, sit: true },
 } satisfies Record<string, FigureSpec>;
 
+/**
+ * Open, level ground near (x, z): walkable, and flat within `r` metres (no stair, wall foot or bank),
+ * searched in widening rings out to `maxR`; falls back to the nearest walkable point.
+ */
+export function flatSpot(s: Stage, x: number, z: number, maxR = 8, r = 1.2): T.Vector3 {
+  const { ctx } = s;
+  const flat = (px: number, pz: number) => {
+    if (!ctx.isWalkable(px, pz)) return false;
+    const y0 = ctx.groundY(px, pz);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      const qx = px + Math.cos(a) * r, qz = pz + Math.sin(a) * r;
+      if (!ctx.isWalkable(qx, qz) || Math.abs(ctx.groundY(qx, qz) - y0) > 0.18) return false;
+    }
+    return true;
+  };
+  for (let d = 0; d <= maxR; d += 0.75) {
+    const n = d === 0 ? 1 : Math.ceil((d * Math.PI * 2) / 0.9);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const px = x + Math.cos(a) * d, pz = z + Math.sin(a) * d;
+      if (flat(px, pz)) return new s.THREE.Vector3(px, ctx.groundY(px, pz), pz);
+    }
+  }
+  return s.spot(x, z, maxR);
+}
+
 /** The 「奇」 mark over whoever has a story to tell (turn it off once they have told it). */
 export function mark(s: Stage, f: Figure): { set(on: boolean): void } {
   return speechMark(s.bag, f, '奇');

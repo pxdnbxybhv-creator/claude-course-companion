@@ -8,7 +8,7 @@ import type { Interactable, WorldCtx } from '../../types';
 import type { MusicTheme, XZ } from '../../map';
 import type { EncounterDef } from '../../../../data/encounters';
 import type { CharacterId } from '../../../../data/characters';
-import { Bag, BRUSH_FONT, canvasTexture, glowTexture, reducedMotion } from '../kit';
+import { Bag, BRUSH_FONT, canvasTexture, glowTexture, loadBrush, reducedMotion } from '../kit';
 import { figure, talk, type Figure, type FigureSpec } from '../minigames/npc';
 import { walkableNear } from '../minigames/cat';
 import { begin, end } from '../minigames/ui';
@@ -29,6 +29,8 @@ export interface Scene {
   r: number;
   /** Follows the walker (a falling star, the herd-boy on the road): never taken down for distance. */
   roaming?: boolean;
+  /** Seconds a finished scene stays up at most (default 240; the walker walking away takes it sooner). */
+  linger?: number;
 }
 
 export type SceneBuild = (s: Stage) => Scene | Promise<Scene>;
@@ -56,6 +58,8 @@ export class Stage {
   private nightHeld = false;
   private rain: { stop(): void } | null = null;
   readonly still = reducedMotion();
+  /** The scene's own music while the walker takes part (played from the first claim; handed back a little after the end). */
+  theme: MusicTheme | null = null;
 
   constructor(
     readonly ctx: WorldCtx, readonly def: EncounterDef, parent: T.Object3D, readonly day: string,
@@ -103,6 +107,7 @@ export class Stage {
     if (!begin(this.ctx, 'qiyu')) return false;
     this.claimed = true;
     this.engaged = true;
+    if (this.theme && !this.musicHeld && !this.finished) this.music(this.theme);
     return true;
   }
   unclaim(): void {
@@ -193,7 +198,8 @@ export class Stage {
     const cell = 72;
     const w = vertical ? cell + 16 : cell * chars.length + 16;
     const h = vertical ? cell * chars.length + 16 : cell + 16;
-    const tex = canvasTexture(THREE, w, h, (g) => {
+    const paint = (g: CanvasRenderingContext2D) => {
+      g.clearRect(0, 0, w, h);
       g.font = `${cell * 0.86}px ${BRUSH_FONT}`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
@@ -205,9 +211,20 @@ export class Stage {
         const y = vertical ? 8 + cell * (i + 0.5) : h / 2 + 2;
         g.fillText(c, x, y);
       });
-    });
+    };
+    const tex = canvasTexture(THREE, w, h, paint);
     const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false });
     const s = new THREE.Sprite(mat);
+    // brushed, not in a fallback face: if the brush font is still on its way, paint again when it lands
+    let ready = true;
+    try { ready = !document.fonts || document.fonts.check('64px "Ma Shan Zheng"', text); } catch { /* assume it is */ }
+    if (!ready) {
+      void loadBrush(text).then(() => {
+        if (!this.alive || !s.parent) return;
+        const g = (tex.image as HTMLCanvasElement).getContext('2d');
+        if (g) { paint(g); tex.needsUpdate = true; }
+      });
+    }
     const size = o.size ?? 0.34;
     s.scale.set((w / cell) * size, (h / cell) * size, 1);
     s.position.copy(at);
@@ -313,6 +330,10 @@ export class Stage {
 
   abandon(): void { this.abandoned = true; }
 
+  private doneFns: (() => void)[] = [];
+  /** Run when the encounter is complete (e.g. take down the prompt of someone who has vanished). */
+  whenDone(fn: () => void): void { this.doneFns.push(fn); }
+
   /** Something that will come of this on another day (see later.ts), e.g. 'fox'. */
   put(key: string): void { this.later(key); }
 
@@ -347,6 +368,9 @@ export class Stage {
       bodyEn: `${d.noteEn}${extraEn}${coinsEn}`,
       seal: o.seal ?? '奇',
     });
+    // the scene's music lingers a little, then the place has its own back
+    if (this.musicHeld) this.bag.later(9000, () => this.releaseMusic());
+    for (const fn of this.doneFns.splice(0)) fn();
     this.done(this);
   }
 

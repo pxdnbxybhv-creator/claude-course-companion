@@ -14,6 +14,29 @@ const WHITEWASH = '#f3ecdc';
 const TILE = '#3d5a64';
 const LACQUER = '#b8402e';
 const WOOD = '#7a4e32';
+/**
+ * What the night does to lit plaster and stone (a multiplier on the day colour), the same as the
+ * places' own (regions/water-kit.ts NIGHT_SHADE): without it the whitewash stays day-bright on a
+ * dark land, and the lanterns have nothing to glow against.
+ */
+const NIGHT_SHADE = new THREE.Color('#b7bbd6');
+const WHITE = new THREE.Color('#ffffff');
+
+/** Dims materials toward NIGHT_SHADE as night falls (only when the night has moved). */
+function nightShader(mats: { color: THREE.Color }[]): (n: number) => void {
+  let last = -1;
+  return (n) => {
+    if (Math.abs(n - last) < 1e-3) return;
+    last = n;
+    for (const m of mats) m.color.copy(WHITE).lerp(NIGHT_SHADE, n);
+  };
+}
+
+export interface GardenWall {
+  group: THREE.Group;
+  /** Dusk on the whitewash: call every frame with night 0..1 (cheap when nothing changed). */
+  setNight(n: number): void;
+}
 
 export interface Architecture {
   group: THREE.Group;
@@ -365,7 +388,8 @@ export function buildArchitecture(bag: Bag): Architecture {
   });
   const rocks = bag.add(mergeGeometries(rockGeos, false)!);
   for (const g of rockGeos) g.dispose();
-  const rockMesh = new THREE.Mesh(rocks, toon(bag, '#ffffff', { vertexColors: true }));
+  const rockMat = toon(bag, '#ffffff', { vertexColors: true });
+  const rockMesh = new THREE.Mesh(rocks, rockMat);
   const rockInk = new THREE.Mesh(rocks, outlineMaterial(bag, 0.03));
   rockInk.layers.set(NO_REFLECT);
   rockMesh.add(rockInk);
@@ -411,9 +435,11 @@ export function buildArchitecture(bag: Bag): Architecture {
 
   const warm = new THREE.Color('#ffc978');
   const cold = new THREE.Color('#5a4636');
+  const shade = nightShader([solid, rockMat]);
   return {
     group,
     setNight(n: number, t: number) {
+      shade(n);
       const flick = 0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1);
       glows.visible = n > 0.02;
       glowMat.opacity = 0.6 * n;
@@ -468,7 +494,7 @@ function latticeCanvas(): HTMLCanvasElement {
 }
 
 /** The long white wall round the garden (粉墙黛瓦), following the land, with a few leak windows. */
-export function buildGardenWall(bag: Bag, path: [number, number][], h: number, thick: number): THREE.Group {
+export function buildGardenWall(bag: Bag, path: [number, number][], h: number, thick: number): GardenWall {
   const group = new THREE.Group();
   group.name = 'garden-wall';
   const n = path.length;
@@ -506,7 +532,8 @@ export function buildGardenWall(bag: Bag, path: [number, number][], h: number, t
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, toon(bag, '#ffffff', { vertexColors: true, side: THREE.DoubleSide }));
+  const wallMat = toon(bag, '#ffffff', { vertexColors: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, wallMat);
   mesh.name = 'wall';
   group.add(mesh);
   // ink: the eave lines on both sides, the ridge, a line at the foot
@@ -548,5 +575,5 @@ export function buildGardenWall(bag: Bag, path: [number, number][], h: number, t
   const lattice = bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
   lattice.forceSinglePass = true;
   group.add(new THREE.Mesh(wg, lattice));
-  return group;
+  return { group, setNight: nightShader([wallMat, lattice]) };
 }

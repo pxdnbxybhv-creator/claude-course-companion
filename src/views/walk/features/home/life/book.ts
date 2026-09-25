@@ -3,6 +3,7 @@
 // visitor's gift, and the lines you taught your parrots. Its own localStorage key; everything here
 // may be lost (a private window) without harm — it just starts afresh.
 import type { DateKey } from '../../../../../core/types';
+import { backupExtras } from '../../../../../app/store';
 
 const KEY = 'banmu.homelife.v1';
 
@@ -82,3 +83,16 @@ export function tidyBook(uids: Set<string>): void {
     for (const k of Object.keys(x.dug)) if (!uids.has(k)) delete x.dug[k];
   });
 }
+
+// It rides along in backups (the day affection was last settled, today's small doings), so a
+// restored backup does not charge the pets for the days in between twice.
+const extra = {
+  key: 'homelife',
+  get: () => ({ ...book() }),
+  set: (raw: unknown) => {
+    cache = sanitize(raw);
+    try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* keep it in memory */ }
+  },
+};
+const at = backupExtras.findIndex((b) => b.key === extra.key);
+if (at >= 0) backupExtras[at] = extra; else backupExtras.push(extra);

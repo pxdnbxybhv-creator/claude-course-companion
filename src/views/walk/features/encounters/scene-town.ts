@@ -38,6 +38,7 @@ export function shijin(s: Stage): Scene {
   const oname = C('客商', 'Merchant');
   let got = false;
   let returned = false;
+  let offPurse: () => void = () => {};
   const hold = (whoHolds: 'walker' | 'thief' | 'none', thief?: ReturnType<Stage['person']>) => {
     bag.removeFromParent();
     if (whoHolds === 'walker') {
@@ -69,16 +70,20 @@ export function shijin(s: Stage): Scene {
     let started = false;
     s.frame((dt) => {
       if (!started) {
-        if (s.dist(at.x, at.z) < 7 && !got) {
+        if (s.dist(at.x, at.z) < 9 && !got) {
           started = true;
           s.engaged = true;
           got = true;
+          offPurse();
           sparkle.hide(0);
-          void walkTo(s, thief, at.x, at.z, 5).then(() => {
+          void walkTo(s, thief, at.x, at.z, 5.5).then(() => {
+            if (!s.alive) return;
             hold('thief', thief);
             s.words('嘿嘿！', new THREE.Vector3(thief.root.position.x, thief.root.position.y + 1.8, thief.root.position.z), { color: '#1b1916', size: 0.3, life: 1.6 });
-            ctx.hud.toast('有贼！快追——按住奔跑', 'A thief! After him — hold Run', 3200);
-            chase = { thief, t: 0, caught: false, dir: Math.atan2(at.x - s.player().x, at.z - s.player().z) };
+            ctx.hud.toast('有贼！快追——按住奔跑，或用轻功', 'A thief! After him — hold Run, or use your light-foot skill', 3600);
+            s.music('festival'); // gongs and drums for the chase
+            const p = s.player();
+            chase = { thief, t: 0, caught: false, dir: Math.atan2(at.x - p.x, at.z - p.z) };
           });
         }
         return;
@@ -88,7 +93,8 @@ export function shijin(s: Stage): Scene {
       const r = chase.thief.root;
       const p = s.player();
       const d = Math.hypot(p.x - r.position.x, p.z - r.position.z);
-      if (d < 1.6 || chase.t > 22) {
+      // a moment's head start (he is quick off the mark), then a hand on his collar within reach
+      if ((d < 1.6 && chase.t > 1.2) || chase.t > 22) {
         chase.caught = true;
         chase.thief.walking = 0;
         void onCaught(d < 1.6);
@@ -103,7 +109,7 @@ export function shijin(s: Stage): Scene {
       let dd = want - chase.dir;
       dd = Math.atan2(Math.sin(dd), Math.cos(dd));
       chase.dir += dd * Math.min(1, dt * 2.5);
-      const speed = chase.t > 12 ? 3.4 : 4.6;
+      const speed = chase.t < 1.5 ? 5.6 : chase.t > 12 ? 3.4 : 4.6;
       for (let k = 0; k < 7; k++) {
         const tryA = chase.dir + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.45;
         const nx = r.position.x + Math.sin(tryA) * speed * dt * 4, nz = r.position.z + Math.cos(tryA) * speed * dt * 4;
@@ -130,7 +136,9 @@ export function shijin(s: Stage): Scene {
         await giveBack(true);
         await s.say(owner, oname, [L('大侠！这是给家母抓药的钱，您可救了我一家！', 'Hero! That was my mother’s medicine money — you have saved my family!')]);
         await s.say(null, C('侠客', 'Swordsman'), [L('路见不平，拔刀相助——举手之劳。', 'A wrong on the road, a blade drawn — it was nothing.')]);
-        s.finish({ zh: '一个小贼抢先拾走了钱袋，侠客几步便追上了他。钱袋物归原主。', en: 'A thief got to the purse first; the swordsman caught him in a few strides. The purse went home.', bonus: 60, seal: '侠' });
+        s.finish(fair
+          ? { zh: '一个小贼抢先拾走了钱袋，侠客几步便追上了他。钱袋物归原主。', en: 'A thief got to the purse first; the swordsman caught him in a few strides. The purse went home.', bonus: 60, seal: '侠' }
+          : { zh: '一个小贼抢先拾走了钱袋，被侠客追得慌不择路，自己绊了一跤。钱袋物归原主。', en: 'A thief got to the purse first; chased by the swordsman he ran blindly and tripped over his own feet. The purse went home.', bonus: 40, seal: '侠' });
       } finally {
         s.unclaim();
       }
@@ -138,12 +146,13 @@ export function shijin(s: Stage): Scene {
   }
 
   const m = mark(s, { root: bag, height: 0.25 } as never);
-  s.prompt({
+  offPurse = s.prompt({
     id: 'qiyu-shijin', position: at, radius: 1.6,
     labelZh: '地上的钱袋', labelEn: 'A purse on the ground', actionZh: '拾起', actionEn: 'Pick it up',
     async act() {
       if (got || s.finished || !s.claim()) return;
       got = true;
+      offPurse();
       m.set(false);
       sparkle.hide(0);
       try {
@@ -373,6 +382,7 @@ export function zuixian(s: Stage): Scene {
   // a tipsy sway
   s.frame((_dt, t) => { if (!s.still) f.root.rotation.z = Math.sin(t * 1.1) * 0.06; });
   const m = mark(s, f);
+  s.theme = 'hall'; // a playful zheng and clappers: the teahouse gets merry
   const name = C('醉仙', 'Drunken Immortal');
   const drink = async (n: number) => {
     ctx.player.emote('eat');
@@ -385,7 +395,7 @@ export function zuixian(s: Stage): Scene {
     await s.wait(1600);
     await vanish(s, f.root, '#efe3c6', 900);
   };
-  talkPrompt(s, f, {
+  s.whenDone(talkPrompt(s, f, {
     labelZh: '喝的不是茶的客人', labelEn: 'A guest who is not drinking tea', actionZh: '同饮', actionEn: 'Join him',
     async act() {
       if (s.finished || !s.claim()) return;
@@ -412,7 +422,7 @@ export function zuixian(s: Stage): Scene {
           if (!s.alive) return;
           faceMe(s, f);
           await s.say(f, name, [back && time < 45
-            ? L('……其酒尚温！好一个关将军，好一个温酒！', '…The wine is still warm! What a general — what warm wine!')
+            ? L('将军去了片刻，回来时杯中其酒尚温——当年温酒斩华雄，也不过如此！', 'Gone a moment and back while the wine is still warm — just as on the day you cut down Hua Xiong before your cup could cool!')
             : L('回来啦？酒凉了——无妨，再温一壶！', 'Back? The wine has gone cold — no matter, I’ll warm another!')]);
           await drink(0);
           await farewell('温酒');
@@ -458,6 +468,6 @@ export function zuixian(s: Stage): Scene {
         s.unclaim();
       }
     },
-  });
+  }));
   return { x: at.x, z: at.z, r: 14 };
 }

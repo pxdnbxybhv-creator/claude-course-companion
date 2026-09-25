@@ -36,7 +36,7 @@ import { buildArchitecture, buildGardenWall } from './architecture';
 import { buildPond, NO_REFLECT } from './pond';
 import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
 import { InkMarks } from './marks';
-import { giftsOf, PlayerController, ScholarModel } from './player';
+import { giftsOf, PlayerController, ScholarModel, type MoveInput, type Physics } from './player';
 import { DriftingVerses, SongBirds } from './gifts';
 import { Controls, type InputState } from './controls';
 import { buildAir, Bursts } from './particles';
@@ -175,15 +175,12 @@ function statsOf(h: Habit, day: string): HabitStats {
 
 function modelFor(id: CharacterId, reduced: boolean): CharacterModel {
   const f = FACTORIES[id];
-  if (f && id !== 'scholar') {
+  if (f) {
     try {
-      return f(THREE, { palette: PIGMENTS as unknown as Record<string, string> });
+      return f(THREE, { palette: PIGMENTS as unknown as Record<string, string>, reduced });
     } catch (e) {
       console.error(`[walk] character "${id}" failed to build`, e);
     }
-  }
-  if (f && id === 'scholar') {
-    try { return f(THREE, { palette: PIGMENTS as unknown as Record<string, string> }); } catch (e) { console.error('[walk] scholar model failed', e); }
   }
   return new ScholarModel(reduced);
 }
@@ -205,7 +202,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // --- renderer
   let renderer: THREE.WebGLRenderer;
   try {
-    renderer = new THREE.WebGLRenderer({ antialias: dpr < 1.6, powerPreference: 'high-performance', alpha: false, stencil: false });
+    // every frame goes through the grade (grade.ts), which multisamples or FXAAs its own target (WebGL2
+    // is all three.js draws with now): the canvas's own antialias would be wasted memory. Only where
+    // the grade steps aside (low-end phones) does the canvas smooth its edges itself.
+    renderer = new THREE.WebGLRenderer({ antialias: lowEnd && dpr < 1.6, powerPreference: 'high-performance', alpha: false, stencil: false });
   } catch (e) {
     throw new WebGLUnavailable(String(e));
   }
@@ -308,7 +308,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   scene.add(ground.mesh);
   garden.add(ground.stones);
   const wall = buildGardenWall(bag, wallPath(), WALL.h, GATE.thick);
-  scene.add(wall);
+  scene.add(wall.group);
   const arch = buildArchitecture(bag);
   garden.add(arch.group);
   const flora = buildFlora(bag, slots, reduced);
@@ -484,20 +484,27 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   setPx();
 
   // --- collisions (regions and features add their props through addCollider)
-  const colliders: Circle[] = [...staticColliders()];
+  /** A prop's footprint, and (given a height) its top in world y: above that the walker steps over it. */
+  type Solid = Circle & { top?: number };
+  const colliders: Solid[] = [...staticColliders()];
   for (const e of plants) {
     const c = plantCollider(e);
     if (c) colliders.push(c);
   }
   for (const t of tabletSpecs) colliders.push({ x: t.x, z: t.z, r: 0.3 });
   const walkHere = (x: number, z: number) => walkableGround(x, z) || (player.floats && x * x + z * z < 172 * 172);
-  const resolve = (x: number, z: number, r: number, fx: number, fz: number): [number, number] => {
+  /** resolve()'s answer: one array, reused (read it at once). */
+  const resolved: [number, number] = [0, 0];
+  const out = (x: number, z: number): readonly [number, number] => { resolved[0] = x; resolved[1] = z; return resolved; };
+  const resolve = (x: number, z: number, r: number, fx: number, fz: number, feetY = -Infinity): readonly [number, number] => {
     const nearGarden = x * x + z * z < 40 * 40;
     for (let pass = 0; pass < 2; pass++) {
       for (let i = 0; i < colliders.length; i++) {
         const c = colliders[i];
         const dx = x - c.x, dz = z - c.z, m = c.r + r;
         if (dx > m || dx < -m || dz > m || dz < -m) continue;
+        // on top of it (or clearing it in a jump): walk along the wall top, over the crate
+        if (c.top !== undefined && c.top <= feetY + 0.03) continue;
         const d = Math.sqrt(dx * dx + dz * dz);
         if (d < m && d > 1e-6) { x = c.x + (dx / d) * m; z = c.z + (dz / d) * m; }
       }
@@ -514,11 +521,11 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       }
     }
     if (!walkHere(x, z)) {
-      if (walkHere(x, fz)) return [x, fz];
-      if (walkHere(fx, z)) return [fx, z];
-      return [fx, fz];
+      if (walkHere(x, fz)) return out(x, fz);
+      if (walkHere(fx, z)) return out(fx, z);
+      return out(fx, fz);
     }
-    return [x, z];
+    return out(x, z);
   };
   const nearWall = (x: number, z: number, m: number) => {
     if (x * x + z * z > 40 * 40) return false;
@@ -563,12 +570,15 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     return () => { const i = occluders.indexOf(c); if (i >= 0) occluders.splice(i, 1); };
   };
   const addCollider = (c0: Collider) => {
-    const c: Circle = { x: c0.x, z: c0.z, r: Math.max(0.05, c0.r) };
+    const c: Solid = { x: c0.x, z: c0.z, r: Math.max(0.05, c0.r) };
+    const h = c0.h !== undefined && Number.isFinite(c0.h) && c0.h > 0 ? c0.h : 0;
+    // its top, from the surface it stands on now (the ground, or a quay it was set on)
+    if (h > 0) c.top = floorY(c.x, c.z) + h;
     colliders.push(c);
     let offOcc: (() => void) | null = null;
-    if ((c0.h ?? 0) >= 0.9) {
+    if (h >= 0.9) {
       const y = floorY(c.x, c.z);
-      offOcc = addOccluder({ x: c.x, z: c.z, r: c.r * 0.9, y0: y - 0.1, y1: y + c0.h! });
+      offOcc = addOccluder({ x: c.x, z: c.z, r: c.r * 0.9, y0: y - 0.1, y1: y + h });
     }
     return () => {
       const i = colliders.indexOf(c);
@@ -595,7 +605,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   /** A plant can be reached at its trunk or at its name tablet, whichever is nearer. */
   const alsoAt = new Map<Interactable, { x: number; z: number }>();
   let nearest: Interactable | null = null;
-  let shown = '';
+  /** What the prompt shows now: the thing and its labels as they were (an interactable may relabel itself). */
+  const shown = { it: null as Interactable | null, qin: false, labelZh: '', labelEn: '', actionZh: '', actionEn: '' };
   const addInteractable = (i: Interactable) => {
     interactables.add(i);
     return () => {
@@ -801,6 +812,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
 
   // --- the player's input, for mini-games (rowing a boat, casting a line)
   const ctxInput = { x: 0, y: 0, run: false, actionPressed: false, jumpPressed: false, skillPressed: false };
+  // the walker's input and its world, one object each (nothing is allocated per frame)
+  const moveIn: MoveInput = { x: 0, z: 0, run: false, jump: false };
+  const physics: Physics = { floorY: standY, resolve, built: (x, z) => floorY(x, z) > terrainY(x, z) + 0.01 };
   // the world's clock can be slowed (棋士's 推演): features and the walker get the scaled dt
   let timeScale = 1, timeScaleWant = 1;
 
@@ -976,6 +990,27 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   const regionOf = new Map<Interactable, RegionId | null>();
   let frozenShown = false;
+  /**
+   * Keep what the places and the features put up out of the pond's mirror (each reflected mesh is a
+   * second draw): the far places whole, and whatever joined the scene or the garden after the core
+   * built it — a feature's props, crowds, festival things, a skill's effects — unless it is marked
+   * userData.reflect (a lantern by the water, a boat on it: that whole branch is left as it is).
+   * Run once the places are dressed, again after the features, and now and then (things come later).
+   */
+  let coreTop: Set<THREE.Object3D> | null = null;
+  let gardenTop: Set<THREE.Object3D> | null = null;
+  const unmirrorBranch = (o: THREE.Object3D) => {
+    if (o.userData.reflect) return;
+    if (o.layers.isEnabled(0)) o.layers.set(NO_REFLECT);
+    for (const c of o.children) unmirrorBranch(c);
+  };
+  const unmirror = () => {
+    for (const [id, g] of regionGroups) {
+      if (id !== 'garden') { for (const c of g.children) unmirrorBranch(c); continue; }
+      if (gardenTop) for (const c of g.children) if (!gardenTop.has(c)) unmirrorBranch(c);
+    }
+    if (coreTop) for (const c of scene.children) if (!coreTop.has(c) && !c.name.startsWith('region:')) unmirrorBranch(c);
+  };
   /** The world's own clock: it slows with setTimeScale (the camera and the HUD keep real time). */
   let clock = 0;
   /** The lens widens a little while running (the world rushes past). */
@@ -995,10 +1030,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     ctxInput.run = controls.intent.run;
     ctxInput.actionPressed = inp.actQueued && !paused;
     ctxInput.jumpPressed = inp.jumpQueued && !paused;
-    // no skills while held by a game, riding, travelling or behind a card
-    ctxInput.skillPressed = inp.skillQueued && !paused && !player.isFrozen && !traveling;
+    // no skills while held by a game or a boat, travelling or behind a card (a skill's own mount,
+    // Red Hare, still hears the key: it is how you get off)
+    ctxInput.skillPressed = inp.skillQueued && !paused && (!player.isFrozen || player.heldBySkill) && !traveling;
     inp.skillQueued = false;
-    player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve, built: (x, z) => floorY(x, z) > terrainY(x, z) + 0.01 });
+    moveIn.x = mv.x; moveIn.z = mv.z; moveIn.run = mv.run;
+    moveIn.jump = inp.jumpQueued && !paused && !player.isFrozen;
+    player.update(dt, moveIn, physics);
     inp.jumpQueued = false;
     camFollow(rawDt);
     const kick = !reduced && player.running && player.speed > 3.4 && !player.isFrozen ? 5 : 0;
@@ -1015,12 +1053,14 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     land.update(camPos, far);
     scatter.update(t, camPos, sky.tint, far);
     openWater.update(t, sky.fogColor, sky.night01);
+    wall.setNight(sky.night01);
     if (frameNo % 12 === 1) {
       stream();
       trackRegion();
       applyTheme();
       checkWaypoints();
       dust.setTint(sky.tint, sky.night01);
+      if (coreTop && frameNo % 96 === 1) unmirror();
       // the walker shows in the pond only when near it (a character can be dozens of draws)
       const mirrored = Math.hypot(player.position.x - POND.x, player.position.z - POND.z) < 16;
       if (mirrored !== playerMirrored) {
@@ -1033,7 +1073,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       for (const f of tablets.faces) (f.material as THREE.MeshBasicMaterial).color.copy(sky.tint);
       arch.setNight(sky.night01, t);
       flora.update(t, sky.tint, sky.fogColor);
-      pond.update(dt, t, sky.fogColor, sky.night01);
+      // jade by day, indigo by night (the sky's own water colour)
+      pond.update(dt, t, sky.waterColor, sky.night01);
       marks.update(dt, sky.night01);
     } else flora.update(t, sky.tint, sky.fogColor);
     if (air) air.update(t, camPos, sky.night01);
@@ -1062,11 +1103,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     // the qin player, standing still with nothing else to do, may play
     stillFor = player.speed < 0.2 ? stillFor + dt : 0;
     const qin = !nearest && !player.isFrozen && !traveling && stillFor > 1.2 && !player.busy && CHARACTER[player.character].ability.kind === 'music';
-    const sig = nearest ? `${nearest.id}|${nearest.labelZh}|${nearest.labelEn}|${nearest.actionZh}|${nearest.actionEn}` : qin ? 'qin' : '';
-    if (sig !== shown) {
-      shown = sig;
-      hud.prompt(nearest ? { labelZh: nearest.labelZh, labelEn: nearest.labelEn, actionZh: nearest.actionZh, actionEn: nearest.actionEn }
-        : qin ? { labelZh: '琴师 · 古琴', labelEn: 'Qin Player · guqin', actionZh: '抚琴', actionEn: 'Play' } : null);
+    const n = nearest;
+    const wantQin = !n && qin;
+    if (n !== shown.it || wantQin !== shown.qin || (n && (n.labelZh !== shown.labelZh || n.labelEn !== shown.labelEn || n.actionZh !== shown.actionZh || n.actionEn !== shown.actionEn))) {
+      shown.it = n; shown.qin = wantQin;
+      shown.labelZh = n?.labelZh ?? ''; shown.labelEn = n?.labelEn ?? ''; shown.actionZh = n?.actionZh ?? ''; shown.actionEn = n?.actionEn ?? '';
+      hud.prompt(n ? { labelZh: n.labelZh, labelEn: n.labelEn, actionZh: n.actionZh, actionEn: n.actionEn }
+        : wantQin ? { labelZh: '琴师 · 古琴', labelEn: 'Qin Player · guqin', actionZh: '抚琴', actionEn: 'Play' } : null);
     }
     if (inp.actQueued) {
       inp.actQueued = false;
@@ -1271,7 +1314,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     checkWaypoints();
   }
   // the places stay out of the garden pond's mirror (they would cost every draw twice)
-  for (const [id, g] of regionGroups) if (id !== 'garden') g.traverse((o) => { if (!o.userData.reflect) o.layers.set(NO_REFLECT); });
+  coreTop = new Set(scene.children);
+  gardenTop = new Set(garden.children);
+  unmirror();
   const inited: WorldFeature[] = [];
   for (let i = 0; i < FEATURES.length; i++) {
     const f = FEATURES[i];
@@ -1284,6 +1329,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     await Promise.race([started, new Promise((r) => setTimeout(r, 4000))]);
     hud.progress(0.88 + (0.07 * (i + 1)) / FEATURES.length);
   }
+  // what the features put up stays out of the mirror too
+  unmirror();
   // whatever the features brought (and anything not yet seen), then the first real frame
   await warm(scene.children, 0.95, 0.995);
   if (running) {

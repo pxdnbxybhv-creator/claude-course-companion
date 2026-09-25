@@ -198,6 +198,8 @@ export function GomokuView() {
       if (!removedHuman) return;
     }
     setHint(-1);
+    // a taken-back game has no result card to pay on (a replayed win pays nothing again: `recorded`)
+    setPaid(null);
     setMoves(m);
     setDropAt(0);
     audio.pluck(-2, 0.4);

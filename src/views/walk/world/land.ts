@@ -25,16 +25,16 @@ const LOD_STEP = [1, 2, 4, 8];
 const GROUND = '#ffffff';
 /** Broad patches of the meadow: jade in the hollows, tender yellow-green on the rises, ochre where it is steep. */
 const PATCH: Record<Season, { jade: string; leaf: string; ochre: string; high: string; damp: string }> = {
-  spring: { jade: '#8cc39e', leaf: '#c2d995', ochre: '#cbb087', high: '#98bcb2', damp: '#94c39f' },
-  summer: { jade: '#7fb98e', leaf: '#b3d08d', ochre: '#c6a87e', high: '#90b6ad', damp: '#86bb95' },
-  autumn: { jade: '#92bd92', leaf: '#c6c987', ochre: '#c89f72', high: '#98b4a8', damp: '#98bf95' },
+  spring: { jade: '#86c29c', leaf: '#b9d792', ochre: '#cbb087', high: '#96bcb2', damp: '#8ec39e' },
+  summer: { jade: '#7ab98e', leaf: '#abcf8b', ochre: '#c6a87e', high: '#8eb6ad', damp: '#82bb95' },
+  autumn: { jade: '#8abd96', leaf: '#b9cc8b', ochre: '#c89f72', high: '#96b4aa', damp: '#90bf98' },
   winter: { jade: '#dfe2dc', leaf: '#efece4', ochre: '#d8cdbd', high: '#e4e6e6', damp: '#d2d4cc' },
 };
 
 /** Where people live and walk the ground is not meadow: the town's packed earth, the grove's leaf litter, the temple's dust. */
 const SETTLED: { id: RegionId; color: string; k: number; inner: number }[] = [
-  { id: 'village', color: '#dbd2be', k: 0.95, inner: 0.62 },
-  { id: 'bamboo', color: '#b3ae78', k: 0.6, inner: 0.7 },
+  { id: 'village', color: '#e4dac5', k: 0.88, inner: 0.62 },
+  { id: 'bamboo', color: '#bfb48c', k: 0.6, inner: 0.7 },
   { id: 'mountain', color: '#cfbd9a', k: 0.55, inner: 0.45 },
 ];
 
@@ -85,9 +85,9 @@ function overlayCanvas(season: Season): HTMLCanvasElement {
       g.stroke();
     }
   }
-  // 3. paths: packed earth, with a soft darker edge
+  // 3. paths: a soft darker edge and a little wear (their pale earth is in the land's own colour)
   for (const list of T.paths) {
-    for (const [w, col] of [[3.6, 'rgba(150,112,62,0.12)'], [2.4, 'rgba(176,132,76,0.2)'], [1.2, 'rgba(120,88,52,0.1)']] as const) {
+    for (const [w, col] of [[3.6, 'rgba(150,112,62,0.1)'], [2.4, 'rgba(176,140,90,0.1)'], [1.2, 'rgba(120,88,52,0.06)']] as const) {
       g.strokeStyle = col;
       g.lineWidth = w * M;
       g.beginPath();
@@ -184,22 +184,26 @@ export function buildLand(bag: Bag, season: Season): Land {
   const overlay = canvasTexture(bag, overlayCanvas(season), { flipY: false });
   const grain = canvasTexture(bag, grainCanvas(), { repeat: true });
   const mat = bag.add(new THREE.MeshLambertMaterial({ color: GROUND, vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }));
+  const nightU = { value: 0 };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uOverlay = { value: overlay };
     sh.uniforms.uGrain = { value: grain };
     sh.uniforms.uOv = { value: new THREE.Vector4(-OVX, -OVX, 2 * OVX, 2 * OVX) };
+    sh.uniforms.uNight = nightU;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGxz = (modelMatrix * vec4(position, 1.0)).xz;\nvSlope = 1.0 - normal.y;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;')
+      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;\nuniform float uNight;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         vec2 ouv = (vGxz - uOv.xy) / uOv.zw;
         vec3 ov = (ouv.x > 0.0 && ouv.x < 1.0 && ouv.y > 0.0 && ouv.y < 1.0) ? texture2D(uOverlay, ouv).rgb : vec3(1.0);
         float g1 = texture2D(uGrain, vGxz / 6.0).r;
         float g2 = texture2D(uGrain, vGxz / 31.0 + 0.37).r;
         float ink = smoothstep(0.12, 0.55, vSlope) * 0.34;
-        diffuseColor.rgb *= ov * (0.8 + 0.2 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink);`);
+        // by night, broad hollows of shade between moonlit swells (the grain's soft blotches, large)
+        float nb = clamp((texture2D(uGrain, vGxz / 57.0 + 0.61).r - 0.87) / 0.13, 0.0, 1.0);
+        diffuseColor.rgb *= ov * (0.8 + 0.2 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink) * (1.0 + uNight * (0.5 * nb - 0.34));`);
   };
   mat.customProgramCacheKey = () => 'land';
 
@@ -208,6 +212,8 @@ export function buildLand(bag: Bag, season: Season): Land {
   const jade = new THREE.Color(P.jade), leaf = new THREE.Color(P.leaf), ochre = new THREE.Color(P.ochre);
   const high = new THREE.Color(P.high), damp = new THREE.Color(P.damp);
   const far = new THREE.Color('#b9c7bd');
+  // the paths' packed earth: pale ochre paper (the meadow merely tinted brown reads khaki)
+  const earth = new THREE.Color(season === 'winter' ? '#e8e4dc' : '#e4d7bc');
   const tmp = new THREE.Color();
   const T = terrain();
   const patches = makeNoise2(7717);
@@ -247,6 +253,8 @@ export function buildLand(bag: Bag, season: Season): Land {
         const q = Math.hypot(x - g.center.x, z - g.center.z) / g.radius;
         if (q < 1) tmp.lerp(g.color, g.k * Math.min(1, (1 - q) / (1 - g.inner)));
       }
+      const pd = T.pathNear(x, z).d;
+      if (pd < 2) tmp.lerp(earth, 0.62 * Math.min(1, 2 - pd));
       const w = T.waterAt(x, z);
       if (w !== null && w - y < 3) tmp.lerp(damp, 0.55);
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
@@ -315,9 +323,9 @@ export function buildLand(bag: Bag, season: Season): Land {
       for (const c of chunks) { geoFor(c, 3); if (Math.hypot(c.cx, c.cz) < 140) geoFor(c, 2); }
     },
     update(cam, far) {
-      // by night the land goes down to a moonlit indigo
+      // by night the land goes down to a moonlit blue-green dark
       const n = skyNow.night;
-      if (Math.abs(n - lastNight) > 1e-3) { lastNight = n; mat.color.setRGB(1, 1, 1).lerp(nightLand, n); }
+      if (Math.abs(n - lastNight) > 1e-3) { lastNight = n; mat.color.setRGB(1, 1, 1).lerp(nightLand, n); nightU.value = n; }
       let budget = 1;
       for (const c of chunks) {
         // distance from the camera to the chunk's square

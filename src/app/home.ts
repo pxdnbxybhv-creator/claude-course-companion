@@ -44,6 +44,8 @@ export interface Pet {
   love: number;
   /** Walks with you out in the world (at most one pet at a time). */
   follow: boolean;
+  /** A line it was taught to say (the parrot). */
+  line?: string;
 }
 
 export interface Resident {
@@ -66,7 +68,7 @@ export interface HomeState {
   residents: Resident[];
 }
 
-export const HOME_LIMITS = { items: 240, pets: 12, residents: 8, name: 12, text: 16 };
+export const HOME_LIMITS = { items: 240, pets: 12, residents: 8, name: 12, text: 16, line: 24 };
 
 export function emptyHome(): HomeState {
   return { v: 1, name: '', items: [], pets: [], residents: [] };
@@ -107,7 +109,8 @@ export function sanitizeHome(raw: unknown): HomeState {
     if (!uid || !species) continue;
     const follow = !!p.follow && !following;
     if (follow) following = true;
-    pets.push({ uid, species, name: str(p.name, HOME_LIMITS.name), since: isDay(p.since) ? p.since : '1970-01-01', fed: isDay(p.fed) ? p.fed : '', love: int(p.love, 0, 100), follow });
+    const line = str(p.line, HOME_LIMITS.line);
+    pets.push({ uid, species, name: str(p.name, HOME_LIMITS.name), since: isDay(p.since) ? p.since : '1970-01-01', fed: isDay(p.fed) ? p.fed : '', love: int(p.love, 0, 100), follow, ...(line ? { line } : {}) });
   }
   const residents: Resident[] = [];
   for (const m of Array.isArray(r.residents) ? r.residents : []) {
@@ -166,6 +169,19 @@ export function placeItem(kind: string, i: number, j: number, rot: HomeItem['rot
   const t = str(text, HOME_LIMITS.text);
   set((h) => ({ ...h, items: [...h.items, { uid, kind, i: int(i, 0, 255), j: int(j, 0, 255), rot, ...(t ? { text: t } : {}) }] }));
   return uid;
+}
+
+/**
+ * Put a thing back exactly as it was — its uid, words and season (undoing a sale). False when that
+ * uid already stands or the plot is full. The caller checks the footprint is free.
+ */
+export function restoreItem(item: HomeItem): boolean {
+  const h = home.value;
+  if (h.items.length >= HOME_LIMITS.items || h.items.some((x) => x.uid === item.uid)) return false;
+  const it = sanitizeHome({ items: [item] }).items[0];
+  if (!it) return false;
+  set((s) => ({ ...s, items: [...s.items, it] }));
+  return true;
 }
 
 export function moveItem(uid: string, i: number, j: number, rot: HomeItem['rot']): void {
@@ -227,6 +243,17 @@ export function petPet(uid: string, n = 1): void {
 /** Set a pet's affection outright (0…100) — the daily settling of affection uses this. */
 export function setPetLove(uid: string, love: number): void {
   set((h) => ({ ...h, pets: h.pets.map((x) => (x.uid === uid ? { ...x, love: int(love, 0, 100) } : x)) }));
+}
+
+/** Teach a pet a line to say ('' forgets it). */
+export function setPetLine(uid: string, line: string): void {
+  const t = str(line, HOME_LIMITS.line);
+  set((h) => ({ ...h, pets: h.pets.map((x) => {
+    if (x.uid !== uid) return x;
+    const next: Pet = { ...x };
+    if (t) next.line = t; else delete next.line;
+    return next;
+  }) }));
 }
 
 /** This pet walks with you out in the world (any other stops following); null: none does. */

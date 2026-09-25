@@ -11,15 +11,21 @@ import { home, petPet, type Pet } from '../../../../../app/home';
 import { record } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
 import { begin, end } from '../../minigames/ui';
-import type { CharacterId } from '../../../../../data/characters';
+import { CHARACTER, type CharacterId } from '../../../../../data/characters';
 import { Actor, type Mode } from './actor';
 import { Bubble, Fx } from './fx';
-import { WORDS } from './pets';
+import { learntLine, parrotSays, WORDS } from './pets';
+import { yieldPrompt } from './prompt';
 import { feed, toggleFollow } from './actions';
 import { countStroke, strokesToday } from './book';
 import { FOOD_PRICE, hasTrick, hearts, isSpecies, SPECIES_DEF, strokeGain, type Species } from './logic';
 import * as snd from './sound';
 
+/** Ways round an obstacle: a little to either side, then more. */
+const DEFLECT = [0.6, -0.6, 1.2, -1.2, 1.8, -1.8];
+/** Where to land when catching up: rings round the walker (m), and angles off straight behind. */
+const CATCH_R = [1.3, 0.8, 1.9, 2.5];
+const CATCH_A = [0, 0.5, -0.5, 1.1, -1.1, Math.PI / 2, -Math.PI / 2, Math.PI];
 const MAX_SPEED: Record<Exclude<Species, 'koi'>, number> = { dog: 7.5, cat: 6.5, rabbit: 6, crane: 6, duck: 5, parrot: 9, goat: 6.5 };
 const SWIMS = new Set(['dog', 'duck']);
 const FLIES = new Set(['parrot', 'crane']);
@@ -104,12 +110,20 @@ export class Follower {
   private lastPx = 0;
   private labelT = 0;
   private lastPz = 0;
+  /** How long the walker has stood still (s). */
+  private stillFor = 0;
+  /** Seconds until the next try at catching up (when far behind). */
+  private catchCd = 0;
+  /** Catch up at once (after a journey to another region). */
+  private snapSoon = false;
+  /** The height to stand at (x, z) for this animal: bound once, handed to Actor.walk every frame. */
+  private floorFn = (x: number, z: number): number => (this.a ? this.floor(this.a.species, x, z) ?? this.ctx.groundY(x, z) : this.ctx.groundY(x, z));
 
   constructor(private bag: Bag, private ctx: WorldCtx, private handoff: (uid: string) => { x: number; z: number; heading: number } | null) {
     this.fx = new Fx(bag, ctx.scene, 10);
     this.bubble = new Bubble(bag, ctx.scene);
     this.wp = new ctx.THREE.Vector3();
-    bag.onDispose(ctx.onRegion(() => this.rebind()));
+    bag.onDispose(ctx.onRegion(() => { this.snapSoon = true; this.rebind(); }));
   }
 
   get uid(): string | null { return this.pet?.uid ?? null; }
@@ -136,11 +150,7 @@ export class Follower {
     a.place(at.x, this.floor(species, at.x, at.z) ?? pp.y, at.z, at.heading);
     this.a = a;
     this.fx.puff(a.x, a.y, a.z, '#f0e6d2', 4, 0.4);
-    this.it = {
-      id: 'home-follower', position: new this.ctx.THREE.Vector3(a.x, a.y, a.z), radius: species === 'parrot' ? 2.6 : 1.8,
-      labelZh: '', labelEn: '', actionZh: '摸摸', actionEn: 'Pet',
-      act: () => this.menu(),
-    };
+    this.it = this.prompt();
     this.relabel();
     this.rebind();
   }
@@ -154,12 +164,25 @@ export class Follower {
     this.it.labelEn = `${this.pet.name || d.en} · ${d.en} ${hs}`;
   }
 
-  /** The core remembers an interactable's region by where it was first seen: re-register as we travel. */
+  /** Its prompt (it gives way to every other one: see ./prompt). */
+  private prompt(): Interactable {
+    const old = this.it;
+    return {
+      id: 'home-follower', position: new this.ctx.THREE.Vector3(), radius: 0,
+      labelZh: old?.labelZh ?? '', labelEn: old?.labelEn ?? '', actionZh: '摸摸', actionEn: 'Pet',
+      act: () => this.menu(),
+    };
+  }
+
+  /**
+   * The core remembers a prompt's region by where it was first seen (keyed by the object): register
+   * a fresh one as we travel, or it would stay tied to the region the walk began in.
+   */
   private rebind(): void {
     this.offIt?.();
     this.offIt = null;
     if (!this.it || !this.a) return;
-    this.it.position.set(this.a.x, this.a.y, this.a.z);
+    this.it = this.prompt();
     this.offIt = this.bag.interact(this.it);
   }
 
@@ -176,16 +199,57 @@ export class Follower {
     this.trick = null;
   }
 
-  /** Where this animal can be at (x, z): its height there, or null where it can't go. */
+  /**
+   * Where this animal can be at (x, z): its height there, or null where it can't go (open water
+   * for a cat). A bridge or a deck over the water is ground to everyone.
+   */
   private floor(species: string, x: number, z: number): number | null {
+    const g = this.ctx.groundY(x, z);
     const w = this.ctx.waterAt(x, z);
-    if (w !== null) {
+    if (w !== null && g < w + 0.3) {
       if (SWIMS.has(species)) return w - (species === 'dog' ? 0.24 : 0.1);
       if (FLIES.has(species)) return w + 0.9;
       return null;
     }
-    if (!this.ctx.isWalkable(x, z)) return null;
-    return this.ctx.groundY(x, z);
+    return g;
+  }
+
+  /** Open water at (x, z) (not a bridge or a deck over it). */
+  private wet(x: number, z: number): boolean {
+    const w = this.ctx.waterAt(x, z);
+    return w !== null && this.ctx.groundY(x, z) < w + 0.3;
+  }
+
+  /** Catch up in a puff: somewhere it can stand near the walker (behind, beside, ahead), else at their feet. */
+  private catchUp(): boolean {
+    const a = this.a;
+    if (!a) return false;
+    const pl = this.ctx.player;
+    const P = pl.position, h = pl.heading;
+    const sp = a.species;
+    const flier = sp === 'parrot';
+    let x = P.x, z = P.z, y: number | null = flier ? P.y + (HEAD[pl.character] ?? 1.3) + 0.35 : null;
+    if (!flier) {
+      found: for (const r of CATCH_R) {
+        for (const off of CATCH_A) {
+          const ang = h + Math.PI + off;
+          const cx = P.x + Math.sin(ang) * r, cz = P.z + Math.cos(ang) * r;
+          const cy = this.floor(sp, cx, cz);
+          if (cy === null || Math.abs(cy - P.y) > 1.2 || !this.ctx.isWalkable(cx, cz)) continue;
+          x = cx; z = cz; y = cy;
+          break found;
+        }
+      }
+      // nowhere good round about (a narrow bridge, a jetty): right where you stand
+      if (y === null) y = this.floor(sp, P.x, P.z) ?? (pl.grounded ? P.y : null);
+    }
+    if (y === null) return false;
+    this.fx.puff(a.x, a.y, a.z, '#f0e6d2', 3, 0.4);
+    a.place(x, y, z, h);
+    this.fx.puff(a.x, a.y, a.z, '#f0e6d2', 4, 0.5);
+    this.trick = null;
+    this.waiting = false;
+    return true;
   }
 
   private async menu(): Promise<void> {
@@ -224,7 +288,7 @@ export class Follower {
       case 'rabbit': return has('binky') ? { zh: '跳一个', en: 'Binky!', mode: 'binky', secs: 0.9 } : has('beg') ? { zh: '作个揖', en: 'Beg', mode: 'beg', secs: 3 } : null;
       case 'crane': return has('dance') ? { zh: '跳支舞', en: 'Dance', mode: 'dance', secs: 6, sound: () => snd.craneCall(0) } : null;
       case 'duck': return { zh: '叫两声', en: 'Quack', mode: 'call', secs: 1.2, sound: () => snd.quack(0, 2) };
-      case 'parrot': return { zh: '说句话', en: 'Say something', mode: 'call', secs: 1, sound: () => { this.bubble.say(home.value.name ? `「${home.value.name}」！` : this.w('你好你好！'), this.a!.m.root, this.a!.m.height + 0.25, 2200); snd.squawk(0, 4); } };
+      case 'parrot': return { zh: '说句话', en: 'Say something', mode: 'call', secs: 1, sound: () => { const l = learntLine(p.uid); this.bubble.say(parrotSays(this.ctx.lang, l, l ? 1 : 3, this.ctx.env.date.getMinutes()), this.a!.m.root, this.a!.m.height + 0.25, 2200); snd.squawk(0, 4); } };
       case 'goat': return { zh: '顶一下', en: 'Headbutt', mode: 'butt', secs: 1, sound: () => snd.thump(0) };
       default: return null;
     }
@@ -266,21 +330,18 @@ export class Follower {
 
     // far behind (a journey, a boat, a flight): catch up in a puff, landing where it can stand
     const flier = sp === 'parrot';
-    if (pd > 16 || (!flier && Math.abs(a.y - P.y) > 5 && pl.grounded)) {
-      const y = this.floor(sp, tx, tz);
-      if (y !== null || flier) {
-        this.fx.puff(a.x, a.y, a.z, '#f0e6d2', 3, 0.4);
-        a.place(tx, flier ? P.y + (HEAD[pl.character] ?? 1.3) + 0.35 : y!, tz, h);
-        this.fx.puff(a.x, a.y, a.z, '#f0e6d2', 4, 0.5);
-        this.rebind();
-      }
-    }
+    this.catchCd -= dt;
+    const far = pd > 16 || (!flier && Math.abs(a.y - P.y) > 5 && pl.grounded) || (this.snapSoon && pd > 6);
+    if (far && this.catchCd <= 0) {
+      this.catchCd = 0.3;
+      if (this.catchUp()) this.snapSoon = false;
+    } else if (this.snapSoon && pd <= 6) this.snapSoon = false;
 
     // a trick or a reaction in progress
     if (this.trick?.go) {
       // first go and stand in front of you
       const g = this.trick.go;
-      if (a.walk(dt, g.x, g.z, 2, (x, z) => this.floor(sp, x, z) ?? ctx.groundY(x, z), 0.1) < 0.15) {
+      if (a.walk(dt, g.x, g.z, 2, this.floorFn, 0.1) < 0.15) {
         this.trick.go = undefined;
         a.heading = Math.atan2(P.x - a.x, P.z - a.z);
       } else a.setMode('idle');
@@ -313,7 +374,14 @@ export class Follower {
     if (!this.trick && a.speed < 0.1 && pd < 2.8) a.lookAt(P.x, P.z);
     a.happy += ((pd < 3 ? 0.9 : 0.5) - a.happy) * Math.min(1, dt);
     a.animate(dt, t, still);
-    if (this.it) this.it.position.set(a.x, a.y, a.z);
+    // its prompt: once you stop beside it, and only when nothing else is in reach (./prompt). The
+    // qin player standing still would rather play, unless the animal is right in front of them.
+    this.stillFor = pv < 0.3 && !pl.isFrozen ? this.stillFor + dt : 0;
+    if (this.it) {
+      const ahead = Math.cos(Math.atan2(a.x - P.x, a.z - P.z) - h) > 0.4;
+      const qin = CHARACTER[pl.character].ability.kind === 'music' && this.stillFor > 1 && !ahead;
+      yieldPrompt(this.it, this.stillFor > 0.35 && pd < (flier ? 1.6 : 2.6) && !qin && pl.grounded, P.x, P.y, P.z, a.x, a.z, h);
+    }
     this.fx.update(dt);
     this.bubble.update(dt, this.wp);
     this.labelT -= dt;
@@ -342,17 +410,28 @@ export class Follower {
     const nx = a.x + ((tx - a.x) / L) * 0.35, nz = a.z + ((tz - a.z) / L) * 0.35;
     const y = this.floor(sp, nx, nz);
     if (y === null) {
-      // the shore (or a wall): wait here, watching
+      // the shore: wait here, watching
       a.halt(dt);
-      if (!this.waiting) { this.waiting = true; if (this.ctx.waterAt(nx, nz) !== null && pd > 3) this.bubble.say(sp === 'cat' ? this.w('喵……') : '……', a.m.root, a.m.height + 0.25, 1600); }
+      if (!this.waiting) { this.waiting = true; if (pd > 3) this.bubble.say(sp === 'cat' ? this.w('喵……') : '……', a.m.root, a.m.height + 0.25, 1600); }
       a.setMode(sp === 'goat' || sp === 'rabbit' ? 'idle' : 'sit');
       a.lookAt(px, pz);
       return;
     }
     this.waiting = false;
-    const inWater = this.ctx.waterAt(a.x, a.z) !== null;
+    // a tree, a post or a wall in the way on land: step round it (or brush past, never stuck)
+    if (!this.wet(nx, nz) && !this.ctx.isWalkable(nx, nz)) {
+      const base = Math.atan2(tx - a.x, tz - a.z);
+      for (const off of DEFLECT) {
+        const ang = base + off;
+        const ox = a.x + Math.sin(ang) * 0.5, oz = a.z + Math.cos(ang) * 0.5;
+        if (this.wet(ox, oz) || !this.ctx.isWalkable(ox, oz) || this.floor(sp, ox, oz) === null) continue;
+        tx = a.x + Math.sin(ang) * 1.2; tz = a.z + Math.cos(ang) * 1.2;
+        break;
+      }
+    }
+    const inWater = this.wet(a.x, a.z);
     a.setMode(inWater ? (sp === 'crane' ? 'fly' : 'swim') : 'idle');
-    a.walk(dt, tx, tz, v, (x, z) => this.floor(sp, x, z) ?? this.ctx.groundY(x, z), 0.2);
+    a.walk(dt, tx, tz, v, this.floorFn, 0.2);
     if (inWater && sp === 'dog' && Math.sin(dt * 999 + a.x) > 0.97) this.fx.puff(a.x, a.y + 0.2, a.z, '#eef4f2', 1, 0.3);
   }
 
@@ -360,8 +439,7 @@ export class Follower {
     const a = this.a!;
     const sp = a.species;
     const k = this.stillT;
-    const water = this.ctx.waterAt(a.x, a.z) !== null;
-    if (water) { a.setMode(sp === 'crane' ? 'fly' : 'swim'); return; }
+    if (this.wet(a.x, a.z)) { a.setMode(sp === 'crane' ? 'fly' : 'swim'); return; }
     if (k < 3) { a.setMode('idle'); return; }
     a.setMode(sp === 'dog' ? 'sit' : sp === 'cat' ? (k > 12 ? 'sleep' : 'groom') : sp === 'rabbit' ? 'eat' : sp === 'goat' ? 'graze' : sp === 'crane' ? 'graze' : 'idle');
   }
@@ -391,7 +469,7 @@ export class Follower {
     if (!r) {
       // no special opinion: an idle little moment of its own
       if (pet.species === 'dog') { this.bubble.say(this.w('哈……哈……'), a.m.root, a.m.height + 0.25, 1500); }
-      else if (pet.species === 'parrot') { this.bubble.say(home.value.name ? `「${home.value.name}」！` : this.w('走走走！'), a.m.root, a.m.height + 0.25, 1800); snd.squawk(0, 3); }
+      else if (pet.species === 'parrot') { this.bubble.say(parrotSays(this.ctx.lang, learntLine(pet.uid), 3, this.ctx.env.date.getMinutes()), a.m.root, a.m.height + 0.25, 1800); snd.squawk(0, 3); }
       return;
     }
     this.bubble.say(ctxLang(this.ctx) === 'zh' ? r.zh : r.en, a.m.root, a.m.height + 0.25, 2200);

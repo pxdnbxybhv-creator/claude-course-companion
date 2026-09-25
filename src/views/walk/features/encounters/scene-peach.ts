@@ -253,7 +253,9 @@ function valley(s: Stage): Valley {
     const a = (i / segA) * Math.PI * 2;
     const u = j / segR;
     const r = R + 0.6 + u * 9;
-    const hTop = 11 + noise(Math.cos(a) * 3, Math.sin(a) * 3) * 5 + Math.sin(a * 5) * 1.5;
+    // a notch in the south where the narrow way comes in (the cleft of light)
+    const da = Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2));
+    const hTop = (11 + noise(Math.cos(a) * 3, Math.sin(a) * 3) * 5 + Math.sin(a * 5) * 1.5) * (1 - 0.8 * Math.exp(-((da / 0.2) ** 2)));
     const y = Math.pow(Math.sin(u * Math.PI * 0.5), 1.3) * hTop;
     return { x: Math.cos(a) * r, y, z: Math.sin(a) * r, k: y / 16 };
   };
@@ -282,19 +284,22 @@ function valley(s: Stage): Valley {
 
   // the mouth (south): a cleft of light in the hills
   const mouthA = Math.PI / 2;
-  const mouth = { x: G.x + Math.cos(mouthA) * (R - 4.5), z: G.z + Math.sin(mouthA) * (R - 4.5) };
+  // you arrive well inside, looking up the valley (the camera behind you stays clear of the hills)
+  const mouth = { x: G.x + Math.cos(mouthA) * (R - 8), z: G.z + Math.sin(mouthA) * (R - 8) };
   const mouthHeading = Math.atan2(G.x - mouth.x, G.z - mouth.z);
   const cleft = mesh(ctx, [
-    part(THREE, new THREE.DodecahedronGeometry(2.2, 0), '#8f8b80', { p: [-1.9, 1.4, 0], s: [0.8, 1.5, 0.8] }),
-    part(THREE, new THREE.DodecahedronGeometry(2.0, 0), '#77736a', { p: [1.9, 1.3, 0], s: [0.8, 1.6, 0.8] }),
-  ], 0.03);
-  cleft.position.set(Math.cos(mouthA) * (R + 0.8), 0, Math.sin(mouthA) * (R + 0.8));
+    part(THREE, new THREE.DodecahedronGeometry(2.2, 0), '#a8987a', { p: [-1.9, 1.4, 0], s: [0.8, 1.5, 0.8] }),
+    part(THREE, new THREE.DodecahedronGeometry(2.0, 0), '#8f7f62', { p: [1.9, 1.3, 0], s: [0.8, 1.6, 0.8] }),
+    part(THREE, new THREE.IcosahedronGeometry(0.9, 0), '#7f9a55', { p: [-1.6, 3.4, 0.2], s: [1.2, 0.5, 1] }),
+    part(THREE, new THREE.IcosahedronGeometry(0.8, 0), '#8aa860', { p: [1.7, 3.5, 0.1], s: [1.1, 0.5, 1] }),
+  ], 0.014);
+  cleft.position.set(Math.cos(mouthA) * (R + 2.2), 0, Math.sin(mouthA) * (R + 2.2));
   cleft.rotation.y = -mouthA + Math.PI / 2;
   root.add(cleft);
   const glowMat = new THREE.SpriteMaterial({ map: s.bag.own(glowTexture(THREE, 64, 0.2)), color: '#fff3d6', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
   const gl = new THREE.Sprite(glowMat);
   gl.scale.set(2.2, 3.4, 1);
-  gl.position.set(Math.cos(mouthA) * (R + 0.9), 1.6, Math.sin(mouthA) * (R + 0.9));
+  gl.position.set(Math.cos(mouthA) * (R + 2.3), 1.6, Math.sin(mouthA) * (R + 2.3));
   root.add(gl);
 
   // the stream: from the mouth, winding across the valley (a ribbon of water)
@@ -324,15 +329,15 @@ function valley(s: Stage): Valley {
 
   // peach trees along both banks (夹岸数百步，中无杂树), cottages, fields, bamboo — all one mesh
   const parts: T.BufferGeometry[] = [];
-  for (let i = 0; i < 18; i++) {
-    const u = (i + 0.5) / 18;
+  for (let i = 0; i < 24; i++) {
+    const u = (i + 0.5) / 24;
     const p = streamAt(u);
     const side = i % 2 ? 1 : -1;
     const off = 2.2 + rng() * 1.8;
     const tx = p.x + side * off, tz = p.z + (rng() - 0.5) * 1.2;
     if (Math.hypot(tx, tz) > R - 1.2) continue;
     // keep the way in open: nothing right at the mouth, where you arrive and look in
-    if (Math.hypot(tx - Math.cos(mouthA) * (R - 4), tz - Math.sin(mouthA) * (R - 4)) < 5) continue;
+    if (Math.abs(tx) < 4.2 && tz > R - 13) continue; // (a clear lane from the mouth, for you and the camera behind you)
     parts.push(...peachTreeParts(THREE, rng, tx, 0, tz, 0.95 + rng() * 0.3));
     offs.push(ctx.addCollider({ x: G.x + tx, z: G.z + tz, r: 0.28, h: 2 }));
   }

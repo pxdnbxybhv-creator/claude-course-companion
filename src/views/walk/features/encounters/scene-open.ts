@@ -37,21 +37,25 @@ export function liuxing(s: Stage): Scene {
   let wait = 5 + s.rng() * 12;
   let fly: { from: T.Vector3; to: T.Vector3; k: number } | null = null;
   let wished = false;
+  s.theme = 'night';
   let btn: HTMLButtonElement | null = null;
   const a = new THREE.Vector3(), b = new THREE.Vector3(), fwd = new THREE.Vector3();
   s.frame((dt) => {
     if (!fly) {
-      if (s.finished || ctx.player.isFrozen || document.querySelector('.walk-say-wrap, .walk-card-wrap')) return;
+      if (s.finished) return;
       wait -= dt;
       if (wait > 0) return;
-      // across the sky in front of the camera, high up, from one side to the other
-      cam.getWorldDirection(fwd);
-      fwd.y = 0;
-      fwd.normalize();
+      // not while the walker is talking to someone or reading a card: a little later
+      if (ctx.player.isFrozen || document.querySelector('.walk-say-wrap, .walk-card-wrap')) { wait = 1.5; return; }
+      // across the part of the sky the walker can see (a phone held upright shows little of it): from
+      // high in one corner of the view down toward the far hills, 200 m out, never below the horizon
       const side = s.rng() < 0.5 ? 1 : -1;
-      const yaw = Math.atan2(fwd.x, fwd.z);
-      const at = (ang: number, h: number, d: number) => new THREE.Vector3(cam.position.x + Math.sin(yaw + ang) * d, cam.position.y + h, cam.position.z + Math.cos(yaw + ang) * d);
-      fly = { from: at(0.55 * side, 95, 230), to: at(-0.2 * side, 55, 230), k: 0 };
+      const at = (nx: number, ny: number) => {
+        fwd.set(nx, ny, 0.5).unproject(cam).sub(cam.position).normalize();
+        fwd.y = Math.max(fwd.y, 0.06);
+        return fwd.clone().normalize().multiplyScalar(200).add(cam.position);
+      };
+      fly = { from: at(0.85 * side, 0.8), to: at(-0.35 * side, 0.48), k: 0 };
       star.visible = true;
       offerWish();
       return;
@@ -63,7 +67,7 @@ export function liuxing(s: Stage): Scene {
     a.copy(fly.from).project(cam);
     b.copy(fly.to).project(cam);
     mat.rotation = Math.atan2((b.y - a.y), (b.x - a.x) * cam.aspect);
-    star.scale.set(42, 1.6, 1);
+    star.scale.set(46, 2.1, 1);
     mat.opacity = Math.sin(k * Math.PI);
     if (k >= 1) { star.visible = false; }
   });
@@ -122,7 +126,7 @@ export function liuxing(s: Stage): Scene {
     };
   }
   const p = s.player();
-  return { x: p.x, z: p.z, r: 1e6, roaming: true };
+  return { x: p.x, z: p.z, r: 1e6, roaming: true, linger: 8 };
 }
 
 // ───────────────────────────── 牧童遥指
@@ -321,7 +325,7 @@ export function hudie(s: Stage): Scene {
   const m = mark(s, { root: (() => { const o = new THREE.Group(); o.position.copy(home); s.bag.add(o, s.group); return o; })(), height: 1.8 } as never);
   const promptPos = new THREE.Vector3();
   s.frame(() => promptPos.copy(pos).setY(pos.y - headY()));
-  s.prompt({
+  s.whenDone(s.prompt({
     id: 'qiyu-hudie', position: promptPos, radius: 2,
     labelZh: '金色的蝴蝶', labelEn: 'A golden butterfly', actionZh: '静观', actionEn: 'Watch it',
     async act() {
@@ -383,6 +387,6 @@ export function hudie(s: Stage): Scene {
         s.unclaim();
       }
     },
-  });
+  }));
   return { x: home.x, z: home.z, r: 14 };
 }
