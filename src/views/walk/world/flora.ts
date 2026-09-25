@@ -6,7 +6,7 @@ import { makeRng } from '../../../core/rng';
 import { Bag, canvas, canvasTexture } from './kit';
 import { BRIDGE, LANTERNS, LOOP, POND, ROCKS, SPURS, polyDist, pondQ, terrainY, type PlantSlot } from './site';
 
-function tuftCanvas(seed: number): HTMLCanvasElement {
+export function tuftCanvas(seed: number): HTMLCanvasElement {
   const W = 128, H = 128;
   const c = canvas(W, H);
   const g = c.getContext('2d')!;
@@ -30,7 +30,7 @@ function tuftCanvas(seed: number): HTMLCanvasElement {
   return c;
 }
 
-function reedCanvas(seed: number): HTMLCanvasElement {
+export function reedCanvas(seed: number): HTMLCanvasElement {
   const W = 128, H = 384;
   const c = canvas(W, H);
   const g = c.getContext('2d')!;
@@ -74,7 +74,7 @@ function reedCanvas(seed: number): HTMLCanvasElement {
   return c;
 }
 
-function crossedQuad(w: number, h: number): THREE.BufferGeometry {
+export function crossedQuad(w: number, h: number): THREE.BufferGeometry {
   const a = new THREE.PlaneGeometry(w, h).translate(0, h / 2, 0);
   const b = a.clone().rotateY(Math.PI / 2);
   const pos = [...Array.from(a.attributes.position.array), ...Array.from(b.attributes.position.array)];
@@ -89,7 +89,7 @@ function crossedQuad(w: number, h: number): THREE.BufferGeometry {
   return g;
 }
 
-function swayMaterial(bag: Bag, tex: THREE.Texture, amp: number, time: { value: number }): THREE.MeshBasicMaterial {
+export function swayMaterial(bag: Bag, tex: THREE.Texture, amp: number, time: { value: number }): THREE.MeshBasicMaterial {
   const m = bag.add(new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.32, side: THREE.DoubleSide }));
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = time;
@@ -112,6 +112,8 @@ function swayMaterial(bag: Bag, tex: THREE.Texture, amp: number, time: { value: 
 export interface Flora {
   group: THREE.Group;
   update(t: number, tint: THREE.Color, fog: THREE.Color): void;
+  /** The band of mist between the land and the far mountains, kept round the camera. */
+  mist: THREE.Mesh;
 }
 
 export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean): Flora {
@@ -195,7 +197,8 @@ export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean): Flor
   mistTex.wrapS = THREE.RepeatWrapping;
   mistTex.repeat.set(2, 1);
   const mistMat = bag.add(new THREE.MeshBasicMaterial({ map: mistTex, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide, opacity: 0.85 }));
-  const mist = new THREE.Mesh(bag.add(new THREE.CylinderGeometry(78, 78, 16, 64, 1, true).translate(0, 5, 0)), mistMat);
+  const mist = new THREE.Mesh(bag.add(new THREE.CylinderGeometry(215, 215, 34, 64, 1, true).translate(0, 7, 0)), mistMat);
+  mist.frustumCulled = false;
   mist.renderOrder = -4;
   group.add(mist);
 
@@ -203,6 +206,7 @@ export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean): Flor
   const reedMat = reeds.material as THREE.MeshBasicMaterial;
   return {
     group,
+    mist,
     update(t, tint, fog) {
       time.value = t;
       tuftMat.color.copy(tint);

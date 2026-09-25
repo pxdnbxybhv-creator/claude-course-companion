@@ -6,10 +6,11 @@ import { Bag, canvas, canvasTexture } from './kit';
 
 interface Layer { R: number; H: number; alpha: number; color: string; seed: number; rough: number; dots: boolean }
 
+// They ride with the camera (always at the horizon, however far you walk), beyond the land's rim.
 const LAYERS: Layer[] = [
-  { R: 210, H: 50, alpha: 0.2, color: '#65727e', seed: 31, rough: 0.35, dots: false },
-  { R: 150, H: 40, alpha: 0.32, color: '#4a5258', seed: 17, rough: 0.5, dots: false },
-  { R: 100, H: 26, alpha: 0.46, color: '#2e3236', seed: 5, rough: 0.7, dots: true },
+  { R: 385, H: 96, alpha: 0.2, color: '#65727e', seed: 31, rough: 0.35, dots: false },
+  { R: 330, H: 84, alpha: 0.3, color: '#4a5258', seed: 17, rough: 0.5, dots: false },
+  { R: 280, H: 60, alpha: 0.42, color: '#2e3236', seed: 5, rough: 0.7, dots: true },
 ];
 
 /** Where the moon hangs (u around the ring, see CylinderGeometry): keep the ridges low there. */
@@ -85,7 +86,8 @@ function paintLayer(L: Layer, W: number, H: number): HTMLCanvasElement {
   return c;
 }
 
-export function buildMountains(bag: Bag): THREE.Group {
+/** The painted ranges; call follow() each frame so they stay on the horizon. */
+export function buildMountains(bag: Bag): THREE.Group & { follow(cam: THREE.Vector3): void } {
   const group = new THREE.Group();
   group.name = 'mountains';
   for (const L of LAYERS) {
@@ -93,10 +95,14 @@ export function buildMountains(bag: Bag): THREE.Group {
     tex.wrapS = THREE.RepeatWrapping;
     const mat = bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide }));
     const geo = bag.add(new THREE.CylinderGeometry(L.R, L.R, L.H, 96, 1, true));
-    geo.translate(0, L.H / 2 - 3.5, 0);
+    geo.translate(0, L.H / 2 - 8, 0);
     const m = new THREE.Mesh(geo, mat);
     m.renderOrder = -5;
     group.add(m);
   }
-  return group;
+  return Object.assign(group, {
+    follow(cam: THREE.Vector3) {
+      group.position.set(cam.x, Math.min(0, cam.y * 0.3), cam.z);
+    },
+  });
 }

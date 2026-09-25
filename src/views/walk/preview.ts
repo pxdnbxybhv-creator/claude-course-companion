@@ -1,5 +1,6 @@
 // A small still for the "入画" card in the games hall: a little scholar on a stepping-stone path
-// among ink bamboo and orchid, a round moon over pale mountains. Cheap (a few ms), deterministic.
+// among ink bamboo and orchid, the path running down to an arched bridge over the river, a pagoda
+// on the far ridge, a round moon over pale mountains. Cheap (a few ms), deterministic.
 import { makeRng } from '../../core/rng';
 import { toLunar, festivalsOn } from '../../core/lunar';
 import { activeHabits } from '../../app/store';
@@ -53,6 +54,43 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
   };
   ridge(H * 0.52, H * 0.16, 'rgba(91,111,130,A)', 0.28, 3);
   ridge(H * 0.62, H * 0.12, 'rgba(46,50,54,A)', 0.35, 8);
+
+  // far off on the left ridge, the temple's pagoda (the world goes on beyond the garden)
+  const pgx = W * 0.2, pgy = H * 0.47;
+  g.fillStyle = 'rgba(46,50,54,0.42)';
+  for (let i = 0; i < 5; i++) {
+    const w = u * (3 - i * 0.42), y = pgy - i * u * 2;
+    g.fillRect(pgx - w * 0.35, y - u * 1.3, w * 0.7, u * 1.3);
+    g.beginPath(); g.moveTo(pgx - w * 0.75, y - u * 1.2); g.quadraticCurveTo(pgx, y - u * 1.9, pgx + w * 0.75, y - u * 1.2); g.lineTo(pgx, y - u * 2.1); g.closePath(); g.fill();
+  }
+  g.fillRect(pgx - u * 0.12, pgy - u * 12.5, u * 0.24, u * 2.4);
+
+  // the river across the middle distance, and an arched bridge where the path meets it
+  const ry = H * 0.665;
+  g.fillStyle = 'rgba(108,128,138,0.2)';
+  g.beginPath();
+  g.moveTo(0, ry - u * 1.2);
+  for (let x = 0; x <= W; x += W / 12) g.lineTo(x, ry - u * (1.1 + 0.4 * Math.sin(x * 0.03)));
+  for (let x = W; x >= 0; x -= W / 12) g.lineTo(x, ry + u * (1.4 + 0.4 * Math.cos(x * 0.025)));
+  g.closePath();
+  g.fill();
+  g.strokeStyle = 'rgba(27,25,22,0.35)';
+  g.lineWidth = Math.max(1, u * 0.2);
+  for (let i = 0; i < 4; i++) {
+    const x = W * (0.1 + i * 0.24);
+    g.beginPath(); g.moveTo(x, ry + u * 0.2); g.lineTo(x + u * 3.5, ry + u * 0.2); g.stroke();
+  }
+  const bx = W * 0.47, bw = u * 6.5, bh = u * 2.6;
+  g.fillStyle = '#e3dccd';
+  g.strokeStyle = 'rgba(27,25,22,0.75)';
+  g.lineWidth = Math.max(1, u * 0.28);
+  g.beginPath();
+  g.moveTo(bx - bw, ry + u * 0.6);
+  g.quadraticCurveTo(bx, ry - bh * 1.6, bx + bw, ry + u * 0.6);
+  g.lineTo(bx + bw * 0.55, ry + u * 0.6);
+  g.ellipse(bx, ry + u * 0.6, bw * 0.55, bh * 0.75, 0, 0, Math.PI, true);
+  g.closePath();
+  g.fill(); g.stroke();
 
   // the path: stepping stones curving toward the moon
   for (let i = 0; i < 11; i++) {

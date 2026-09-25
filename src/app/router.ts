@@ -1,4 +1,4 @@
-// Hash router: #garden, #focus, #almanac, #scroll, #settings, #games, #snake, #tictactoe, #gomoku, #walk
+// Hash router: #garden, #focus, #almanac, #scroll, #settings, #games (+ one per game, #quests), #walk
 // (a leading slash, #/garden, is accepted too). Plain-token hashes survive being embedded in hosts
 // that only pass through simple anchors.
 //
@@ -7,11 +7,14 @@
 import { signal } from '@preact/signals';
 import { transition, type Origin } from './transition';
 
-export type Route = 'garden' | 'focus' | 'almanac' | 'scroll' | 'settings' | 'games' | 'snake' | 'tictactoe' | 'gomoku' | 'walk';
-const ROUTES: Route[] = ['garden', 'focus', 'almanac', 'scroll', 'settings', 'games', 'snake', 'tictactoe', 'gomoku', 'walk'];
+export type Route =
+  | 'garden' | 'focus' | 'almanac' | 'scroll' | 'settings'
+  | 'games' | 'snake' | 'tictactoe' | 'gomoku' | 'xiangqi' | 'klotski' | 'tangram' | 'feihua' | 'quests'
+  | 'walk';
+const ROUTES: Route[] = ['garden', 'focus', 'almanac', 'scroll', 'settings', 'games', 'snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua', 'quests', 'walk'];
 
 /** The games live under the 弈 tab. */
-export const GAME_ROUTES: Route[] = ['snake', 'tictactoe', 'gomoku'];
+export const GAME_ROUTES: Route[] = ['snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua', 'quests'];
 
 /** Which tab a route belongs to (sub-pages light up their parent tab). */
 export function tabOf(r: Route): Route {

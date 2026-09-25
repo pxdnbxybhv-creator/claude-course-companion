@@ -9,6 +9,7 @@ import { SnakeEngine, type Phase } from './engine';
 import { currentFestival } from './festival';
 import { sprite } from './paint';
 import { loadStats, saveStats, type SnakeMode, type SnakeStats } from './store';
+import { record as playRecord, recordMax } from '../../../app/play';
 import './snake.css';
 
 const KEYS: Record<string, Dir> = {
@@ -62,6 +63,7 @@ export function SnakeView() {
     statsRef.current = next;
     setStats(next);
     saveStats(next);
+    recordMax('snake', s.score);
     return isRecord && s.score > 0;
   };
 
@@ -81,6 +83,7 @@ export function SnakeView() {
           if (s === 0 && engRef.current) setHintAt(hintSide(engRef.current)); // a fresh board
         },
         event: (ev) => {
+          if (ev.ate === 'food') playRecord('blossom');
           if (ev.bonusSpawned && fest && !treatShown.current) {
             treatShown.current = true;
             toast(tRef.current(`${fest.zh}快乐！园中来了${fest.treatZh}，趁它还在，吃到加五分`, `Happy ${fest.en}! A ${fest.treatEn} appeared — eat it before it fades for +5`));
@@ -422,3 +425,4 @@ function AgainIcon() {
     </svg>
   );
 }
+export default SnakeView;

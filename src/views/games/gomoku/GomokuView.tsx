@@ -11,6 +11,7 @@ import type { Level } from './ai';
 import { AiClient, type Pending } from './aiClient';
 import { BoardPainter, hitTest, type Ghost } from './board';
 import { loadSaved, writeSaved, statText, LEVEL_NAMES, type Mode, type Saved } from './save';
+import { record as playRecord } from '../../../app/play';
 import './gomoku.css';
 
 type T = (zh: string, en: string) => string;
@@ -120,9 +121,17 @@ export function GomokuView() {
     };
   }, [aiTurn, moves, level]);
 
+  /** Play events count once per game: set when this game's end is recorded (or it was restored
+   *  already finished), cleared only by startNew — so undo-and-replay of a finished game adds nothing. */
+  const counted = useRef(over);
   // game end: stroke, seal, sound, stats
   useEffect(() => {
     if (!over) return;
+    if (!counted.current) {
+      counted.current = true;
+      playRecord('boardgame');
+      if (vsAi && res.winner === human && level !== 'beginner') playRecord('win:club');
+    }
     winAt.current = performance.now() + (reducedMotion() ? 0 : 260);
     if (vsAi && res.winner === human) audio.chime(5);
     else if (vsAi && res.winner) audio.bell();
@@ -144,6 +153,7 @@ export function GomokuView() {
     if (patch?.human) setHuman(patch.human);
     setMoves([]);
     setRecorded(false);
+    counted.current = false;
     setHint(-1);
     if (inProgress && !quiet) {
       toast(t('已开新局', 'New game started'), {
@@ -642,3 +652,4 @@ function Board(props: {
     </div>
   );
 }
+export default GomokuView;

@@ -5,6 +5,7 @@
 //
 // Every browser API that a sandboxed/embedded host may refuse (localStorage, Notification,
 // wakeLock) is feature-detected and wrapped — the timer works fully without them.
+import { record } from '../../app/play';
 import { signal } from '@preact/signals';
 import type { AmbientKind, PlantKind } from '../../core/types';
 import { toKey } from '../../core/date';
@@ -320,6 +321,7 @@ function finish(finishedAt: number, live: boolean): void {
   }
   logFocus(toSession(s, true));
   const habit = checkOffHabit(s.habitId, finishedAt);
+  record('incense');
   completion.value = { session: s, finishedAt, live, ...(habit ? { habit } : {}) };
   if (live && habit?.marked) {
     // Let the bell ring first; the harmonics answer it.

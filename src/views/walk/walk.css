@@ -272,7 +272,15 @@
   animation: walk-rise 0.6s var(--ease) 0.4s both;
 }
 .walk-hint small { display: block; margin-top: 4px; color: #d9c7a5; font-size: 12px; letter-spacing: 0.2em; }
-.is-touch .walk-hint { bottom: calc(env(safe-area-inset-bottom) + 180px); }
+/* on a phone the thumbs and the walker own the lower half: the hint sits up under the top bar */
+.is-touch .walk-hint {
+  top: calc(env(safe-area-inset-top) + 118px);
+  bottom: auto;
+  max-width: min(calc(100vw - 32px), 300px);
+  padding: 10px 14px 8px;
+  font-size: 13px;
+  line-height: 1.75;
+}
 
 /* ---------- card: a small hanging scroll */
 .walk-card-wrap {
@@ -402,3 +410,184 @@
 @media (prefers-reduced-motion: reduce) {
   .walk-inkstone i, .walk-act.is-on { animation: none; }
 }
+
+/* ---------- tools: who you are, the map, music, festivals */
+.walk-tools { display: flex; gap: 6px; align-items: center; flex-wrap: nowrap; }
+.walk-tool { padding: 0 12px; }
+.walk-tool .brush { font-size: 19px; line-height: 1; }
+.walk-tool:disabled { opacity: 0.45; }
+.walk-music { width: 40px; padding: 0; justify-content: center; }
+.walk-music .brush { opacity: 0.4; text-decoration: line-through; text-decoration-thickness: 1px; }
+.walk-music.is-on .brush { opacity: 1; text-decoration: none; }
+@media (max-width: 640px) {
+  .walk-tool-label { display: none; }
+  .walk-tool { width: 40px; padding: 0; justify-content: center; }
+  .walk-title small { display: none; }
+}
+@media (max-width: 480px) {
+  .walk-title { display: none; }
+}
+
+/* ---------- the layer mini-games mount their overlays in: it and what is mounted in it stay
+   pointer-transparent (a mounted overlay is full-screen); each overlay turns pointer events back on
+   for its own buttons and panels (hud.mount's contract, see types.ts) */
+.walk-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+
+/* ---------- arriving somewhere: a name brushed on the sky */
+.walk-arrive {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 18%);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  text-align: center;
+  color: #1b1916;
+  text-shadow: 0 0 18px rgba(244, 238, 226, 0.95), 0 0 6px rgba(244, 238, 226, 0.9);
+  animation: walk-arrive 5.2s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)) both;
+  z-index: 2;
+}
+.walk-arrive-name { font-size: clamp(44px, 9vw, 76px); line-height: 1.05; letter-spacing: 0.18em; padding-left: 0.18em; }
+.walk-arrive-en { font-size: clamp(16px, 2.6vw, 21px); font-style: italic; letter-spacing: 0.08em; color: #3e3a33; }
+.walk-arrive-blurb { font-size: 14px; letter-spacing: 0.12em; color: #4a443c; margin-top: 6px; max-width: 80vw; }
+.walk-arrive-seal {
+  margin-top: 10px;
+  padding: 2px 6px;
+  font-size: 15px;
+  color: #fbf5ea;
+  background: var(--cinnabar, #b93a2b);
+  border-radius: 3px;
+  writing-mode: vertical-rl;
+  letter-spacing: 0.1em;
+  text-shadow: none;
+  transform: rotate(-3deg);
+}
+@keyframes walk-arrive {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.98); }
+  16% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  78% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-4px) scale(1); }
+}
+
+/* ---------- somebody speaks: a paper slip at the foot of the painting */
+.walk-say-wrap {
+  position: absolute;
+  left: 0; right: 0;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  display: flex;
+  justify-content: center;
+  padding: 0 12px;
+  pointer-events: none;
+  z-index: 4;
+}
+.is-touch .walk-say-wrap { bottom: calc(env(safe-area-inset-bottom) + 12px); }
+.walk-say {
+  position: relative;
+  pointer-events: auto;
+  width: min(620px, 100%);
+  padding: 22px 22px 16px;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+    #f3ecdd;
+  border: 1px solid rgba(27, 25, 22, 0.3);
+  border-radius: 4px 4px 10px 10px;
+  box-shadow: 0 18px 40px -22px rgba(30, 20, 5, 0.55), inset 0 0 0 5px rgba(243, 236, 221, 1), inset 0 0 0 6px rgba(27, 25, 22, 0.12);
+  animation: walk-say-in 0.34s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)) both;
+}
+@keyframes walk-say-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.walk-say-name {
+  position: absolute;
+  top: -15px;
+  left: 18px;
+  padding: 2px 12px 3px;
+  background: #1f1d1a;
+  color: #f3ecdd;
+  border-radius: 3px;
+  font-size: 17px;
+  letter-spacing: 0.14em;
+}
+.walk-say-name .latin { font-style: italic; letter-spacing: 0.04em; }
+.walk-say-text { margin: 4px 26px 10px 0; font-size: 16px; line-height: 1.75; letter-spacing: 0.04em; white-space: pre-line; color: #1b1916; }
+.walk-say-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.walk-say-choice {
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 25, 22, 0.3);
+  background: rgba(255, 255, 255, 0.5);
+  color: #1b1916;
+  font-size: 15px;
+  text-align: left;
+  transition: background 0.15s, transform 0.15s;
+}
+.walk-say-choice:hover, .walk-say-choice:focus-visible { background: #1f1d1a; color: #f3ecdd; }
+.walk-say-choice:active { transform: scale(0.97); }
+.walk-say-choice kbd { font-size: 11px; opacity: 0.6; margin-right: 4px; }
+.walk-say-next {
+  float: right;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  font-size: 18px;
+  color: #1b1916;
+  animation: walk-say-bob 1.4s ease-in-out infinite;
+}
+@keyframes walk-say-bob { 50% { transform: translateX(3px); } }
+.walk-say-close { position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 50%; color: #5a544a; font-size: 13px; }
+
+/* ---------- the curtain for fast travel: ink bleeds in from the edges */
+.walk-curtain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+  opacity: 0;
+  background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(241, 233, 216, 1) 0%, rgba(241, 233, 216, 1) 30%, rgba(120, 110, 95, 1) 100%);
+  transition: opacity 0.5s var(--ease, ease);
+}
+.walk-curtain.is-on { opacity: 1; pointer-events: auto; }
+
+/* ---------- 舆图 · the map */
+.walk-map-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px);
+  background: rgba(30, 26, 20, 0.36);
+  animation: walk-fade 0.25s ease both;
+}
+@keyframes walk-fade { from { opacity: 0; } to { opacity: 1; } }
+.walk-map {
+  position: relative;
+  width: min(92vw, 78vh, 640px);
+  background: #f1e9d8;
+  border: 8px solid #3b3128;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #6b5a48, 0 30px 70px -30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  animation: walk-say-in 0.32s var(--ease, ease) both;
+}
+.walk-map-head { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px 4px; }
+.walk-map-head h2 { margin: 0; font-size: 26px; letter-spacing: 0.2em; font-weight: normal; }
+.walk-map-head small { color: #5a544a; font-size: 12px; letter-spacing: 0.08em; flex: 1; }
+.walk-map-close { width: 34px; height: 34px; border-radius: 50%; color: #3b3128; }
+.walk-map-canvas { display: block; width: 100%; aspect-ratio: 1 / 1; cursor: pointer; touch-action: manipulation; }
+.walk-map-foot { display: flex; align-items: center; gap: 12px; min-height: 58px; padding: 8px 14px 12px; border-top: 1px solid rgba(27, 25, 22, 0.14); }
+.walk-map-foot .muted { font-size: 13px; }
+.walk-map-place { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.walk-map-place b { font-size: 20px; font-weight: normal; letter-spacing: 0.12em; }
+.walk-map-place span { font-size: 13px; color: #4a443c; }
+.walk-map-go { white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-arrive { animation-duration: 4s; animation-name: walk-fade-hold; }
+  .walk-say, .walk-map, .walk-map-wrap { animation: none; }
+  .walk-say-next { animation: none; }
+  .walk-curtain { transition-duration: 0.12s; }
+}
+@keyframes walk-fade-hold { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }

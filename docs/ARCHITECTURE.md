@@ -52,11 +52,21 @@ src/
     weather.ts      seasonal particles
     seal.ts         seal stamps
     incense.ts      censer, incense stick, smoke (focus view)
-  audio/       Web Audio synthesis in a worker (guqin, harmonics, bowl, knock, ambient beds)
+  audio/       Web Audio synthesis in a worker (guqin, harmonics, bowl, knock, ambient beds);
+               music*.ts is the generative BGM (composer, themes, instruments, conductor)
   app/         store (signals + localStorage, cross-tab sync), router, i18n, App shell, demo data,
                PWA registration, hostSave (downloads when embedded in a host page)
   ui/          shared kit: Sheet, Segmented, Toggle, toast (with Undo), PlantGlyph
-  views/       Garden, Focus, Almanac, Scroll, Settings
+  views/       Garden, Focus, Almanac, Scroll, Settings; games/* (gomoku, xiangqi, klotski, tangram,
+               feihua, snake, tictactoe); quests/ (quest book, celebrations)
+    walk/        入画, the 3D world (three.js):
+      map.ts         the one source of truth for where things are (regions, river, lake, paths, anchors)
+      types.ts       the WorldCtx contract every region and feature builds against
+      world/         core: terrain, water, bridges, scatter, garden, player, camera, HUD, travel
+      regions/       the five places (water town, lotus lake, bamboo, plum ridge, temple)
+      features/      festivals, everyday life, mini-games and NPCs (features/minigames/)
+      characters/    the thirteen companions (models, portraits, the picker)
+  data/        also characters.ts (the cast) and quests.ts; app/play.ts keeps play progress
   lab/         visual test bench: /lab.html?scene=<name> (scenes in src/lab/scenes/*.ts)
 scripts/snap.mjs          headless screenshots: node scripts/snap.mjs "/lab.html?scene=brush" .snaps/x.png
 scripts/build_fonts.py    subsets the bundled fonts to the characters the source uses (npm run fonts)

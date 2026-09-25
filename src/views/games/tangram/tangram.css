@@ -1,0 +1,71 @@
+/* 七巧板 — a sheet of paper with the figure in pale ink; tools and the album of figures beside it. */
+.game-page.tangram-page { max-width: 1000px; }
+.tg { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.tg-table {
+  position: relative; width: min(100%, 460px, calc((100dvh - 250px) * 0.776)); min-width: 280px;
+  border-radius: 6px; overflow: hidden; background: #f1e9d8;
+  box-shadow: 0 0 0 1px var(--line), 0 14px 34px -22px rgba(40, 30, 10, 0.55);
+}
+.tg-table canvas {
+  display: block; width: 100%; aspect-ratio: 9 / 11.6;
+  touch-action: pan-y; /* a finger on a piece moves it (touchstart is held in JS); elsewhere the page scrolls */
+  cursor: grab; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+.tg-table canvas:focus { outline: none; }
+.tg-table:has(canvas:focus-visible) { box-shadow: 0 0 0 2px var(--cinnabar); }
+@media (max-width: 520px) {
+  .tg-table { width: calc(100% + 2 * var(--gutter) - 8px); margin: 0 calc(-1 * var(--gutter) + 4px); min-width: 0; }
+}
+.tg-name {
+  position: absolute; left: 0; right: 0; bottom: 5%; text-align: center; pointer-events: none;
+  font-size: clamp(34px, 12vw, 58px); color: rgba(27, 25, 22, 0.82); letter-spacing: 0.1em;
+  animation: tg-in 0.9s var(--ease) 0.5s both;
+}
+.tg-name .latin { font-size: 0.62em; font-style: italic; letter-spacing: 0.02em; }
+.tg-name:not(.is-own) { color: rgba(27, 25, 22, 0.5); }
+
+.tg-side { width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.tg-tools { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.tg-tool { min-height: 44px; min-width: 84px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.tg-help { margin: 0; text-align: center; font-size: 13px; line-height: 1.6; letter-spacing: 0.04em; min-height: 3.2em; }
+@media (pointer: coarse) { .tg-kbd { display: none; } }
+
+.tg-figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; width: 100%; }
+.tg-fig {
+  position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 64px; padding: 6px 4px 4px;
+  border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+@media (hover: hover) { .tg-fig:hover { border-color: var(--line-strong); } }
+.tg-fig.is-on { border-color: var(--cinnabar); background: var(--cinnabar-soft); color: var(--ink); }
+.tg-thumb { width: 34px; height: 34px; }
+.tg-thumb path { fill: var(--ink-3); opacity: 0.55; }
+.tg-fig.is-done .tg-thumb path { fill: var(--ink); opacity: 0.9; }
+.tg-fig.is-done::after { content: ''; position: absolute; top: 5px; right: 5px; width: 7px; height: 7px; border-radius: 2px; background: var(--cinnabar); }
+.tg-fig-name { font-size: 12.5px; line-height: 1.2; text-align: center; }
+:lang(en) .tg-fig-name { font-size: 11.5px; }
+
+.tg-result {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 14px; padding: 12px 16px;
+  border-radius: 8px; background: var(--paper-2); border: 1px solid var(--line); animation: tg-in 0.6s var(--ease) both;
+}
+.tg-result:not(:has(.tg-seal)) { grid-template-columns: 1fr; }
+.tg-seal { width: 56px; height: 56px; }
+.tg-verdict { margin: 0; font-family: var(--font-brush); font-size: 24px; line-height: 1.25; color: var(--ink); }
+:lang(en) .tg-verdict { font-family: var(--font-latin); font-weight: 500; }
+.tg-count { margin: 2px 0 0; font-size: 13.5px; }
+.tg-again { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: center; }
+.tg-again .btn { min-height: 44px; min-width: 110px; }
+.tg-n { font-variant-numeric: lining-nums tabular-nums; }
+@keyframes tg-in { from { opacity: 0; transform: translateY(6px); } }
+
+@media (min-width: 900px) {
+  .tg { flex-direction: row; align-items: flex-start; justify-content: center; gap: 36px; }
+  .tg-table { width: min(480px, calc((100dvh - 150px) * 0.776)); flex: none; }
+  .tg-side { width: 340px; flex: none; align-items: stretch; padding-top: 8px; }
+  .tg-tools { justify-content: flex-start; }
+  .tg-help { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tg-name, .tg-result { animation: none; }
+}

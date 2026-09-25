@@ -53,22 +53,58 @@ inscription is placed in empty sky, and the date and your record are written in 
 phrasing, followed by your own seal. There is also a *Year in Ink* poster with one ink dot per
 day. You can save or share either one.
 
-**入画 Into the Painting.** Step inside your garden in 3D, as a small scholar in a white robe.
-Enter through a moon gate. Inside is a pond with a zigzag bridge and the 问月亭 pavilion, under
-ink-wash mountains, with light that follows the real clock. Each of your habits stands there as
-its own plant, painted from the same drawing as the 2D garden. Walk up to one and water it to
-check the habit in, and the plant grows in front of you. Festivals have easter eggs. On 中秋 a
-huge moon rises and eight mooncakes are hidden around the garden, each with a flavour and a
-verse; eat all eight and you get 苏轼's 但愿人长久. 春节, 元宵, 清明, 端午, 七夕, 重阳, 冬至,
-腊八 and 元旦 each have their own, and a picker lets you preview any of them. Every day there
-are koi that dart away, fireflies and a crane, plus a sleeping ginger cat, a shrine that draws
-you a daily fortune, and a bridge that plays the qin as you cross. On a phone you steer with a
-joystick; on a computer, with WASD.
+**入画 Into the Painting.** Step inside your garden in 3D and walk out into a whole painted
+country. The walled garden with the half-acre pond is where you begin: each of your habits
+stands there as its own plant, painted from the same drawing as the 2D garden, and watering one
+checks the habit in while the plant grows in front of you. Through the moon gate the paths lead
+to five more places, joined by a river that falls from the mountain, feeds a lotus lake and runs
+on through a water town:
 
-**弈 Play.** 五子棋 Gomoku against a friend or an AI with three levels (the AI thinks in a
-background worker). 贪吃蛇 Snake, drawn as one long ink stroke that eats plum blossoms to a
-rising guqin melody. 井字棋 Tic-tac-toe, whose circles and crosses are brushed in stroke by
-stroke; on Hard the AI never loses.
+- **水乡 Water Town** — 粉墙黛瓦 houses along stone quays, a high arched bridge, a teahouse, a
+  market street, 乌篷 boats, and river steps where you can float a lantern with a wish.
+- **荷塘 Lotus Lake** — a dock, a pavilion on stilts with a zigzag bridge, an island with an old
+  pine, a white moon bridge, and lotus that changes with the season. Fish from the dock, or row
+  a boat out and pick lotus pods.
+- **竹林 Bamboo Grove** — hundreds of swaying culms, light shafts, a stone go table and a qin, a
+  thatched hut, and a child who has lost a kite.
+- **梅岭 Plum Ridge** — plum trees in blossom (snow in winter), 林逋's poem on a stele, and a
+  pavilion on the summit where a poet plays 飞花令 with you.
+- **山寺 Mountain Temple** — a gate between ochre walls, stairs up to a double-eaved hall, a bell
+  pavilion where you can strike the bell (张继's 夜半钟声), a seven-storey pagoda and a waterfall.
+
+A map screen (舆图) takes you back to any place you have visited. Each place has its own music
+and people to talk to. Festivals have easter eggs: on 中秋 a huge moon rises and eight mooncakes
+are hidden around the garden, each with a flavour and a verse; eat all eight and you get 苏轼's
+但愿人长久. 春节, 元宵, 清明, 端午, 七夕, 重阳, 冬至, 腊八 and 元旦 each have their own. On a phone
+you steer with a joystick; on a computer, with WASD.
+
+**同伴 Companions.** You can walk as any of thirteen companions: the scholar, a gardener, an old
+fisherman, a qin player, a wandering swordsman, a Taoist child, a painter, a board-game master,
+Big Ginger the cat, the jade rabbit, a poet, 关公, and 嫦娥 herself. Each has a small gift: the
+swordsman runs faster, the Taoist child jumps higher, the rabbit floats down after a jump, 嫦娥
+walks on water, and the gardener's watering brings a shower of petals. Companions are earned
+through quests, and some of those quests are real-life ones: keep any habit seven days in a row
+and the swordsman joins you; burn five sticks of incense all the way through and the qin player
+does. Others come from play: catch five fish, ring the temple bell, visit all six places, beat
+the Club level at gomoku or xiangqi, find the cat three times, eat all eight mooncakes, chain
+ten lines of 飞花令, solve 横刀立马. When all twelve have joined you, 嫦娥 comes down from the moon.
+**任务簿 The quest book** shows today's three errands, every companion with the quest that
+brings them, and an album of the seals you have earned.
+
+**弈 Play.** 象棋 Xiangqi against an AI with three levels, from 初学 to 国手 (an iterative-
+deepening search in a background worker, with the full rules: flying general, perpetual check,
+repetition). 华容道 Huarong Pass with its classic layouts and a solver for hints. 七巧板 Tangram,
+21 figures to fill with the seven pieces. 飞花令 Flying Flowers: pick the line that holds the key
+character in the right place, from over a hundred classical poems. 五子棋 Gomoku against a friend or an
+AI with three levels. 贪吃蛇 Snake, drawn as one long ink stroke that eats plum blossoms to a
+rising guqin melody. 井字棋 Tic-tac-toe, whose circles and crosses are brushed in stroke by stroke.
+
+**乐 Music.** The background music is generative and synthesised live: 古筝, 琵琶, 箫, 笛, 二胡, 笙,
+a gently played 唢呐, drums, gongs and bells. It composes pentatonic tunes in 起承转合 periods,
+with a new tune every day, and changes with the place and the hour. The garden is contemplative,
+the water town lively, the lake flowing, the temple slow with bells, the night sparse and the
+festival days joyful. It shares a key with the sound effects, ducks under the reward chime,
+gives way to the incense's own ambience, and can be turned down or off in Settings.
 
 Moving between pages, the new page spreads in like a drop of ink from the point you tapped.
 
@@ -85,7 +121,7 @@ image or audio files.
 ```bash
 npm install
 npm run dev            # http://127.0.0.1:5173
-npm test               # unit tests: calendar science, habits, store, texts, focus timer
+npm test               # unit tests: calendar science, habits, store, games, music, quests
 npm run build          # static site in dist/ (GitHub Pages workflow included)
 npm run build:single   # one self-contained HTML file in dist-single/
 ```

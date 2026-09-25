@@ -9,6 +9,7 @@ import { FESTIVE } from './festive';
 import { SEASONAL } from './seasonal';
 import { closeSfx } from './sfx';
 import { disposeShared, type FreshFeature } from './kit';
+import { MINIGAME_FEATURES } from './minigames';
 
 export { FESTIVALS };
 
@@ -43,7 +44,7 @@ function finale(): WorldFeature {
   };
 }
 
-const LIST: WorldFeature[] = [...LIFE, ...HIDDEN, midautumn, ...FESTIVE, ...SEASONAL];
+const LIST: WorldFeature[] = [...LIFE, ...HIDDEN, midautumn, ...FESTIVE, ...SEASONAL, ...MINIGAME_FEATURES];
 
 /** A fresh, independent instance of every feature (their Bags never cross worlds). */
 function freshList(): WorldFeature[] {
