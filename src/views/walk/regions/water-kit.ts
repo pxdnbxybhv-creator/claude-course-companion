@@ -5,7 +5,8 @@
 import type * as T from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Collider, Interactable, Occluder, WorldCtx } from '../types';
-import { RIVER, RIVER_LAKE_BREAK, type XZ } from '../map';
+import { type XZ } from '../map';
+import { RIVER_LOWER_START, RIVER_SAMPLES } from '../world/terrain';
 import { registerClearing, registerDeck, type Clearing, type Deck } from './water-decks';
 
 export type Three = WorldCtx['THREE'];
@@ -278,14 +279,17 @@ export async function fontsReady(chars: string): Promise<void> {
 
 export interface RiverPt { d: number; w: number; px: number; pz: number; tx: number; tz: number }
 
-/** Nearest point on the river centreline (lake gap excluded): distance, half-width, tangent. */
+/** Nearest point on the river centreline (lake gap excluded): distance, half-width, tangent.
+ *  Follows the channel the world core actually carved (a smooth curve through map.ts's RIVER). */
 export function riverNear(x: number, z: number): RiverPt {
+  const RS = RIVER_SAMPLES;
   let best: RiverPt = { d: Infinity, w: 4, px: x, pz: z, tx: 1, tz: 0 };
-  for (let i = 1; i < RIVER.length; i++) {
-    if (i === RIVER_LAKE_BREAK) continue;
-    const a = RIVER[i - 1], b = RIVER[i];
+  for (let i = 1; i < RS.length; i++) {
+    if (i === RIVER_LOWER_START) continue;
+    const a = RS[i - 1], b = RS[i];
     const dx = b.x - a.x, dz = b.z - a.z;
     const L2 = dx * dx + dz * dz;
+    if (L2 < 1e-9) continue;
     const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / L2));
     const px = a.x + dx * t, pz = a.z + dz * t;
     const d = Math.hypot(x - px, z - pz);
@@ -299,16 +303,17 @@ export function riverNear(x: number, z: number): RiverPt {
 
 /** The river's centre z where it crosses the vertical line x (downstream of the lake). */
 export function riverZ(x: number): { z: number; w: number; tx: number; tz: number } {
-  for (let i = RIVER_LAKE_BREAK + 1; i < RIVER.length; i++) {
-    const a = RIVER[i - 1], b = RIVER[i];
+  const RS = RIVER_SAMPLES;
+  for (let i = RIVER_LOWER_START + 1; i < RS.length; i++) {
+    const a = RS[i - 1], b = RS[i];
     const lo = Math.min(a.x, b.x), hi = Math.max(a.x, b.x);
-    if (x >= lo && x <= hi) {
+    if (x >= lo && x <= hi && hi > lo) {
       const t = (x - a.x) / (b.x - a.x);
       const L = Math.hypot(b.x - a.x, b.z - a.z);
       return { z: a.z + (b.z - a.z) * t, w: a.w + (b.w - a.w) * t, tx: (b.x - a.x) / L, tz: (b.z - a.z) / L };
     }
   }
-  const e = RIVER[RIVER.length - 1];
+  const e = RS[RS.length - 1];
   return { z: e.z, w: e.w, tx: -1, tz: 0 };
 }
 

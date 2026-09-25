@@ -207,6 +207,11 @@ void main() {
 export interface Scatter {
   group: THREE.Group;
   update(t: number, cam: THREE.Vector3, tint: THREE.Color, far: number): void;
+  /**
+   * Pull up whatever grows where the places have since built (quays, paving, stairs, decks):
+   * `built(x, z, pad)` is asked for each tree, shrub, reed, tuft, rock and slab.
+   */
+  clear(built: (x: number, z: number, pad: number) => boolean): void;
 }
 
 interface Cell { cx: number; cz: number; trees: THREE.Object3D | null; shrubs: THREE.Object3D | null; reeds: THREE.Object3D | null; tufts: THREE.Object3D | null; rocks: THREE.Object3D | null; slabs: THREE.Object3D | null }
@@ -383,8 +388,40 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
     cells.push(c);
   }
 
+  const m4 = new THREE.Matrix4();
+  const sweep = (o: THREE.Object3D | null, pad: number, built: (x: number, z: number, pad: number) => boolean) => {
+    if (!(o instanceof THREE.InstancedMesh)) return;
+    const hull = o.children.find((c): c is THREE.InstancedMesh => c instanceof THREE.InstancedMesh) ?? null;
+    let changed = false;
+    for (let i = 0; i < o.count; i++) {
+      o.getMatrixAt(i, m4);
+      const el = m4.elements;
+      if (el[0] === 0 && el[5] === 0 && el[10] === 0) continue;
+      if (!built(el[12], el[14], pad)) continue;
+      // keep the spot, shrink it to nothing
+      for (const k of [0, 1, 2, 4, 5, 6, 8, 9, 10]) el[k] = 0;
+      o.setMatrixAt(i, m4);
+      hull?.setMatrixAt(i, m4);
+      changed = true;
+    }
+    if (changed) {
+      o.instanceMatrix.needsUpdate = true;
+      if (hull) hull.instanceMatrix.needsUpdate = true;
+    }
+  };
+
   return {
     group,
+    clear(built) {
+      for (const c of cells) {
+        sweep(c.trees, 2.2, built);
+        sweep(c.shrubs, 1, built);
+        sweep(c.rocks, 1, built);
+        sweep(c.reeds, 0.5, built);
+        sweep(c.tufts, 0.25, built);
+        sweep(c.slabs, 0.2, built);
+      }
+    },
     update(t, cam, tint, far) {
       time.value = t;
       (treeMat.uniforms.uTint.value as THREE.Color).copy(tint);

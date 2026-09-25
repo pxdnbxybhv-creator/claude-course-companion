@@ -84,7 +84,7 @@ export class Controls {
 
   private onKey(e: KeyboardEvent, down: boolean): void {
     const t = e.target as HTMLElement | null;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.closest?.('.sheet'))) return;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable || t.closest?.('.sheet, [aria-modal="true"]'))) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const code = e.code;
     const movement = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'];

@@ -9,10 +9,10 @@
 //   music-player.ts  the bus (reverb, valley echo, duck, volume, compressor) and the Conductor
 //   /lab.html?scene=music  offline renders of every theme with waveform, spectrogram, score, checks
 //
-// Audio context: the music plays on the SAME AudioContext as the sound effects (src/audio/engine.ts)
-// so iOS only has one context to unlock. engine.ts does not export it, so it is read from the engine
-// instance after audio.unlock() has created it (see engineContext()); if that ever fails, the music
-// creates its own context on the first gesture instead (and suspends it while the page is hidden).
+// Audio context: the music plays on the SAME AudioContext as the sound effects (audio.context in
+// src/audio/engine.ts) so iOS only has one context to unlock; if that ever fails, the music creates
+// its own context on the first gesture instead (and suspends it while the page is hidden). It ducks
+// under the reward chime and the bell (audio.onEffect).
 import type { MusicTheme } from '../views/walk/map';
 import { audio } from './engine';
 import { Conductor, MusicBus } from './music-player';
@@ -51,13 +51,12 @@ const TICK_MS = 250;
 const CROSSFADE = 3;
 const DEBOUNCE_MS = 450;
 
-/** Perceptual volume law (0.5 → −9 dB). */
-export const musicGain = (v: number) => (v <= 0 ? 0 : Math.pow(Math.min(1, v), 1.5));
+/** Perceptual volume law (0.5 → −12 dB): the music sits under the reward chime, not level with it. */
+export const musicGain = (v: number) => (v <= 0 ? 0 : 0.72 * Math.pow(Math.min(1, v), 1.5));
 
-/** The sound-effects engine's context, if it has one (private field; see header). */
+/** The sound-effects engine's context, if it has one yet. */
 function engineContext(): AudioContext | null {
-  const a = audio as unknown as { context?: AudioContext | null; ctx?: AudioContext | null };
-  const c = a.context ?? a.ctx ?? null;
+  const c = audio.context;
   return c && typeof c.createGain === 'function' && c.state !== 'closed' ? c : null;
 }
 
@@ -97,8 +96,14 @@ class WebMusic implements MusicEngine {
   }
 
   setEnabled(on: boolean) {
+    const was = this.enabled;
     this.enabled = !!on;
     this.applyVolume();
+    // switched on by a tap (the settings toggle): start now rather than on the next tap
+    if (this.enabled && !was && typeof navigator !== 'undefined') {
+      const ua = (navigator as Navigator & { userActivation?: { isActive: boolean } }).userActivation;
+      if (ua?.isActive || engineContext()?.state === 'running') this.onGesture();
+    }
     this.sync();
   }
 
@@ -258,6 +263,8 @@ class WebMusic implements MusicEngine {
 }
 
 const engine = new WebMusic();
+// the reward chime and the bell sit on top of the music, not inside it
+audio.onEffect = (kind) => engine.duck(0.45, kind === 'bell' ? 1600 : 900);
 
 export const music: MusicEngine = engine;
 

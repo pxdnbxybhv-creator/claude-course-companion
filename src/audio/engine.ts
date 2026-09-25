@@ -39,6 +39,10 @@ export interface AudioEngine {
   setAmbient(kind: AmbientKind): void;
   /** Diagnostics (lab / debugging). */
   stats(): AudioStats;
+  /** The context, once unlock() or a sound has created it (the music shares it). */
+  readonly context: AudioContext | null;
+  /** Told whenever a reward sound plays (the music ducks under it). */
+  onEffect: ((kind: 'chime' | 'bell') => void) | null;
 }
 
 type Ctor = typeof AudioContext;
@@ -47,6 +51,8 @@ const TICK_MS = 200;
 
 class WebAudioEngine implements AudioEngine {
   private ctx: AudioContext | null = null;
+  onEffect: ((kind: 'chime' | 'bell') => void) | null = null;
+  get context(): AudioContext | null { return this.ctx; }
   private mix: Mixer | null = null;
   private unsupported = false;
   private enabled = true;
@@ -171,9 +177,11 @@ class WebAudioEngine implements AudioEngine {
     this.safely((m, t) => playPluck(m, t, d, v));
   }
   chime(streak = 1) {
+    if (this.enabled) this.onEffect?.('chime');
     this.safely((m, t) => playChime(m, t, Number.isFinite(streak) ? streak : 1));
   }
   bell() {
+    if (this.enabled) this.onEffect?.('bell');
     this.safely((m, t) => playBell(m, t));
   }
   knock() {

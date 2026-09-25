@@ -37,7 +37,7 @@ export const FISH: FishSpecies[] = [
   { id: 'carp', zh: '鲤鱼', en: 'Carp', rarity: 'common', weight: 26, cm: [22, 58], fight: 1.0, color: '#b0874a',
     verseZh: '江南可采莲，莲叶何田田。鱼戏莲叶间。', srcZh: '汉乐府《江南》', verseEn: 'Lotus to pick south of the river, leaves so lush — and fish at play among them.' },
   { id: 'dace', zh: '白鲦', en: 'White minnow', rarity: 'common', weight: 18, cm: [6, 16], fight: 1.35, color: '#c9ccc4',
-    verseZh: '儵鱼出游从容，是鱼之乐也。', srcZh: '《庄子·秋水》', verseEn: '“See the minnows darting about at their ease — that is the joy of fish.”' },
+    verseZh: '鲦鱼出游从容，是鱼之乐也。', srcZh: '《庄子·秋水》', verseEn: '“See the minnows darting about at their ease — that is the joy of fish.”' },
   { id: 'blackcarp', zh: '青鱼', en: 'Black carp', rarity: 'uncommon', weight: 10, cm: [40, 110], fight: 1.2, color: '#3f4a52',
     verseZh: '潭中鱼可百许头，皆若空游无所依。', srcZh: '柳宗元《小石潭记》', verseEn: 'A hundred fish in the pool, all seeming to swim in empty air, resting on nothing.', night: true },
   { id: 'mandarin', zh: '鳜鱼', en: 'Mandarin fish', rarity: 'uncommon', weight: 8, cm: [20, 48], fight: 1.45, color: '#8f7a3a',

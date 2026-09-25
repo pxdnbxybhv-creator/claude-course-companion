@@ -161,7 +161,7 @@ function SelectBody(props: { onClose: () => void }) {
 
       <div class="cs-info" aria-live="polite">
         <div class="cs-name">
-          <span class="cs-zh">{isOpen ? def.zh : '？？'}</span>
+          <span class="cs-zh">{def.zh}</span>
           <span class="cs-en">{isOpen ? def.en : t('尚未结伴', 'Not yet met')}</span>
         </div>
         {isOpen ? (
@@ -198,13 +198,13 @@ function SelectBody(props: { onClose: () => void }) {
               role="option"
               aria-selected={c.id === focus}
               tabIndex={c.id === focus ? 0 : -1}
-              aria-label={has ? t(`${c.zh}，${c.titleZh}`, `${c.en}, ${c.titleEn}`) : t(`未结伴，任务：${q?.zh ?? ''}`, `Locked — quest: ${q?.en ?? ''}`)}
+              aria-label={has ? t(`${c.zh}，${c.titleZh}`, `${c.en}, ${c.titleEn}`) : t(`${c.zh}，未结伴，任务：${q?.zh ?? ''}`, `${c.en}, locked — quest: ${q?.en ?? ''}`)}
               onClick={() => setFocus(c.id)}
               onDblClick={() => choose(c.id)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (c.id === focus) choose(c.id); else setFocus(c.id); } }}
             >
               <Portrait id={c.id} locked={!has} size={64} />
-              <span class="cs-tname">{has ? t(c.zh, c.en) : '？'}</span>
+              <span class="cs-tname">{t(c.zh, c.en)}</span>
               {c.id === current && <span class="cs-dot" aria-hidden="true" />}
             </button>
           );

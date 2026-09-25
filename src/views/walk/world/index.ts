@@ -9,7 +9,7 @@ import { effect } from '@preact/signals';
 import type { FestivalKey, Hud, Interactable, InputState as CtxInput, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
 import { REGION_MODULES } from '../regions';
-import { allDecks } from '../regions/water-decks';
+import { allDecks, clearedAt } from '../regions/water-decks';
 import { FACTORIES } from '../characters';
 import type { CharacterModel } from '../characters/types';
 import { ANCHORS, REGION, REGIONS, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
@@ -44,7 +44,7 @@ import { terrain } from './terrain';
 import { buildLand } from './land';
 import { buildWater } from './water';
 import { buildScatter } from './scatter';
-import { buildBridges, setVillageBridgeBuilt } from './bridges';
+import { bridgeSpecs, buildBridges, setBridgeReplaced } from './bridges';
 import {
   GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, WALL, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallPath, wallSegments, waterAt,
   type Circle, type PlantSlot,
@@ -147,7 +147,7 @@ const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ }> = {
   lake: { x: 58, z: 31, face: ANCHORS.lakeIsland },
   bamboo: { x: -66, z: 29.5, face: ANCHORS.bambooClearing },
   plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
-  mountain: { x: 45, z: -92.6, face: ANCHORS.templeHall },
+  mountain: { x: 27.1, z: -87.6, face: ANCHORS.templeHall },   // before the temple gate
 };
 
 /** How far beyond its radius a place stays drawn. */
@@ -266,8 +266,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   check();
   const openWater = buildWater(bag, reduced);
   scene.add(openWater.group);
-  const hasVillage = REGION_MODULES.some((m) => m.id === 'village');
-  const bridges = buildBridges(bag, !hasVillage);
+  // the water town builds its own arched bridge and the lotus lake its moon bridge over the outlet
+  const bridgeOwners: [string, RegionId][] = [['village', 'village'], ['outlet', 'lake']];
+  const ownBridges = new Set(bridgeOwners.filter(([, r]) => REGION_MODULES.some((m) => m.id === r)).map(([b]) => b));
+  const bridges = buildBridges(bag, ownBridges);
   bridges.traverse((o) => o.layers.set(NO_REFLECT));
   scene.add(bridges);
   const scatter = buildScatter(bag, base.season, reduced);
@@ -843,7 +845,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     ctxInput.y = controls.intent.y;
     ctxInput.run = controls.intent.run;
     ctxInput.actionPressed = inp.actQueued && !paused;
-    player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve });
+    player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve, built: (x, z) => floorY(x, z) > terrainY(x, z) + 0.01 });
     inp.jumpQueued = false;
     camFollow(dt);
     sky.update(dt, camera);
@@ -998,8 +1000,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     await Promise.race([started, new Promise((r) => setTimeout(r, 6000))]);
   }
   // the water town brought its own bridge: the core's stand-in deck steps aside
-  const vb = ANCHORS.villageBridge;
-  setVillageBridgeBuilt(allDecks().some((d) => Math.hypot(d.cx - vb.x, d.cz - vb.z) < 8));
+  for (const b of bridgeSpecs()) {
+    if (ownBridges.has(b.id)) setBridgeReplaced(b.id, allDecks().some((d) => Math.hypot(d.cx - b.x, d.cz - b.z) < 9));
+  }
+  // nothing grows through the quays, paving and stairs the places just built
+  if (running) scatter.clear(clearedAt);
+  // the places stay out of the garden pond's mirror (they would cost every draw twice)
+  for (const [id, g] of regionGroups) if (id !== 'garden') g.traverse((o) => { if (!o.userData.reflect) o.layers.set(NO_REFLECT); });
   const inited: WorldFeature[] = [];
   for (const f of FEATURES) {
     if (!running) break;
@@ -1026,7 +1033,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     for (const m of builtRegions) {
       try { m.dispose?.(); } catch (err) { console.error(`[walk] region "${m.id}" failed to dispose`, err); }
     }
-    setVillageBridgeBuilt(false);
+    for (const b of ownBridges) setBridgeReplaced(b, false);
     frameFns.clear();
     regionFns.clear();
     interactables.clear();

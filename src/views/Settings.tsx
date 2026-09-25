@@ -8,6 +8,7 @@ import { useT } from '../app/i18n';
 import { go } from '../app/router';
 import { Segmented, Sheet, Toggle, toast } from '../ui/kit';
 import { audio } from '../audio/engine';
+import { music } from '../audio/music';
 import { makeSeal } from '../ink/seal';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
@@ -212,6 +213,7 @@ function SoundSection() {
   const t = useT();
   const s = state.value.settings;
   const vol = Math.round(s.volume * 100);
+  const mvol = Math.round(s.musicVolume * 100);
   const preview = async () => {
     try {
       await audio.unlock();
@@ -260,6 +262,39 @@ function SoundSection() {
         <button class="btn btn-small set-preview" onClick={preview} disabled={!s.sound}>
           {t('试听', 'Preview')}
         </button>
+      </div>
+      <Row title={t('背景乐', 'Music')} sub={t('筝、箫、琵琶随处即兴，每日一曲不同', 'Zheng, xiao and pipa improvise for each place; a new tune every day')}>
+        <Toggle
+          checked={s.music}
+          label={t('背景乐', 'Music')}
+          onChange={(on) => {
+            setSettings({ music: on });
+            music.setEnabled(on);
+          }}
+        />
+      </Row>
+      <div class={'row set-row set-volume' + (s.music ? '' : ' is-off')}>
+        <label class="row-main set-volume-label" for="set-music-volume">
+          <span class="row-title">{t('乐声', 'Music volume')}</span>
+          <span class="row-sub num">{mvol}%</span>
+        </label>
+        <input
+          id="set-music-volume"
+          class="set-range"
+          type="range"
+          min={0}
+          max={100}
+          step={1}
+          value={mvol}
+          disabled={!s.music}
+          style={{ '--fill': `${mvol}%` }}
+          aria-valuetext={`${mvol}%`}
+          onInput={(e) => {
+            const v = Number(e.currentTarget.value) / 100;
+            setSettings({ musicVolume: v });
+            music.setVolume(v);
+          }}
+        />
       </div>
     </Section>
   );
@@ -578,7 +613,7 @@ export function SettingsView() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
           <h1 class="brush">{t('设置', 'Settings')}</h1>
-          <span class="topbar-sub">{t('印章 · 语言 · 声音 · 数据', 'Seal · language · sound · data')}</span>
+          <span class="topbar-sub">{t('印章 · 语言 · 声乐 · 数据', 'Seal · language · sound · data')}</span>
         </div>
       </header>
       <div class="page set-page">

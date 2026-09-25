@@ -219,3 +219,21 @@ describe('instruments', () => {
     ok(renderGong(sr, 'xiao', 2));
   });
 });
+
+describe('themes share the key of the sound effects', () => {
+  it('every theme mode has its 宫 on F, and modulation stays near home', async () => {
+    const { THEMES } = await import('../src/audio/music-themes');
+    const { MUSIC_GONG_PC, relatedMode } = await import('../src/audio/music-theory');
+    for (const [id, spec] of Object.entries(THEMES)) {
+      for (const m of spec.style.modes) {
+        expect(gongPc(m), `${id} ${JSON.stringify(m)}`).toBe(MUSIC_GONG_PC);
+        let cur = m;
+        for (let i = 0; i < 200; i++) {
+          cur = relatedMode(cur, (i * 3 + 1) % 5, m.tonic);
+          expect(Math.abs(cur.tonic - m.tonic)).toBeLessThanOrEqual(6);
+          expect(gongPc(cur)).toBe(MUSIC_GONG_PC);
+        }
+      }
+    }
+  });
+});

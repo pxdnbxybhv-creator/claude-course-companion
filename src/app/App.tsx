@@ -11,6 +11,7 @@ import { SettingsView } from '../views/Settings';
 import { GamesView } from '../views/Games';
 import { Celebrate } from '../views/quests/Celebrate';
 import { music } from '../audio/music';
+import { active } from '../views/focus/session';
 import type { MusicTheme } from '../views/walk/map';
 
 /** Load a page's code the first time it is opened (games and the 3D walk are large). */
@@ -70,10 +71,12 @@ export function App() {
     music.setEnabled(musicOn);
     music.setVolume(musicVolume);
   }, [musicOn, musicVolume]);
+  // while a stick burns with its own ambience (rain, a stream…), the music gives way to it
+  const burning = active.value !== null && active.value.pausedAt === null && state.value.settings.ambient !== 'none';
   useEffect(() => {
     const th = themeFor(r);
-    if (th !== 'walk') music.setTheme(th);
-  }, [r]);
+    if (th !== 'walk') music.setTheme(burning ? null : th);
+  }, [r, burning]);
   useEffect(() => {
     // Warm up the games' code while the visitor is looking at the garden.
     const t = setTimeout(() => { void GomokuView.prefetch(); void SnakeView.prefetch(); }, 6000);

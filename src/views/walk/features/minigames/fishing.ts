@@ -108,11 +108,14 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
 
   const fishFactor = () => { const a = ability(ctx); return a.kind === 'fish' ? a.factor : 1; };
 
+  let handObj: T.Object3D | null = null;
   function start() {
     if (!begin(ctx, 'fishing')) return;
     ctx.player.freeze(true);
     ctx.player.teleport(stand.x, stand.z, heading);
     rodYaw.visible = true;
+    // the rod goes in the walker's own hand (the fisher's own rod is put away meanwhile)
+    handObj = ctx.player.holdProp('rod');
     const p = panel(bag, 'mg-fishing');
     const dock = h('div', 'mg-dock', undefined, p.root);
     const status = h('div', 'mg-status mg-live', '', dock);
@@ -143,6 +146,8 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     floatMesh.visible = false;
     line.visible = false;
     rodYaw.visible = false;
+    ctx.player.holdProp(null);
+    handObj = null;
     ctx.player.freeze(false);
     end(ctx, 'fishing');
   }
@@ -194,7 +199,7 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     clickAcc = toneAcc = 0;
     ui!.reelBox.style.display = '';
     ui!.fish.classList.toggle('is-rare', s.rarity === 'rare' || s.rarity === 'legend');
-    ui!.fish.textContent = s.rarity === 'junk' ? '履' : s.rarity === 'legend' ? '龍' : '鱼';
+    ui!.fish.textContent = s.rarity === 'junk' ? '履' : s.rarity === 'legend' ? '龙' : '鱼';
     pitchGoal = 1.25;
     snd.splash(0.35);
     rip.spawn(floatAt.x, floatAt.y, floatAt.z, 1.2, 0.7);
@@ -287,6 +292,7 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
   });
 
   const tipW = new THREE.Vector3();
+  const handW = new THREE.Vector3();
   const tmp = new THREE.Vector3();
   bag.frame((dt, t) => {
     if (!rodYaw.visible) return;
@@ -294,7 +300,10 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     const pp = ctx.player.position;
     const hd = ctx.player.heading;
     const rx = Math.cos(hd), rz = -Math.sin(hd); // the walker's right
-    rodYaw.position.set(pp.x - rx * 0.2 + Math.sin(hd) * 0.12, pp.y + 0.72, pp.z - rz * 0.2 + Math.cos(hd) * 0.12);
+    if (handObj) {
+      handObj.getWorldPosition(handW);
+      rodYaw.position.copy(handW);
+    } else rodYaw.position.set(pp.x - rx * 0.2 + Math.sin(hd) * 0.12, pp.y + 0.72, pp.z - rz * 0.2 + Math.cos(hd) * 0.12);
     rodYaw.rotation.y = hd;
     pitch += (pitchGoal - pitch) * Math.min(1, dt * (phase === 'flying' ? 14 : 6));
     let jig = 0;

@@ -59,16 +59,17 @@ export function bridgeSpecs(): BridgeSpec[] {
   return cache;
 }
 
-let villageBuilt = false;
-/** The water town registered its own bridge deck: stand the core's stand-in down. */
-export function setVillageBridgeBuilt(on: boolean): void {
-  villageBuilt = on;
+const replaced = new Set<string>();
+/** A place built its own bridge here (the water town's arch, the lake's moon bridge): stand the core's down. */
+export function setBridgeReplaced(id: string, on: boolean): void {
+  if (on) replaced.add(id);
+  else replaced.delete(id);
 }
 
 /** Height of a bridge deck under (x, z), or null when not on one. `pad` widens the test. */
 export function deckY(x: number, z: number, pad = 0): number | null {
   for (const b of bridgeSpecs()) {
-    if (b.village && villageBuilt) continue;
+    if (replaced.has(b.id)) continue;
     const dx = x - b.x, dz = z - b.z;
     const along = dx * b.ax + dz * b.az;
     if (along > b.L + pad || along < -b.L - pad) continue;
@@ -81,13 +82,13 @@ export function deckY(x: number, z: number, pad = 0): number | null {
 }
 
 /** Stone arched bridges, merged: one draw for the stone, one for the ink lines. */
-export function buildBridges(bag: Bag, withVillage: boolean): THREE.Group {
+export function buildBridges(bag: Bag, skip: ReadonlySet<string>): THREE.Group {
   const group = new THREE.Group();
   group.name = 'bridges';
   const parts: THREE.BufferGeometry[] = [];
   const lines: THREE.BufferGeometry[] = [];
   for (const b of bridgeSpecs()) {
-    if (b.village && !withVillage) continue;
+    if (skip.has(b.id)) continue;
     const mine: THREE.BufferGeometry[] = [];
     const ext = b.L + 0.5;
     const yb = b.waterY - 0.9;

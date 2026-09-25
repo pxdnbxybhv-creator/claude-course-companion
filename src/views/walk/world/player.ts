@@ -26,7 +26,12 @@ export interface Physics {
   floorY(x: number, z: number): number;
   /** Push (x, z) out of obstacles and back onto walkable ground; returns the corrected position. */
   resolve(x: number, z: number, r: number, fromX: number, fromZ: number): [number, number];
+  /** Is (x, z) on a built surface (a deck, stair or bridge) rather than bare terrain? Steps onto those are fine. */
+  built?(x: number, z: number): boolean;
 }
+
+/** The highest single step a walker takes onto a built surface (a stair riser, a quay lip). */
+const STEP_UP = 0.34;
 
 function lathe(points: [number, number][], segs = 20): THREE.LatheGeometry {
   return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segs);
@@ -352,6 +357,15 @@ export class PlayerController implements Player {
     this.holder.add(model.root);
     this.character = id;
     this.gifts = gifts;
+    if (this.lent) model.hold?.(this.lent);
+  }
+
+  /** The prop a feature has lent the walker, if any. */
+  private lent: string | null = null;
+  holdProp(prop: string | null): THREE.Object3D | null {
+    this.lent = prop;
+    try { this.model.hold?.(prop); } catch (e) { console.warn('[walk] hold', e); }
+    return prop ? this.model.hand ?? null : null;
   }
 
   /** Where the camera looks (above the feet). */
@@ -463,8 +477,11 @@ export class PlayerController implements Player {
     const f0 = phys.floorY(px, pz);
     const tooSteep = (x: number, z: number) => {
       const rise = phys.floorY(x, z) - f0;
+      if (rise <= 0.05) return false;
+      // stairs, quay lips and bridge ends: a stair-sized step onto something built is fine
+      if (this.grounded && rise <= STEP_UP && phys.built?.(x, z)) return false;
       const run = Math.hypot(x - px, z - pz);
-      return rise > (this.grounded ? 0.5 : 0.25) || (this.grounded && rise > 0.05 && rise > run * 0.72);
+      return rise > (this.grounded ? 0.5 : 0.25) || (this.grounded && rise > run * 0.72);
     };
     if (tooSteep(nx, nz)) {
       if (!tooSteep(nx, pz)) nz = pz;

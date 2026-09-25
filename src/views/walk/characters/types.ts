@@ -28,6 +28,10 @@ export interface CharacterModel {
   height: number;
   update(dt: number, s: MotionState): void;
   dispose(): void;
+  /** Right-hand attach point for a prop a feature lends the walker (a fishing rod…). */
+  hand?: THREE_NS.Object3D;
+  /** A feature put `prop` in the hand (parented to `hand`): hide the character's own hand props; null gives them back. */
+  hold?(prop: string | null): void;
 }
 
 export type CharacterFactory = (THREE: typeof THREE_NS, opts: { palette: Record<string, string> }) => CharacterModel;

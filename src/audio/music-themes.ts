@@ -4,7 +4,7 @@
 import type { Rng } from '../core/rng';
 import { clamp } from './dsp';
 import type { LineInst, LineNote, MusicJob, PluckInst, PluckNote } from './music-dsp';
-import { degreeToMidi, halfCadence, midiToFreq, modeSteps, type MNote, type Mode, type Phrase, type Style } from './music-theory';
+import { degreeToMidi, halfCadence, midiToFreq, modeSteps, MUSIC_GONG_PC, PENT, type MNote, type Mode, type Phrase, type Style } from './music-theory';
 
 import type { MusicTheme } from '../views/walk/map';
 
@@ -59,7 +59,17 @@ const MED = [[1], [0.5, 0.5], [1.5, 0.5], [1, 1], [0.5, 0.5, 1], [2], [1, 0.5, 0
 const LIVELY = [[0.5, 0.5], [1], [0.75, 0.25], [0.25, 0.25, 0.5], [0.5, 0.25, 0.25], [1.5, 0.5], [0.5, 1, 0.5]];
 const FLOW = [[1], [0.5, 0.5], [1.5, 0.5], [2], [0.5, 0.5, 1], [1, 1]];
 
-const M = (tonic: number, final: number): Mode => ({ tonic, final });
+/**
+ * A mode by its final and a rough tonic, moved (by at most a tritone) onto the music's 宫 F so that
+ * every theme shares the key of the sound effects: a chime never lands a semitone off the tune.
+ */
+const M = (tonic: number, final: number): Mode => {
+  const gong = (((tonic - PENT[final]) % 12) + 12) % 12;
+  let d = MUSIC_GONG_PC - gong;
+  if (d > 6) d -= 12;
+  if (d < -5) d += 12;
+  return { tonic: tonic + d, final };
+};
 
 // ---------------------------------------------------------------------------
 // helpers

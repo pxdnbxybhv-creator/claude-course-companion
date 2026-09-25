@@ -74,6 +74,13 @@ export interface Player {
   freeze(on: boolean): void;
   /** Sit in / stand on a moving object; the character is placed at the object's origin each frame. Pass null to get off. */
   ride(obj: THREE_NS.Object3D | null): void;
+  /** True while frozen by a feature or riding. */
+  readonly isFrozen: boolean;
+  /**
+   * Lend the walker a prop ('rod'…): the character's own hand props hide, and the returned object
+   * is the hand to follow (its world position), or null when this character has no hand. null gives it back.
+   */
+  holdProp(prop: string | null): THREE_NS.Object3D | null;
 }
 
 /** The movement intent from keys / joystick, readable by features (e.g. rowing a boat). */
