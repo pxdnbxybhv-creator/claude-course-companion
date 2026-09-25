@@ -101,5 +101,5 @@
 /* 测试码: a short field and its button on one line */
 .set-code > .row-main { display: flex; flex-direction: column; flex: 1 1 96px; min-width: 0; }
 .set-code-field { display: flex; align-items: center; gap: 8px; flex: none; }
-.set-code-field .input { width: 4.4em; font-family: var(--font-latin); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; }
+.set-code-field .input { width: 4.4em; font-family: var(--font-latin), var(--font-text); font-size: 17px; letter-spacing: 0.14em; text-transform: uppercase; }
 .set-code-field .input::placeholder { text-transform: none; letter-spacing: 0.04em; color: var(--ink-4, var(--ink-3)); }

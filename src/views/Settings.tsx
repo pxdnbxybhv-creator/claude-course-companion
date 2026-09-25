@@ -571,27 +571,37 @@ function TestCodeRow() {
   const t = useT();
   const [code, setCode] = useState('');
   const on = codeActive.value;
+  // the field and the Undo button replace each other: keep the keyboard on whichever is shown
+  const formRef = useRef<HTMLFormElement>(null);
+  const refocus = useRef(false);
+  useEffect(() => {
+    if (!refocus.current) return;
+    refocus.current = false;
+    formRef.current?.querySelector<HTMLElement>(on ? 'button' : 'input')?.focus();
+  }, [on]);
   const submit = (e: Event) => {
     e.preventDefault();
     const r = redeemCode(code);
     if (r === 'invalid') return void toast(t('测试码无效', 'That code doesn’t work'));
+    refocus.current = true;
     setCode('');
     toast(r === 'unlocked'
       ? t('十三位同伴已全部解锁，可在「入画」中挑选', 'All thirteen companions unlocked — pick one in Into the Painting')
       : t('同伴早已全部解锁', 'Every companion is already unlocked'), 3200);
   };
   const undo = () => {
+    refocus.current = true;
     revokeCode();
     toast(t('测试码已撤销，同伴恢复为已结识的', 'Code removed — companions are back to the ones you’ve met'));
   };
   return (
-    <form class="row set-row set-row-wrap set-code" onSubmit={submit}>
+    <form ref={formRef} class="row set-row set-row-wrap set-code" onSubmit={submit}>
       <label class="row-main" for={on ? undefined : 'set-code'}>
         <span class="row-title">{t('测试码', 'Test code')}</span>
         <span class="row-sub">{on ? t('已生效：全部同伴可选', 'Active: every companion is open') : t('解锁全部同伴', 'Unlocks every companion')}</span>
       </label>
       {on ? (
-        <button type="button" class="btn btn-small btn-ghost" onClick={undo}>{t('撤销', 'Undo')}</button>
+        <button type="button" class="btn btn-small btn-ghost" onClick={undo} aria-label={t('撤销测试码', 'Remove the test code')}>{t('撤销', 'Undo')}</button>
       ) : (
         <div class="set-code-field">
           <input
