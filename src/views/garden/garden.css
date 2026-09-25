@@ -228,3 +228,7 @@
 }
 
 .garden-first-hint { margin: -2px 0 6px; font-size: 14px; letter-spacing: 0.04em; }
+
+.garden-walk { gap: 6px; margin-left: auto; margin-right: 4px; font-size: 16px; }
+.garden-walk .brush { font-size: 18px; letter-spacing: 0.08em; }
+.garden-walk-en:empty { display: none; }

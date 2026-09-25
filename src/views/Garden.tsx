@@ -140,7 +140,11 @@ export function GardenView() {
             <span>{t(line.zh, line.en)}</span>
           </p>
         </div>
-        <button class="btn btn-ghost btn-icon garden-settings" onClick={() => go('settings')} aria-label={t('设置', 'Settings')}>
+        <button type="button" class="btn btn-small garden-walk" onClick={(e) => go('walk', e)} aria-label={t('入画：走进园子', 'Walk into the garden')}>
+          <span class="brush" aria-hidden="true">入画</span>
+          <span class="garden-walk-en latin">{t('', 'Walk in')}</span>
+        </button>
+        <button class="btn btn-ghost btn-icon garden-settings" onClick={(e) => go('settings', e)} aria-label={t('设置', 'Settings')}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
             <path d="M4 7.2c3.2-.4 9.4-.3 16 .1M4.2 12.1c5.1-.3 10.3-.2 15.6.2M4 17c4.2-.3 11-.2 16 .1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             <circle cx="15.5" cy="7.3" r="1.9" fill="var(--paper)" stroke="currentColor" stroke-width="1.5" />

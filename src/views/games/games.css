@@ -1,0 +1,13 @@
+/* Shared layout for the games hall and each game page. */
+.game-page { width: 100%; max-width: 760px; margin: 0 auto; padding: calc(8px + env(safe-area-inset-top)) var(--gutter) 24px; }
+.game-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; min-height: 56px; margin-bottom: 8px; }
+.game-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px 0 4px; border-radius: 999px; color: var(--ink-2); font-size: 15px; }
+.game-back > span:first-child { font-size: 28px; line-height: 1; margin-top: -3px; }
+.game-back:hover { background: var(--cinnabar-soft); }
+.game-title { min-width: 0; text-align: center; }
+.game-title h1 { margin: 0; font-size: 30px; font-weight: 400; line-height: 1.15; }
+.game-title h1.latin { font-weight: 500; font-size: 28px; }
+.game-sub { font-size: 13.5px; color: var(--ink-3); letter-spacing: 0.06em; min-height: 1.4em; }
+.game-actions { display: flex; gap: 6px; justify-content: flex-end; min-width: 60px; }
+.game-body { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+@media (max-width: 380px) { .game-back-label { display: none; } }
