@@ -117,11 +117,10 @@ export function touchInput(): boolean {
 
 /**
  * Swing the camera round to show the walker and a thing (the pot, the float, the bell) together at
- * a game's start, where the core offers it (WorldCtx.frameCamera); a no-op until then.
+ * a game's start (WorldCtx.frameCamera).
  */
 export function frameOn(ctx: WorldCtx, x: number, z: number, y: number, secs = 2.6): void {
-  const f = (ctx as WorldCtx & { frameCamera?: (x: number, z: number, y: number, secs?: number) => void }).frameCamera;
-  try { f?.call(ctx, x, z, y, secs); } catch { /* framing is a nicety */ }
+  try { ctx.frameCamera(x, z, y, secs); } catch { /* framing is a nicety */ }
 }
 
 // ───────────────────────────── one game at a time ─────────────────────────────
@@ -158,7 +157,7 @@ export function withTheme(ctx: WorldCtx, theme: MusicTheme | null): () => void {
   return () => {
     if (done) return;
     done = true;
-    try { ctx.music?.setTheme(regionTheme(ctx)); } catch { /* ignore */ }
+    try { ctx.music?.release(); } catch { /* ignore */ }
   };
 }
 

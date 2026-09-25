@@ -678,6 +678,7 @@ function build(ctx: WorldCtx): void {
       const radius = 0.8, bottom = hang.y - 0.35 - Hb, centreY = (bottom + hang.y + 0.31) / 2;
       const pivotY = bottom + (centreY - bottom) * 0.55 + 1.5;
       const restD = radius + 0.95;
+      bellMesh.userData.strikerRestD = restD; // the bell mini-game hangs its log from here
       const q = F(restD, 0);
       b.add(place(new THREE.BoxGeometry(1.5, 0.16, 0.16), q.x, pivotY + 0.08, q.z, ry), COL.wood, { edge: 30 });
       for (const u of [-0.6, 0.6]) {
@@ -692,52 +693,55 @@ function build(ctx: WorldCtx): void {
   // ── the pagoda: seven storeys, octagonal, wind-bells at every corner ────
   const windBells: { p: T.Vector3; ph: number }[] = [];
   let pagodaTop = 0;
+  // built apart and flagged as a landmark, so it still rises over the ridge from the other places
+  const pb = new Batch();
   {
     const { x, z } = PAGODA;
     const g0 = h.span(x, z, 3.2).hi + 0.2;
     const lo = h.span(x, z, 4.6).lo - 0.6;
-    b.add(place(new THREE.CylinderGeometry(4.2, 4.4, g0 - lo, 8, 1, false, Math.PI / 8), x, (g0 + lo) / 2, z), COL.stone, { edge: 30, jitter: 0.04 });
-    b.add(place(new THREE.CylinderGeometry(3.3, 3.5, 0.7, 8, 1, false, Math.PI / 8), x, g0 + 0.35, z), COL.stoneMid, { edge: 30 });
+    pb.add(place(new THREE.CylinderGeometry(4.2, 4.4, g0 - lo, 8, 1, false, Math.PI / 8), x, (g0 + lo) / 2, z), COL.stone, { edge: 30, jitter: 0.04 });
+    pb.add(place(new THREE.CylinderGeometry(3.3, 3.5, 0.7, 8, 1, false, Math.PI / 8), x, g0 + 0.35, z), COL.stoneMid, { edge: 30 });
     let y = g0 + 0.7;
     const storeys = 7;
     for (let s = 0; s < storeys; s++) {
       const k = s / (storeys - 1);
       const r = 2.55 - 1.05 * k;
       const hs = s === 0 ? 3.6 : 2.55 - 0.5 * k;
-      b.add(place(new THREE.CylinderGeometry(r, r * 1.02, hs, 8, 1, false, Math.PI / 8), x, y + hs / 2, z), '#e6dfd1', { edge: 30, jitter: 0.03 });
+      pb.add(place(new THREE.CylinderGeometry(r, r * 1.02, hs, 8, 1, false, Math.PI / 8), x, y + hs / 2, z), '#e6dfd1', { edge: 30, jitter: 0.03 });
       // corner posts (ink lines down the real corners, which sit at odd multiples of π/8) and a door
       // on alternate faces, set just proud of the face
       const segs: number[] = [];
       for (const [cx, cz] of ngon(8, r * 1.012, Math.PI / 8)) segs.push(x + cx, y, z + cz, x + cx, y + hs, z + cz);
-      b.segs(segs);
+      pb.segs(segs);
       const apo = r * Math.cos(Math.PI / 8);
       for (let i = 0; i < 8; i += 2) {
         const a = ((i + (s % 2)) / 8) * TAU;
         const fx = x + Math.cos(a) * (apo + 0.05), fz = z + Math.sin(a) * (apo + 0.05);
         const dh = Math.min(hs * 0.62, 2.2);
-        b.add(place(new THREE.BoxGeometry(r * 0.4, dh, 0.08), fx, y + hs * 0.08 + dh / 2, fz, Math.atan2(Math.cos(a), Math.sin(a))), s === 0 && i === 0 ? '#2e2622' : '#6d5a4a', { edge: 30 });
+        pb.add(place(new THREE.BoxGeometry(r * 0.4, dh, 0.08), fx, y + hs * 0.08 + dh / 2, fz, Math.atan2(Math.cos(a), Math.sin(a))), s === 0 && i === 0 ? '#2e2622' : '#6d5a4a', { edge: 30 });
       }
       // brackets band, then the eave
       y += hs;
-      b.add(place(new THREE.CylinderGeometry(r + 0.25, r, 0.3, 8, 1, false, Math.PI / 8), x, y + 0.15, z), '#3f5553', { edge: 30 });
+      pb.add(place(new THREE.CylinderGeometry(r + 0.25, r, 0.3, 8, 1, false, Math.PI / 8), x, y + 0.15, z), '#3f5553', { edge: 30 });
       const eo = r + 1.35 - 0.3 * k;
       const eaveY = y + 0.25;
       // the eave's corners over the body's corners, a wind-bell under each flying corner
-      roof(b, ngon(8, eo / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), ngon(8, (r * 0.92) / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), eaveY, eaveY + 0.75, { curl: 0.42, flare: 0.3, U: 6, V: 4 });
+      roof(pb, ngon(8, eo / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), ngon(8, (r * 0.92) / Math.cos(Math.PI / 8), Math.PI / 8).map(([a, c]) => [x + a, z + c]), eaveY, eaveY + 0.75, { curl: 0.42, flare: 0.3, U: 6, V: 4 });
       for (const [cx, cz] of ngon(8, (eo + 0.3) / Math.cos(Math.PI / 8), Math.PI / 8)) windBells.push({ p: new THREE.Vector3(x + cx, eaveY + 0.3, z + cz), ph: rng() * TAU });
       y = eaveY + 0.55;
     }
     // the spire (塔刹): a lotus base, stacked rings, a vase and a pearl
-    b.add(place(new THREE.CylinderGeometry(0.9, 1.3, 0.8, 8, 1, false, Math.PI / 8), x, y + 0.2, z), COL.tile, { edge: 30 });
-    b.add(place(new THREE.SphereGeometry(0.62, 10, 6, 0, TAU, 0, Math.PI / 2), x, y + 0.6, z), '#5b5a55', { hull: true });
-    b.add(place(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), x, y + 2.7, z), COL.bronzeDark, { rim: true });
-    for (let i = 0; i < 7; i++) b.add(place(new THREE.TorusGeometry(0.36 - i * 0.03, 0.06, 5, 12).rotateX(Math.PI / 2), x, y + 1.4 + i * 0.32, z), COL.bronze, { rim: true });
-    b.add(place(new THREE.SphereGeometry(0.28, 10, 8), x, y + 4.0, z, 0, 1, 1.3, 1), COL.bronze, { hull: true });
-    b.add(place(new THREE.SphereGeometry(0.16, 10, 8), x, y + 4.55, z), '#b08d55', { hull: true });
+    pb.add(place(new THREE.CylinderGeometry(0.9, 1.3, 0.8, 8, 1, false, Math.PI / 8), x, y + 0.2, z), COL.tile, { edge: 30 });
+    pb.add(place(new THREE.SphereGeometry(0.62, 10, 6, 0, TAU, 0, Math.PI / 2), x, y + 0.6, z), '#5b5a55', { hull: true });
+    pb.add(place(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), x, y + 2.7, z), COL.bronzeDark, { rim: true });
+    for (let i = 0; i < 7; i++) pb.add(place(new THREE.TorusGeometry(0.36 - i * 0.03, 0.06, 5, 12).rotateX(Math.PI / 2), x, y + 1.4 + i * 0.32, z), COL.bronze, { rim: true });
+    pb.add(place(new THREE.SphereGeometry(0.28, 10, 8), x, y + 4.0, z, 0, 1, 1.3, 1), COL.bronze, { hull: true });
+    pb.add(place(new THREE.SphereGeometry(0.16, 10, 8), x, y + 4.55, z), '#b08d55', { hull: true });
     pagodaTop = y + 4.8;
     h.collide({ x, z, r: 4.2, h: pagodaTop - g0 });
     h.occlude({ x, z, r: 2.4, y0: g0, y1: pagodaTop });
   }
+  for (const o of pb.build(h, 'mountain:pagoda', { outline: 0.04, lineOpacity: 0.66, rim: 0.6 })) o.userData.landmark = true;
 
   // ── the waterfall ───────────────────────────────────────────────────
   // The stream crosses the terrace in a stone-lined runnel from behind the pagoda and pours over the

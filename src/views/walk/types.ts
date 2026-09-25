@@ -76,6 +76,8 @@ export interface Player {
   ride(obj: THREE_NS.Object3D | null): void;
   /** True while frozen by a feature or riding. */
   readonly isFrozen: boolean;
+  /** The emote playing now, if any (e.g. 'play' while the qin player plays). */
+  readonly emoting: EmoteKind | null;
   /**
    * Lend the walker a prop ('rod'…): the character's own hand props hide, and the returned object
    * is the hand to follow (its world position), or null when this character has no hand. null gives it back.
@@ -159,7 +161,13 @@ export interface WorldCtx {
   /** World position of a named spot from map.ts ANCHORS, with y on the ground (or water). */
   anchor(x: XZ): THREE_NS.Vector3;
   /** Background music: request a theme (the core already sets one per region; features may override briefly). */
-  music: { setTheme(theme: MusicTheme | null): void };
+  music: {
+    setTheme(theme: MusicTheme | null): void;
+    /** Hand the music back to the place (ends a feature's setTheme override). */
+    release(): void;
+  };
+  /** For a moment, swing the camera to show the walker and the point (x, y, z) together (a game's target). */
+  frameCamera(x: number, z: number, y: number, secs?: number): void;
 }
 
 /** Builds one region's scenery (see map.ts REGIONS). Content goes into ctx.regionGroup(id). */

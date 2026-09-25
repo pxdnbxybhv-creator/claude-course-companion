@@ -20,7 +20,7 @@ const PALETTES: Record<TimeOfDay, Palette> = {
   dusk: { top: '#d5c2a7', horizon: '#eecfa6', fog: '#e9d1b2', hemiSky: '#f4e0c8', hemiGround: '#9b8a74', hemi: 2.0, sun: '#ffcf9e', sunI: 1.2, tint: '#f5e4cc', glow: '#e89a62' },
   // Night keeps the paper light — cool silver-blue moonlit xuan, value ≥ ~0.75 — and lets the dark
   // gather in the upper sky and the far distance; the moon's glow and the lanterns carry the mood.
-  night: { top: '#121a28', horizon: '#6c7788', fog: '#65707f', hemiSky: '#cfd8e8', hemiGround: '#8f98a8', hemi: 2.75, sun: '#e2e9f6', sunI: 0.8, tint: '#c6cedb', glow: '#d8d4c4' },
+  night: { top: '#121a28', horizon: '#6c7788', fog: '#65707f', hemiSky: '#cfd8e8', hemiGround: '#8f98a8', hemi: 2.05, sun: '#e2e9f6', sunI: 0.6, tint: '#c6cedb', glow: '#d8d4c4' },
 };
 
 const SKY_VS = /* glsl */`

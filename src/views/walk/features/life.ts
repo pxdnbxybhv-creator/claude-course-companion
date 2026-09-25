@@ -81,10 +81,23 @@ export const koi: WorldFeature = feature('koi', (bag, ctx) => {
     const pp = ctx.player.position;
     feeding = Math.max(0, feeding - dt);
     plopCool -= dt;
+    // the qin player playing by the pond: the koi forget their fear and gather to listen
+    const listening = ctx.player.emoting === 'play' && pondDist(ctx, pp.x, pp.z) < 2.4;
+    let lx = 0, lz = 0;
+    if (listening) {
+      const a = Math.atan2(pp.z - pond.center.z, pp.x - pond.center.x);
+      lx = pond.center.x + Math.cos(a) * pond.radiusX * 0.62;
+      lz = pond.center.z + Math.sin(a) * pond.radiusZ * 0.62;
+    }
     for (let i = 0; i < n; i++) {
       const f = fish[i];
       const dp = Math.hypot(f.x - pp.x, f.z - pp.z);
-      if (dp < 2.6 && f.scare <= 0) {
+      if (listening) {
+        const k = i * 1.7;
+        f.scare = 0;
+        f.tx = lx + Math.cos(t * 0.5 + k) * 0.6;
+        f.tz = lz + Math.sin(t * 0.5 + k) * 0.6;
+      } else if (dp < 2.6 && f.scare <= 0) {
         f.scare = 2.2;
         const ax = f.x - pp.x, az = f.z - pp.z, len = Math.hypot(ax, az) || 1;
         f.tx = pond.center.x + (ax / len) * pond.radiusX * 0.2 + (pond.center.x - pp.x) * 0.3;
@@ -97,9 +110,9 @@ export const koi: WorldFeature = feature('koi', (bag, ctx) => {
         f.tx = feedWater.x + Math.cos(t * 0.8 + k) * 0.45;
         f.tz = feedWater.z + Math.sin(t * 0.8 + k) * 0.45;
       }
-      let want = f.scare > 0 ? 1.5 : feeding > 0 ? 0.7 : 0.22;
+      let want = f.scare > 0 ? 1.5 : feeding > 0 || listening ? 0.7 : 0.22;
       const dx = f.tx - f.x, dz = f.tz - f.z, d = Math.hypot(dx, dz);
-      if (d < 0.3 && f.scare <= 0 && feeding <= 0) {
+      if (d < 0.3 && f.scare <= 0 && feeding <= 0 && !listening) {
         f.wait -= dt;
         want = 0.04;
         if (f.wait <= 0) { [f.tx, f.tz] = inside(); f.wait = 1 + rng() * 4; }

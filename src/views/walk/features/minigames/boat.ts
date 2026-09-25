@@ -4,7 +4,7 @@
 // lotus-picking song drifts up. Land again at the dock or the water pavilion.
 import type * as T from 'three';
 import { ANCHORS, LAKE } from '../../map';
-import { dayRng, feature, inked, reducedMotion, reflects } from '../kit';
+import { dayRng, feature, inked, outlineMat, propMat, reducedMotion, reflects } from '../kit';
 import { merge, part } from '../geo';
 import { burst } from '../props';
 import { record } from '../../../../app/play';
@@ -87,7 +87,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
 
   // ── lotus pods among leaves (the same all day)
   const rng = dayRng(ctx, 'lotus-pods');
-  const pods: { g: T.Group; x: number; z: number; picked: boolean }[] = [];
+  const pods: { x: number; y: number; z: number; rz: number; picked: boolean }[] = [];
   const podGeo = merge(THREE, [
     part(THREE, new THREE.CylinderGeometry(0.012, 0.016, 1.05, 5), '#6f8a4a', { p: [0, 0.52, 0] }),
     part(THREE, new THREE.CylinderGeometry(0.1, 0.045, 0.1, 12), '#7f9a55', { p: [0, 1.08, 0] }),
@@ -98,26 +98,41 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     }),
   ]);
   const leafGeo = merge(THREE, [part(THREE, new THREE.CircleGeometry(0.5, 14, 0.3, Math.PI * 2 - 0.3), P.malachite, { r: [-Math.PI / 2, 0, 0] })]);
+  // one instanced draw each for the pods, their ink hulls and the pads (not 12 little groups)
+  const leaves: T.Matrix4[] = [];
   for (let i = 0; i < 40 && pods.length < 12; i++) {
     const a = rng() * Math.PI * 2, r = Math.sqrt(rng()) * 0.8;
     const x = LAKE.x + Math.cos(a) * LAKE.rx * r, z = LAKE.z + Math.sin(a) * LAKE.rz * r;
     if (!inLake(x, z, 0.85) || Math.hypot(x - moor.x, z - moor.z) < 6 || pods.some((p) => Math.hypot(p.x - x, p.z - z) < 4)) continue;
-    const g = new THREE.Group();
     const y = ctx.waterAt(x, z) ?? LAKE.waterY;
-    g.position.set(x, y, z);
-    const pod = inked(ctx, podGeo, { width: 0.006 });
-    pod.rotation.z = (rng() - 0.5) * 0.25;
-    g.add(pod);
+    pods.push({ x, y, z, rz: (rng() - 0.5) * 0.25, picked: false });
     for (let k = 0; k < 3; k++) {
-      const leaf = new THREE.Mesh(leafGeo, pod.material as T.Material);
-      leaf.position.set((rng() - 0.5) * 1.4, 0.02 + k * 0.004, (rng() - 0.5) * 1.4);
-      leaf.rotation.y = rng() * Math.PI * 2;
-      leaf.scale.setScalar(0.7 + rng() * 0.6);
-      g.add(leaf);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng() * Math.PI * 2);
+      const sc = 0.7 + rng() * 0.6;
+      leaves.push(new THREE.Matrix4().compose(new THREE.Vector3(x + (rng() - 0.5) * 1.4, y + 0.02 + k * 0.004, z + (rng() - 0.5) * 1.4), q, new THREE.Vector3(sc, sc, sc)));
     }
-    bag.add(reflects(g), group);
-    pods.push({ g, x, z, picked: false });
   }
+  const podIM = new THREE.InstancedMesh(podGeo, propMat(ctx), Math.max(1, pods.length));
+  const podHull = new THREE.InstancedMesh(podGeo, outlineMat(ctx, 0.006), Math.max(1, pods.length));
+  const leafIM = new THREE.InstancedMesh(leafGeo, propMat(ctx), Math.max(1, leaves.length));
+  podIM.count = podHull.count = pods.length;
+  leafIM.count = leaves.length;
+  leaves.forEach((m, i) => leafIM.setMatrixAt(i, m));
+  const podM = new THREE.Matrix4(), podQ = new THREE.Quaternion(), podE = new THREE.Euler(), podP = new THREE.Vector3(), podS = new THREE.Vector3();
+  const placePods = (t: number) => {
+    for (let i = 0; i < pods.length; i++) {
+      const pd = pods[i];
+      podE.set(still ? 0 : Math.sin(t * 0.8 + i) * 0.04, 0, pd.rz);
+      podQ.setFromEuler(podE);
+      podS.setScalar(pd.picked ? 0 : 1);
+      podM.compose(podP.set(pd.x, pd.y, pd.z), podQ, podS);
+      podIM.setMatrixAt(i, podM);
+      podHull.setMatrixAt(i, podM);
+    }
+    podIM.instanceMatrix.needsUpdate = podHull.instanceMatrix.needsUpdate = true;
+  };
+  placePods(0);
+  for (const im of [podIM, podHull, leafIM]) { im.computeBoundingSphere(); bag.add(reflects(im), group); }
 
   // ── rowing
   let ui: { p: Panel; status: HTMLElement; pick: HTMLButtonElement; land: HTMLButtonElement; hPick: Hold; hLand: Hold; offEsc: () => void } | null = null;
@@ -179,8 +194,8 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     pd.picked = true;
     snd.snap();
     ctx.player.emote('water');
-    burst(bag, new THREE.Vector3(pd.x, pd.g.position.y + 1, pd.z), '#9fb46a', 10, { speed: 0.8, size: 0.02, life: 1 });
-    pd.g.children[0].visible = false;
+    burst(bag, new THREE.Vector3(pd.x, pd.y + 1, pd.z), '#9fb46a', 10, { speed: 0.8, size: 0.02, life: 1 });
+    placePods(0);
     record('lotus');
     picked++;
     const song = SONGS[songI++ % SONGS.length];
@@ -204,7 +219,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     hull.rotation.z = still ? 0 : Math.sin(t * 0.9) * 0.025 + (riding ? Math.sin(t * 1.7) * 0.01 : 0);
     hull.rotation.x = still ? 0 : Math.sin(t * 0.7 + 1) * 0.015 - speed * 0.01;
     // lotus pods sway a little
-    if (!still) for (let i = 0; i < pods.length; i++) pods[i].g.children[0].rotation.x = Math.sin(t * 0.8 + i) * 0.04;
+    if (!still) placePods(t);
 
     if (!riding) {
       // left somewhere: after a while it quietly drifts home to the mooring

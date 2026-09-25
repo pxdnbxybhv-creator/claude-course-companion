@@ -144,7 +144,7 @@ const WILD: { kind: PlantKind; seed: number }[] = [
 /** Where fast travel sets you down in each place (on its approach path, facing in). */
 const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ }> = {
   garden: { x: SPAWN.x, z: SPAWN.z, face: { x: 0, z: 0 } },
-  village: { x: 1.5, z: 75, face: ANCHORS.villageSquare },
+  village: { x: -1.5, z: 49, face: ANCHORS.villageSquare },   // under the 小桥流水 archway: the bridge and the town ahead
   lake: { x: 58, z: 31, face: ANCHORS.lakeIsland },
   bamboo: { x: -66, z: 29.5, face: ANCHORS.bambooClearing },
   plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
@@ -808,6 +808,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       return new THREE.Vector3(a.x, w === null ? g : Math.max(g, w), a.z);
     },
     music: worldMusic,
+    frameCamera(x: number, z: number, y: number, secs?: number) {
+      controls.frame(player.position.x, player.position.z, x, z, y, secs);
+    },
   };
 
   let playerMirrored = true;
