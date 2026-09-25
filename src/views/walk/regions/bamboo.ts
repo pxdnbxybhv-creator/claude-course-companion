@@ -81,7 +81,7 @@ function litterCanvas(): HTMLCanvasElement {
   for (let i = 0; i < 26; i++) {
     const x = S * (0.1 + rng() * 0.8), y = S * (0.1 + rng() * 0.8);
     const a = rng() * TAU;
-    const col = rng() < 0.6 ? '#a8905e' : rng() < 0.5 ? '#6f6a58' : '#8a8f6e';
+    const col = rng() < 0.6 ? '#b8964f' : rng() < 0.5 ? '#76694e' : '#8c9a62';
     p.leaf(x, y, a, S * (0.1 + rng() * 0.06), S * 0.022, 0.55 + rng() * 0.3, { color: col });
   }
   return rasterize(p.drawing(S, S, 0, 0), 1, 1);
@@ -136,7 +136,7 @@ function goCanvas(): HTMLCanvasElement {
   const S = 256;
   const c = canvas(S, S);
   const g = c.getContext('2d')!;
-  g.fillStyle = '#b8b09c';
+  g.fillStyle = '#c2b493';
   g.fillRect(0, 0, S, S);
   const m = 16, step = (S - m * 2) / 18;
   g.strokeStyle = 'rgba(40,36,30,0.75)';
@@ -241,7 +241,7 @@ function build(ctx: WorldCtx): void {
   const culmMesh = new THREE.InstancedMesh(culmGeo, culmMat, culms.length);
   culmMesh.name = 'bamboo:culms';
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3(), ax = new THREE.Vector3();
-  const tones = ['#34423a', '#4c5e4b', '#627a5c', '#7b906e', '#93a283', '#a49f78'].map((c) => new THREE.Color(c));
+  const tones = ['#2f4a3a', '#46684a', '#5f8a5a', '#7ea66a', '#9cb97c', '#b8b176'].map((c) => new THREE.Color(c));
   const tipOf: T.Vector3[] = [];
   culms.forEach((c, i) => {
     const dx = Math.cos(c.dir), dz = Math.sin(c.dir);
@@ -309,7 +309,7 @@ function build(ctx: WorldCtx): void {
   cardGeo.setAttribute('aCell', cellAttr);
   const leaves = new THREE.InstancedMesh(cardGeo, leafMat, cards.length);
   leaves.name = 'bamboo:leaves';
-  const leafTones = ['#2e3b33', '#43553f', '#5b7052', '#7a8c6c', '#9aa78e'].map((c) => new THREE.Color(c));
+  const leafTones = ['#2a4434', '#3f6444', '#588454', '#7aa26a', '#9dbb84'].map((c) => new THREE.Color(c));
   const e = new THREE.Euler();
   cards.forEach((cd, i) => {
     e.set(cd.rx, cd.ry, cd.rz, 'YXZ');
@@ -379,7 +379,7 @@ function build(ctx: WorldCtx): void {
   lit(h, tuftMat);
 
   // ── the winding stone paths ───────────────────────────────────────
-  TRAILS.forEach((t, i) => steppingStones(b, h, t, { gap: 0.72, w: 0.56, seed: 40 + i, color: '#a9a898' }));
+  TRAILS.forEach((t, i) => steppingStones(b, h, t, { gap: 0.72, w: 0.56, seed: 40 + i, color: '#b4a98f' }));
 
   // ── the clearing: stone table with a go board, four drum stools, a qin on its stand ──
   const cy = h.y(CLEAR.x, CLEAR.z);
@@ -604,7 +604,7 @@ function build(ctx: WorldCtx): void {
   ];
   rockSpots.forEach(([x, z, s], i) => {
     if (ctx.waterAt(x, z) !== null) return;
-    const g = rockGeometry(700 + i, s * 1.3, s * 0.8, { base: '#aeb0a2', dark: '#4a5048', lean: 0.1 });
+    const g = rockGeometry(700 + i, s * 1.3, s * 0.8, { base: '#b6ad97', dark: '#4f4a3e', lean: 0.1 });
     g.rotateY(rng() * TAU);
     g.translate(x, h.y(x, z) - 0.05, z);
     b.colored(g, { hull: true });
@@ -659,10 +659,10 @@ function build(ctx: WorldCtx): void {
     if (pathDist(x, z) < 3 || trailDist(x, z) < 2) continue;
     hazeItems.push({ p: new THREE.Vector3(x, h.y(x, z) + 1.6 + rng() * 2.5, z), w: 9 + rng() * 8, h: 3.5 + rng() * 3 });
   }
-  const haze = mistCards(h, hazeItems, { tex: h.tex(puffCanvas(128, 21)), color: '#dfe3d6', opacity: 0.55, drift: 0.25 });
+  const haze = mistCards(h, hazeItems, { tex: h.tex(puffCanvas(128, 21)), color: '#ece6cc', opacity: 0.55, drift: 0.25 });
   haze.name = 'bamboo:haze';
   h.add(haze);
-  h.frame(() => { (haze.material as T.MeshBasicMaterial).color.set('#dfe3d6').multiply(h.paper); });
+  h.frame(() => { (haze.material as T.MeshBasicMaterial).color.set('#ece6cc').multiply(h.paper); });
 
   // the go board invites a look
   h.interact({

@@ -7,7 +7,7 @@
 import type * as T from 'three';
 import type { RegionModule } from '../types';
 import { ANCHORS } from '../map';
-import { Kit, Parts, bob, flatsMesh, fontsReady, headingTo, packAtlas, riverZ, sway, type Flat } from './water-kit';
+import { Kit, Parts, bob, flatsMesh, fontsReady, headingTo, lampPools, packAtlas, riverZ, sway, type Flat } from './water-kit';
 import { Quads, RIDGE, STONE, WOODC, buildHouse, gableRoof, rectColliders, xfLines, type Collectors, type Front, type HouseSpec } from './water-arch';
 import { ATLAS_CHARS, CELL, bannerUV, cellUV, paintFacades, signUV, stripUV, willowDrawing } from './water-paint';
 import { rectClearing, segmentDeck } from './water-decks';
@@ -132,12 +132,12 @@ async function buildVillage(k: Kit): Promise<void> {
       if (run.n >= 6) flush();
       const shade = (Math.round(x / step) % 3) * 0.05;
       // slab: long side along the bank (local z = along ry)
-      c.solid.add(k.box(depth, top - bottom, len + 0.02, shade ? '#c4bdad' : STONE, cx, (top + bottom) / 2, cz, ry, 0.08), 25);
+      c.solid.add(k.box(depth, top - bottom, len + 0.02, shade ? '#c9bca2' : STONE, cx, (top + bottom) / 2, cz, ry, 0.08), 25);
       const ex = (pa.x + pb.x) / 2 + side * nm.x * 0.28, ez = (pa.z + pb.z) / 2 + side * nm.z * 0.28;
-      c.solid.add(k.box(0.66, 0.14, len - 0.03, '#b3ac9d', ex, top + 0.05, ez, ry, 0.08), 25);
+      c.solid.add(k.box(0.66, 0.14, len - 0.03, '#b8ab93', ex, top + 0.05, ez, ry, 0.08), 25);
       // tide mark and moss on the water face: a dark band just above the water
       const fx = (pa.x + pb.x) / 2 - side * nm.x * 0.02, fz = (pa.z + pb.z) / 2 - side * nm.z * 0.02;
-      c.solid.add(k.box(0.04, 0.28, len + 0.02, '#6f6c5e', fx, wy + 0.16, fz, ry, 0.15), false);
+      c.solid.add(k.box(0.04, 0.28, len + 0.02, '#726b58', fx, wy + 0.16, fz, ry, 0.15), false);
     }
     flush();
   };
@@ -157,24 +157,24 @@ async function buildVillage(k: Kit): Promise<void> {
     // landing at the water
     const l0 = r.w - 2.7, l1 = r.w - 0.9;
     const lm = at((l0 + l1) / 2);
-    c.solid.add(k.box(3.4, land - (wy - 0.9), l1 - l0, '#bfb8a8', lm.x, (land + wy - 0.9) / 2, lm.z, ry, 0.06), 25);
+    c.solid.add(k.box(3.4, land - (wy - 0.9), l1 - l0, '#c4b79d', lm.x, (land + wy - 0.9) / 2, lm.z, ry, 0.06), 25);
     for (let i = 0; i < nSteps; i++) {
       const d0 = l1 + i * 0.5, d1 = d0 + 0.5;
       const yTop = land + ((top - land) * (i + 1)) / (nSteps + 1);
       const m = at((d0 + d1) / 2);
-      c.solid.add(k.box(3.4, yTop - (wy - 0.9), 0.5, i % 2 ? '#c6bfaf' : '#bbb4a4', m.x, (yTop + wy - 0.9) / 2, m.z, ry, 0.06), 25);
+      c.solid.add(k.box(3.4, yTop - (wy - 0.9), 0.5, i % 2 ? '#cbbea4' : '#c0b399', m.x, (yTop + wy - 0.9) / 2, m.z, ry, 0.06), 25);
     }
     // a mooring post and two small stone lanterns on the landing's outer corners
     const mp = at(l0 + 0.3);
-    c.solid.add(k.cyl(0.12, 0.14, 0.7, 8, '#8f8a7f', mp.x - n.z * 1.3, land + 0.3, mp.z + n.x * 1.3), 30);
+    c.solid.add(k.cyl(0.12, 0.14, 0.7, 8, '#938977', mp.x - n.z * 1.3, land + 0.3, mp.z + n.x * 1.3), 30);
     for (const s of [-1, 1]) {
       const p = at(l0 + 0.35);
       const x = p.x - n.z * s * 1.4, z = p.z + n.x * s * 1.4, y = land;
       if (s > 0) continue;
-      c.solid.add(k.cyl(0.18, 0.22, 0.12, 6, '#a6a092', x, y + 0.06, z), 30);
-      c.solid.add(k.cyl(0.05, 0.07, 0.42, 6, '#b1ab9e', x, y + 0.33, z), 30);
-      c.solid.add(k.box(0.24, 0.22, 0.24, '#b8b2a5', x, y + 0.64, z, ry), 30);
-      c.solid.add(k.cyl(0.02, 0.26, 0.2, 6, '#8f8a80', x, y + 0.85, z), 30);
+      c.solid.add(k.cyl(0.18, 0.22, 0.12, 6, '#aa9f89', x, y + 0.06, z), 30);
+      c.solid.add(k.cyl(0.05, 0.07, 0.42, 6, '#b6aa94', x, y + 0.33, z), 30);
+      c.solid.add(k.box(0.24, 0.22, 0.24, '#bdb19a', x, y + 0.64, z, ry), 30);
+      c.solid.add(k.cyl(0.02, 0.26, 0.2, 6, '#938978', x, y + 0.85, z), 30);
       lanternAt.push([x, y + 0.64, z]);
       k.collider({ x, z, r: 0.25, h: 1 });
     }
@@ -221,39 +221,39 @@ async function buildVillage(k: Kit): Promise<void> {
     const body = new THREE.ExtrudeGeometry(shape, { depth: W, bevelEnabled: false, curveSegments: 28 });
     body.translate(0, 0, -W / 2);
     body.rotateY(-Math.PI / 2);
-    c.solid.add(k.tint(body, '#cbc4b4', 0.06, 3).applyMatrix4(m), 25);
+    c.solid.add(k.tint(body, '#d0c3a8', 0.06, 3).applyMatrix4(m), 25);
     // voussoir rings on both faces, keystone
     for (const s of [1, -1]) {
       const ring = new THREE.RingGeometry(R, R + 0.42, 26, 1, 0, Math.PI);
       ring.translate(0, yc, 0);
       ring.rotateY(s * Math.PI / 2);
       ring.translate(s * (W / 2 + 0.012), 0, 0);
-      c.solid.add(k.tint(ring, '#aaa395', 0.1, 5).applyMatrix4(m), 20);
-      c.solid.add(k.box(0.06, 0.5, 0.36, '#9d9689', s * (W / 2 + 0.03), yc + R + 0.22, 0).applyMatrix4(m), 30);
+      c.solid.add(k.tint(ring, '#aea28b', 0.1, 5).applyMatrix4(m), 20);
+      c.solid.add(k.box(0.06, 0.5, 0.36, '#a19580', s * (W / 2 + 0.03), yc + R + 0.22, 0).applyMatrix4(m), 30);
       // a creeper hanging over the arch
       c.solid.add(k.box(0.05, 0.9, 0.5, '#4f6a55', s * (W / 2 + 0.03), yc + R - 0.1, 1.9 * s, 0, 0.2).applyMatrix4(m), false);
     }
     // stair treads
     for (let s = -L + 0.3; s <= L - 0.3; s += 0.38) {
       const y = deckY(s);
-      c.solid.add(k.box(W - 0.46, 0.16, 0.4, Math.round(s / 0.38) % 2 ? '#c2bbab' : '#b8b1a1', 0, y + 0.03, s, 0, 0.05).applyMatrix4(m), 25);
+      c.solid.add(k.box(W - 0.46, 0.16, 0.4, Math.round(s / 0.38) % 2 ? '#c7baa0' : '#bdb097', 0, y + 0.03, s, 0, 0.05).applyMatrix4(m), 25);
     }
     // parapets: posts and panels following the hump, drum stones at the ends
     const posts: number[] = [];
     for (let s = -L + 0.5; s <= L - 0.4; s += 1.18) posts.push(s);
     for (const side of [1, -1]) {
       const x = side * (W / 2 - 0.12);
-      for (const s of posts) c.solid.add(k.box(0.2, 0.78, 0.2, '#c4bdae', x, deckY(s) + 0.39, s).applyMatrix4(m), 30);
+      for (const s of posts) c.solid.add(k.box(0.2, 0.78, 0.2, '#c9bca3', x, deckY(s) + 0.39, s).applyMatrix4(m), 30);
       for (let i = 1; i < posts.length; i++) {
         const s0 = posts[i - 1], s1 = posts[i];
         const y0 = deckY(s0) + 0.34, y1 = deckY(s1) + 0.34;
         const len = Math.hypot(s1 - s0, y1 - y0);
-        c.solid.add(k.box(0.13, 0.46, len, '#d0c9b9', x, (y0 + y1) / 2, (s0 + s1) / 2, 0, 0.04, -Math.atan2(y1 - y0, s1 - s0)).applyMatrix4(m), 30);
+        c.solid.add(k.box(0.13, 0.46, len, '#d5c8ad', x, (y0 + y1) / 2, (s0 + s1) / 2, 0, 0.04, -Math.atan2(y1 - y0, s1 - s0)).applyMatrix4(m), 30);
       }
       for (const e of [-1, 1]) {
         const s = e * (L - 0.1);
-        c.solid.add(k.box(0.24, 0.55, 0.8, '#bdb6a6', x, deckY(s) + 0.27, s).applyMatrix4(m), 30);
-        c.solid.add(k.cyl(0.3, 0.3, 0.2, 12, '#c7c0b0', x, deckY(s) + 0.72, s + e * 0.12, 0, 0, Math.PI / 2).applyMatrix4(m), 30);
+        c.solid.add(k.box(0.24, 0.55, 0.8, '#c2b59b', x, deckY(s) + 0.27, s).applyMatrix4(m), 30);
+        c.solid.add(k.cyl(0.3, 0.3, 0.2, 12, '#ccbfa5', x, deckY(s) + 0.72, s + e * 0.12, 0, 0, Math.PI / 2).applyMatrix4(m), 30);
       }
       // colliders along the parapet
       const a = new THREE.Vector3(x, 0, -L).applyMatrix4(m), b = new THREE.Vector3(x, 0, L).applyMatrix4(m);
@@ -387,9 +387,9 @@ async function buildVillage(k: Kit): Promise<void> {
         c.solid.add(k.box(1.0, 0.06, 0.28, '#6a4632', tx, y + 0.45, tz + s * 0.85), 30);
         c.solid.add(k.box(0.9, 0.42, 0.05, '#5a3b2a', tx, y + 0.22, tz + s * 0.85), false);
       }
-      c.solid.add(k.tint(k.xf(new THREE.SphereGeometry(0.11, 10, 7), tx + 0.1, y + 0.9, tz), '#4c5a63', 0.05), false);
-      c.solid.add(k.cyl(0.02, 0.02, 0.08, 5, '#4c5a63', tx + 0.22, y + 0.92, tz, 0, 0, 1.0), false);
-      for (const [a, b] of [[-0.25, 0.2], [-0.2, -0.22], [0.25, -0.25]]) c.solid.add(k.cyl(0.04, 0.03, 0.05, 7, '#e8e2d4', tx + a, y + 0.84, tz + b), false);
+      c.solid.add(k.tint(k.xf(new THREE.SphereGeometry(0.11, 10, 7), tx + 0.1, y + 0.9, tz), '#4f5a5d', 0.05), false);
+      c.solid.add(k.cyl(0.02, 0.02, 0.08, 5, '#4f5a5d', tx + 0.22, y + 0.92, tz, 0, 0, 1.0), false);
+      for (const [a, b] of [[-0.25, 0.2], [-0.2, -0.22], [0.25, -0.25]]) c.solid.add(k.cyl(0.04, 0.03, 0.05, 7, '#eee1c6', tx + a, y + 0.84, tz + b), false);
       k.collider({ x: tx, z: tz, r: 0.9, h: 0.9 });
     }
   }
@@ -406,7 +406,7 @@ async function buildVillage(k: Kit): Promise<void> {
     const x0 = -21, x1 = 36, z0 = 74.5, z1 = 99.5;
     const pos: number[] = [], col: number[] = [], lines: number[] = [];
     const inside = (x: number, z: number) => paveRects.some(([a, b, cc, d]) => x >= a && x <= cc && z >= b && z <= d);
-    const cA = new THREE.Color('#c3bba9'), cB = new THREE.Color('#d2cbba'), cM = new THREE.Color('#aaa290');
+    const cA = new THREE.Color('#c3bba9'), cB = new THREE.Color('#d7caae'), cM = new THREE.Color('#aaa290');
     let n = 0;
     for (let z = z0; z < z1; z += S) for (let x = x0; x < x1; x += S) {
       const mx = x + S / 2, mz = z + S / 2;
@@ -437,9 +437,9 @@ async function buildVillage(k: Kit): Promise<void> {
   {
     const wx = ANCHORS.villageSquare.x - 6, wz = ANCHORS.villageSquare.z + 6.8;
     const y = gy(wx, wz);
-    c.solid.add(k.tint(k.xf(new THREE.CylinderGeometry(0.78, 0.84, 0.72, 14, 1, true), wx, y + 0.36, wz), '#aaa395', 0.05), 25);
-    c.solid.add(k.tint(k.xf(new THREE.CylinderGeometry(0.6, 0.6, 0.7, 14, 1, true), wx, y + 0.36, wz).scale(1, 1, 1), '#6e695e', 0.05), false);
-    c.solid.add(k.tint(k.xf(new THREE.RingGeometry(0.6, 0.84, 14).rotateX(-Math.PI / 2), wx, y + 0.72, wz), '#bab3a4', 0.05), 25);
+    c.solid.add(k.tint(k.xf(new THREE.CylinderGeometry(0.78, 0.84, 0.72, 14, 1, true), wx, y + 0.36, wz), '#aea28b', 0.05), 25);
+    c.solid.add(k.tint(k.xf(new THREE.CylinderGeometry(0.6, 0.6, 0.7, 14, 1, true), wx, y + 0.36, wz).scale(1, 1, 1), '#716858', 0.05), false);
+    c.solid.add(k.tint(k.xf(new THREE.RingGeometry(0.6, 0.84, 14).rotateX(-Math.PI / 2), wx, y + 0.72, wz), '#bfb299', 0.05), 25);
     c.solid.add(k.tint(k.xf(new THREE.CircleGeometry(0.6, 14).rotateX(-Math.PI / 2), wx, y + 0.2, wz), '#2f3634', 0), false);
     for (const s of [-1, 1]) c.solid.add(k.box(0.12, 1.9, 0.12, WOODC, wx + s * 0.95, y + 0.95, wz), 30);
     c.solid.add(k.cyl(0.05, 0.05, 2.1, 6, WOODC, wx, y + 1.8, wz, 0, 0, Math.PI / 2), 30);
@@ -450,15 +450,15 @@ async function buildVillage(k: Kit): Promise<void> {
     // stone benches along the square's edges
     for (const [bx, bz, ry] of [[-19.2, 85, Math.PI / 2], [-19.2, 90, Math.PI / 2], [6.5, 82.6, 0]] as V3[]) {
       const yy = gy(bx, bz);
-      c.solid.add(k.box(1.8, 0.14, 0.5, '#bdb6a6', bx, yy + 0.46, bz, ry), 30);
-      for (const s of [-0.65, 0.65]) c.solid.add(k.box(0.3, 0.4, 0.44, '#aaa395', bx + Math.sin(ry + Math.PI / 2) * s, yy + 0.2, bz + Math.cos(ry + Math.PI / 2) * s, ry), 30);
+      c.solid.add(k.box(1.8, 0.14, 0.5, '#c2b59b', bx, yy + 0.46, bz, ry), 30);
+      for (const s of [-0.65, 0.65]) c.solid.add(k.box(0.3, 0.4, 0.44, '#aea28b', bx + Math.sin(ry + Math.PI / 2) * s, yy + 0.2, bz + Math.cos(ry + Math.PI / 2) * s, ry), 30);
       k.collider({ x: bx, z: bz, r: 0.7, h: 0.6 });
     }
   }
 
   // ───────────── the market: stalls with awnings, baskets, umbrellas, the 糖人 stall
   {
-    const AWN = ['#3d5a73', '#a8703a', '#e2dccd', '#8c5a48', '#3d5a73', '#6d7d6a'];
+    const AWN = ['#3d5a73', '#a8703a', '#e8dbc0', '#8c5a48', '#3d5a73', '#707c63'];
     const stall = (x: number, z: number, ry: number, i: number, kind: 'produce' | 'umbrella' | 'baskets') => {
       const y = gy(x, z);
       const m = mat4(x, y, z, ry);
@@ -531,23 +531,23 @@ async function buildVillage(k: Kit): Promise<void> {
     const m = mat4(px, y, pz, ry);
     const add = (g: T.BufferGeometry, e: number | false = 30) => c.solid.add(g.applyMatrix4(m), e);
     const P = (lx: number, ly: number, lz: number) => new THREE.Vector3(lx, ly, lz).applyMatrix4(m);
-    const PIL = '#c3bcac';
+    const PIL = '#c8bba1';
     for (const [x, hgt] of [[-3.7, 4.3], [-1.75, 5.3], [1.75, 5.3], [3.7, 4.3]]) {
       add(k.box(0.44, hgt, 0.44, PIL, x, hgt / 2, 0));
-      add(k.box(0.62, 0.3, 0.62, '#b1aa9a', x, 0.15, 0));
+      add(k.box(0.62, 0.3, 0.62, '#b6a990', x, 0.15, 0));
       for (const s of [-1, 1]) {
-        add(k.box(0.34, 0.9, 0.7, '#b6af9f', x, 0.45, s * 0.55));
-        add(k.cyl(0.32, 0.32, 0.26, 12, '#bdb6a6', x, 1.0, s * 0.6, 0, 0, Math.PI / 2));
+        add(k.box(0.34, 0.9, 0.7, '#bbae95', x, 0.45, s * 0.55));
+        add(k.cyl(0.32, 0.32, 0.26, 12, '#c2b59b', x, 1.0, s * 0.6, 0, 0, Math.PI / 2));
       }
       const w = P(x, 0, 0);
       k.collider({ x: w.x, z: w.z, r: 0.42, h: hgt });
     }
-    add(k.box(3.9, 0.36, 0.34, '#bab3a3', 0, 4.55, 0));
-    add(k.box(3.9, 0.28, 0.3, '#bab3a3', 0, 3.55, 0));
-    add(k.box(1.6, 0.26, 0.3, '#bab3a3', -2.72, 3.55, 0));
-    add(k.box(1.6, 0.26, 0.3, '#bab3a3', 2.72, 3.55, 0));
-    add(k.box(0.3, 0.7, 0.26, '#b1aa9a', -0.9, 4.05, 0));
-    add(k.box(0.3, 0.7, 0.26, '#b1aa9a', 0.9, 4.05, 0));
+    add(k.box(3.9, 0.36, 0.34, '#bfb298', 0, 4.55, 0));
+    add(k.box(3.9, 0.28, 0.3, '#bfb298', 0, 3.55, 0));
+    add(k.box(1.6, 0.26, 0.3, '#bfb298', -2.72, 3.55, 0));
+    add(k.box(1.6, 0.26, 0.3, '#bfb298', 2.72, 3.55, 0));
+    add(k.box(0.3, 0.7, 0.26, '#b6a990', -0.9, 4.05, 0));
+    add(k.box(0.3, 0.7, 0.26, '#b6a990', 0.9, 4.05, 0));
     // plaque on both faces
     const pq = new Quads();
     for (const s of [1, -1]) {
@@ -600,7 +600,7 @@ async function buildVillage(k: Kit): Promise<void> {
 
   // ───────────── laundry: bamboo poles out of upper windows, and a line in the back yard
   {
-    const COL = ['#f1ece0', '#3d5a73', '#e6dcc4', '#a8703a', '#46607a', '#f1ece0'];
+    const COL = ['#f7ebd1', '#3d5a73', '#e6dcc4', '#a8703a', '#46607a', '#f7ebd1'];
     let ci = 0;
     const pole = (a: T.Vector3, b: T.Vector3, pieces: number) => {
       c.solid.add(k.beam(a, b, 0.05, '#9a8458', true), false);
@@ -688,7 +688,9 @@ async function buildVillage(k: Kit): Promise<void> {
   g2.fillRect(0, 0, 64, 64);
   const pg = new THREE.BufferGeometry();
   pg.setAttribute('position', new THREE.Float32BufferAttribute(lanternAt.flat(), 3));
-  const glowMat = k.own(new THREE.PointsMaterial({ map: k.canvasTex(gc), color: '#ffc47a', size: 2.6, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  const glowTex = k.canvasTex(gc);
+  const pools = lampPools(k, lanternAt, glowTex, 'village-pools');
+  const glowMat = k.own(new THREE.PointsMaterial({ map: glowTex, color: '#ffc47a', size: 2.6, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
   const glows = new THREE.Points(k.own(pg), glowMat);
   glows.name = 'village-glows';
   glows.visible = false;
@@ -704,6 +706,7 @@ async function buildVillage(k: Kit): Promise<void> {
     lanternMat.emissive.setRGB(0.6 * night * flick, 0.22 * night * flick, 0.08 * night);
     glowMat.opacity = 0.6 * night;
     glows.visible = night > 0.02;
+    pools(night, flick);
   });
 }
 

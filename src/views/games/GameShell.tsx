@@ -1,8 +1,10 @@
 // The frame every game page shares: a way back to the games hall, a title, and an actions slot.
 import type { ComponentChildren } from 'preact';
+import { useEffect } from 'preact/hooks';
 import { go } from '../../app/router';
 import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
+import { watchErrands } from './purse';
 import './games.css';
 
 export function GameShell(props: {
@@ -18,6 +20,8 @@ export function GameShell(props: {
 }) {
   const t = useT();
   const zh = lang.value === 'zh';
+  // today's errands a game finishes pay into the purse: say so
+  useEffect(watchErrands, []);
   return (
     <section class={'game-page' + (props.class ? ' ' + props.class : '')}>
       <header class="game-head">

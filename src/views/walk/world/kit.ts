@@ -1,5 +1,59 @@
 // Small shared helpers for the 3D world: disposal bag, toon & outline materials, canvas textures.
 import * as THREE from 'three';
+import type { Season } from '../../../ink/scene-types';
+
+/**
+ * The warm palette of the world (青绿山水 with restraint): pigments for everyone who paints in it.
+ * Use these rather than inventing near-greys — 冷清 (cold and desolate) is the enemy.
+ */
+export const WARM = {
+  /** xuan paper, the ground of everything */
+  paper: '#f1e9d8',
+  /** a whitewashed wall in daylight (warm white, never blue-white) */
+  wall: '#f3ecdc',
+  /** ink: near-black with a brown heart */
+  ink: '#1b1916',
+  /** thin ink wash / a shadow: warm ink-brown, never blue-grey */
+  shadow: '#5a4636',
+  /** 朱 vermilion: pillars, railings, seals */
+  vermilion: '#c0412f',
+  /** 胭脂 rouge: plum and peach blossom, lanterns' silk */
+  rouge: '#c8506a',
+  /** 藤黄 gamboge: chrysanthemum, gold leaf, sunlit willow */
+  gamboge: '#e2a72e',
+  /** 赭石 ochre: earth, bark, the foot of hills */
+  ochre: '#b27a48',
+  /** 石绿 jade green: foliage, moss, lotus leaves */
+  jade: '#5f9c7c',
+  /** tender yellow-green of new leaves and grass */
+  leaf: '#a4b964',
+  /** 花青 indigo-teal: roof tiles' glaze, far hills, deep water */
+  indigo: '#2f5f73',
+  /** 石青 azurite: the blue of the far ridges */
+  azure: '#6e93a8',
+  /** dark roof tiles: blue-black */
+  tile: '#2e3239',
+  /** timber: warm brown */
+  wood: '#7a4e32',
+  /** lantern light and lit windows */
+  lantern: '#ffb86b',
+  /** moonlight on things */
+  moon: '#dfe6fa',
+  /** the night sky overhead */
+  night: '#0b1130',
+} as const;
+
+/**
+ * The meadow by season — the garden's lawn and the open country around it share it, so they meet
+ * without a seam. Painted grass: yellow-green, a little ochre in autumn, snow-pale in winter.
+ */
+export const LAWN: Record<Season, string> = { spring: '#b0cda0', summer: '#a3c597', autumn: '#b7c59d', winter: '#e8e8e2' };
+
+/**
+ * What the night does to the land (a multiplier on the lit ground): a deep moonlit indigo, so the
+ * paths and lawns go quiet and the lanterns' pools and the lit windows carry the warmth.
+ */
+export const NIGHT_LAND = '#848cb4';
 
 /** Everything the world allocates goes in here so unmounting frees all GPU memory. */
 export class Bag {

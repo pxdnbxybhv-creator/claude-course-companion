@@ -7,7 +7,7 @@ import { makeSeal, sealReady, SEAL_RED } from '../../ink/seal';
 import { play } from '../../app/play';
 import { QUESTS } from '../../data/quests';
 import { paintCompanion } from './paint';
-import { SEAL_QUESTS, sealLook, statText } from './helpers';
+import { SEAL_QUESTS, hallStat, sealLook } from './helpers';
 
 const TEXT_FONT = "'LXGW WenKai','Kaiti SC','STKaiti','KaiTi',serif";
 let sealImg: { key: string; c: HTMLCanvasElement } | null = null;
@@ -127,7 +127,7 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
 /** "同伴 4/13 · 印 2" / "Companions 4/13 · Seals 2". */
 export function statLine(lang: 'zh' | 'en'): string | null {
   try {
-    return statText(play.value, lang);
+    return hallStat(play.value, lang);
   } catch {
     return null;
   }

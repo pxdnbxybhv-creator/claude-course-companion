@@ -1,7 +1,8 @@
 // 中秋 · Mid-Autumn: a huge golden moon rising over the 问月亭 and its glittering path on the pond,
 // eight mooncakes hidden round the garden (eat them all!), a jade rabbit on the lawn, an ink-painted
 // osmanthus with a lantern in its branches, two more lanterns held out over the water.
-// Chosen 昼 (day) wins over the festival's night: a pale daytime moon, lanterns unlit.
+// It keeps the real clock: by day a pale daytime moon and the lanterns hung unlit; the big moon
+// rises at dusk (or when the visitor picks 夜, or previews the festival on another day).
 import type * as T from 'three';
 import type { WorldCtx } from '../types';
 import { Bag, BRUSH_FONT, canvasTexture, claims, distXZ, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, outlineMat, loadBrush, pondDist, propMat, reducedMotion, reflects, shorePoint, tabletSpots, tween, dayRng } from './kit';
@@ -226,7 +227,7 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   await loadBrush(FLAVOURS.map((f) => f.mark).join('') + '但愿人长久千里共婵娟团圆');
   if (bag.disposed) return;
 
-  // Night falls for the moon — unless the visitor chose 昼. Features never own the sky: restore it.
+  // The moon's night comes at dusk (at once in a preview; 昼 / 夜 win). Features never own the sky: restore it.
   const night = festivalNight(bag);
   // Where the moon rises: across the pond from the way in, along the bridge toward the 问月亭 and a
   // little to its right, low (about 7°) so it hangs framed over the pavilion inside the walking view.
@@ -346,7 +347,7 @@ export const midautumn = feature('midautumn', async (bag, ctx) => {
   const label = { zh: '月饼', en: 'Mooncakes' };
   bag.counter('mooncakes', label, `0/${total}`);
   if (night) ctx.hud.toast('中秋快乐！园中藏着八块月饼，去找找看', 'Happy Mid-Autumn! Eight mooncakes are hidden in the garden', 4200);
-  else ctx.hud.toast('中秋快乐！白日里月亮淡淡的——园中藏着八块月饼', 'Happy Mid-Autumn! A pale moon by day, and eight mooncakes hidden in the garden', 4200);
+  else ctx.hud.toast('中秋快乐！园中藏着八块月饼；待到黄昏，明月便从亭后升起', 'Happy Mid-Autumn! Eight mooncakes are hidden in the garden; at dusk the full moon rises behind the pavilion', 4200);
 
   cakes.forEach((c, i) => {
     const off = bag.interact({

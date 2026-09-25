@@ -105,6 +105,22 @@
 .cel.is-stamped .cel-ring { animation: cel-ring 0.7s 0.3s ease-out backwards; }
 @keyframes cel-ring { from { opacity: 0.7; transform: scale(0.8) rotate(-5deg); } to { opacity: 0; transform: scale(1.45) rotate(-5deg); } }
 .cel-sealnote { margin: 4px 0 0; font-size: 15px; color: #4a443c; line-height: 1.6; max-width: 26em; }
+/* 技 and 赏钱: the new companion's skill, and the coins the quest paid */
+.cel-skill {
+  display: inline-flex; align-items: center; gap: 7px; margin: 8px 0 0; font-size: 13.5px; color: #4a443c; letter-spacing: 0.06em;
+  animation: cel-rise 0.8s 0.85s var(--ease) both;
+}
+.cel-skill b {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-weight: 400;
+  font-family: var(--font-brush); font-size: 15px; line-height: 1; color: #fbf5ea; background: #b93a2b;
+}
+.cel-coins {
+  --paper: #f1e9d8;
+  display: inline-flex; align-items: center; gap: 6px; margin: 8px 0 0; padding: 3px 12px 3px 5px; border-radius: 999px;
+  font-size: 13.5px; color: #7a5019; letter-spacing: 0.06em;
+  background: rgba(232, 199, 122, 0.22); border: 1px solid rgba(184, 137, 58, 0.4);
+  animation: cel-rise 0.8s 0.95s var(--ease) both;
+}
 
 .cel-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
 .cel-btn {
@@ -163,7 +179,7 @@
 .cel.is-reduced.is-stamped .cel-leaf.is-seal { animation: cel-fade 0.2s linear both; -webkit-mask-image: none; mask-image: none; }
 .cel.is-reduced.is-out .cel-leaf, .cel.is-reduced.is-out .cel-veil { animation: cel-fade-out 0.16s linear both; }
 .cel.is-reduced .cel-bloom, .cel.is-reduced .cel-fan, .cel.is-reduced .cel-new, .cel.is-reduced .cel-names,
-.cel.is-reduced .cel-title, .cel.is-reduced .cel-ability, .cel.is-reduced .cel-ring { animation: none; }
+.cel.is-reduced .cel-title, .cel.is-reduced .cel-ability, .cel.is-reduced .cel-ring, .cel.is-reduced .cel-skill, .cel.is-reduced .cel-coins { animation: none; }
 .cel.is-reduced.is-stamped .cel-stamp { animation: none; opacity: 1; transform: rotate(-5deg); }
 .cel.is-reduced .cel-timer { display: none; }
 @media (prefers-reduced-motion: reduce) {

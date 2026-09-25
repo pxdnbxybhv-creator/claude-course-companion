@@ -34,6 +34,7 @@ export interface CharacterModel {
   hold?(prop: string | null): void;
 }
 
-export type CharacterFactory = (THREE: typeof THREE_NS, opts: { palette: Record<string, string> }) => CharacterModel;
+/** `reduced`: prefers-reduced-motion (read from the media query when not given). */
+export type CharacterFactory = (THREE: typeof THREE_NS, opts: { palette: Record<string, string>; reduced?: boolean }) => CharacterModel;
 
 export type CharacterRegistry = Record<CharacterId, CharacterFactory>;

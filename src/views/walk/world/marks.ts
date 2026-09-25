@@ -81,21 +81,37 @@ function discGeometry(bag: Bag, seg = 28, rings = 5): THREE.BufferGeometry {
 
 interface Drape { mesh: THREE.Mesh; base: Float32Array; x: number; z: number }
 
+/** A damp patch in the shared wet layer: its place, size, and how wet it is now (k) and wants to be. */
+interface Wet { x: number; z: number; r: number; k: number; want: number; at: number }
+
 export class InkMarks {
   readonly group = new THREE.Group();
   private bloomTex: THREE.Texture;
-  private wetTex: THREE.Texture;
   private unit: THREE.BufferGeometry;
   private blooms: { d: Drape; mat: THREE.MeshBasicMaterial; age: number; life: number; r: number }[] = [];
-  private wet = new Map<string, { d: Drape; mat: THREE.MeshBasicMaterial; k: number; want: number; r: number }>();
+  /** Every damp patch is one draw: the patches share a mesh; each one's wetness is its vertices' alpha. */
+  private wet = new Map<string, Wet>();
+  private wetMesh: THREE.Mesh;
+  private wetMat: THREE.MeshBasicMaterial;
+  private wetDirty = false;
   private tmp = new THREE.Color();
-  private nightInk = new THREE.Color('#2a3140');
+  private nightInk = new THREE.Color('#2d2218');
 
   constructor(private bag: Bag, private reduced: boolean) {
     this.group.name = 'ink-marks';
     this.bloomTex = canvasTexture(bag, bloomCanvas(), { mips: false });
-    this.wetTex = canvasTexture(bag, wetCanvas(), { mips: false });
+    const wetTex = canvasTexture(bag, wetCanvas(), { mips: false });
     this.unit = discGeometry(bag);
+    this.wetMat = bag.add(new THREE.MeshBasicMaterial({
+      map: wetTex, color: '#1b1916', transparent: true, depthWrite: false, vertexColors: true,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    }));
+    this.wetMesh = new THREE.Mesh(bag.add(new THREE.BufferGeometry()), this.wetMat);
+    this.wetMesh.layers.set(NO_REFLECT);
+    this.wetMesh.renderOrder = 1;
+    this.wetMesh.frustumCulled = false;
+    this.wetMesh.visible = false;
+    this.group.add(this.wetMesh);
   }
 
   private drape(x: number, z: number, r: number, map: THREE.Texture, lift: number): { d: Drape; mat: THREE.MeshBasicMaterial } {
@@ -145,25 +161,74 @@ export class InkMarks {
     b.d.mesh.visible = true;
   }
 
+  /** Lay every damp patch into the shared mesh (when one is added). */
+  private rebuildWet(): void {
+    const unit = this.unit;
+    const up = unit.attributes.position as THREE.BufferAttribute, uu = unit.attributes.uv as THREE.BufferAttribute;
+    const ui = unit.index!;
+    const nv = up.count, ni = ui.count;
+    const list = [...this.wet.values()];
+    const pos = new Float32Array(list.length * nv * 3), uv = new Float32Array(list.length * nv * 2), col = new Float32Array(list.length * nv * 4);
+    const idx = new Uint32Array(list.length * ni);
+    list.forEach((w, n) => {
+      w.at = n * nv;
+      for (let i = 0; i < nv; i++) {
+        const x = w.x + up.getX(i) * w.r, z = w.z + up.getZ(i) * w.r;
+        const o = (w.at + i) * 3;
+        pos[o] = x; pos[o + 1] = terrainY(x, z) + 0.028; pos[o + 2] = z;
+        uv[(w.at + i) * 2] = uu.getX(i); uv[(w.at + i) * 2 + 1] = uu.getY(i);
+        const c = (w.at + i) * 4;
+        col[c] = col[c + 1] = col[c + 2] = 1; col[c + 3] = w.k * 0.55;
+      }
+      for (let j = 0; j < ni; j++) idx[n * ni + j] = w.at + ui.getX(j);
+    });
+    const old = this.wetMesh.geometry;
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    this.wetMesh.geometry = this.bag.add(g);
+    old.dispose();
+  }
+
+  /** Write each patch's wetness into its vertices' alpha. */
+  private paintWet(): void {
+    const col = this.wetMesh.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+    if (!col) return;
+    const a = col.array as Float32Array;
+    const nv = this.unit.attributes.position.count;
+    let any = false;
+    for (const w of this.wet.values()) {
+      const v = w.k * 0.55;
+      for (let i = 0; i < nv; i++) a[(w.at + i) * 4 + 3] = v;
+      if (w.k > 0.01) any = true;
+    }
+    col.needsUpdate = true;
+    this.wetMesh.visible = any;
+  }
+
   /** The damp patch under a plant watered today; `strength` grows a little with the streak. */
   setWet(key: string, x: number, z: number, on: boolean, strength = 1, r = 1.1): void {
     let w = this.wet.get(key);
     if (!w) {
       if (!on) return;
-      const { d, mat } = this.drape(x, z, r, this.wetTex, 0.028);
-      w = { d, mat, k: 0, want: 0, r };
+      w = { x, z, r, k: 0, want: 0, at: 0 };
       this.wet.set(key, w);
+      this.rebuildWet();
     }
     w.want = on ? Math.min(1, 0.55 + 0.45 * strength) : 0;
+    this.wetDirty = true;
   }
 
   /** Show the patches at once (the world is built with today's watering already done). */
   settle(): void {
-    for (const w of this.wet.values()) { w.k = w.want; w.mat.opacity = w.k * 0.55; w.d.mesh.visible = w.k > 0.01; }
+    for (const w of this.wet.values()) w.k = w.want;
+    this.paintWet();
   }
 
   update(dt: number, night: number): void {
-    // at night the ink reads as shadow-blue, never pure black
+    // at night the ink reads as a warm deep shadow, never pure black (nor cold blue)
     const ink = this.tmp.set('#1b1916').lerp(this.nightInk, night);
     for (const b of this.blooms) {
       if (b.age >= b.life) continue;
@@ -175,12 +240,13 @@ export class InkMarks {
       b.mat.opacity = 0.62 * Math.min(1, k * 6) * (1 - k * k);
       b.mat.color.copy(ink);
     }
+    this.wetMat.color.copy(ink);
+    let moving = false;
     for (const w of this.wet.values()) {
-      w.mat.color.copy(ink);
-      if (Math.abs(w.k - w.want) < 0.002) continue;
+      if (Math.abs(w.k - w.want) < 0.002) { w.k = w.want; continue; }
       w.k += (w.want - w.k) * Math.min(1, dt * 1.4);
-      w.mat.opacity = w.k * 0.55;
-      w.d.mesh.visible = w.k > 0.01;
+      moving = true;
     }
+    if (moving || this.wetDirty) { this.wetDirty = moving; this.paintWet(); }
   }
 }

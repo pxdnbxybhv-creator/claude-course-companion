@@ -11,6 +11,8 @@ import { toKey } from '../../../../core/date';
 import { catSpotFor, type CatSpot } from './logic';
 import * as sfx from '../sfx';
 import * as snd from './sound';
+import { catPay } from '../../../games/economy';
+import { pay, payLine } from '../../../games/purse';
 
 /** Today's hiding place (by the world's date). */
 export function todaysCat(ctx: WorldCtx): CatSpot {
@@ -58,13 +60,16 @@ export const hideAndSeek = feature('mg-cat', (bag, ctx) => {
       sfx.purr(2.8, 0.8);
       if (pets === 1 && !foundToday()) {
         record('cat');
+        const pp = catPay();
+        const out = pay(pp);
+        const coinZh = payLine(pp, out, 'zh'), coinEn = payLine(pp, out, 'en');
         ctx.player.emote('jump');
         snd.ding(4);
         const n = play.value.counters.cat ?? 0;
         ctx.hud.showCard({
           titleZh: '找到大橘了！', titleEn: 'Found Big Ginger!',
-          bodyZh: `它躲在${spot.whereZh}，正睡得香。\n被你找到，它不情不愿地伸了个懒腰。\n\n寻猫启事 · 第 ${n} 回${n < 3 ? '（找到三回，它就愿意跟你走）' : ''}\n明天它又会换个地方。`,
-          bodyEn: `He was hiding ${spot.whereEn}, fast asleep.\nFound out, he stretches — most unwillingly.\n\nMissing cat · found ${n} time${n === 1 ? '' : 's'}${n < 3 ? ' (find him three times and he will come along with you)' : ''}\nTomorrow he will hide somewhere else.`,
+          bodyZh: `它躲在${spot.whereZh}，正睡得香。\n被你找到，它不情不愿地伸了个懒腰。\n\n寻猫启事 · 第 ${n} 回${n < 3 ? '（找到三回，它就愿意跟你走）' : ''}\n明天它又会换个地方。${coinZh ? `\n\n寻猫赏钱 · ${coinZh}` : ''}`,
+          bodyEn: `He was hiding ${spot.whereEn}, fast asleep.\nFound out, he stretches — most unwillingly.\n\nMissing cat · found ${n} time${n === 1 ? '' : 's'}${n < 3 ? ' (find him three times and he will come along with you)' : ''}\nTomorrow he will hide somewhere else.${coinEn ? `\n\nA finder’s reward · ${coinEn}` : ''}`,
           seal: '猫',
         });
       } else {

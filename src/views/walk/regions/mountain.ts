@@ -9,7 +9,7 @@ import type { RegionModule, WorldCtx } from '../types';
 import { ANCHORS, REGION, RIVER, type XZ } from '../map';
 import { makeRng } from '../../../core/rng';
 import {
-  Batch, COL, Hill, TAU, canvas, clamp, footing, glowCanvas, hipRoof, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
+  Batch, COL, Hill, TAU, canvas, clamp, footing, glowCanvas, hipRoof, lampPools, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
   polyDist, puffCanvas, rect, rockGeometry, roof, stairs, three, windCards, wind, xform,
 } from './hill-kit';
 import { segmentDeck, type Clearing, type Deck } from './water-decks';
@@ -272,7 +272,7 @@ function build(ctx: WorldCtx): void {
   const lion = (p: XZ, s: number) => {
     const L = frame(p.x, p.z, FACE);
     const gy = h.y(p.x, p.z);
-    const stone = '#b5afa1', dark = '#8f897c';
+    const stone = '#baae97', dark = '#938874';
     footing(b, h, p.x, p.z, 0.6, 0.72, FACE, gy + 0.2, COL.stoneMid);
     footing(b, h, p.x, p.z, 0.46, 0.6, FACE, gy + 0.74, stone);
     const y0 = gy + 0.74;
@@ -344,7 +344,7 @@ function build(ctx: WorldCtx): void {
     }
     const beamY = top + colH;
     b.add(place(new THREE.BoxGeometry(A * 2, 0.34, C * 2), GATE.x, beamY + 0.1, GATE.z, FACE), COL.wood, { edge: 30 });
-    b.add(place(new THREE.BoxGeometry(A * 2 + 0.3, 0.3, C * 2 + 0.3), GATE.x, beamY + 0.42, GATE.z, FACE), '#3f5553', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(A * 2 + 0.3, 0.3, C * 2 + 0.3), GATE.x, beamY + 0.42, GATE.z, FACE), '#41554e', { edge: 30 });
     hipRoof(b, GATE.x, GATE.z, FACE, A + 1.4, C + 1.3, beamY + 0.55, 2.0, { curl: 0.5, flare: 0.35 });
     // the name board hangs below the painted band, clear of it
     plaque('云深寺', F(0, C + 0.19), beamY - 0.2, FACE, 1.8, 0.62);
@@ -409,12 +409,12 @@ function build(ctx: WorldCtx): void {
   flight('stairs', G, 0, -C_GATE - 2.2, COURT.z0, gateY, courtTop, 4.2, 21);
   rects.push(gRect(-9.6, 9.6, -C_GATE - 0.9, -C_GATE - 2.2));
   const stoneLantern = (p: XZ, y: number) => {
-    b.add(place(new THREE.CylinderGeometry(0.26, 0.3, 0.18, 6), p.x, y + 0.09, p.z), '#a6a092', { edge: 40 });
-    b.add(place(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), p.x, y + 0.5, p.z), '#b1ab9e', { rim: true });
-    b.add(place(new THREE.BoxGeometry(0.34, 0.3, 0.34), p.x, y + 1.0, p.z), '#b8b2a5', { edge: 40 });
+    b.add(place(new THREE.CylinderGeometry(0.26, 0.3, 0.18, 6), p.x, y + 0.09, p.z), '#aa9f89', { edge: 40 });
+    b.add(place(new THREE.CylinderGeometry(0.08, 0.1, 0.7, 8), p.x, y + 0.5, p.z), '#b6aa94', { rim: true });
+    b.add(place(new THREE.BoxGeometry(0.34, 0.3, 0.34), p.x, y + 1.0, p.z), '#bdb19a', { edge: 40 });
     b.add(place(new THREE.BoxGeometry(0.35, 0.14, 0.35), p.x, y + 1.0, p.z), '#4a4540');
-    b.add(place(new THREE.ConeGeometry(0.38, 0.28, 6), p.x, y + 1.29, p.z), '#8f8a80', { edge: 40 });
-    b.add(place(new THREE.SphereGeometry(0.07, 8, 6), p.x, y + 1.46, p.z), '#8f8a80');
+    b.add(place(new THREE.ConeGeometry(0.38, 0.28, 6), p.x, y + 1.29, p.z), '#938978', { edge: 40 });
+    b.add(place(new THREE.SphereGeometry(0.07, 8, 6), p.x, y + 1.46, p.z), '#938978');
     addGlow(new THREE.Vector3(p.x, y + 1.0, p.z), 1.5);
     h.collide({ x: p.x, z: p.z, r: 0.3, h: 1.5 });
   };
@@ -489,7 +489,7 @@ function build(ctx: WorldCtx): void {
     const smokeAt = new THREE.Vector3(cp.x, cy + 1.45, cp.z);
     const smoke = particles(h, {
       count: 70, at: [smokeAt], spread: [0.3, 0.05, 0.3], vel: [0.08, 0.5, 0.04], velJitter: [0.06, 0.1, 0.06], life: 9, size: 0.9, grow: 3.4,
-      color: '#8e8a84', opacity: 0.3, tex: h.tex(puffCanvas(64, 5)), wobble: 0.6, seed: 12,
+      color: '#92897b', opacity: 0.3, tex: h.tex(puffCanvas(64, 5)), wobble: 0.6, seed: 12,
     });
     smoke.name = 'mountain:incense-smoke';
     h.add(smoke);
@@ -559,7 +559,7 @@ function build(ctx: WorldCtx): void {
     // beams, bracket sets (斗拱) and the lower eave
     const beamY = hallTop + colH;
     b.add(place(new THREE.BoxGeometry(A * 2 + 0.5, 0.42, C * 2 + 0.5), HALL.x, beamY + 0.05, HALL.z, FACE), COL.wood, { edge: 30 });
-    b.add(place(new THREE.BoxGeometry(A * 2 + 0.9, 0.36, C * 2 + 0.9), HALL.x, beamY + 0.44, HALL.z, FACE), '#3f5553', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(A * 2 + 0.9, 0.36, C * 2 + 0.9), HALL.x, beamY + 0.44, HALL.z, FACE), '#41554e', { edge: 30 });
     for (let i = 0; i <= 16; i++) {
       const lx = -A + (i / 16) * A * 2;
       for (const lz of [C + 0.46, -C - 0.46]) {
@@ -580,7 +580,7 @@ function build(ctx: WorldCtx): void {
       win.push(p.x, dY + 0.25, p.z, p.x, dY + 1.25, p.z);
     }
     b.segs(win);
-    b.add(place(new THREE.BoxGeometry((A - 0.3) * 2, 0.3, (C - 0.3) * 2), HALL.x, dY + 1.62, HALL.z, FACE), '#3f5553', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry((A - 0.3) * 2, 0.3, (C - 0.3) * 2), HALL.x, dY + 1.62, HALL.z, FACE), '#41554e', { edge: 30 });
     hipRoof(b, HALL.x, HALL.z, FACE, A + 1.3, C + 1.2, dY + 1.78, 3.1, { curl: 0.65, flare: 0.5 });
     const pf = F(0, C - 0.52);
     plaque('大雄宝殿', pf, dY + 0.78, FACE, 2.6, 0.9);
@@ -627,7 +627,7 @@ function build(ctx: WorldCtx): void {
     b.add(place(new THREE.BoxGeometry(5.8, 0.34, 0.3), BELL.x, beamY - 0.55, BELL.z, ry), COL.wood, { edge: 30 });
     b.add(place(new THREE.BoxGeometry(5.8, 0.34, 0.3), BELL.x, beamY - 0.55, BELL.z, ry + Math.PI / 2), COL.wood, { edge: 30 });
     b.add(place(new THREE.BoxGeometry(5.9, 0.4, 5.9), BELL.x, beamY + 0.05, BELL.z, ry), COL.wood, { edge: 30 });
-    b.add(place(new THREE.BoxGeometry(6.2, 0.3, 6.2), BELL.x, beamY + 0.38, BELL.z, ry), '#3f5553', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(6.2, 0.3, 6.2), BELL.x, beamY + 0.38, BELL.z, ry), '#41554e', { edge: 30 });
     // double roof: a skirt, a short drum, a pyramidal top (攒尖)
     const e1 = beamY + 0.5;
     roof(b, xform(rect(4.2, 4.2), BELL.x, BELL.z, ry), xform(rect(2.3, 2.3), BELL.x, BELL.z, ry), e1, e1 + 0.95, { curl: 0.5, flare: 0.4 });
@@ -646,7 +646,7 @@ function build(ctx: WorldCtx): void {
       [0.0, 0.0], [0.38, 0.0], [0.55, -0.05], [0.64, -0.2], [0.66, -0.6], [0.67, -1.2], [0.7, -1.6], [0.78, -1.88], [0.8, -Hb], [0.72, -Hb + 0.02],
     ].map(([r, y]) => new THREE.Vector2(r, y - 0.35));
     let bg: T.BufferGeometry = new THREE.LatheGeometry(prof, 22);
-    bg = tintGeo(THREE, bg, '#56604c');
+    bg = tintGeo(THREE, bg, '#596047');
     const parts: T.BufferGeometry[] = [bg];
     for (const [y, r] of [[-0.25, 0.63], [-0.95, 0.68], [-1.5, 0.7], [-1.9, 0.8]] as [number, number][]) {
       parts.push(tintGeo(THREE, place(new THREE.TorusGeometry(r + 0.015, 0.03, 4, 24).rotateX(Math.PI / 2), 0, y - 0.35, 0), '#3b4236'));
@@ -707,7 +707,7 @@ function build(ctx: WorldCtx): void {
       const k = s / (storeys - 1);
       const r = 2.55 - 1.05 * k;
       const hs = s === 0 ? 3.6 : 2.55 - 0.5 * k;
-      pb.add(place(new THREE.CylinderGeometry(r, r * 1.02, hs, 8, 1, false, Math.PI / 8), x, y + hs / 2, z), '#e6dfd1', { edge: 30, jitter: 0.03 });
+      pb.add(place(new THREE.CylinderGeometry(r, r * 1.02, hs, 8, 1, false, Math.PI / 8), x, y + hs / 2, z), '#ecdec3', { edge: 30, jitter: 0.03 });
       // corner posts (ink lines down the real corners, which sit at odd multiples of π/8) and a door
       // on alternate faces, set just proud of the face
       const segs: number[] = [];
@@ -722,7 +722,7 @@ function build(ctx: WorldCtx): void {
       }
       // brackets band, then the eave
       y += hs;
-      pb.add(place(new THREE.CylinderGeometry(r + 0.25, r, 0.3, 8, 1, false, Math.PI / 8), x, y + 0.15, z), '#3f5553', { edge: 30 });
+      pb.add(place(new THREE.CylinderGeometry(r + 0.25, r, 0.3, 8, 1, false, Math.PI / 8), x, y + 0.15, z), '#41554e', { edge: 30 });
       const eo = r + 1.35 - 0.3 * k;
       const eaveY = y + 0.25;
       // the eave's corners over the body's corners, a wind-bell under each flying corner
@@ -732,7 +732,7 @@ function build(ctx: WorldCtx): void {
     }
     // the spire (塔刹): a lotus base, stacked rings, a vase and a pearl
     pb.add(place(new THREE.CylinderGeometry(0.9, 1.3, 0.8, 8, 1, false, Math.PI / 8), x, y + 0.2, z), COL.tile, { edge: 30 });
-    pb.add(place(new THREE.SphereGeometry(0.62, 10, 6, 0, TAU, 0, Math.PI / 2), x, y + 0.6, z), '#5b5a55', { hull: true });
+    pb.add(place(new THREE.SphereGeometry(0.62, 10, 6, 0, TAU, 0, Math.PI / 2), x, y + 0.6, z), '#5e5a4f', { hull: true });
     pb.add(place(new THREE.CylinderGeometry(0.07, 0.09, 4.2, 6), x, y + 2.7, z), COL.bronzeDark, { rim: true });
     for (let i = 0; i < 7; i++) pb.add(place(new THREE.TorusGeometry(0.36 - i * 0.03, 0.06, 5, 12).rotateX(Math.PI / 2), x, y + 1.4 + i * 0.32, z), COL.bronze, { rim: true });
     pb.add(place(new THREE.SphereGeometry(0.28, 10, 8), x, y + 4.0, z, 0, 1, 1.3, 1), COL.bronze, { hull: true });
@@ -788,7 +788,7 @@ function build(ctx: WorldCtx): void {
         const tilt = k === layers - 1 ? 0 : 1;
         const ry = lr.range(-0.06, 0.06) + Math.atan2(edgeAt(cx + 1) - edgeAt(cx - 1), 2) * -1;
         place(g, cx, (top + bot) / 2, front - depth / 2, ry, 1, 1, 1, lr.range(-0.03, 0.03) * tilt, lr.range(-0.04, 0.04) * tilt);
-        const tone = new THREE.Color(k % 2 ? '#a7a295' : '#9b968a').multiplyScalar(lr.range(0.88, 1.05)).lerp(new THREE.Color('#5f5b53'), (1 - k / layers) * 0.35);
+        const tone = new THREE.Color(k % 2 ? '#aba18b' : '#9f9581').multiplyScalar(lr.range(0.88, 1.05)).lerp(new THREE.Color('#625b4e'), (1 - k / layers) * 0.35);
         b.add(g, tone, { edge: 25, jitter: 0.05, seed: 4100 + k });
         xx += w;
       }
@@ -798,7 +798,7 @@ function build(ctx: WorldCtx): void {
     for (const s of [-1, 1]) {
       for (let i = 0; i < 8; i++) {
         const x = FALL.x + s * (1.4 + i * 0.85), z = edgeAt(x) - 0.35;
-        const g = rockGeometry(4300 + i + (s > 0 ? 10 : 0), 0.9 + lr() * 0.4, 0.38 + lr() * 0.2, { base: '#aaa598', dark: '#57544d', lean: 0.05, flat: 0.4 });
+        const g = rockGeometry(4300 + i + (s > 0 ? 10 : 0), 0.9 + lr() * 0.4, 0.38 + lr() * 0.2, { base: '#aea48e', dark: '#5a5448', lean: 0.05, flat: 0.4 });
         g.rotateY(lr() * TAU);
         g.translate(x, terraceY - 0.05, z);
         b.colored(g, { hull: true });
@@ -831,12 +831,12 @@ function build(ctx: WorldCtx): void {
       g.setIndex(idx);
       g.computeVertexNormals();
       const tex = h.tex(streakCanvas(73), { repeat: true });
-      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color: '#b7c4c2', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
+      const m = h.own(new THREE.MeshBasicMaterial({ map: tex, color: '#bcc3b5', transparent: true, opacity: 0.95, depthWrite: false, side: THREE.DoubleSide }));
       const mesh = new THREE.Mesh(g, m);
       mesh.name = 'mountain:runnel';
       mesh.renderOrder = 2;
       h.add(mesh);
-      const base = new THREE.Color('#b7c4c2');
+      const base = new THREE.Color('#bcc3b5');
       h.frame((dt) => {
         if (!h.reduced) tex.offset.y = (tex.offset.y - dt * 0.5) % 1;
         m.color.copy(base).multiply(h.paper);
@@ -853,7 +853,7 @@ function build(ctx: WorldCtx): void {
       const x = POOL.x + Math.cos(a) * d, z = POOL.z + Math.sin(a) * d;
       if (z < edgeAt(x) + 2.2) continue;
       const s = 0.8 + rng() * 0.9;
-      const g = rockGeometry(4200 + i, s * 1.6, s * 1.0, { base: '#aeab9e', dark: '#4a4843', lean: 0.1 });
+      const g = rockGeometry(4200 + i, s * 1.6, s * 1.0, { base: '#b2aa94', dark: '#4a4843', lean: 0.1 });
       g.rotateY(rng() * TAU);
       g.translate(x, Math.min(h.y(x, z), waterY) - 0.35, z);
       b.colored(g, { hull: true });
@@ -861,7 +861,7 @@ function build(ctx: WorldCtx): void {
     }
     // our own pool surface if the core has no water here
     if (ctx.waterAt(POOL.x, POOL.z) === null) {
-      const pool = new THREE.Mesh(new THREE.CircleGeometry(4.6, 28).rotateX(-Math.PI / 2), h.own(new THREE.MeshLambertMaterial({ color: '#98aaa8', transparent: true, opacity: 0.88 })));
+      const pool = new THREE.Mesh(new THREE.CircleGeometry(4.6, 28).rotateX(-Math.PI / 2), h.own(new THREE.MeshLambertMaterial({ color: '#9ca99d', transparent: true, opacity: 0.88 })));
       pool.position.set(POOL.x, waterY, POOL.z);
       pool.name = 'mountain:pool';
       h.add(pool);
@@ -907,12 +907,12 @@ function build(ctx: WorldCtx): void {
       });
     };
     // a pale body behind, bright streaks in front
-    const body = new THREE.Mesh(ribbon(topW * 0.95, botW * 0.9, 0.95), h.own(new THREE.MeshBasicMaterial({ color: '#c9d2cf', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })));
+    const body = new THREE.Mesh(ribbon(topW * 0.95, botW * 0.9, 0.95), h.own(new THREE.MeshBasicMaterial({ color: '#ced1c2', transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide })));
     body.renderOrder = 3;
     h.add(body);
-    lit(h, body.material as T.MeshBasicMaterial, '#c9d2cf');
+    lit(h, body.material as T.MeshBasicMaterial, '#ced1c2');
     mk(71, '#ffffff', 0.95, topW, botW, 1.0, 1.4, 4);
-    mk(72, '#eef3f1', 0.75, topW * 1.08, botW * 1.12, 1.05, 2.1, 5);
+    mk(72, '#f4f2e1', 0.75, topW * 1.08, botW * 1.12, 1.05, 2.1, 5);
     // foam where it lands, spray and mist
     const foamTex = h.tex(foamCanvas());
     const foam = new THREE.Mesh(new THREE.CircleGeometry(3.4, 24).rotateX(-Math.PI / 2), h.own(new THREE.MeshBasicMaterial({ map: foamTex, transparent: true, depthWrite: false, opacity: 0.85 })));
@@ -990,7 +990,7 @@ function build(ctx: WorldCtx): void {
     const x = R.center.x + Math.cos(a) * d, z = R.center.z + Math.sin(a) * d;
     if (!clearOf(x, z, -1.5)) continue;
     const s = 0.6 + rng() * 1.2;
-    const g = rockGeometry(4400 + i, s * 1.5, s * 0.9, { base: '#b3ae9f', dark: '#4d4a44' });
+    const g = rockGeometry(4400 + i, s * 1.5, s * 0.9, { base: '#b8ad95', dark: '#504a40' });
     g.rotateY(rng() * TAU);
     g.translate(x, h.y(x, z) - 0.1, z);
     b.colored(g, { hull: true });
@@ -1091,6 +1091,7 @@ function build(ctx: WorldCtx): void {
     lanterns.computeBoundingSphere();
     h.add(lanterns);
     for (const p of redLanterns) addGlow(p.clone(), 3);
+    lampPools(h, redLanterns, 'mountain:pools');
     const gg = new THREE.BufferGeometry();
     gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPts.flatMap((p) => [p.x, p.y, p.z]), 3));
     gg.setAttribute('aSize', new THREE.Float32BufferAttribute(glowSize, 1));
@@ -1147,10 +1148,10 @@ function build(ctx: WorldCtx): void {
     }
     // a veil drifting across the pagoda's middle storeys (塔隐云中)
     clouds.push({ p: new THREE.Vector3(PAGODA.x + 3, pagodaTop - 9, PAGODA.z + 3), w: 12, h: 3.2 });
-    const cloud = mistCards(h, clouds, { tex: h.tex(puffCanvas(128, 27)), color: '#f4efe6', opacity: 0.6, drift: 0.4 });
+    const cloud = mistCards(h, clouds, { tex: h.tex(puffCanvas(128, 27)), color: '#faeed7', opacity: 0.6, drift: 0.4 });
     cloud.name = 'mountain:clouds';
     h.add(cloud);
-    h.frame(() => { (cloud.material as T.MeshBasicMaterial).color.set('#f4efe6').multiply(h.paper); });
+    h.frame(() => { (cloud.material as T.MeshBasicMaterial).color.set('#faeed7').multiply(h.paper); });
   }
   // the walkable terraces, stairs and platforms, and the built-over ground (registered last, so every
   // height sampled above is the bare ground's)

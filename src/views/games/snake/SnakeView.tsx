@@ -10,6 +10,9 @@ import { currentFestival } from './festival';
 import { sprite } from './paint';
 import { loadStats, saveStats, type SnakeMode, type SnakeStats } from './store';
 import { record as playRecord, recordMax } from '../../../app/play';
+import { snakePay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import './snake.css';
 
 const KEYS: Record<string, Dir> = {
@@ -49,6 +52,8 @@ export function SnakeView() {
   const [won, setWon] = useState(false);
   /** Put the result card in the half of the board away from the splash. */
   const [cardAt, setCardAt] = useState<'top' | 'bottom'>('bottom');
+  /** What the run paid (a coin for every five points), for the card. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const [fest] = useState(currentFestival);
   const treatShown = useRef(false);
   const tRef = useRef(t);
@@ -91,6 +96,7 @@ export function SnakeView() {
         },
         over: (s) => {
           setRecord(settle(s));
+          setPaid(payToast(snakePay(s.score)));
           setWon(s.won);
           const y = engRef.current?.crashY();
           setCardAt(y != null && y > 0.5 ? 'top' : 'bottom');
@@ -219,6 +225,7 @@ export function SnakeView() {
     }
     eng.reset();
     setRecord(false);
+    setPaid(null);
     setWon(false);
   };
 
@@ -247,12 +254,14 @@ export function SnakeView() {
     eng.reset({ wrap });
     setPlayMode(m);
     setRecord(false);
+    setPaid(null);
     setWon(false);
   };
 
   const again = () => {
     void audio.unlock();
     setRecord(false);
+    setPaid(null);
     setWon(false);
     engRef.current?.reset();
   };
@@ -338,6 +347,7 @@ export function SnakeView() {
                   <span class="snake-dot"> · </span>
                   {modeName(playMode)}
                 </p>
+                <PaidLine paid={paid} class="snake-paid" />
               </div>
               <button type="button" class="btn btn-seal" onClick={again} ref={cardBtn}>
                 {t('再来一局', 'Play again')}
@@ -377,6 +387,7 @@ export function SnakeView() {
           ? t(`方向键 / WASD 转向 · 空格或 P 暂停 · 吃梅花长一节，${fest.treatZh}加五分`, `Arrows / WASD to steer · Space or P to pause · each blossom adds a segment; a ${fest.treatEn} is +5`)
           : t('方向键 / WASD 转向 · 空格或 P 暂停 · 吃梅花长一节，金桂加三分', 'Arrows / WASD to steer · Space or P to pause · each blossom adds a segment; golden osmanthus is +3')}
       </p>
+      <PayHint zh="每得五分，得钱一文" en="Every five points pays a coin" />
     </GameShell>
   );
 }

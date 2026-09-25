@@ -9,6 +9,7 @@ import type { CharacterModel, MotionState } from '../characters/types';
 import type { Ability, CharacterId } from '../../../data/characters';
 import { Bag, damp, dampAngle, glowTexture, inked, outlineMaterial, toon } from './kit';
 import { NO_REFLECT } from './pond';
+import { JumpGate, squashAt } from './jump';
 
 export type Emote = EmoteKind;
 const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8, skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
@@ -41,6 +42,17 @@ const MAX_GRADE = 0.75;
 const LOOK = 0.3;
 /** The jade rabbit's slowest fall (m/s): a jump turns into a drift. */
 const GLIDE_FALL = 0.9;
+/** Walking and running speeds (m/s) before a character's gifts. */
+export const WALK_SPEED = 2.1;
+export const RUN_SPEED = 5.1;
+/** Take-off speed of a jump (m/s): about 0.7 m high. */
+const JUMP_V = 4.2;
+/** Gravity going up, and a little more coming down (a jump that hangs, then lands with intent). */
+const GRAVITY = 12.5;
+const FALL_GRAVITY = 16;
+/** How quickly the walker steers: on the ground, and in the air (enough to aim a landing). */
+const GROUND_ACC = 10;
+const AIR_ACC = 5.5;
 
 function lathe(points: [number, number][], segs = 20): THREE.LatheGeometry {
   return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segs);
@@ -327,6 +339,19 @@ export class PlayerController implements Player {
   running = false;
   /** Called after teleport() so the camera can snap along. */
   onTeleport: (() => void) | null = null;
+  /** Feet left the ground in a jump ('ground') or an extra jump in the air ('air'). */
+  onJump: ((kind: 'ground' | 'air') => void) | null = null;
+  /** Feet touched down; `impact` is the falling speed (m/s). */
+  onLand: ((impact: number) => void) | null = null;
+  /** A running footfall (for a puff of dust). */
+  onStride: (() => void) | null = null;
+  private gate = new JumpGate();
+  /** Squash (−) or stretch (+) and the time since it was kicked. */
+  private squashK = 0;
+  private squashT = 1;
+  private strideAt = 0;
+  /** Reduced motion: a smaller squash. */
+  reduced = false;
   /** Set by the world: the surface under a point for this walker. */
   floorAt: (x: number, z: number) => number = () => 0;
   private motion: MotionState = { speed: 0, running: false, grounded: true, vy: 0, emote: null, emoteT: 0, t: 0, riding: false };
@@ -348,8 +373,9 @@ export class PlayerController implements Player {
     this.holder.add(model.root);
     this.root.rotation.y = heading;
 
+    // a warm ink-brown shadow (never a cold grey)
     const sh = new THREE.Mesh(bag.add(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), bag.add(new THREE.MeshBasicMaterial({
-      color: '#000000', transparent: true, opacity: 0.3, depthWrite: false,
+      color: '#3a2618', transparent: true, opacity: 0.3, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     })));
     (sh.material as THREE.MeshBasicMaterial).alphaMap = glowTexture(bag, 64, 1.4);
@@ -389,6 +415,7 @@ export class PlayerController implements Player {
     if (kind === 'jump' && this.grounded && !this.frozen) {
       this.vy = 3.4 * this.gifts.jump;
       this.grounded = false;
+      this.gate.launched();
     }
     this.emoteKind = kind;
     this.emoteT = 0;
@@ -414,12 +441,15 @@ export class PlayerController implements Player {
     this.grounded = y === undefined;
     if (y !== undefined && Math.abs(y - this.floorAt(x, z)) < 0.05) this.grounded = true;
     this.standY = this.position.y;
+    this.gate.reset();
+    this.squashT = 1;
     this.onTeleport?.();
   }
 
   freeze(on: boolean): void {
     this.frozen = on;
     this.vx = this.vz = 0;
+    this.gate.reset();
     if (!on) { this.vy = 0; this.grounded = false; this.standY = this.position.y; }
   }
 
@@ -453,6 +483,7 @@ export class PlayerController implements Player {
     if (ok(vy) > 0) {
       this.vy = Math.max(this.vy, 0) + ok(vy);
       this.grounded = false;
+      this.gate.launched();
     }
   }
 
@@ -497,6 +528,10 @@ export class PlayerController implements Player {
     m.t = this.time;
     m.riding = this.riding !== null;
     try { this.model.update(dt, m); } catch (e) { console.error('[walk] character update failed', e); }
+    // squash and stretch of the whole figure (feet stay planted: the holder scales from the origin)
+    this.squashT += dt;
+    const [sxz, sy] = squashAt(this.squashK * (this.reduced ? 0.4 : 1), this.squashT);
+    this.holder.scale.set(sxz, sy, sxz);
 
     this.shadow.position.set(this.position.x, floor + 0.03, this.position.z);
     const lift = Math.max(0, this.position.y - floor);
@@ -549,13 +584,14 @@ export class PlayerController implements Player {
     const mag = Math.min(1, Math.hypot(input.x, input.z));
     if (mag > 0.25 && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
     const busy = this.busy;
-    this.running = input.run;
     const mods = this.mods;
-    const maxSpeed = (input.run ? 4.3 : 2.1) * mag * this.gifts.speed * (mods?.speed ?? 1);
+    this.running = input.run && mag > 0.05;
+    const maxSpeed = (input.run ? RUN_SPEED : WALK_SPEED) * mag * this.gifts.speed * (mods?.speed ?? 1);
     const tx = mag > 0.01 && !busy ? (input.x / Math.max(mag, 1e-6)) * maxSpeed : 0;
     const tz = mag > 0.01 && !busy ? (input.z / Math.max(mag, 1e-6)) * maxSpeed : 0;
     this.dashT = Math.max(0, this.dashT - dt);
-    const acc = this.dashT > 0 ? 1.2 : this.grounded ? 10 : 3;
+    // in the air: steer to aim the landing, but let go of the stick and the jump keeps its way
+    const acc = this.dashT > 0 ? 1.2 : this.grounded ? GROUND_ACC : mag > 0.05 ? AIR_ACC : 0.6;
     this.vx = damp(this.vx, tx, acc, dt);
     this.vz = damp(this.vz, tz, acc, dt);
     const px = this.position.x, pz = this.position.z;
@@ -570,29 +606,41 @@ export class PlayerController implements Player {
     }
     const moved = Math.hypot(nx - px, nz - pz);
     this.speed = dt > 0 ? moved / dt : 0;
+    // a wall stops the momentum it took (no sliding off it later at full speed)
+    if (dt > 0 && moved < Math.hypot(this.vx, this.vz) * dt * 0.5) { this.vx = (nx - px) / dt; this.vz = (nz - pz) / dt; }
     this.position.x = nx;
     this.position.z = nz;
 
     const jump = this.gifts.jump * (mods?.jump ?? 1);
-    if (input.jump && this.grounded) {
-      this.vy = 4.1 * jump;
+    const take = this.gate.step(dt, this.grounded, input.jump && !busy, this.airLeft);
+    if (take === 'ground') {
+      this.vy = JUMP_V * jump;
       this.grounded = false;
-    } else if (input.jump && !this.grounded && this.airLeft > 0) {
+      this.kick(0.12);
+      this.onJump?.('ground');
+    } else if (take === 'air') {
       // a second jump in the air (轻功)
       this.airLeft--;
-      this.vy = 3.8 * jump;
+      this.vy = 3.9 * jump;
+      this.kick(0.1);
+      this.onJump?.('air');
     }
     const floor = phys.floorY(nx, nz);
     if (!this.grounded) {
       if (mods?.hover) this.vy = damp(this.vy, 0, 1.6, dt); // held up: no gravity, a gentle settle
-      else this.vy -= 12.5 * dt;
+      else this.vy -= (this.vy > 0 ? GRAVITY : FALL_GRAVITY) * dt;
       // the jade rabbit drifts down
       if ((this.gifts.glide || mods?.glide) && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
       this.position.y += this.vy * dt;
       if (this.position.y <= floor) {
+        const impact = -this.vy;
         this.position.y = floor;
         this.grounded = true;
         this.vy = 0;
+        if (impact > 1.2) {
+          this.kick(-Math.min(0.2, 0.05 + impact * 0.018));
+          this.onLand?.(impact);
+        }
       }
     } else {
       if (floor < this.position.y - 0.35) { this.grounded = false; this.vy = 0; }
@@ -601,14 +649,25 @@ export class PlayerController implements Player {
     if (this.grounded) {
       this.standY = floor;
       this.airLeft = mods?.airJumps ?? 0;
+      // a running footfall every so often: a light puff of dust
+      if (this.running && this.speed > 3.2) {
+        this.strideAt += dt * this.speed;
+        if (this.strideAt > 2.6) { this.strideAt = 0; this.onStride?.(); }
+      }
     }
 
     if (moved > 0.002 && mag > 0.05) {
       this.targetHeading = null;
-      this.heading = dampAngle(this.heading, Math.atan2(this.vx, this.vz), 12, dt);
+      this.heading = dampAngle(this.heading, Math.atan2(this.vx, this.vz), this.grounded ? 12 : 7, dt);
     } else if (this.targetHeading !== null) {
       this.heading = dampAngle(this.heading, this.targetHeading, 8, dt);
     }
     return floor;
+  }
+
+  /** Stretch (k > 0) or squash (k < 0) the figure for a moment. */
+  private kick(k: number): void {
+    this.squashK = k;
+    this.squashT = 0;
   }
 }

@@ -1,7 +1,7 @@
 // The new-year festivals: 春节 (two lanterns over the water, 福 on posts — one upside down —,
 // couplets on the gate, fireworks, red envelopes to find), 元宵 (sky lanterns, a line of riddle
-// lanterns, 汤圆), 元旦 (a countdown and fireworks). An explicit 昼 keeps the day: lanterns stay
-// unlit and the fireworks wait for dark.
+// lanterns, 汤圆), 元旦 (a countdown and fireworks). They keep the real clock (festivalNight): by
+// day the lanterns hang unlit and the fireworks wait for dusk; 夜, or a preview, shows the night.
 import type * as T from 'three';
 import type { Interactable, WorldCtx } from '../types';
 import { BRUSH_FONT, canvasTexture, entry, feature, festivalNight, findSpot, glowTexture, inked, landmarks, loadBrush, propMat, reducedMotion, reflects, tween, dayRng, type Bag } from './kit';

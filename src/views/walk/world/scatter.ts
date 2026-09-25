@@ -22,6 +22,18 @@ const NCELL = (EXT * 2) / CELL;
 
 type Painter = (g: CanvasRenderingContext2D, r: Rng, W: number, H: number, season: Season) => void;
 
+/**
+ * Colour laid under the ink (设色), 青绿 style: mineral green pads on the pines, jade and willow
+ * green, and in autumn the round trees turn gamboge, vermilion and deep red. The billboards cut out
+ * at alpha 0.35 and draw opaque, so each wash is a flat, confident fill with the ink on top.
+ */
+const LEAVES: Record<Season, { pine: string; willow: string; crown: string[] }> = {
+  spring: { pine: '86,142,104', willow: '150,190,98', crown: ['120,172,100', '160,196,104', '98,156,104', '224,150,168'] },
+  summer: { pine: '72,132,96', willow: '118,168,90', crown: ['78,142,94', '108,164,92', '140,182,100'] },
+  autumn: { pine: '82,126,96', willow: '178,176,92', crown: ['204,160,58', '206,106,48', '170,62,44', '142,164,88', '222,184,84'] },
+  winter: { pine: '78,110,94', willow: '128,126,110', crown: ['112,120,104', '140,138,120'] },
+};
+
 function stroke(g: CanvasRenderingContext2D, pts: [number, number][], w0: number, w1: number, color: string) {
   for (let i = 1; i < pts.length; i++) {
     const t = i / (pts.length - 1);
@@ -43,7 +55,7 @@ function trunk(g: CanvasRenderingContext2D, r: Rng, x: number, y0: number, y1: n
     cx += (r() - 0.5) * w * 0.9 + lean * 3;
     pts.push([cx, y0 + (y1 - y0) * t]);
   }
-  stroke(g, pts, w, w * 0.35, 'rgba(34,30,26,0.9)');
+  stroke(g, pts, w, w * 0.35, 'rgba(58,40,28,0.92)');
   // dry-brush bark
   for (let i = 0; i < 14; i++) {
     const k = Math.floor(r() * (pts.length - 1));
@@ -55,7 +67,7 @@ function trunk(g: CanvasRenderingContext2D, r: Rng, x: number, y0: number, y1: n
   return pts;
 }
 
-const pine: Painter = (g, r, W, H) => {
+const pine: Painter = (g, r, W, H, season) => {
   const pts = trunk(g, r, W / 2 + r.range(-10, 10), H - 4, H * 0.28, 11, r.range(-0.6, 0.6));
   // needle pads on crooked branches
   const pads = 7;
@@ -67,6 +79,9 @@ const pine: Painter = (g, r, W, H) => {
     const ex = bx + side * len, ey = by - r.range(4, 18);
     stroke(g, [[bx, by], [(bx + ex) / 2, by - r.range(0, 8)], [ex, ey]], 4, 1.5, 'rgba(34,30,26,0.85)');
     const pw = r.range(30, 52), ph = pw * 0.36;
+    // the mineral-green pad under the needles
+    g.fillStyle = `rgba(${LEAVES[season].pine},${r.range(0.8, 0.95)})`;
+    g.beginPath(); g.ellipse(ex, ey + ph * 0.05, pw * 0.92, ph * 0.72, r.range(-0.08, 0.08), 0, Math.PI * 2); g.fill();
     for (let i = 0; i < 60; i++) {
       const a = r.range(-Math.PI, 0);
       const d = r.range(0.2, 1);
@@ -75,15 +90,13 @@ const pine: Painter = (g, r, W, H) => {
       g.lineWidth = r.range(1, 2);
       g.beginPath(); g.moveTo(px, py); g.lineTo(px + r.range(-4, 4), py - r.range(5, 11)); g.stroke();
     }
-    g.fillStyle = 'rgba(40,48,44,0.18)';
-    g.beginPath(); g.ellipse(ex, ey + ph * 0.1, pw, ph * 0.8, 0, 0, Math.PI * 2); g.fill();
   }
 };
 
 const willow: Painter = (g, r, W, H, season) => {
   const pts = trunk(g, r, W / 2, H - 4, H * 0.45, 14, r.range(-0.5, 0.5));
   const [tx, ty] = pts[pts.length - 1];
-  const strandColor = season === 'winter' ? '52,50,46' : '74,96,80';
+  const strandColor = LEAVES[season].willow;
   for (let i = 0; i < 44; i++) {
     const a = r.range(-2.6, -0.5);
     const len = r.range(30, 70);
@@ -94,14 +107,14 @@ const willow: Painter = (g, r, W, H, season) => {
     // the long hanging strands
     const drop = r.range(H * 0.3, H * 0.6);
     const sway = r.range(-12, 12);
-    g.strokeStyle = `rgba(${strandColor},${r.range(0.35, 0.6)})`;
-    g.lineWidth = r.range(0.8, 1.6);
+    g.strokeStyle = `rgba(${strandColor},${r.range(0.7, 0.95)})`;
+    g.lineWidth = r.range(1.2, 2.2);
     g.beginPath(); g.moveTo(sx, sy); g.quadraticCurveTo(sx + sway, sy + drop * 0.5, sx + sway * 0.4, Math.min(H - 6, sy + drop)); g.stroke();
     if (season !== 'winter') for (let k = 0; k < 6; k++) {
       const tt = r.range(0.2, 1);
       const lx = sx + sway * tt * 0.7, ly = sy + drop * tt;
-      g.fillStyle = `rgba(${strandColor},${r.range(0.3, 0.55)})`;
-      g.beginPath(); g.ellipse(lx, Math.min(H - 6, ly), 1.2, 3.4, r.range(-0.3, 0.3), 0, Math.PI * 2); g.fill();
+      g.fillStyle = `rgba(${strandColor},${r.range(0.7, 0.95)})`;
+      g.beginPath(); g.ellipse(lx, Math.min(H - 6, ly), 1.6, 3.8, r.range(-0.3, 0.3), 0, Math.PI * 2); g.fill();
     }
   }
 };
@@ -112,15 +125,26 @@ const midot: Painter = (g, r, W, H, season) => {
   // a few branches into the crown
   for (let i = 0; i < 4; i++) stroke(g, [[tx, ty + 30], [tx + r.range(-40, 40), ty - r.range(10, 50)]], 4, 1, 'rgba(34,30,26,0.8)');
   const cx = tx, cy = ty - 30, rx = r.range(70, 100), ry = r.range(70, 110);
-  const warm = season === 'autumn';
-  for (let i = 0; i < 460; i++) {
+  const crown = LEAVES[season].crown;
+  // colour first: clusters of flat dabs, one pigment per cluster (a tree of mixed autumn leaves)
+  for (let k = 0; k < 26; k++) {
+    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 0.8;
+    const kx = cx + Math.cos(a) * rx * d, ky = cy + Math.sin(a) * ry * d * 0.9;
+    const col = crown[Math.floor(r() * crown.length)];
+    for (let i = 0; i < 16; i++) {
+      const x = kx + r.gauss() * 13, y = ky + r.gauss() * 9;
+      g.fillStyle = `rgba(${col},${r.range(0.75, 0.95)})`;
+      g.beginPath(); g.ellipse(x, y, r.range(4, 8), r.range(2, 3.4), r.range(-0.2, 0.2), 0, Math.PI * 2); g.fill();
+    }
+  }
+  // then the ink dots (米点), heavier toward the bottom of the crown
+  for (let i = 0; i < 300; i++) {
     const a = r() * Math.PI * 2, d = Math.sqrt(r());
     const x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d * 0.9;
-    const low = (y - (cy - ry)) / (2 * ry); // darker toward the bottom of the crown
-    const tone = 0.18 + 0.5 * low * r.range(0.6, 1.1);
-    const col = warm && r() < 0.12 ? `rgba(168,102,56,${tone})` : `rgba(30,32,30,${tone})`;
-    g.fillStyle = col;
-    g.beginPath(); g.ellipse(x, y, r.range(3.5, 7), r.range(1.6, 2.8), r.range(-0.2, 0.2), 0, Math.PI * 2); g.fill();
+    const low = (y - (cy - ry)) / (2 * ry);
+    const tone = 0.12 + 0.55 * low * r.range(0.6, 1.1);
+    g.fillStyle = `rgba(30,32,28,${tone})`;
+    g.beginPath(); g.ellipse(x, y, r.range(3, 6), r.range(1.4, 2.4), r.range(-0.2, 0.2), 0, Math.PI * 2); g.fill();
   }
 };
 
@@ -154,12 +178,20 @@ function treeAtlas(season: Season): HTMLCanvasElement {
   return c;
 }
 
-function shrubCanvas(): HTMLCanvasElement {
+function shrubCanvas(season: Season): HTMLCanvasElement {
   const W = 128, H = 96;
   const c = canvas(W, H);
   const g = c.getContext('2d')!;
   const r = makeRng(4411);
-  for (let i = 0; i < 180; i++) {
+  const crown = LEAVES[season].crown;
+  for (let i = 0; i < 110; i++) {
+    const a = r.range(Math.PI, Math.PI * 2), d = Math.sqrt(r());
+    const x = W / 2 + Math.cos(a) * 50 * d, y = H - 6 + Math.sin(a) * 64 * d;
+    const col = i % 5 === 0 ? crown[Math.floor(r() * crown.length)] : LEAVES[season].pine;
+    g.fillStyle = `rgba(${col},${r.range(0.6, 0.9)})`;
+    g.beginPath(); g.ellipse(x, y, r.range(3, 6), r.range(1.8, 3), r.range(-0.4, 0.4), 0, Math.PI * 2); g.fill();
+  }
+  for (let i = 0; i < 120; i++) {
     const a = r.range(Math.PI, Math.PI * 2), d = Math.sqrt(r());
     const x = W / 2 + Math.cos(a) * 54 * d, y = H - 4 + Math.sin(a) * 70 * d;
     g.fillStyle = `rgba(30,34,30,${r.range(0.2, 0.55)})`;
@@ -234,7 +266,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
   const treeGeo = bag.add(new THREE.PlaneGeometry(1, 2).translate(0, 1, 0));
   const tuftMat = swayMaterial(bag, canvasTexture(bag, tuftCanvas(7)), reduced ? 0 : 0.18, time);
   const reedMat = swayMaterial(bag, canvasTexture(bag, reedCanvas(11)), reduced ? 0 : 0.035, time);
-  const shrubMat = swayMaterial(bag, canvasTexture(bag, shrubCanvas()), reduced ? 0 : 0.02, time);
+  const shrubMat = swayMaterial(bag, canvasTexture(bag, shrubCanvas(season)), reduced ? 0 : 0.02, time);
   const tuftGeo = bag.add(crossedQuad(0.42, 0.3));
   const reedGeo = bag.add(crossedQuad(0.6, 1.55));
   const shrubGeo = bag.add(crossedQuad(1.6, 1.2));
@@ -242,7 +274,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
   const rockMat = toon(bag, '#ffffff', { vertexColors: true });
   const rockOutline = outlineMaterial(bag, 0.03);
   const slabGeo = bag.add(new THREE.CylinderGeometry(1, 1.08, 0.09, 6).translate(0, 0.015, 0));
-  const slabMat = toon(bag, '#c9c1ae');
+  const slabMat = toon(bag, '#cdbfa6');
 
   const q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
   const tinted = new Set<THREE.Material>([tuftMat, reedMat, shrubMat]);

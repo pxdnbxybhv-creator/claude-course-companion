@@ -2,6 +2,7 @@
 //   &pose=walk|run|idle|air|<EmoteKind>   what they all do (default walk)
 //   &only=cat&poses=idle,walk,run,air,eat,bow,…   one character in many poses
 //   &u=0.5          emote progress for a still
+//   &warm=12        seconds of warm-up before the still (idle fidgets start after ~3 s standing)
 //   &night=1        the night light
 //   &ui=portraits   the painted portraits (unlocked row, locked row)
 //   &ui=select      the character-select sheet
@@ -11,7 +12,8 @@ import { FACTORIES, paintPortrait } from '../../views/walk/characters';
 import type { CharacterModel, MotionState } from '../../views/walk/characters/types';
 import type { EmoteKind } from '../../views/walk/types';
 
-const EMOTES: EmoteKind[] = ['eat', 'bow', 'jump', 'wave', 'throw', 'cast', 'row', 'sit', 'play', 'water'];
+const EMOTES: EmoteKind[] = ['eat', 'bow', 'jump', 'wave', 'throw', 'cast', 'row', 'sit', 'play', 'water', 'skill', 'talk', 'pet', 'build', 'dance', 'sleep'];
+const DUR: Partial<Record<EmoteKind, number>> = { skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
 
 export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const ui = p.get('ui');
@@ -27,8 +29,8 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const night = p.get('night') === '1';
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(night ? '#2a3140' : '#efe9dc');
-  scene.add(new THREE.HemisphereLight(night ? '#cfd8e8' : '#fbf8f1', night ? '#8f98a8' : '#b0a898', night ? 2.75 : 2.25));
-  const sun = new THREE.DirectionalLight(night ? '#e2e9f6' : '#fff8ec', night ? 0.8 : 1.25);
+  scene.add(new THREE.HemisphereLight(night ? '#cfd8e8' : '#fff4e2', night ? '#8f98a8' : '#b89f80', night ? 2.75 : 2.1));
+  const sun = new THREE.DirectionalLight(night ? '#e2e9f6' : '#ffe9c8', night ? 0.8 : 1.4);
   sun.position.set(4, 8, 6);
   scene.add(sun);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), new THREE.MeshBasicMaterial({ color: night ? '#394150' : '#e4dccb' }));
@@ -69,15 +71,31 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
       else if (pose === 'air') { s.grounded = false; s.vy = Math.sin(t * 2) * 3; }
       else if ((EMOTES as string[]).includes(pose)) {
         s.emote = pose as EmoteKind;
-        s.emoteT = u0 ? Number(u0) : (t % 2.2) / 2.2;
+        const d = DUR[pose as EmoteKind] ?? 2.2;
+        s.emoteT = u0 ? Number(u0) : (t % d) / d;
         if (pose === 'row' || pose === 'sit') s.riding = true;
       }
       m.update(dt, s);
     }
   };
   // warm up so the stills are mid-motion
-  for (let i = 0; i < 90; i++) step(1 / 60);
+  const warm = Number(p.get('warm') ?? 1.5);
+  for (let i = 0; i < warm * 60; i++) step(1 / 60);
   renderer.render(scene, camera);
+  // draw calls per figure (one at a time)
+  const calls: Record<string, number> = {};
+  for (const a of models) {
+    for (const b of models) b.m.root.visible = a === b;
+    ground.visible = false;
+    renderer.info.reset();
+    renderer.render(scene, camera);
+    calls[ids[models.indexOf(a)] + ':' + a.pose] = renderer.info.render.calls;
+  }
+  for (const b of models) b.m.root.visible = true;
+  ground.visible = true;
+  renderer.render(scene, camera);
+  (window as unknown as { __calls: unknown }).__calls = calls;
+  if (p.get('still') === '1') { (window as unknown as { __chars: unknown }).__chars = { models, scene, renderer, step: (n: number, dt = 1 / 60) => { for (let i = 0; i < n; i++) step(dt); renderer.render(scene, camera); } }; return; }
   let last = performance.now();
   const loop = (now: number) => {
     step(Math.min(0.05, (now - last) / 1000));

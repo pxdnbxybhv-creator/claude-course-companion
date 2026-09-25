@@ -4,47 +4,31 @@
 // bamboo whose kite got away (a little errand).
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
-import type { XZ } from '../../map';
+import type { RegionId, XZ } from '../../map';
 import { ANCHORS, REGION } from '../../map';
-import { dayRng, feature, inked, reducedMotion } from '../kit';
+import { Bag, dayRng, feature, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { glints } from '../props';
 import { flag, record, recordMax, play } from '../../../../app/play';
 import { makeRng, hashString } from '../../../../core/rng';
 import { toKey } from '../../../../core/date';
 import { feihuaTurns, playableLing } from './logic';
-import { figure, speechMark, talk, type Figure, type FigureSpec } from './npc';
+import { front, greet, person, speechMark, talk, type Figure, type FigureSpec } from './npc';
+import { forCompanion, type Line, type PerCompanion } from '../npcs/logic';
+import { FISHER_HELLO, KITE_HELLO, MONK_HELLO, POET_NPC_HELLO, TEA_HELLO } from '../npcs/lines';
+import { offerFlower } from '../npcs/gift';
 import { begin, end, withTheme } from './ui';
 import { todaysCat, walkableNear } from './cat';
 import * as snd from './sound';
 
-/** Stand an NPC near an anchor, on open ground, facing a point. */
-function stand(ctx: WorldCtx, a: XZ, dx: number, dz: number, look: XZ): { at: T.Vector3; heading: number } {
-  const p = walkableNear(ctx, a.x + dx, a.z + dz, 5);
-  return { at: new ctx.THREE.Vector3(p.x, ctx.groundY(p.x, p.z), p.z), heading: Math.atan2(look.x - p.x, look.z - p.z) };
+/** A standing NPC in a place, by an anchor, facing a point (see npc.ts person). */
+function placed(bag: Bag, ctx: WorldCtx, region: RegionId, spec: FigureSpec, a: XZ, dx: number, dz: number, look: XZ): Figure {
+  return person(bag, ctx, ctx.regionGroup(region), spec, a, dx, dz, look);
 }
 
-function person(bag: Parameters<typeof figure>[0], ctx: WorldCtx, region: Parameters<WorldCtx['regionGroup']>[0], spec: FigureSpec, a: XZ, dx: number, dz: number, look: XZ): Figure {
-  const s = stand(ctx, a, dx, dz, look);
-  const f = figure(bag, ctx.regionGroup(region), spec, s.at, s.heading);
-  bag.onDispose(ctx.addCollider({ x: s.at.x, z: s.at.z, r: 0.35, h: 1.3 }));
-  return f;
-}
-
-/** A spot in front of someone for the talk prompt. */
-function front(f: Figure, d = 0.9): T.Vector3 {
-  const r = f.root;
-  return r.position.clone().set(r.position.x + Math.sin(r.rotation.y) * d, r.position.y, r.position.z + Math.cos(r.rotation.y) * d);
-}
-
-/** Wave once when the walker first comes near. */
-function greet(bag: Parameters<typeof figure>[0], ctx: WorldCtx, f: Figure, r = 5): void {
-  let near = false;
-  bag.frame(() => {
-    const d = Math.hypot(ctx.player.position.x - f.root.position.x, ctx.player.position.z - f.root.position.z);
-    if (d < r && !near) { near = true; f.wave(); }
-    else if (d > r + 4) near = false;
-  });
+/** The first thing someone says: a line of their own for some companions, else their usual one. */
+function hello(ctx: WorldCtx, own: PerCompanion<Line | null>, usual: Line): Line {
+  return forCompanion(own, ctx.player.character) ?? usual;
 }
 
 // ───────────────────────────── 茶博士, the teahouse keeper ─────────────────────────────
@@ -57,7 +41,7 @@ const TEAS = [
 
 export const teahouse = feature('npc-teahouse', (bag, ctx) => {
   const sq = ANCHORS.villageSquare;
-  const f = person(bag, ctx, 'village', { robe: '#6d7f8c', trim: '#2f3b45', apron: '#efe8d8', hat: 'cap', hatColor: '#2f3b45' }, ANCHORS.teahouse, -0.3, 0, sq);
+  const f = placed(bag, ctx, 'village', { robe: '#6d7f8c', trim: '#2f3b45', apron: '#efe8d8', hat: 'cap', hatColor: '#2f3b45' }, ANCHORS.teahouse, -0.3, 0, sq);
   // a kettle with a long spout in his hand
   const { THREE } = ctx;
   const kettle = inked(ctx, merge(THREE, [
@@ -75,10 +59,14 @@ export const teahouse = feature('npc-teahouse', (bag, ctx) => {
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
+        record('npc:tea');
+        if (await offerFlower(ctx, f, name, 'tea')) { served++; ctx.player.emote('eat'); return; }
         const cat = todaysCat(ctx);
+        const hi = served ? { zh: '客官又来啦！再来一壶？', en: 'Welcome back! Another pot?' } : hello(ctx, TEA_HELLO, { zh: '客官里边请！走了一路，喝口茶歇歇脚？', en: 'Come in, come in! A long walk — sit and have some tea?' });
+        if (!served && ctx.player.character === 'guan') f.wave();
         const c = await talk(ctx, f, name, [{
-          zh: served ? '客官又来啦！再来一壶？' : '客官里边请！走了一路，喝口茶歇歇脚？',
-          en: served ? 'Welcome back! Another pot?' : 'Come in, come in! A long walk — sit and have some tea?',
+          zh: hi.zh,
+          en: hi.en,
           choices: [{ zh: '来一壶茶', en: 'A pot of tea' }, { zh: '打听大橘', en: 'Ask about the cat' }, { zh: '告辞', en: 'Goodbye' }],
         }]);
         if (c === 0) {
@@ -117,7 +105,7 @@ export const oldFisherman = feature('npc-fisherman', (bag, ctx) => {
   const a = ANCHORS.dock;
   const lake = { x: REGION.lake.center.x, z: REGION.lake.center.z };
   const dx = lake.x - a.x, dz = lake.z - a.z, L = Math.hypot(dx, dz);
-  const f = person(bag, ctx, 'lake', { robe: '#8a8468', trim: '#4a4434', cape: '#9c8a5a', hat: 'bamboo', hatColor: '#c8b07a', beard: '#e8e2d4', hair: '#d8d2c4', sit: true }, a, (-dz / L) * 3.2 - (dx / L) * 0.5, (dx / L) * 3.2 - (dz / L) * 0.5, { x: a.x + dx * 2, z: a.z + dz * 2 });
+  const f = placed(bag, ctx, 'lake', { robe: '#8a8468', trim: '#4a4434', cape: '#9c8a5a', hat: 'bamboo', hatColor: '#c8b07a', beard: '#e8e2d4', hair: '#d8d2c4', sit: true }, a, (-dz / L) * 3.2 - (dx / L) * 0.5, (dx / L) * 3.2 - (dz / L) * 0.5, { x: a.x + dx * 2, z: a.z + dz * 2 });
   // his rod out over the water
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.02, 2.6, 5).translate(0, 1.3, 0), new THREE.MeshLambertMaterial({ color: '#9b7d4a' }));
   rod.position.copy(f.hand);
@@ -135,10 +123,13 @@ export const oldFisherman = feature('npc-fisherman', (bag, ctx) => {
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
+        record('npc:fisher');
+        if (await offerFlower(ctx, f, name, 'fisher')) return;
         const n = play.value.counters.fish ?? 0;
+        const hi = hello(ctx, FISHER_HELLO, n >= 5 ? { zh: '哟，你如今也是个老把式了。', en: 'Well now, you’re an old hand yourself these days.' } : { zh: '年轻人，也想试试这一竿风月？', en: 'Young one — fancy a try at the rod?' });
         const c = await talk(ctx, f, name, [{
-          zh: n >= 5 ? '哟，你如今也是个老把式了。' : '年轻人，也想试试这一竿风月？',
-          en: n >= 5 ? 'Well now, you’re an old hand yourself these days.' : 'Young one — fancy a try at the rod?',
+          zh: hi.zh,
+          en: hi.en,
           choices: [{ zh: '怎么钓？', en: 'How do I fish?' }, { zh: '讲个笑话', en: 'Tell me a joke' }, { zh: '见过大橘吗？', en: 'Seen the cat?' }],
         }]);
         if (c === 0) {
@@ -171,7 +162,7 @@ const KOANS = [
 
 export const monk = feature('npc-monk', (bag, ctx) => {
   const g = ANCHORS.templeGate;
-  const f = person(bag, ctx, 'mountain', { robe: '#b0703a', trim: '#6a3f22', hat: 'bald', skin: '#efd6b8', cape: '#a8463a' }, g, 2.2, 1.8, { x: g.x, z: g.z + 10 });
+  const f = placed(bag, ctx, 'mountain', { robe: '#b0703a', trim: '#6a3f22', hat: 'bald', skin: '#efd6b8', cape: '#a8463a' }, g, 2.2, 1.8, { x: g.x, z: g.z + 10 });
   // prayer beads
   const { THREE } = ctx;
   const beads = new THREE.Mesh(new THREE.TorusGeometry(0.08, 0.018, 5, 14), new THREE.MeshLambertMaterial({ color: '#5a3d2b' }));
@@ -188,11 +179,14 @@ export const monk = feature('npc-monk', (bag, ctx) => {
       if (!begin(ctx, 'talk')) return;
       ctx.player.emote('bow');
       try {
+        record('npc:monk');
+        if (await offerFlower(ctx, f, name, 'monk')) return;
         const koan = KOANS[k++ % KOANS.length];
         const rang = !!play.value.flags.bell;
         const cat = todaysCat(ctx);
+        if (ctx.player.character === 'guan') window.dispatchEvent(new CustomEvent('banmu:bow', { detail: { x: f.root.position.x, z: f.root.position.z, r: 1 } }));
         const c = await talk(ctx, f, name, [
-          { zh: '阿弥陀佛。施主远来辛苦。', en: 'Amituofo. You have come a long way.' },
+          hello(ctx, MONK_HELLO, { zh: '阿弥陀佛。施主远来辛苦。', en: 'Amituofo. You have come a long way.' }),
           { zh: '贫僧讲个公案给施主听：\n' + koan.zh, en: 'Let me tell you a story of the old masters:\n' + koan.en, choices: [{ zh: '……懂了？', en: '…I think I get it?' }, { zh: '不懂', en: 'I don’t get it' }] },
         ]);
         await talk(ctx, f, name, [
@@ -211,7 +205,7 @@ export const monk = feature('npc-monk', (bag, ctx) => {
 
 export const poet = feature('npc-poet', (bag, ctx) => {
   const top = ANCHORS.plumSummit;
-  const f = person(bag, ctx, 'plum', { robe: '#e9e6dc', trim: '#3d5a73', hat: 'bun', beard: '#23201d' }, top, 1.6, 1.2, { x: top.x + 8, z: top.z + 8 });
+  const f = placed(bag, ctx, 'plum', { robe: '#e9e6dc', trim: '#3d5a73', hat: 'bun', beard: '#23201d' }, top, 1.6, 1.2, { x: top.x + 8, z: top.z + 8 });
   // a wine gourd on his hip
   const { THREE, palette: P } = ctx;
   const gourd = inked(ctx, merge(THREE, [
@@ -250,6 +244,10 @@ export const poet = feature('npc-poet', (bag, ctx) => {
       const restore = withTheme(ctx, 'quiet');
       mark.set(false);
       try {
+        record('npc:poet');
+        if (await offerFlower(ctx, f, name, 'poet')) return;
+        const own = forCompanion(POET_NPC_HELLO, ctx.player.character);
+        if (own) await talk(ctx, f, name, [own]);
         const go = await talk(ctx, f, name, [{
           zh: '好山好水，正好行令。来一局飞花令？我出一句，你接一句带「令字」的诗。三轮，每轮四句。',
           en: 'Fine hills, fine water — just right for a drinking game. Flying Flowers? I say a line, you answer with a line containing the key character. Three rounds, four lines each.',
@@ -329,7 +327,7 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
   const { THREE } = ctx;
   const group = ctx.regionGroup('bamboo');
   const edge = { x: -60, z: 34 }; // at the edge of the grove, by the path from the garden
-  const f = person(bag, ctx, 'bamboo', { robe: '#d4553a', trim: '#6a3f22', hat: 'buns', scale: 0.72 }, edge, 0, 0, { x: -40, z: 30 });
+  const f = placed(bag, ctx, 'bamboo', { robe: '#d4553a', trim: '#6a3f22', hat: 'buns', scale: 0.72 }, edge, 0, 0, { x: -40, z: 30 });
   greet(bag, ctx, f, 7);
   const mark = speechMark(bag, f, '？');
   const still = reducedMotion();
@@ -381,6 +379,8 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
+        record('npc:kite');
+        if (await offerFlower(ctx, f, name, 'kite')) return;
         if (returned) {
           await talk(ctx, f, name, [{ zh: '你看！两只都飞起来啦！', en: 'Look! Both of them are flying!' }]);
         } else if (carrying) {
@@ -399,7 +399,9 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
             seal: '鸢',
           });
         } else {
+          const own = forCompanion(KITE_HELLO, ctx.player.character);
           await talk(ctx, f, name, [
+            ...(own ? [own] : []),
             { zh: '呜……我的红沙燕被风刮进竹林里了！', en: 'Waah… the wind blew my red swallow kite into the bamboo!' },
             { zh: '它挂在竹子上，一闪一闪的。你能帮我拿回来吗？', en: 'It’s stuck up in the bamboo, glinting. Could you fetch it for me?' },
           ]);

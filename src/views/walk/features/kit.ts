@@ -4,6 +4,7 @@ import type * as T from 'three';
 import type { Interactable, WorldCtx, WorldFeature } from '../types';
 import { activeHabits } from '../../../app/store';
 import { hashString, makeRng, type Rng } from '../../../core/rng';
+import { festivalsOn } from './calendar';
 
 export type Three = WorldCtx['THREE'];
 
@@ -247,16 +248,27 @@ export function timeChoice(ctx: WorldCtx): TimeChoice {
 }
 
 /**
- * A festival that belongs to the night (the moon, lanterns, fireworks) brings night on — unless the
- * visitor explicitly chose 昼, which always wins: the festival then shows its daytime face.
- * Returns true when the world is (now) at night.
+ * A festival that belongs to the night (the moon, lanterns, fireworks) keeps the real clock: by day
+ * it shows its daytime face (lanterns hung but unlit, decorations), and its night comes on at dusk.
+ * The night is brought on early only in a preview of another day's festival — and the visitor's
+ * choice always wins (昼: its daytime face; 夜: its night). Returns true when the world is (now) at night.
  */
 export function festivalNight(bag: Bag): boolean {
   const ctx = bag.ctx;
-  if (timeChoice(ctx) === 'day') return ctx.sky.isNight();
+  const choice = timeChoice(ctx);
+  if (choice === 'day') return ctx.sky.isNight();
+  if (choice === 'night' || ctx.sky.isNight()) return true;
+  // the real clock: the festival evening begins at dusk; a preview shows the night at once
+  if (ctx.env.tod !== 'dusk' && !festivalPreview(ctx)) return false;
   ctx.sky.forceNight(true);
   bag.onDispose(() => ctx.sky.forceNight(false));
   return true;
+}
+
+/** True when the festivals on show are not today's (the visitor is previewing another day's). */
+export function festivalPreview(ctx: WorldCtx): boolean {
+  const real = festivalsOn(ctx.env.date);
+  return ctx.env.festivals.some((f) => !real.includes(f));
 }
 
 // ───────────────────────────── colour & materials ─────────────────────────────

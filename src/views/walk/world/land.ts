@@ -5,8 +5,9 @@
 import * as THREE from 'three';
 import type { Season } from '../../../ink/scene-types';
 import { makeNoise2, makeRng } from '../../../core/rng';
-import { LAKE } from '../map';
-import { Bag, canvas, canvasTexture } from './kit';
+import { LAKE, REGION, type RegionId } from '../map';
+import { Bag, LAWN, NIGHT_LAND, canvas, canvasTexture } from './kit';
+import { skyNow } from './sky';
 import { RIVER_SAMPLES, POOL, terrain } from './terrain';
 import { terrainY } from './site';
 
@@ -20,7 +21,22 @@ const OVX = 196;
 const OVS = 1024;
 const LOD_STEP = [1, 2, 4, 8];
 
-const GROUND: Record<Season, string> = { spring: '#dcd8c8', summer: '#d9d6c5', autumn: '#ddd5c4', winter: '#e6e3dc' };
+/** The colour of the land is all in its vertices (meadow, jade hollows, ochre slopes, blue-green heights). */
+const GROUND = '#ffffff';
+/** Broad patches of the meadow: jade in the hollows, tender yellow-green on the rises, ochre where it is steep. */
+const PATCH: Record<Season, { jade: string; leaf: string; ochre: string; high: string; damp: string }> = {
+  spring: { jade: '#8cc39e', leaf: '#c2d995', ochre: '#cbb087', high: '#98bcb2', damp: '#94c39f' },
+  summer: { jade: '#7fb98e', leaf: '#b3d08d', ochre: '#c6a87e', high: '#90b6ad', damp: '#86bb95' },
+  autumn: { jade: '#92bd92', leaf: '#c6c987', ochre: '#c89f72', high: '#98b4a8', damp: '#98bf95' },
+  winter: { jade: '#dfe2dc', leaf: '#efece4', ochre: '#d8cdbd', high: '#e4e6e6', damp: '#d2d4cc' },
+};
+
+/** Where people live and walk the ground is not meadow: the town's packed earth, the grove's leaf litter, the temple's dust. */
+const SETTLED: { id: RegionId; color: string; k: number; inner: number }[] = [
+  { id: 'village', color: '#dbd2be', k: 0.95, inner: 0.62 },
+  { id: 'bamboo', color: '#b3ae78', k: 0.6, inner: 0.7 },
+  { id: 'mountain', color: '#cfbd9a', k: 0.55, inner: 0.45 },
+];
 
 function overlayCanvas(season: Season): HTMLCanvasElement {
   const c = canvas(OVS, OVS);
@@ -71,7 +87,7 @@ function overlayCanvas(season: Season): HTMLCanvasElement {
   }
   // 3. paths: packed earth, with a soft darker edge
   for (const list of T.paths) {
-    for (const [w, col] of [[3.4, 'rgba(110,88,58,0.07)'], [2.4, 'rgba(120,96,62,0.13)'], [1.2, 'rgba(96,78,52,0.08)']] as const) {
+    for (const [w, col] of [[3.6, 'rgba(150,112,62,0.12)'], [2.4, 'rgba(176,132,76,0.2)'], [1.2, 'rgba(120,88,52,0.1)']] as const) {
       g.strokeStyle = col;
       g.lineWidth = w * M;
       g.beginPath();
@@ -167,7 +183,7 @@ export function buildLand(bag: Bag, season: Season): Land {
   group.name = 'land';
   const overlay = canvasTexture(bag, overlayCanvas(season), { flipY: false });
   const grain = canvasTexture(bag, grainCanvas(), { repeat: true });
-  const mat = bag.add(new THREE.MeshLambertMaterial({ color: GROUND[season], vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }));
+  const mat = bag.add(new THREE.MeshLambertMaterial({ color: GROUND, vertexColors: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 2 }));
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uOverlay = { value: overlay };
     sh.uniforms.uGrain = { value: grain };
@@ -187,13 +203,15 @@ export function buildLand(bag: Bag, season: Season): Land {
   };
   mat.customProgramCacheKey = () => 'land';
 
-  const base = new THREE.Color(GROUND[season]);
-  void base;
-  const high = new THREE.Color('#c9ccd0');
-  const damp = new THREE.Color('#b9b6a6');
-  const green = season === 'winter' ? new THREE.Color('#f2f1ec') : new THREE.Color('#cfd3bf');
+  const P = PATCH[season];
+  const lawn = new THREE.Color(LAWN[season]);
+  const jade = new THREE.Color(P.jade), leaf = new THREE.Color(P.leaf), ochre = new THREE.Color(P.ochre);
+  const high = new THREE.Color(P.high), damp = new THREE.Color(P.damp);
+  const far = new THREE.Color('#b9c7bd');
   const tmp = new THREE.Color();
   const T = terrain();
+  const patches = makeNoise2(7717);
+  const settled = SETTLED.map((g) => ({ ...REGION[g.id], color: new THREE.Color(g.color), k: g.k, inner: g.inner }));
 
   const buildChunk = (ci: number, cj: number, lod: number): THREE.BufferGeometry => {
     const step = LOD_STEP[lod];
@@ -210,16 +228,27 @@ export function buildLand(bag: Bag, season: Season): Land {
       const y = terrainY(x, z);
       hs[k] = y;
       pos[k * 3] = x; pos[k * 3 + 1] = y; pos[k * 3 + 2] = z;
-      // colour: greener in the lowland, cooler and paler up high, darker where damp
+      // colour: the season's meadow in broad patches, ochre on steep ground, blue-green up high
+      // (青绿), deeper green where damp; it meets the garden's lawn without a seam
       const r = Math.hypot(x, z);
-      tmp.setRGB(1, 1, 1);
       const up = Math.min(1, Math.max(0, (y - 3) / 26));
-      // meet the garden's lawn (plain paper) without a seam
       const out = Math.min(1, Math.max(0, (Math.max(Math.abs(x), Math.abs(z)) - 30) / 12));
-      tmp.lerp(green, 0.35 * (1 - up) * out);
-      tmp.lerp(high, up * 0.7 + Math.min(1, Math.max(0, (r - 170) / 50)) * 0.2);
+      const nv = patches(x / 46, z / 46) + 0.35 * patches(x / 13 + 5.1, z / 13);
+      tmp.copy(lawn);
+      tmp.lerp(jade, Math.min(1, Math.max(0, -nv * 1.5)) * 0.9 * out);
+      tmp.lerp(leaf, Math.min(1, Math.max(0, nv * 1.5)) * 0.8 * out);
+      // 青绿: ochre earth where the low ground turns steep, mineral blue-green as the hills rise
+      const sl = T.slope(x, z);
+      const low = (1 - up) * (1 - up);
+      tmp.lerp(ochre, Math.min(1, Math.max(0, sl * 2 - 0.3)) * 0.5 * low * out);
+      tmp.lerp(high, Math.min(1, up * 1.1 + Math.max(0, sl - 0.25) * 0.8 * (1 - low * 0.5)) * 0.85 * out);
+      tmp.lerp(far, Math.min(1, Math.max(0, (r - 165) / 50)) * 0.35);
+      for (const g of settled) {
+        const q = Math.hypot(x - g.center.x, z - g.center.z) / g.radius;
+        if (q < 1) tmp.lerp(g.color, g.k * Math.min(1, (1 - q) / (1 - g.inner)));
+      }
       const w = T.waterAt(x, z);
-      if (w !== null && w - y < 3) tmp.lerp(damp, 0.5);
+      if (w !== null && w - y < 3) tmp.lerp(damp, 0.55);
       col[k * 3] = tmp.r; col[k * 3 + 1] = tmp.g; col[k * 3 + 2] = tmp.b;
     }
     // skirt: the border ring again, 4 m lower, to hide cracks between levels
@@ -276,6 +305,8 @@ export function buildLand(bag: Bag, season: Season): Land {
     if (!g) { g = bag.add(buildChunk(c.ci, c.cj, lod)); c.geos[lod] = g; }
     return g;
   };
+  const nightLand = new THREE.Color(NIGHT_LAND);
+  let lastNight = -1;
   const want = (d: number) => (d < 56 ? 0 : d < 110 ? 1 : d < 170 ? 2 : 3);
   return {
     group,
@@ -284,6 +315,9 @@ export function buildLand(bag: Bag, season: Season): Land {
       for (const c of chunks) { geoFor(c, 3); if (Math.hypot(c.cx, c.cz) < 140) geoFor(c, 2); }
     },
     update(cam, far) {
+      // by night the land goes down to a moonlit indigo
+      const n = skyNow.night;
+      if (Math.abs(n - lastNight) > 1e-3) { lastNight = n; mat.color.setRGB(1, 1, 1).lerp(nightLand, n); }
       let budget = 1;
       for (const c of chunks) {
         // distance from the camera to the chunk's square

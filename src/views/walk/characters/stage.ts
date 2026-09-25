@@ -1,6 +1,7 @@
 // The turntable in the character select: one small WebGLRenderer showing one companion at a
-// time, idling, now and then waving or bowing or walking on the spot, slowly turning (drag to
-// turn it yourself). Loaded lazily (it imports three.js); dispose() frees everything.
+// time, idling (with its own little fidgets), now and then showing off its skill or another
+// emote or walking on the spot, slowly turning (drag to turn it yourself, tap to see the skill).
+// Loaded lazily (it imports three.js); dispose() frees everything.
 import * as THREE from 'three';
 import type { CharacterId } from '../../../data/characters';
 import type { EmoteKind } from '../types';
@@ -18,10 +19,12 @@ export interface Stage {
 }
 
 const SHOWCASE: Partial<Record<CharacterId, EmoteKind[]>> = {
-  scholar: ['bow', 'play', 'wave'], gardener: ['water', 'wave'], fisher: ['cast', 'bow'], musician: ['play', 'bow'],
-  swordsman: ['bow', 'throw'], taoist: ['play', 'jump', 'wave'], painter: ['play', 'wave'], player: ['play', 'bow'],
-  cat: ['bow', 'wave', 'play'], rabbit: ['play', 'wave', 'eat'], poet: ['eat', 'wave'], guan: ['bow', 'wave'], change: ['play', 'wave'],
+  scholar: ['skill', 'bow', 'play', 'talk'], gardener: ['skill', 'water', 'wave'], fisher: ['skill', 'cast', 'bow'], musician: ['skill', 'bow', 'dance'],
+  swordsman: ['skill', 'bow', 'dance'], taoist: ['skill', 'play', 'jump'], painter: ['skill', 'play', 'talk'], player: ['skill', 'play', 'bow'],
+  cat: ['skill', 'dance', 'play', 'wave'], rabbit: ['skill', 'play', 'dance'], poet: ['skill', 'eat', 'dance'], guan: ['skill', 'bow', 'talk'], change: ['skill', 'play', 'dance'],
 };
+/** As in the world (world/player.ts EMOTE_DUR). */
+const DUR: Partial<Record<EmoteKind, number>> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, play: 2.8, skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
 
 export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }): Stage {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' });
@@ -29,8 +32,8 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.setClearColor(0x000000, 0);
   const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight('#fbf8f1', '#b0a898', 2.25));
-  const sun = new THREE.DirectionalLight('#fff8ec', 1.25);
+  scene.add(new THREE.HemisphereLight('#fff4e2', '#b89f80', 2.1));
+  const sun = new THREE.DirectionalLight('#ffe9c8', 1.4);
   sun.position.set(3, 6, 5);
   scene.add(sun);
   const camera = new THREE.PerspectiveCamera(28, 1, 0.05, 50);
@@ -62,7 +65,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
   let settle = 0.2;
   // a little programme: idle, a showcase emote, idle, walk on the spot
   let cue = 0, cueT = 0;
-  let emote: EmoteKind | null = null, emoteT = 0, emoteDur = 2.2, walking = false;
+  let emote: EmoteKind | null = null, emoteT = 0, emoteDur = 2.2, walking = false, showN = 0;
   const showcase = () => SHOWCASE[current ?? 'scholar'] ?? ['wave'];
 
   // frame what is really there: the figure plus its hair loops, hat, hover and long props (a
@@ -104,7 +107,7 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     current = id;
     if (model) { scene.remove(model.root); model.dispose(); }
     const f = FACTORIES[id];
-    model = f(THREE, { palette: {} });
+    model = f(THREE, { palette: {}, reduced: o.reduced });
     scene.add(model.root);
     // settle into the idle pose before the first frame (and before measuring)
     model.root.rotation.y = Math.PI + yaw;
@@ -114,15 +117,16 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     measure(model.root);
     frame(model.height);
     pop = o.reduced ? 1 : 0;
-    cue = 0; cueT = 0; emote = null; walking = false;
+    cue = 0; cueT = 3.4; emote = null; walking = false; showN = 0;
     settle = 0.2;
   };
 
-  const doEmote = (k: EmoteKind) => { emote = k; emoteT = 0; emoteDur = k === 'play' ? 3 : 2.2; settle = 0.2; };
+  const doEmote = (k: EmoteKind) => { emote = k; emoteT = 0; emoteDur = DUR[k] ?? 2.2; settle = 0.2; walking = false; };
 
-  // drag to turn
+  // drag to turn; a tap (no drag) shows the skill
   let dragX: number | null = null;
-  const down = (e: PointerEvent) => { dragX = e.clientX; canvas.setPointerCapture?.(e.pointerId); };
+  let tapX = 0, tapAt = 0;
+  const down = (e: PointerEvent) => { dragX = e.clientX; tapX = e.clientX; tapAt = performance.now(); canvas.setPointerCapture?.(e.pointerId); };
   const move = (e: PointerEvent) => {
     if (dragX === null) return;
     const dx = e.clientX - dragX;
@@ -130,7 +134,11 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     yaw += dx * 0.012;
     spinV = o.reduced ? 0 : dx * 0.6;
   };
-  const up = () => { dragX = null; };
+  const up = (e: PointerEvent) => {
+    const tap = dragX !== null && e.type === 'pointerup' && Math.abs(e.clientX - tapX) < 8 && performance.now() - tapAt < 450;
+    dragX = null;
+    if (tap && model) { doEmote('skill'); cue = 2; cueT = 0; }
+  };
   canvas.addEventListener('pointerdown', down);
   canvas.addEventListener('pointermove', move);
   canvas.addEventListener('pointerup', up);
@@ -151,8 +159,8 @@ export function createStage(canvas: HTMLCanvasElement, o: { reduced: boolean }):
     // the programme
     if (!o.reduced && !emote) {
       cueT += dt;
-      const len = [3, 0, 2.2, 3.2][cue];
-      if (cue === 1) { doEmote(showcase()[Math.floor(t) % showcase().length]); cue = 2; cueT = 0; }
+      const len = [5.2, 0, 2.4, 3.2][cue];
+      if (cue === 1) { doEmote(showcase()[showN++ % showcase().length]); cue = 2; cueT = 0; }
       else if (cueT > len) { cue = (cue + 1) % 4; cueT = 0; walking = cue === 3; }
     }
     if (emote) { emoteT += dt / emoteDur; if (emoteT >= 1) { emote = null; emoteT = 0; } }

@@ -48,7 +48,7 @@ export function plumTree(rng: Rng, x: number, y: number, z: number, scale = 1): 
   const twigs: T.BufferGeometry[] = [];
   const blossoms: { p: V3; s: number }[] = [];
   const crown: V3[] = [];
-  const bark = rng() < 0.5 ? '#4a3a30' : '#3f3833';
+  const bark = rng() < 0.5 ? '#553a2a' : '#4a3a30';
   const lean = rng() * TAU;
   const tH = (1.6 + rng() * 1.4) * scale;
   // trunk: a heavy, bent stroke
@@ -137,7 +137,7 @@ export function pineTree(rng: Rng, x: number, y: number, z: number, scale = 1, o
   const r0 = (0.32 + rng() * 0.12) * scale;
   const bark = '#57432f';
   trunk.push(taperTube(pts, pts.map((_, i) => r0 * (1 - 0.72 * (i / n)) * (i === 0 ? 1.4 : 1)), 7, bark, { seed: rng.int(1, 1e6), jitter: 0.25, dark: '#241a13' }));
-  const padC = [new THREE.Color('#2c3930'), new THREE.Color('#3a4a3a'), new THREE.Color('#4b5b45')];
+  const padC = [new THREE.Color('#2e4a3a'), new THREE.Color('#3e5f46'), new THREE.Color('#58795a')];
   const addPad = (c: V3, s: number) => {
     let g: T.BufferGeometry = new THREE.IcosahedronGeometry(1, 1);
     g.deleteAttribute('uv');

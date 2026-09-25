@@ -39,7 +39,8 @@
 .ttt-status { transition: color 0.3s; }
 .ttt-status.is-over { color: var(--ink); letter-spacing: 0.12em; }
 
-.ttt-result { min-height: 44px; display: flex; align-items: center; justify-content: center; margin: -4px 0; }
+.ttt-result { min-height: 44px; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px 12px; margin: -4px 0; }
+.ttt-result .game-paid { margin: 0; }
 .ttt-result .btn { animation: ttt-rise 0.5s var(--ease) 0.35s backwards; }
 
 .ttt-score { display: flex; align-items: stretch; justify-content: center; gap: 0; }

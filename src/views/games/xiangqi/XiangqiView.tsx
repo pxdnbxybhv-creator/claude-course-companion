@@ -5,6 +5,9 @@ import { Segmented, Sheet, toast } from '../../../ui/kit';
 import { useT } from '../../../app/i18n';
 import { lang } from '../../../app/store';
 import { record } from '../../../app/play';
+import { BOARD_WIN_COINS, boardWinPay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import { audio } from '../../../audio/engine';
 import { makeSeal, sealReady } from '../../../ink/seal';
 import { Position, RED, BLACK, moveOf, sideOf, pieceChar, sq, notation, type Outcome, type Side } from './engine';
@@ -91,6 +94,8 @@ export function XiangqiView() {
   const [human, setHuman] = useState<Side>(saved.game?.human ?? saved.prefs.human);
   const [moves, setMoves] = useState<number[]>(saved.game?.moves ?? []);
   const [recorded, setRecorded] = useState(saved.game?.recorded ?? false);
+  /** What this game paid (a win over the machine), for the result card. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const [stats, setStats] = useState(saved.stats);
   const [flipManual, setFlipManual] = useState(false);
   const [thinking, setThinking] = useState(false);
@@ -205,6 +210,7 @@ export function XiangqiView() {
       setStats(next);
       if (won && (level === 'club' || level === 'master')) record('win:club');
       if (won && level === 'master') record('win:xiangqi-master');
+      if (won) setPaid(payToast(boardWinPay('xiangqi', level)));
     }
   }, [over]);
 
@@ -216,6 +222,7 @@ export function XiangqiView() {
     if (patch?.human !== undefined) setHuman(patch.human);
     setMoves([]);
     setRecorded(false);
+    setPaid(null);
     setHint(0);
     setSel(-1);
     setSlide(null);
@@ -348,7 +355,7 @@ export function XiangqiView() {
           )}
           <span class="visually-hidden" aria-live="polite">{announce}</span>
 
-          {res && <Result t={t} res={res} vsAi={vsAi} human={human} plies={moves.length} record={recordLine} onAgain={() => startNew(undefined, true)} />}
+          {res && <Result t={t} res={res} vsAi={vsAi} human={human} plies={moves.length} record={recordLine} paid={paid} onAgain={() => startNew(undefined, true)} />}
 
           <Tray t={t} lostRed={lostBy(RED)} lostBlack={lostBy(BLACK)} />
 
@@ -509,6 +516,9 @@ function Setup(props: { t: T; mode: Mode; level: Level; human: Side; record: str
           ? props.record ?? t('将死或困毙对方即胜；长将判负。', 'Checkmate or stalemate wins; perpetual check loses.')
           : t('二人同坐一案，红先黑后。', 'Two people, one board — red moves first.')}
       </p>
+      {props.mode === 'ai' && (
+        <PayHint zh={`胜「${LEVEL_NAMES[props.level][0]}」得 ${BOARD_WIN_COINS[props.level]} 文`} en={`A win at ${LEVEL_NAMES[props.level][1]} pays ${BOARD_WIN_COINS[props.level]} coins`} />
+      )}
     </div>
   );
 }
@@ -551,7 +561,7 @@ function NewGameSheet(props: { open: boolean; t: T; mode: Mode; level: Level; hu
   );
 }
 
-function Result(props: { t: T; res: Outcome; vsAi: boolean; human: Side; plies: number; record: string | null; onAgain: () => void }) {
+function Result(props: { t: T; res: Outcome; vsAi: boolean; human: Side; plies: number; record: string | null; paid: Paid | null; onAgain: () => void }) {
   const { t, res, vsAi, human } = props;
   const sealRef = useRef<HTMLCanvasElement>(null);
   const won = vsAi && res.winner === human;
@@ -587,6 +597,7 @@ function Result(props: { t: T; res: Outcome; vsAi: boolean; human: Side; plies: 
           <span class="xq-poet">— {zh ? poem[2] : poem[3]}</span>
         </p>
         {props.record && <p class="xq-rec muted">{props.record}</p>}
+        <PaidLine paid={props.paid} />
       </div>
       <button type="button" class="btn btn-seal xq-again" onClick={props.onAgain}>
         {t('再来一局', 'Play again')}

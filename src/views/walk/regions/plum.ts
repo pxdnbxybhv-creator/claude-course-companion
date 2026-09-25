@@ -9,7 +9,7 @@ import { ANCHORS, REGION, type XZ } from '../map';
 import { makeNoise2, makeRng } from '../../../core/rng';
 import { rasterize } from '../../../ink/brush';
 import {
-  Batch, COL, Hill, Painter, TAU, canvas, clamp, glowCanvas, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
+  Batch, COL, Hill, Painter, TAU, canvas, clamp, glowCanvas, lampPools, lit, mistCards, ngon, particles, pathDist, place, plaqueCanvas,
   polyDist, puffCanvas, rockGeometry, roof, steleCanvas, stepPath, steppingStones, three, wind, windCards,
 } from './hill-kit';
 import { blossomCanvas, pineTree, plumTree } from './hill-trees';
@@ -210,7 +210,7 @@ function build(ctx: WorldCtx): void {
     }
     h.clearing({ cx: x, cz: z, ax: 1, az: 0, hl: PAV_R + 0.3, hw: PAV_R + 0.3 });
     // two red lanterns at the south opening (the cinnabar accent of the ridge)
-    const lanMat = h.toon('#b0473a', { emissive: '#000000' });
+    const lanMat = h.toon('#c0412f', { emissive: '#000000' });
     const capMat = h.toon('#2b2724');
     const lanGeo = new THREE.SphereGeometry(0.2, 12, 9);
     const capGeo = new THREE.CylinderGeometry(0.09, 0.09, 0.06, 10);
@@ -232,6 +232,7 @@ function build(ctx: WorldCtx): void {
       h.add(sp);
       glows.push(sp);
     }
+    lampPools(h, lans.map((l) => l.position.clone()), 'plum:pools');
     h.frame((_dt, t) => {
       const n = h.night;
       const flick = 0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1);
@@ -245,7 +246,7 @@ function build(ctx: WorldCtx): void {
   // ── the steps up the ridge and down toward the temple; a trail to the bench ─────
   stepPath(b, h, UP_STEPS, { width: 1.7, run: 0.5, seed: 3, endTop: top });
   stepPath(b, h, EAST_STEPS, { width: 1.5, run: 0.55, seed: 4, startTop: top });
-  steppingStones(b, h, BENCH_TRAIL, { gap: 0.75, w: 0.6, seed: 5, color: '#b2ad9e' });
+  steppingStones(b, h, BENCH_TRAIL, { gap: 0.75, w: 0.6, seed: 5, color: '#bbae94' });
 
   // ── the bench, the stele, scholar's rocks ─────────────────────────────────
   {
@@ -263,9 +264,9 @@ function build(ctx: WorldCtx): void {
     const ry = Math.atan2(-72 - x, -68 - z); // faces the steps
     const sy = h.span(x, z, 0.7).lo;
     b.add(place(new THREE.BoxGeometry(1.3, 0.45, 0.8), x, sy + 0.12, z, ry), COL.stoneMid, { edge: 30, jitter: 0.05 });
-    b.add(place(new THREE.BoxGeometry(0.95, 2.0, 0.26), x, sy + 1.3, z, ry), '#77726a', { edge: 30 });
-    b.add(place(new THREE.BoxGeometry(1.15, 0.18, 0.4), x, sy + 2.36, z, ry), '#6a655e', { edge: 30 });
-    b.add(place(new THREE.CylinderGeometry(0.12, 0.62, 0.3, 4, 1, false, Math.PI / 4), x, sy + 2.58, z, ry, 1, 1, 0.45), '#5f5a54', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(0.95, 2.0, 0.26), x, sy + 1.3, z, ry), '#7a7064', { edge: 30 });
+    b.add(place(new THREE.BoxGeometry(1.15, 0.18, 0.4), x, sy + 2.36, z, ry), '#6c6258', { edge: 30 });
+    b.add(place(new THREE.CylinderGeometry(0.12, 0.62, 0.3, 4, 1, false, Math.PI / 4), x, sy + 2.58, z, ry, 1, 1, 0.45), '#605549', { edge: 30 });
     const face = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 1.86), h.own(new THREE.MeshLambertMaterial({ map: h.tex(steleCanvas(['疏影横斜水清浅', '暗香浮动月黄昏'], { w: 256, h: 512, title: '梅岭' })) })));
     face.position.set(x + Math.sin(ry) * 0.132, sy + 1.3, z + Math.cos(ry) * 0.132);
     face.rotation.y = ry;
@@ -290,7 +291,7 @@ function build(ctx: WorldCtx): void {
   ];
   rocks.forEach(([x, z, w, hh], i) => {
     if (ctx.waterAt(x, z) !== null || pathDist(x, z) < 1.5 || stepDist(x, z) < 1.3) return;
-    const g = rockGeometry(3100 + i, w * 1.4, hh * 1.3, { base: '#bdb6a8', dark: '#524e48', lean: 0.35 });
+    const g = rockGeometry(3100 + i, w * 1.4, hh * 1.3, { base: '#c3b8a2', dark: '#554b40', lean: 0.35 });
     g.rotateY(rng() * TAU);
     g.translate(x, h.y(x, z) - 0.05, z);
     b.colored(g, { hull: true });
@@ -462,10 +463,10 @@ function build(ctx: WorldCtx): void {
     const x = R.center.x + Math.cos(a) * d, z = R.center.z + Math.sin(a) * d;
     mistItems.push({ p: new THREE.Vector3(x, h.y(x, z) + 1.2 + rng() * 1.5, z), w: 14 + rng() * 10, h: 3 + rng() * 2.5 });
   }
-  const mist = mistCards(h, mistItems, { tex: h.tex(puffCanvas(128, 33)), color: '#f3eee4', opacity: 0.6, drift: 0.35 });
+  const mist = mistCards(h, mistItems, { tex: h.tex(puffCanvas(128, 33)), color: '#f6ecd8', opacity: 0.6, drift: 0.35 });
   mist.name = 'plum:mist';
   h.add(mist);
-  h.frame(() => { (mist.material as T.MeshBasicMaterial).color.set('#f3eee4').multiply(h.paper); });
+  h.frame(() => { (mist.material as T.MeshBasicMaterial).color.set('#f6ecd8').multiply(h.paper); });
   void clamp;
 }
 

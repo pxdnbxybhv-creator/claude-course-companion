@@ -1,7 +1,9 @@
 // 同伴 · Companions — choose who to walk the painting as. A turntable stage shows the focused
 // companion in 3D (one small WebGL renderer, loaded lazily and freed on close); below, the roster
-// of painted round-fan portraits. Locked companions are pale silhouettes with the quest that
-// brings them, its hint and progress. Arrow keys move through the roster, Enter chooses.
+// of painted round-fan portraits. Each companion's knack (身手, always on) sits beside its skill
+// (技, the Q button in the walk), and a tap on the turntable — or the ▶ by the skill — plays it.
+// Locked companions are pale silhouettes with the quest that brings them, its hint and progress.
+// Arrow keys move through the roster, Enter chooses.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { CHARACTERS, CHARACTER, type CharacterId } from '../../../data/characters';
@@ -148,7 +150,8 @@ function SelectBody(props: { onClose: () => void }) {
   return (
     <div class="cs">
       <div class={'cs-stage' + (isOpen ? '' : ' is-locked')}>
-        <canvas ref={stageRef} class="cs-canvas" style={{ visibility: isOpen && stageState === 'ready' ? 'visible' : 'hidden' }} aria-label={t(`${def.zh}的立像，可拖动旋转`, `${def.en}, drag to turn`)} role="img" />
+        <canvas ref={stageRef} class="cs-canvas" style={{ visibility: isOpen && stageState === 'ready' ? 'visible' : 'hidden' }} aria-label={t(`${def.zh}的立像，可拖动旋转，轻点看绝技`, `${def.en}, drag to turn, tap to see the skill`)} role="img" />
+        {isOpen && stageState === 'ready' && <div class="cs-taphint" aria-hidden="true">{t('轻点 · 看绝技', 'Tap · see the skill')}</div>}
         {(!isOpen || stageState !== 'ready') && (
           <div class="cs-still">
             <Portrait id={focus} locked={!isOpen} size={188} seal />
@@ -168,7 +171,23 @@ function SelectBody(props: { onClose: () => void }) {
           <>
             <p class="cs-title">{t(`「${def.titleZh}」`, `“${def.titleEn}”`)}</p>
             <p class="cs-desc">{t(def.descZh, def.descEn)}</p>
-            <p class="cs-ability"><span class="cs-tag">{t('身手', 'Knack')}</span>{t(def.abilityZh, def.abilityEn)}</p>
+            <div class="cs-gifts">
+              <p class="cs-ability"><span class="cs-tag">{t('身手', 'Knack')}</span>{t(def.abilityZh, def.abilityEn)}</p>
+              <div class="cs-skill">
+                <span class="cs-glyph" aria-hidden="true">{def.skill.glyph}</span>
+                <div class="cs-sbody">
+                  <p class="cs-sname">
+                    <span class="cs-tag cs-tag-skill">{t('技', 'Skill')}</span>
+                    <b>{t(def.skill.zh, def.skill.en)}</b>
+                    <kbd class="cs-key" aria-label={t('按 Q 键', 'Q key')}>Q</kbd>
+                    {stageState === 'ready' && (
+                      <button type="button" class="cs-demo" onClick={() => stage.current?.emote('skill')} aria-label={t(`演示${def.skill.zh}`, `Show ${def.skill.en}`)}>▶</button>
+                    )}
+                  </p>
+                  <p class="cs-sdesc">{t(def.skill.descZh, def.skill.descEn)}</p>
+                </div>
+              </div>
+            </div>
             <button type="button" class={'btn cs-go' + (focus === current ? '' : ' btn-primary')} disabled={focus === current} onClick={() => choose(focus)}>
               {focus === current ? t('正与你同行', 'Walking together') : t(`与${def.zh}同行`, `Walk as ${enWho(focus)}`)}
             </button>
@@ -178,6 +197,7 @@ function SelectBody(props: { onClose: () => void }) {
             <p class="cs-qtitle"><span class="cs-tag">{t('任务', 'Quest')}</span>{t(quest.zh, quest.en)}</p>
             <p class="cs-desc">{t(quest.descZh, quest.descEn)}</p>
             <p class="cs-hint">{t(quest.hintZh, quest.hintEn)}</p>
+            <p class="cs-lockskill"><span class="cs-tag cs-tag-skill">{t('技', 'Skill')}</span>{t(`结伴后可用「${def.skill.zh}」`, `Brings “${def.skill.en}”`)}</p>
             <div class="cs-bar" role="progressbar" aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={progress.value} aria-label={t('进度', 'Progress')}>
               <i style={{ width: `${(progress.value / progress.target) * 100}%` }} />
             </div>

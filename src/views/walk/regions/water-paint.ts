@@ -38,7 +38,7 @@ export const STRIPS = ['小桥流水', '烟雨人家', '藕香榭', '枕河'];
 export const BANNERS = ['茶', '酒', '面', '糖'];
 export const ATLAS_CHARS = SIGNS.join('') + STRIPS.join('') + BANNERS.join('');
 
-const WHITE = '#f0ebe0';
+const WHITE = '#f5ecd9';
 
 function wash(g: CanvasRenderingContext2D, r: Rng, x: number, y: number, w: number, h: number, damp = true) {
   g.fillStyle = WHITE;
@@ -59,7 +59,7 @@ function wash(g: CanvasRenderingContext2D, r: Rng, x: number, y: number, w: numb
     g.fillStyle = d;
     g.fillRect(x, y + h * 0.72, w, h * 0.28);
     for (let i = 0; i < 26; i++) {
-      g.fillStyle = `rgba(52,58,44,${r.range(0.15, 0.45)})`;
+      g.fillStyle = `rgba(56,86,50,${r.range(0.15, 0.45)})`;
       g.beginPath();
       g.arc(x + r() * w, y + h * r.range(0.88, 0.99), r.range(0.6, 1.8), 0, Math.PI * 2);
       g.fill();
@@ -142,7 +142,7 @@ export function paintFacades(seed = 5151): { day: HTMLCanvasElement; glow: HTMLC
   // 0 · plain whitewash
   { const [x, y] = at(CELL.wall); wash(g, r, x, y, C, C); }
   // 1 · whitewash with a small lattice window high up
-  { const [x, y] = at(CELL.wallWin); wash(g, r, x, y, C, C); lattice(g, x + 44, y + 30, 40, 34, '#5d5a54', '#d9d0bb'); glow(x + 44, y + 30, 40, 34, 0.8); }
+  { const [x, y] = at(CELL.wallWin); wash(g, r, x, y, C, C); lattice(g, x + 44, y + 30, 40, 34, '#5a4434', '#e0d2b2'); glow(x + 44, y + 30, 40, 34, 0.8); }
   // 2 · shop front: boards with an open counter in the middle
   {
     const [x, y] = at(CELL.shop);
@@ -160,7 +160,7 @@ export function paintFacades(seed = 5151): { day: HTMLCanvasElement; glow: HTMLC
   {
     const [x, y] = at(CELL.door);
     wash(g, r, x, y, C, C);
-    g.fillStyle = '#a19b8f';
+    g.fillStyle = '#aa9d88';
     g.fillRect(x + 34, y + 30, 60, 98);
     g.fillStyle = '#2d2520';
     g.fillRect(x + 42, y + 38, 44, 90);
@@ -168,9 +168,9 @@ export function paintFacades(seed = 5151): { day: HTMLCanvasElement; glow: HTMLC
     g.fillRect(x + 63.5, y + 38, 1.4, 90);
     g.fillStyle = '#b89a5c';
     g.beginPath(); g.arc(x + 58, y + 80, 2.4, 0, 7); g.arc(x + 70, y + 80, 2.4, 0, 7); g.fill();
-    g.fillStyle = '#403e3b';
+    g.fillStyle = '#41372e';
     g.fillRect(x + 26, y + 20, 76, 9);
-    g.fillStyle = '#5a5855';
+    g.fillStyle = '#5d5146';
     g.fillRect(x + 30, y + 16, 68, 5);
     glow(x + 64, y + 38, 2, 90, 0.5);
   }
@@ -189,7 +189,7 @@ export function paintFacades(seed = 5151): { day: HTMLCanvasElement; glow: HTMLC
     lattice(g, x + 40, y + 30, 48, 52);
     glow(x + 40, y + 30, 48, 52, 0.85);
     boards(g, r, x + 22, y + 27, 15, 58, '#5a3d2c');
-    g.fillStyle = '#3c3a37';
+    g.fillStyle = '#3f352c';
     g.fillRect(x + 32, y + 20, 64, 6);
   }
   // 6 · teahouse front: open, a bamboo blind rolled half down, dark room with a lamp

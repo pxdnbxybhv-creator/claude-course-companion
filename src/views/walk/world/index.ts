@@ -9,13 +9,13 @@ import { effect } from '@preact/signals';
 import type { FestivalKey, Hud, Interactable, InputState as CtxInput, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
 import { REGION_MODULES } from '../regions';
-import { allDecks, clearedAt } from '../regions/water-decks';
+import { allDecks, clearedAt, rectClearing, registerClearing } from '../regions/water-decks';
 import { FACTORIES } from '../characters';
 import type { CharacterModel } from '../characters/types';
-import { ANCHORS, REGION, REGIONS, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
+import { ANCHORS, HOME_PLOT, REGION, REGIONS, WAYPOINTS, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
 import { CHARACTER, type CharacterId } from '../../../data/characters';
 import { activeHabits, refreshToday, state, toggleCheckin } from '../../../app/store';
-import { play, record, visitRegion } from '../../../app/play';
+import { play, record, unlockWaypoint, visitRegion, waypointOpen } from '../../../app/play';
 import { music } from '../../../audio/music';
 import { go } from '../../../app/router';
 import { statsFor, type HabitStats } from '../../../core/habits';
@@ -34,7 +34,7 @@ import { buildMountains } from './mountains';
 import { buildGround } from './ground';
 import { buildArchitecture, buildGardenWall } from './architecture';
 import { buildPond, NO_REFLECT } from './pond';
-import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, rebrushTablet, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
+import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
 import { InkMarks } from './marks';
 import { giftsOf, PlayerController, ScholarModel } from './player';
 import { DriftingVerses, SongBirds } from './gifts';
@@ -47,6 +47,10 @@ import { buildWater } from './water';
 import { buildScatter } from './scatter';
 import { createGrade } from './grade';
 import { bridgeSpecs, buildBridges, setBridgeReplaced } from './bridges';
+import { Dust } from './fx';
+import { buildSteles, type PlacedWaypoint, type Steles } from './waypoints';
+import { arrivalAt, findSpot, toLight } from './wayfind';
+import { drum } from '../features/sfx';
 import {
   GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, WALL, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallPath, wallSegments, waterAt,
   type Circle, type PlantSlot,
@@ -95,10 +99,17 @@ export interface WorldHandle {
   setPaused(p: boolean): void;
   /** Where the player is (map screen). */
   where(): WhereAmI;
-  /** Fast travel (驿站) to a place. */
+  /** Fast travel (驿站) to a place's waypoint stele (only a lit one). */
   travel(id: RegionId): Promise<void>;
+  /** The waypoint steles as built (their real footing), and whether each is lit. */
+  waypoints(): WaypointInfo[];
+  /** Always run (the 疾 toggle); Shift inverts it while held. */
+  setRun(on: boolean): void;
   dispose(): void;
 }
+
+/** A waypoint for the map screen. */
+export interface WaypointInfo { id: RegionId; x: number; z: number; zh: string; en: string; lit: boolean }
 
 export class WebGLUnavailable extends Error {}
 
@@ -371,7 +382,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     const i = tabletFor.get(e.key);
     if (i === undefined) return;
     tabletSpecs[i].note = noteFor(st);
-    rebrushTablet(tablets.faces[i], tabletSpecs[i]);
+    tablets.rebrush(i, tabletSpecs[i]);
   };
 
   // ink on the ground: the bloom of each watering, and the damp patch of plants tended today
@@ -448,12 +459,27 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   if (air) scene.add(air.points);
   const bursts = new Bursts(bag, 1);
   scene.add(bursts.points);
+  // dust at the walker's feet: running strides, take-offs, landings
+  const dust = new Dust(bag, reduced);
+  scene.add(dust.points);
+  player.reduced = reduced;
+  player.onStride = () => { if (!reduced) dust.stride(player.position.x, player.position.y, player.position.z, player.heading); };
+  player.onJump = (kind) => { if (kind === 'ground') dust.takeoff(player.position.x, player.position.y, player.position.z); };
+  player.onLand = (impact) => {
+    const p = player.position;
+    // a landing on water is a splash, not a puff
+    if (!player.floats || waterAt(p.x, p.z) === null || floorY(p.x, p.z) > (waterAt(p.x, p.z) ?? -99) + 0.05) dust.land(p.x, p.y, p.z, impact);
+    else bursts.drops(p.x, p.y + 0.3, p.z, 12);
+    // a soft thump, louder for a harder landing
+    try { drum(Math.min(0.32, 0.05 + impact * 0.035)); } catch { /* no sound */ }
+  };
   // the pixel ratio actually in use: lowered step by step if frames run long (see the loop)
   let pr = dpr;
   const setPx = () => {
     const px = (H() * pr) / (2 * Math.tan((camera.fov * Math.PI) / 360));
     if (air) (air.points.material as THREE.ShaderMaterial).uniforms.uPx.value = px;
     (bursts.points.material as THREE.ShaderMaterial).uniforms.uPx.value = px;
+    dust.setPx(px);
   };
   setPx();
 
@@ -520,9 +546,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     player.emote('play');
     const phrase = QIN[qinN++ % QIN.length];
     phrase.forEach((d, i) => later(260 + i * (i === phrase.length - 1 ? 330 : 300), () => audio.pluck(d, i === phrase.length - 1 ? 0.75 : 0.5 + (i % 2) * 0.12)));
-    const t = (performance.now() - t0) / 1000;
     const p = player.position;
-    songBirds.call(p.x, p.z, t, 9);
+    songBirds.call(p.x, p.z, clock, 9);
     for (let i = 0; i < 4; i++) later(300 + i * 600, () => bursts.sparks(p.x, p.y + 0.9, p.z, '#dfe6d8', 6));
     if (qinN === 1) later(1400, () => hud.toast('琴声一起，鸟儿都飞来听了', 'At the first notes, the birds come down to listen', 2800));
   };
@@ -923,13 +948,46 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       if (c.visible) { c.visible = false; set.add(c); }
     }
   }
+  // --- waypoint steles (驿碑): one per place (built once the places have dressed themselves)
+  let steles: Steles | null = null;
+  const placed: PlacedWaypoint[] = [];
+  const placedById = new Map<RegionId, PlacedWaypoint>();
+  const steleSpots: { id: RegionId; x: number; z: number }[] = [];
+  const isLit = (id: string) => waypointOpen(play.peek(), id);
+  /** Light the stele the walker has reached (and any a code or another tab opened meanwhile). */
+  const checkWaypoints = () => {
+    if (!steles) return;
+    for (const w of placed) if (isLit(w.id)) steles.light(w.id, false);
+    if (traveling || player.isFrozen) return;
+    const p = player.position;
+    const w = toLight(p.x, p.z, steleSpots, isLit);
+    if (!w) return;
+    if (!unlockWaypoint(w.id)) return;
+    steles.light(w.id, true);
+    const at = steles.lanternAt(w.id);
+    if (at) {
+      bursts.sparks(at.x, at.y, at.z, '#ffc46b', 28);
+      later(260, () => bursts.sparks(at.x, at.y + 0.2, at.z, '#ffe2a8', 18));
+    }
+    audio.chime(5);
+    later(420, () => audio.pluck(4, 0.55));
+    later(700, () => audio.pluck(7, 0.45));
+    hud.toast('驿站已通 · 可在舆图中传送', 'Waypoint lit · you can travel here from the map', 3600);
+  };
   const regionOf = new Map<Interactable, RegionId | null>();
   let frozenShown = false;
-  const step = (rawDt: number, t: number) => {
+  /** The world's own clock: it slows with setTimeScale (the camera and the HUD keep real time). */
+  let clock = 0;
+  /** The lens widens a little while running (the world rushes past). */
+  let baseFov = camera.fov, fovKick = 0;
+  const step = (rawDt: number, _realT: number) => {
     frameNo++;
-    timeScale += (timeScaleWant - timeScale) * Math.min(1, rawDt * 6);
-    if (Math.abs(timeScale - timeScaleWant) < 0.01) timeScale = timeScaleWant;
+    // ease toward the wanted pace over about a third of a second, never overshooting
+    timeScale += (timeScaleWant - timeScale) * Math.min(1, rawDt * 7);
+    if (Math.abs(timeScale - timeScaleWant) < 0.005) timeScale = timeScaleWant;
     const dt = rawDt * timeScale;
+    clock += dt;
+    const t = clock;
     const mv = controls.move();
     const inp = controls.input;
     ctxInput.x = controls.intent.x;
@@ -937,11 +995,17 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     ctxInput.run = controls.intent.run;
     ctxInput.actionPressed = inp.actQueued && !paused;
     ctxInput.jumpPressed = inp.jumpQueued && !paused;
-    ctxInput.skillPressed = inp.skillQueued && !paused;
+    // no skills while held by a game, riding, travelling or behind a card
+    ctxInput.skillPressed = inp.skillQueued && !paused && !player.isFrozen && !traveling;
     inp.skillQueued = false;
     player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve, built: (x, z) => floorY(x, z) > terrainY(x, z) + 0.01 });
     inp.jumpQueued = false;
     camFollow(rawDt);
+    const kick = !reduced && player.running && player.speed > 3.4 && !player.isFrozen ? 5 : 0;
+    const f0 = fovKick;
+    fovKick += (kick - fovKick) * Math.min(1, rawDt * (kick > fovKick ? 2.2 : 3.5));
+    if (Math.abs(fovKick - f0) > 0.01) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+    dust.update(dt);
     sky.update(dt, camera);
     grade.setLight({ night: sky.night01, tint: sky.tint });
     camPos.copy(camera.position);
@@ -955,6 +1019,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       stream();
       trackRegion();
       applyTheme();
+      checkWaypoints();
+      dust.setTint(sky.tint, sky.night01);
       // the walker shows in the pond only when near it (a character can be dozens of draws)
       const mirrored = Math.hypot(player.position.x - POND.x, player.position.z - POND.z) < 16;
       if (mirrored !== playerMirrored) {
@@ -974,6 +1040,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     bursts.update(dt, t);
     songBirds.update(dt, t, player.position.x, player.position.z);
     verses.update(dt, player.character === 'poet' && player.speed > 0.8 && !player.isFrozen, player.position.x, player.position.y, player.position.z, player.heading, sky.night01, camPos);
+    steles?.update(dt, t, sky.night01);
     for (const fn of frameFns) {
       try { fn(dt, t); } catch (err) { console.error('[walk] frame hook failed', err); frameFns.delete(fn); }
     }
@@ -1049,7 +1116,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     renderer.setSize(w, h);
     grade.setSize(w, h);
     camera.aspect = w / h;
-    camera.fov = w / h < 0.8 ? 62 : 50;
+    baseFov = w / h < 0.8 ? 62 : 50;
+    camera.fov = baseFov + fovKick;
     camera.updateProjectionMatrix();
     pond.setSize(w * pr, h * pr);
     setPx();
@@ -1103,10 +1171,11 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   raf = requestAnimationFrame(frame);
   enter(region, false);
 
-  // --- fast travel (驿站): the curtain falls, the player is set down, it lifts
+  // --- fast travel (驿站): the curtain falls, the player is set down at the stele, it lifts
   const travel = async (id: RegionId) => {
     if (traveling || !running) return;
     if (player.isFrozen) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
+    if (!isLit(id)) { hud.toast('那处驿站尚未到访：循路走到驿碑前，点亮它的灯。', 'Not yet visited: walk to its waypoint stele and light the lantern first.'); return; }
     traveling = true;
     try {
       hud.curtain(true);
@@ -1115,10 +1184,17 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       player.ride(null);
       player.freeze(false);
       const a = ARRIVE[id];
-      let x = a.x, z = a.z;
-      // never set down in the water or inside a prop
-      for (let k = 0; k < 24 && !isWalkable(x, z); k++) { const ang = k * 2.4; x = a.x + Math.cos(ang) * (1 + k * 0.4); z = a.z + Math.sin(ang) * (1 + k * 0.4); }
-      const heading = Math.atan2(a.face.x - x, a.face.z - z);
+      const w = placedById.get(id);
+      let x = a.x, z = a.z, heading: number;
+      if (w) {
+        // a step in front of the stele, looking into the place
+        const at = arrivalAt({ x: w.sx, z: w.sz }, a.face, isWalkable);
+        x = at.x; z = at.z; heading = at.heading;
+      } else {
+        // never set down in the water or inside a prop
+        for (let k = 0; k < 24 && !isWalkable(x, z); k++) { const ang = k * 2.4; x = a.x + Math.cos(ang) * (1 + k * 0.4); z = a.z + Math.sin(ang) * (1 + k * 0.4); }
+        heading = Math.atan2(a.face.x - x, a.face.z - z);
+      }
       player.teleport(x, z, heading);
       controls.yaw = heading + Math.PI;
       camFollow(0, true);
@@ -1151,8 +1227,49 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   for (const b of bridgeSpecs()) {
     if (ownBridges.has(b.id)) setBridgeReplaced(b.id, allDecks().some((d) => Math.hypot(d.cx - b.x, d.cz - b.z) < 9));
   }
-  // nothing grows through the quays, paving and stairs the places just built
+  // nothing grows through the quays, paving and stairs the places just built, nor on the homestead's
+  // plot (the owner builds there)
+  const P2 = HOME_PLOT.size / 2 + 1.5;
+  const offPlot = registerClearing(rectClearing(HOME_PLOT.x - P2, HOME_PLOT.z - P2, HOME_PLOT.x + P2, HOME_PLOT.z + P2));
   if (running) scatter.clear(clearedAt);
+  // the waypoint steles, on firm, level ground clear of what the places built and off the paths' tread
+  if (running) {
+    try {
+      await Promise.race([document.fonts.load('60px "Ma Shan Zheng"', WAYPOINTS.map((w) => w.zh).join('') + '驿'), new Promise((r) => setTimeout(r, 1200))]);
+    } catch { /* system fonts */ }
+    const T = terrain();
+    // the plot itself, and the approach to its gate (a stele must never stand in the way in)
+    const G = HOME_PLOT.gate;
+    const onPlot = (x: number, z: number) => (Math.abs(x - HOME_PLOT.x) < HOME_PLOT.size / 2 + 1.2 && Math.abs(z - HOME_PLOT.z) < HOME_PLOT.size / 2 + 1.2)
+      || (x > G.x - 1 && x < G.x + 6.5 && Math.abs(z - G.z) < 2.4);
+    const test = {
+      walkable: (x: number, z: number) => isWalkable(x, z) && !onPlot(x, z) && floorY(x, z) < terrainY(x, z) + 0.05 && !clearedAt(x, z, 0.3),
+      height: floorY,
+      pathDist: (x: number, z: number) => T.pathNear(x, z).d,
+    };
+    for (const w of WAYPOINTS) {
+      const spot = findSpot(w.x, w.z, test) ?? { x: w.x, z: w.z, moved: 0 };
+      if (import.meta.env.DEV && spot.moved > 0) console.info(`[walk] waypoint "${w.id}" moved ${spot.moved.toFixed(1)} m to (${spot.x.toFixed(1)}, ${spot.z.toFixed(1)})`);
+      // the stele faces the road it stands beside (or its place, off the roads)
+      let fx = REGION[w.id].center.x, fz = REGION[w.id].center.z, bd = 14;
+      for (const list of T.paths) for (const q of list) {
+        const d = Math.hypot(q.x - spot.x, q.z - spot.z);
+        if (d < bd) { bd = d; fx = q.x; fz = q.z; }
+      }
+      const pw: PlacedWaypoint = { ...w, sx: spot.x, sz: spot.z, y: floorY(spot.x, spot.z), rot: Math.atan2(fx - spot.x, fz - spot.z) };
+      placed.push(pw);
+      placedById.set(w.id, pw);
+      steleSpots.push({ id: w.id, x: spot.x, z: spot.z });
+    }
+    steles = buildSteles(bag, placed, (id) => regionGroup(id as RegionId), lang, reduced);
+    for (const w of placed) {
+      addCollider({ x: w.sx, z: w.sz, r: 0.55, h: 2.2 });
+      const c = Math.cos(w.rot), sn = Math.sin(w.rot);
+      addCollider({ x: w.sx + 0.78 * c + 0.12 * sn, z: w.sz - 0.78 * sn + 0.12 * c, r: 0.16 });
+      regionGroup(w.id).getObjectByName('stele:' + w.id)?.traverse((o) => o.layers.set(NO_REFLECT));
+    }
+    checkWaypoints();
+  }
   // the places stay out of the garden pond's mirror (they would cost every draw twice)
   for (const [id, g] of regionGroups) if (id !== 'garden') g.traverse((o) => { if (!o.userData.reflect) o.layers.set(NO_REFLECT); });
   const inited: WorldFeature[] = [];
@@ -1194,6 +1311,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       try { m.dispose?.(); } catch (err) { console.error(`[walk] region "${m.id}" failed to dispose`, err); }
     }
     for (const b of ownBridges) setBridgeReplaced(b, false);
+    offPlot();
     frameFns.clear();
     regionFns.clear();
     interactables.clear();
@@ -1247,6 +1365,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         trackRegion();
       },
       travel,
+      /** The steles as placed: [id, x, z, lit]. */
+      waypoints: () => placed.map((w) => [w.id, +w.sx.toFixed(1), +w.sz.toFixed(1), isLit(w.id)]),
+      timeScale: () => timeScale,
       region: () => region,
       regions: () => Object.fromEntries([...regionGroups].map(([k, g]) => [k, { visible: g.visible, near: near.get(k) ?? false, shown: g.children.filter((c) => c.visible).length, children: g.children.length }])),
       where: () => ({ x: +player.position.x.toFixed(2), y: +player.position.y.toFixed(2), z: +player.position.z.toFixed(2), heading: +player.heading.toFixed(2), region, character: player.character }),
@@ -1269,6 +1390,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     setPaused: (p: boolean) => { paused = p; controls.paused = p; },
     where: () => ({ x: player.position.x, z: player.position.z, heading: player.heading, region }),
     travel,
+    waypoints: () => (placed.length ? placed.map((w) => ({ id: w.id, x: w.sx, z: w.sz, zh: w.zh, en: w.en, lit: isLit(w.id) }))
+      : WAYPOINTS.map((w) => ({ id: w.id, x: w.x, z: w.z, zh: w.zh, en: w.en, lit: isLit(w.id) }))),
+    setRun: (on: boolean) => { controls.runToggle = on; },
     dispose,
   };
 }

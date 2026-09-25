@@ -92,19 +92,18 @@ export function buildAir(bag: Bag, season: Season, night: boolean, reduced: bool
   let colorA = '#b83a4b', colorB = '#e8b4b8';
   let fall = 0.35, wind = 0.25, size = 0.16, spin = 1.2, opacity = 0.85, count = 150;
   let blending: THREE.Blending = THREE.NormalBlending;
-  if (season === 'spring') {
-    kind = 'petal';
+  if (night && season !== 'winter') {
+    // warm night: fireflies drifting low, amber like the lanterns
+    kind = 'firefly'; colorA = '#ffcf6e'; colorB = '#f4f0a0'; fall = -0.05; wind = 0.05; size = 0.12; spin = 0; count = season === 'summer' ? 110 : 70; blending = THREE.AdditiveBlending;
+  } else if (season === 'spring') {
+    kind = 'petal'; colorA = '#c8506a'; colorB = '#f0bcc4';
   } else if (season === 'summer') {
-    if (night) {
-      kind = 'firefly'; colorA = '#f0e39a'; colorB = '#d6f0a0'; fall = -0.05; wind = 0.05; size = 0.12; spin = 0; count = 90; blending = THREE.AdditiveBlending;
-    } else {
-      kind = 'fluff'; colorA = '#ffffff'; colorB = '#f1ece0'; fall = 0.08; wind = 0.35; size = 0.12; spin = 0; count = 90; opacity = 0.7;
-    }
+    kind = 'fluff'; colorA = '#ffffff'; colorB = '#f4eed8'; fall = 0.08; wind = 0.35; size = 0.12; spin = 0; count = 90; opacity = 0.75;
   } else if (season === 'autumn') {
-    kind = 'leaf'; colorA = '#a8703a'; colorB = '#7a5a3a'; fall = 0.55; wind = 0.4; size = 0.2; spin = 1.6; count = 90;
-    if (night) { colorA = '#6b5a48'; colorB = '#4f4a44'; }
+    // gamboge, vermilion and russet leaves
+    kind = 'leaf'; colorA = '#dc9a34'; colorB = '#b8452e'; fall = 0.55; wind = 0.4; size = 0.2; spin = 1.6; count = 90;
   } else {
-    kind = 'snow'; colorA = '#ffffff'; colorB = '#eef1f4'; fall = 0.6; wind = 0.15; size = 0.12; spin = 0; count = 260;
+    kind = 'snow'; colorA = '#ffffff'; colorB = '#f3f1ec'; fall = 0.6; wind = 0.15; size = 0.12; spin = 0; count = 260;
   }
   if (reduced) count = Math.round(count * 0.35);
   const rng = makeRng(606);
@@ -210,7 +209,7 @@ export class Bursts {
   drops(x: number, y: number, z: number, n = 26): void {
     const r = this.rng;
     for (let i = 0; i < n; i++) {
-      this.add({ x: x + r.gauss() * 0.35, y: y + r.range(0, 0.6), z: z + r.gauss() * 0.35, vx: r.gauss() * 0.2, vy: -r.range(0.5, 1.5), vz: r.gauss() * 0.2, life: r.range(0.7, 1.2), size: r.range(0.05, 0.09), drag: 0.2, grav: 7, flutter: 0 }, i % 3 ? '#6f8aa0' : '#9fb4c4');
+      this.add({ x: x + r.gauss() * 0.35, y: y + r.range(0, 0.6), z: z + r.gauss() * 0.35, vx: r.gauss() * 0.2, vy: -r.range(0.5, 1.5), vz: r.gauss() * 0.2, life: r.range(0.7, 1.2), size: r.range(0.05, 0.09), drag: 0.2, grav: 7, flutter: 0 }, i % 3 ? '#6fa2a4' : '#a8d0cc');
     }
   }
 

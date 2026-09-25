@@ -24,6 +24,32 @@ export const mix = (a: number, b: number, k: number) => a + (b - a) * k;
 /** Ink outline width (m, before the rig's scale). */
 export const OL = 0.013;
 
+/** The figures' ink line: brown-black, like pine-soot ink on warm paper. */
+export const INK_LINE = '#2a1f18';
+
+/** Toon shading that reads the gradient's colour (three reads only .r): warm shade bands. */
+function warmToon(m: THREE_NS.MeshToonMaterial): void {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <gradientmap_pars_fragment>',
+      `#ifdef USE_GRADIENTMAP
+uniform sampler2D gradientMap;
+#endif
+vec3 getGradientIrradiance( vec3 normal, vec3 lightDirection ) {
+  float dotNL = dot( normal, lightDirection );
+  vec2 coord = vec2( dotNL * 0.5 + 0.5, 0.0 );
+  #ifdef USE_GRADIENTMAP
+    return texture2D( gradientMap, coord ).rgb;
+  #else
+    vec2 fw = fwidth( coord ) * 0.5;
+    return mix( vec3( 0.7 ), vec3( 1.0 ), smoothstep( 0.7 - fw.x, 0.7 + fw.x, coord.x ) );
+  #endif
+}`,
+    );
+  };
+  m.customProgramCacheKey = () => 'ch-toon-warm';
+}
+
 // ------------------------------------------------------------------------------------------ kit
 
 export class Kit {
@@ -31,9 +57,15 @@ export class Kit {
   private mats = new Map<string, Mat>();
   private gradient: THREE_NS.DataTexture;
 
-  constructor(readonly THREE: T3) {
-    // three soft bands — shade, half-light, light — the flat washes of a painted figure
-    const data = new Uint8Array([158, 158, 158, 255, 212, 212, 212, 255, 255, 255, 255, 255]);
+  /** prefers-reduced-motion: no idle fidgets, gentler flutter. */
+  readonly reduced: boolean;
+
+  constructor(readonly THREE: T3, reduced?: boolean) {
+    this.reduced = reduced ?? (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    // three soft bands — shade, half-light, light — the flat washes of a painted figure. The bands
+    // are tinted (the shader below reads all three channels): shade falls into a warm ink-brown,
+    // the half-light into ochre, the light into a sunlit paper-gold — never a cold grey.
+    const data = new Uint8Array([176, 146, 124, 255, 226, 206, 184, 255, 255, 250, 238, 255]);
     const g = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
     g.minFilter = g.magFilter = THREE.NearestFilter;
     g.generateMipmaps = false;
@@ -61,6 +93,7 @@ export class Kit {
       ...(o.vertexColors ? { vertexColors: true } : {}),
     });
     if (m.transparent) m.depthWrite = false;
+    warmToon(m);
     this.mats.set(key, this.add(m));
     return m;
   }
@@ -85,8 +118,8 @@ export class Kit {
     return m;
   }
 
-  /** Inverted-hull ink outline: back faces pushed out along the normal. */
-  outline(width: number, color = '#1b1916'): THREE_NS.MeshBasicMaterial {
+  /** Inverted-hull ink outline: back faces pushed out along the normal (a warm brown-black ink). */
+  outline(width: number, color = INK_LINE): THREE_NS.MeshBasicMaterial {
     const w = Math.round(width * 2000) / 2000;
     const key = `o|${w}|${color}`;
     const hit = this.mats.get(key);
@@ -393,6 +426,73 @@ export class Ribbon {
   }
 }
 
+// ------------------------------------------------------------------------------------------ trails
+
+/**
+ * Ink left in the air: a strip that follows a tip (a brush's point) through `space` while drawing,
+ * then lingers and fades. The strip faces along `face` (the figure's front/back).
+ */
+export class Trail {
+  readonly mesh: Mesh;
+  private rib: Ribbon;
+  private buf: Float32Array;
+  private count = 0;
+  private mat: THREE_NS.MeshBasicMaterial;
+  private v: THREE_NS.Vector3;
+  private readonly peak: number;
+
+  /** `step`: the least distance (m) between recorded points, so n points cover n × step of stroke. */
+  constructor(kit: Kit, color: string, private n: number, width: number, opacity = 0.9, private step = 0.03, private space?: Obj) {
+    const T = kit.THREE;
+    this.peak = opacity;
+    this.rib = new Ribbon(kit, color, n, (u) => width * (0.3 + 0.7 * Math.sin(Math.PI * (0.08 + 0.84 * u))));
+    this.mat = kit.add(new T.MeshBasicMaterial({ color, transparent: true, opacity, side: T.DoubleSide, depthWrite: false }));
+    this.rib.mesh.material = this.mat;
+    this.rib.face = new T.Vector3(0, 0, 1);
+    this.mesh = this.rib.mesh;
+    this.mesh.visible = false;
+    this.buf = new Float32Array(n * 3);
+    this.v = new T.Vector3();
+  }
+
+  /** Start a new stroke. */
+  reset(): void {
+    this.count = 0;
+    this.mesh.visible = false;
+  }
+
+  /** Add the tip's current position (a world object) to the stroke. */
+  follow(tip: Obj): void {
+    const v = this.v;
+    tip.updateWorldMatrix(true, false);
+    v.setFromMatrixPosition(tip.matrixWorld);
+    const sp = this.space ?? this.mesh.parent;
+    if (sp) { sp.updateWorldMatrix(true, false); sp.worldToLocal(v); }
+    const b = this.buf, n = this.n;
+    if (this.count > 0) {
+      const i = (this.count - 1) * 3;
+      if (Math.hypot(v.x - b[i], v.y - b[i + 1], v.z - b[i + 2]) < this.step) return;
+    }
+    if (this.count === n) { b.copyWithin(0, 3); this.count--; }
+    b[this.count * 3] = v.x; b[this.count * 3 + 1] = v.y; b[this.count * 3 + 2] = v.z;
+    this.count++;
+  }
+
+  /** Draw what there is at this opacity (0..1 of the peak). */
+  draw(alpha: number): void {
+    const c = this.count;
+    this.mesh.visible = c >= 3 && alpha > 0.01;
+    if (!this.mesh.visible) return;
+    this.mat.opacity = this.peak * alpha;
+    const b = this.buf;
+    this.rib.update((u, ce, si) => {
+      const x = u * (c - 1), i = Math.floor(x), k = x - i, j = Math.min(c - 1, i + 1);
+      ce.set(mix(b[i * 3], b[j * 3], k), mix(b[i * 3 + 1], b[j * 3 + 1], k), mix(b[i * 3 + 2], b[j * 3 + 2], k));
+      si.set(0, 1, 0);
+    });
+  }
+}
+
 // ------------------------------------------------------------------------------------------ eyes
 
 export class Blinker {
@@ -501,7 +601,42 @@ export interface Frame {
   air: boolean;
   /** Seconds standing still. */
   idle: number;
+  /** Seconds since this emote began (0 when none). */
+  since: number;
+  /** The idle fidget playing (see Fidget), its blend 0..1, progress 0..1 and seconds in. */
+  fidget: string | null;
+  fk: number;
+  fu: number;
+  fs: number;
+  reduced: boolean;
 }
+
+/**
+ * A little something a figure does after standing still for a few seconds (licks a paw, sips
+ * from the gourd, strokes the beard). The rig plays them in turn with pauses between; `pose`
+ * bends the target pose by k (0..1, the fidget's blend) — characters may also read f.fidget.
+ */
+export interface Fidget {
+  id: string;
+  /** Seconds. */
+  dur: number;
+  pose?(p: Pose, k: number, u: number, secs: number, f: Frame): void;
+  /** The mouth moves (reciting, humming, a yawn when `lid` is low too). */
+  mouth?: boolean;
+  /** Eyelids (1 open … 0.1 shut) while it plays. */
+  lid?: number;
+}
+
+/** Blend pose keys toward values by a weight, without allocating a closure per frame. */
+export class Mixer {
+  private p: Pose = zeroPose();
+  private k = 1;
+  set(p: Pose, k: number): this { this.p = p; this.k = k; return this; }
+  readonly m = (key: keyof Pose, v: number): void => { this.p[key] += (v - this.p[key]) * this.k; };
+  /** Add to a key, scaled by the weight. */
+  readonly add = (key: keyof Pose, v: number): void => { this.p[key] += v * this.k; };
+}
+const MX = new Mixer();
 
 export interface Arm { sh: Group; el: Group; hand: Group; sleeve: Mesh }
 export interface Leg { hip: Group; knee: Group; foot: Mesh }
@@ -536,6 +671,24 @@ export class Human implements CharacterModel {
   /** Character hooks. */
   onPose?: (p: Pose, f: Frame) => void;
   onAfter?: (f: Frame) => void;
+  /** Idle fidgets, played in turn after a few seconds standing (none under reduced motion). */
+  fidgets: Fidget[] = [];
+  /** A pose mixer for the hooks: `const m = h.mx.set(p, f.env).m;` */
+  readonly mx = new Mixer();
+  /** The mouth that opens while talking (and yawning); the resting mouth hides meanwhile. */
+  readonly talkMouth: Mesh;
+  private restMouth: Mesh | null = null;
+  /** A wooden mallet for 'build', in the right hand (the character's own hand props hide). */
+  readonly mallet: Group;
+  /** Extra yaw (a dance turn), applied undamped so a full turn never unwinds. */
+  private spinYaw = 0;
+  private fid = -1;
+  private fidT = 0;
+  private fidRest = 3.2;
+  private fidN = 0;
+  private fidGate = 0;
+  private readonly seed: number;
+  private readonly frame: Frame;
 
   private robed: boolean;
   private baked = false;
@@ -565,6 +718,8 @@ export class Human implements CharacterModel {
   constructor(readonly kit: Kit, readonly spec: HumanSpec, style: Partial<Style> = {}, seed = 1) {
     const T = kit.THREE;
     this.style = { ...STYLE, ...style };
+    this.seed = seed;
+    this.frame = { dt: 0, t: 0, s: null as unknown as MotionState, gait: 0, run: false, phase: 0, emote: null, u: 0, env: 0, air: false, idle: 0, since: 0, fidget: null, fk: 0, fu: 0, fs: 0, reduced: kit.reduced };
     // under a long robe the feet only peek out at the hem
     this.robed = (spec.hem ?? 0.07) < 0.15;
     if (this.robed) this.style.legSwing = Math.min(this.style.legSwing, 0.36);
@@ -589,7 +744,8 @@ export class Human implements CharacterModel {
     // --- legs: thigh (hip → knee), shin + shoe (knee → ground)
     const mkLeg = (sx: number): Leg => {
       const hip = kit.group(this.body, 0.072 * sx * g, H.hip, 0);
-      const thigh = kit.mesh(kit.cyl(0.052 * g, 0.046, H.hip - H.knee + 0.02, 10, 'top'), pantsM, OL * 0.8);
+      // under a long robe the thigh is never seen: no ink hull for it (one draw fewer per leg)
+      const thigh = kit.mesh(kit.cyl(0.052 * g, 0.046, H.hip - H.knee + 0.02, 10, 'top'), pantsM, this.robed ? 0 : OL * 0.8);
       hip.add(thigh);
       const knee = kit.group(hip, 0, -(H.hip - H.knee), 0);
       const shin = kit.mesh(kit.cyl(0.046, 0.04, H.knee - 0.03, 10, 'top'), pantsM, OL * 0.8);
@@ -662,8 +818,10 @@ export class Human implements CharacterModel {
         hole.position.y = -len - 0.0015;
         el.add(sl, cuff, hole);
       }
-      const hand = kit.group(el, 0, sleeve === 'long' ? -0.235 : -0.2, 0);
-      hand.add(new T.Mesh(kit.sphere(0.042, 1, 1.1, 0.95, 10, 8), skin));
+      const hy = sleeve === 'long' ? -0.235 : -0.2;
+      const hand = kit.group(el, 0, hy, 0);
+      // the hand itself hangs from the elbow (it never turns on its own): one draw fewer per arm
+      put(el, new T.Mesh(kit.sphere(0.042, 1, 1.1, 0.95, 10, 8), skin), 0, hy, 0);
       sh.rotation.z = 0.1 * sx;
       return { sh, el, hand, sleeve: sl };
     };
@@ -682,6 +840,20 @@ export class Human implements CharacterModel {
       put(this.head, capM, 0, H.headC, 0, -0.4, 0, 0);
     }
     this.eyes = this.addFace(sp.eyes ?? 'dot', sp.blush ?? 0.5, sp.mouth ?? 'none', sp.brows ?? null);
+    // the talking mouth: a small open 'o', shown while speaking
+    this.talkMouth = new T.Mesh(kit.sphere(0.017, 1.15, 1, 0.45, 10, 6), kit.toon('#7a2e24'));
+    this.talkMouth.position.set(0, H.headC - 0.085, hr * 0.9 - 0.004);
+    this.talkMouth.visible = false;
+    kit.keep(this.talkMouth);
+    this.head.add(this.talkMouth);
+    if (this.restMouth) kit.keep(this.restMouth);
+
+    // a little wooden mallet for building (hidden till then)
+    this.mallet = kit.group(this.armR.hand, 0, -0.02, 0.02);
+    const wood = kit.toon('#9a6a3c'), head = kit.toon('#6e4a2c');
+    put(this.mallet, kit.mesh(kit.cyl(0.011, 0.013, 0.26, 6), wood, OL * 0.5), 0, 0.02, 0.09, Math.PI / 2, 0, 0);
+    put(this.mallet, kit.mesh(kit.cyl(0.042, 0.042, 0.13, 10), head, OL * 0.6), 0, 0.02, 0.22, 0, 0, 0);
+    this.mallet.visible = false;
 
     this.height = (H.waist + H.neck + H.headC + hr + 0.02) * sp.scale;
   }
@@ -734,6 +906,7 @@ export class Human implements CharacterModel {
       else m = new T.Mesh(kit.box(0.03, 0.006, 0.006), ink);
       m.position.set(0, y - 0.07, z - 0.005);
       this.head.add(m);
+      this.restMouth = m;
     }
     return row;
   }
@@ -782,7 +955,9 @@ export class Human implements CharacterModel {
     const u = clamp(s.emoteT);
     const env = e ? (sustained ? seat : smooth(Math.min(1, u / 0.14, (1 - u) / 0.18))) : 0;
 
-    const f: Frame = { dt, t, s, gait, run, phase: ph, emote: e, u, env, air, idle: this.idleT };
+    const f = this.frame;
+    f.dt = dt; f.t = t; f.s = s; f.gait = gait; f.run = run; f.phase = ph; f.emote = e; f.u = u; f.env = env; f.air = air;
+    f.idle = this.idleT; f.since = e ? this.emoteSeen : 0;
     const p = this.tgt;
     const legA = st.legSwing * (run ? 1.25 : 1) * walkK;
     const armA = st.armSwing * (run ? 1.3 : 1) * walkK;
@@ -856,11 +1031,18 @@ export class Human implements CharacterModel {
       p.bodyY -= k * 0.06; p.knL += k * 0.5; p.knR += k * 0.5; p.hipLx -= k * 0.25; p.hipRx -= k * 0.25;
     }
 
+    // idle fidgets: after a few seconds standing, one of the character's little habits
+    // (not while holding a feature's prop: no reading a scroll with a fishing rod in hand)
+    this.fidgetStep(f, dt, walkK < 0.05 && !e && !air && seat < 0.05 && !s.riding && !this.holding);
+    if (f.fidget) this.fidgets[this.fid]?.pose?.(p, f.fk, f.fu, f.fs, f);
+
     // seated with no seated emote playing (riding between strokes, or a bow / wave in the boat)
     if (seat > 0 && !sustained) emotePose(p, 'sit', 0, seat, t, 0);
     if (e && env > 0) emotePose(p, e, u, env, t, this.emoteSeen);
     // whatever the arms do, the legs stay folded on the seat
-    if (seat > 0 && e && !sustained) sitPose((k, v) => { p[k] = mix(p[k], v, seat); });
+    if (seat > 0 && e && !sustained) sitPose(MX.set(p, seat).m);
+    // a dance turns the whole figure once round (not under reduced motion)
+    this.spinYaw = e === 'dance' && !this.kit.reduced ? Math.PI * 2 * smooth((u - 0.18) / 0.55) : 0;
     this.onPose?.(p, f);
 
     // --- apply, eased
@@ -868,7 +1050,7 @@ export class Human implements CharacterModel {
     const kLimb = run ? 22 : 16;
     for (const k of POSE_KEYS) c[k] = damp(c[k], p[k], k === 'lift' || k === 'bodyY' ? 12 : kLimb, dt);
     this.body.position.y = c.bodyY;
-    this.body.rotation.set(c.bodyX, c.bodyYaw, c.bodyZ);
+    this.body.rotation.set(c.bodyX, c.bodyYaw + this.spinYaw, c.bodyZ);
     this.scaler.position.y = c.lift * sc;
     this.torso.rotation.set(c.torsoX, c.torsoY, c.torsoZ);
     this.chest.scale.set(1, 1 + Math.sin(t * 1.8) * 0.014 * (1 - walkK), 1);
@@ -883,10 +1065,70 @@ export class Human implements CharacterModel {
     this.legR.knee.rotation.x = c.knR;
     this.skirt.rotation.set(c.skX, 0, c.skZ);
     this.skirt.scale.set(c.skF, c.skS, c.skF);
-    const blink = this.blink.at(t);
-    this.eyes.scale.y = blink;
+    // the face: blinks; shut while dozing (a start awake at the end), a happy squint dancing
+    let lid = this.blink.at(t);
+    if (e === 'sleep') lid = u > 0.82 && u < 0.95 ? 1.15 : mix(lid, 0.1, env);
+    else if (e === 'dance' || e === 'pet') lid = Math.min(lid, mix(1, 0.45, env));
+    const fd = f.fidget ? this.fidgets[this.fid] : null;
+    if (fd?.lid !== undefined) lid = Math.min(lid, mix(1, fd.lid, f.fk));
+    this.eyes.scale.y = lid;
+    const fidMouth = !!fd?.mouth && f.fk > 0.3;
+    const talking = (e === 'talk' && env > 0.2) || fidMouth || (e === 'sleep' && u > 0.1 && u < 0.3);
+    this.talkMouth.visible = talking;
+    if (talking) {
+      const ts = e === 'talk' ? this.emoteSeen : f.fs;
+      const yawn = fidMouth && (fd?.lid ?? 1) < 0.5;
+      const open = yawn || e === 'sleep' ? 1.5 : 0.55 + Math.abs(Math.sin(ts * 11)) * 0.9 * (Math.sin(ts * 2.3) > -0.6 ? 1 : 0.2);
+      this.talkMouth.scale.set(1, open, 1);
+    }
+    if (this.restMouth) this.restMouth.visible = !talking;
+    // building: the mallet in the hand, the character's own props (those in the hand) away
+    const building = e === 'build' && env > 0.15 && !this.holding;
+    this.mallet.visible = building;
+    if (!building && this.propsAway) { this.propsAway = false; if (!this.holding) for (const o of this.handProps) o.visible = true; }
     this.onAfter?.(f);
     if (this.holding) for (const o of this.handProps) o.visible = false;
+    else if (building) {
+      for (const o of this.handProps) if (this.inHand(o)) o.visible = false;
+      this.propsAway = true;
+    }
+  }
+
+  private propsAway = false;
+  /** Is o held in the right hand now (not slung on the back)? */
+  private inHand(o: Obj): boolean {
+    for (let p = o.parent; p; p = p.parent) if (p === this.armR.hand) return true;
+    return false;
+  }
+
+  private fidgetStep(f: Frame, dt: number, can: boolean): void {
+    const n = this.fidgets.length;
+    const ok = can && n > 0 && !this.kit.reduced;
+    this.fidGate = damp(this.fidGate, ok ? 1 : 0, ok ? 6 : 12, dt);
+    if (ok) {
+      if (this.fid < 0) {
+        this.fidRest -= dt;
+        if (this.fidRest <= 0) { this.fid = (this.fidN++ + this.seed) % n; this.fidT = 0; }
+      } else {
+        this.fidT += dt;
+        if (this.fidT >= this.fidgets[this.fid].dur) {
+          this.fid = -1;
+          this.fidRest = 2.2 + ((this.fidN * 1.37 + this.seed * 0.61) % 2.6);
+        }
+      }
+    } else {
+      if (!can) this.fidRest = 3.2;
+      if (this.fid >= 0 && this.fidGate < 0.02) this.fid = -1;
+    }
+    if (this.fid >= 0) {
+      const d = this.fidgets[this.fid];
+      f.fidget = d.id;
+      f.fs = this.fidT;
+      f.fu = clamp(this.fidT / d.dur);
+      f.fk = smooth(Math.min(1, this.fidT / 0.45, (d.dur - this.fidT) / 0.55)) * this.fidGate;
+    } else {
+      f.fidget = null; f.fk = 0; f.fu = 0; f.fs = 0;
+    }
   }
 
   dispose(): void {
@@ -902,7 +1144,8 @@ export class Human implements CharacterModel {
  */
 export function bothHands(f: Frame, seat: number): number {
   const e = f.emote;
-  const k = e === 'row' || e === 'bow' || e === 'throw' || e === 'cast' || e === 'eat' || e === 'jump' || e === 'water' ? f.env : 0;
+  const k = e === 'row' || e === 'bow' || e === 'throw' || e === 'cast' || e === 'eat' || e === 'jump' || e === 'water'
+    || e === 'dance' || e === 'pet' || e === 'build' ? f.env : 0;
   return Math.max(k, seat);
 }
 
@@ -918,7 +1161,7 @@ export function holdLevel(obj: Obj, frame: Obj, want: THREE_NS.Quaternion, tmp: 
 
 /** The generic poses for every EmoteKind (characters may refine them in onPose). */
 export function emotePose(p: Pose, e: EmoteKind, u: number, env: number, t: number, since: number): void {
-  const m = (k: keyof Pose, v: number) => { p[k] = mix(p[k], v, env); };
+  const m = MX.set(p, env).m;
   switch (e) {
     case 'eat': {
       const chew = Math.sin(since * 16) * 0.06;
@@ -997,6 +1240,63 @@ export function emotePose(p: Pose, e: EmoteKind, u: number, env: number, t: numb
       m('shLx', -1.0 + k); m('shLz', -0.3); m('elLx', -0.35);
       m('shRx', -0.95 + k); m('shRz', 0.3); m('elRx', -0.4);
       m('torsoX', 0.24); m('bodyX', 0.04); m('headX', 0.22); m('skX', -0.03);
+      break;
+    }
+    case 'talk': {
+      // an open palm that turns over as the words come, a nod, a tilt of the head
+      const a = Math.sin(since * 3.1), b = Math.sin(since * 4.7 + 1);
+      m('shRx', -0.75 + a * 0.18); m('shRz', 0.12 - b * 0.12); m('elRx', -1.05 + b * 0.2); m('elRz', 0.2);
+      m('shLx', -0.25); m('shLz', 0.18); m('elLx', -0.5 + a * 0.08);
+      m('headX', 0.02 + Math.sin(since * 5.3) * 0.06); m('headZ', Math.sin(since * 1.4) * 0.09); m('headY', Math.sin(since * 0.9) * 0.12);
+      m('torsoY', a * 0.06);
+      break;
+    }
+    case 'pet': {
+      // crouch and stroke something small at the feet
+      const st = Math.sin(since * 4.2);
+      m('bodyY', -0.17); m('bodyX', 0.1);
+      m('hipLx', -1.25); m('knL', 1.9); m('hipRx', -0.35); m('knR', 1.65); m('hipLz', 0.12); m('hipRz', -0.1);
+      m('torsoX', 0.38); m('headX', 0.28);
+      m('shRx', -0.95 + st * 0.22); m('shRz', 0.1); m('elRx', -0.35 - st * 0.12);
+      m('shLx', -0.55); m('shLz', 0.15); m('elLx', -1.0);
+      m('skX', -0.25); m('skS', 0.72); m('skF', 1.18);
+      break;
+    }
+    case 'build': {
+      // hammering: the mallet comes up and down on a peg held in the other hand
+      const c = (since * 2.4) % 1;
+      const hit = c < 0.62 ? smooth(c / 0.62) : 1 - smooth((c - 0.62) / 0.12);
+      m('shRx', mix(-0.55, -2.25, hit)); m('shRz', 0.06); m('elRx', mix(-0.5, -1.15, hit));
+      m('shLx', -0.72); m('shLz', -0.12); m('elLx', -0.72);
+      m('torsoX', 0.22 - hit * 0.08); m('bodyX', 0.05); m('headX', 0.3); m('hipLx', -0.22); m('hipRx', 0.12);
+      break;
+    }
+    case 'dance': {
+      // a little celebratory turn: arms up and swaying, a bounce in the knees
+      const a = Math.sin(since * 6.2), b = Math.sin(since * 6.2 + Math.PI);
+      m('shLx', -0.4); m('shLz', 1.3 + a * 0.35); m('elLx', -0.5 + a * 0.3); m('elLz', 0.2);
+      m('shRx', -0.4); m('shRz', -1.3 - b * 0.35); m('elRx', -0.5 + b * 0.3); m('elRz', -0.2);
+      m('bodyY', Math.abs(Math.sin(since * 6.2)) * 0.05); m('bodyZ', a * 0.07); m('headZ', -a * 0.1); m('headX', -0.08);
+      m('hipLx', -Math.max(0, a) * 0.5); m('knL', Math.max(0, a) * 0.8); m('hipRx', -Math.max(0, b) * 0.5); m('knR', Math.max(0, b) * 0.8);
+      m('skF', 1.08 + Math.abs(a) * 0.05);
+      break;
+    }
+    case 'sleep': {
+      // nods off where it stands: head sinks, a slow sway, a start awake near the end
+      const wake = u > 0.82 && u < 0.95 ? Math.sin(((u - 0.82) / 0.13) * Math.PI) : 0;
+      const sink = smooth(u / 0.25) * (1 - wake);
+      m('headX', 0.5 * sink - 0.12 * wake + Math.sin(since * 1.2) * 0.04 * sink);
+      m('headZ', 0.12 * sink); m('torsoX', 0.08 * sink); m('bodyZ', Math.sin(since * 0.9) * 0.035 * sink);
+      m('shLx', 0.05); m('shRx', 0.05); m('shLz', 0.05); m('shRz', -0.05); m('elLx', -0.08); m('elRx', -0.08);
+      m('bodyY', -0.015 * sink);
+      if (wake) { m('shLz', 0.5 * wake + 0.05); m('shRz', -0.5 * wake - 0.05); }
+      break;
+    }
+    case 'skill': {
+      // the generic flourish (every character has its own in its onPose)
+      const up = smooth(u / 0.3);
+      m('shRx', -2.4 * up); m('shRz', -0.3); m('elRx', -0.2);
+      m('shLx', -0.4); m('shLz', 0.4); m('elLx', -0.8); m('headX', -0.15 * up);
       break;
     }
   }

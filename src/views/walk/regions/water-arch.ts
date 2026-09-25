@@ -6,11 +6,11 @@ import type * as T from 'three';
 import { Kit, Parts } from './water-kit';
 import { CELL, cellUV } from './water-paint';
 
-export const TILE = '#55544f';
-export const RIDGE = '#3b3a38';
-export const PLINTH = '#9f998d';
-export const WOODC = '#5e4030';
-export const STONE = '#c9c2b3';
+export const TILE = '#40464f';
+export const RIDGE = '#2a2e35';
+export const PLINTH = '#a99c86';
+export const WOODC = '#6b412b';
+export const STONE = '#cfc2a9';
 
 type V3 = [number, number, number];
 type UV = [number, number, number, number];
@@ -331,10 +331,10 @@ export function buildHouse(kit: Kit, c: Collectors, h: HouseSpec, y0: number, si
           const len = b - a + 0.3, mz = (a + b) / 2;
           const x = s * (hw - T0 / 2 + 0.02);
           c.solid.add(kit.box(0.62, 0.1, len, RIDGE, x, lv[k] + 0.05, mz).applyMatrix4(m), 30);
-          c.solid.add(kit.box(0.2, 0.12, len, '#2f2e2c', x, lv[k] + 0.16, mz).applyMatrix4(m), 30);
+          c.solid.add(kit.box(0.2, 0.12, len, '#2a2e35', x, lv[k] + 0.16, mz).applyMatrix4(m), 30);
           if (k < n - 1) {
             const endZ = Math.sign(a + b) * (Math.abs(a + b) / 2 + (b - a) / 2 + 0.1);
-            c.solid.add(kit.box(0.5, 0.16, 0.55, '#2f2e2c', x, lv[k] + 0.24, endZ, 0, 0, -Math.sign(endZ) * 0.45, 0).applyMatrix4(m), 30);
+            c.solid.add(kit.box(0.5, 0.16, 0.55, '#2a2e35', x, lv[k] + 0.24, endZ, 0, 0, -Math.sign(endZ) * 0.45, 0).applyMatrix4(m), 30);
           }
         }
       }

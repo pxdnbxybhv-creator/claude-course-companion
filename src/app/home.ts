@@ -17,6 +17,19 @@ export interface HomeItem {
   rot: 0 | 1 | 2 | 3;
   /** Words the owner wrote on it (a plaque 匾额, a couplet 对联, a sign). */
   text?: string;
+  /** A growing thing (the vegetable plot 菜畦): see HomeGrow. */
+  grow?: HomeGrow;
+}
+
+/**
+ * A vegetable plot's season: sown on `sown`; it ripens with the days (plus `boost` stages: watered,
+ * or the gardener's 催花). `wet` is the last day it was watered, `reaped` the last harvest.
+ */
+export interface HomeGrow {
+  sown: DateKey;
+  boost: number;
+  wet?: DateKey;
+  reaped?: DateKey;
 }
 
 export interface Pet {
@@ -63,6 +76,13 @@ const str = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/[\u
 const int = (v: unknown, lo: number, hi: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : lo);
 const isDay = (v: unknown): v is DateKey => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
+function sanitizeGrow(g: unknown): HomeGrow | undefined {
+  if (!g || typeof g !== 'object') return undefined;
+  const r = g as Partial<HomeGrow>;
+  if (!isDay(r.sown)) return undefined;
+  return { sown: r.sown, boost: int(r.boost, 0, 9), ...(isDay(r.wet) ? { wet: r.wet } : {}), ...(isDay(r.reaped) ? { reaped: r.reaped } : {}) };
+}
+
 /** Validate & repair anything loaded or imported. Never throws. */
 export function sanitizeHome(raw: unknown): HomeState {
   const base = emptyHome();
@@ -76,7 +96,8 @@ export function sanitizeHome(raw: unknown): HomeState {
     const uid = uidOk(it.uid), kind = str(it.kind, 32);
     if (!uid || !kind) continue;
     const text = str(it.text, HOME_LIMITS.text);
-    items.push({ uid, kind, i: int(it.i, 0, 255), j: int(it.j, 0, 255), rot: int(it.rot, 0, 3) as HomeItem['rot'], ...(text ? { text } : {}) });
+    const grow = sanitizeGrow(it.grow);
+    items.push({ uid, kind, i: int(it.i, 0, 255), j: int(it.j, 0, 255), rot: int(it.rot, 0, 3) as HomeItem['rot'], ...(text ? { text } : {}), ...(grow ? { grow } : {}) });
   }
   const pets: Pet[] = [];
   let following = false;
@@ -160,6 +181,17 @@ export function removeItem(uid: string): HomeItem | null {
 export function setItemText(uid: string, text: string): void {
   const t = str(text, HOME_LIMITS.text);
   set((h) => ({ ...h, items: h.items.map((it) => (it.uid === uid ? { ...it, text: t || undefined } : it)) }));
+}
+
+/** A growing thing's season changed (sown, watered, ripened, harvested); null clears it. */
+export function tendItem(uid: string, grow: HomeGrow | null): void {
+  const g = grow ? sanitizeGrow(grow) : undefined;
+  set((h) => ({ ...h, items: h.items.map((it) => {
+    if (it.uid !== uid) return it;
+    const next: HomeItem = { ...it };
+    if (g) next.grow = g; else delete next.grow;
+    return next;
+  }) }));
 }
 
 export function setHomeName(name: string): void {

@@ -1,5 +1,6 @@
-// Input and the third-person camera. Keyboard (WASD / arrows, Shift, Space, E / Enter), a virtual
-// joystick fed by the HUD, drag to orbit, wheel / pinch to zoom.
+// Input and the third-person camera. Keyboard (WASD / arrows, Shift, Space, E / Enter, Q), a virtual
+// joystick fed by the HUD, drag to orbit, wheel / pinch to zoom. Running: hold Shift, push the stick
+// to its edge, or switch 疾 on (then Shift walks).
 import * as THREE from 'three';
 import { damp, dampAngle } from './kit';
 
@@ -31,6 +32,12 @@ export class Controls {
   private listeners: [EventTarget, string, EventListener, AddEventListenerOptions?][] = [];
   /** Set by the world while a card or sheet is open: movement keys are ignored. */
   paused = false;
+  /** The 疾 switch: always run (Shift then walks). */
+  runToggle = false;
+  /** Shift is held (for the HUD's run chip). */
+  get shiftHeld(): boolean {
+    return this.keys.has('ShiftLeft') || this.keys.has('ShiftRight');
+  }
   private clock = 0;
 
   constructor(el: HTMLElement, private camera: THREE.PerspectiveCamera, heading: number, private reduced: boolean) {
@@ -131,7 +138,8 @@ export class Controls {
       if (k.has('KeyS') || k.has('ArrowDown')) iy -= 1;
       if (k.has('KeyD') || k.has('ArrowRight')) ix += 1;
       if (k.has('KeyA') || k.has('ArrowLeft')) ix -= 1;
-      if (k.has('ShiftLeft') || k.has('ShiftRight')) run = true;
+      const shift = k.has('ShiftLeft') || k.has('ShiftRight');
+      if (shift !== this.runToggle) run = true;
     } else {
       ix = 0; iy = 0;
     }

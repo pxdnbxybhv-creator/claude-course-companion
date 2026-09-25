@@ -563,7 +563,7 @@
 @keyframes walk-fade { from { opacity: 0; } to { opacity: 1; } }
 .walk-map {
   position: relative;
-  width: min(92vw, 78vh, 640px);
+  width: min(92vw, 70vh, 600px);
   background: #f1e9d8;
   border: 8px solid #3b3128;
   border-radius: 3px;
@@ -592,7 +592,194 @@
 }
 @keyframes walk-fade-hold { 0% { opacity: 0; } 10% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 
-/* the skill button (技): a cooldown shade sweeps back as it recharges (the core refines this) */
-.walk-skill { position: relative; overflow: hidden; }
-.walk-skill.is-cooling::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(27, 25, 22, 0.35) calc(var(--cd, 0) * 360deg), transparent 0); pointer-events: none; }
-.walk-skill.is-active { box-shadow: 0 0 0 3px rgba(185, 58, 43, 0.55); }
+
+/* ---------- the purse: coins beside the way out; new coins float up from it */
+.walk-left { display: flex; gap: 8px; align-items: center; }
+.walk-purse { position: relative; padding: 0 12px; gap: 0; font-size: 15px; pointer-events: none; }
+.walk-purse .coin-badge { gap: 6px; }
+.walk-purse-gain {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-left: -1em;
+  color: #9a6a12;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 6px rgba(255, 246, 225, 0.95), 0 0 2px rgba(255, 246, 225, 0.95);
+  white-space: nowrap;
+  animation: walk-gain 1.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes walk-gain {
+  0% { opacity: 0; transform: translateY(6px) scale(0.9); }
+  15% { opacity: 1; transform: translateY(0) scale(1.08); }
+  70% { opacity: 1; transform: translateY(-4px) scale(1); }
+  100% { opacity: 0; transform: translateY(-12px); }
+}
+.walk-travel .brush { color: #8a4b1c; }
+
+/* ---------- touch: a thumb's arc in the corner — 跃 and the big action button below, 疾 (the run
+   switch) and 技 (the skill) above them, all clear of the joystick */
+.is-touch .walk-buttons {
+  display: grid;
+  grid-template-columns: 56px 84px;
+  grid-template-rows: 60px 84px;
+  grid-template-areas: 'run skill' 'jump act';
+  gap: 12px 12px;
+  align-items: end;
+  justify-items: center;
+}
+.is-touch .walk-buttons .walk-run { grid-area: run; align-self: center; }
+.is-touch .walk-buttons .walk-skill-wrap { grid-area: skill; }
+.is-touch .walk-buttons .walk-jump { grid-area: jump; align-self: end; }
+.is-touch .walk-buttons .walk-act { grid-area: act; }
+.is-touch .walk-prompt { bottom: calc(env(safe-area-inset-bottom) + 196px); }
+.walk-run {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--walk-paper);
+  border: 1.5px solid rgba(27, 25, 22, 0.35);
+  font-size: 20px;
+  color: rgba(27, 25, 22, 0.75);
+  touch-action: manipulation;
+  transition: transform 0.12s var(--ease), background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.walk-run.is-on {
+  background: #b93a2b;
+  border-color: #8f2a1f;
+  color: #fbf3e4;
+  box-shadow: 0 0 0 4px rgba(185, 58, 43, 0.18), 0 6px 14px -8px rgba(120, 30, 10, 0.7);
+}
+.walk-run:active { transform: scale(0.92); }
+
+/* ---------- desktop: the run chip and the skill button, bottom right */
+.walk-deck {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 18px);
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.walk-run-chip { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.walk-run-chip .brush { font-size: 19px; line-height: 1; }
+.walk-run-chip kbd { font-size: 10px; height: 18px; opacity: 0.55; }
+.walk-run-chip.is-on { background: #b93a2b; color: #fbf3e4; border-color: #8f2a1f; }
+.walk-run-chip.is-on kbd { opacity: 0.8; }
+
+/* ---------- 技: the companion's skill — a gamboge ring when ready, the cooldown sweeping back as
+   it recharges, a warm glow while the skill lasts, its name on hover / long-press */
+.walk-skill-wrap { position: relative; display: grid; place-items: center; }
+.walk-skill {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 36%, #fffaf0, #efe3c8 70%);
+  border: 2px solid #1b1916;
+  color: #1b1916;
+  touch-action: manipulation;
+  box-shadow: 0 8px 18px -10px rgba(40, 25, 5, 0.7);
+  transition: transform 0.12s var(--ease), box-shadow 0.25s, border-color 0.25s;
+}
+.walk-skill-wrap.is-touch .walk-skill { width: 60px; height: 60px; }
+.walk-skill-glyph { position: relative; z-index: 1; font-size: 28px; line-height: 1; }
+.walk-skill kbd {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  z-index: 2;
+  min-width: 20px;
+  height: 20px;
+  background: #1b1916;
+  color: #f1e9d8;
+  border-color: #1b1916;
+  font-size: 11px;
+  opacity: 1;
+}
+.walk-skill.is-ready { border-color: #c99422; box-shadow: 0 0 0 3px rgba(228, 178, 60, 0.35), 0 8px 18px -10px rgba(40, 25, 5, 0.7); }
+.walk-skill.is-cooling .walk-skill-glyph { opacity: 0.55; }
+.walk-skill.is-cooling::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(rgba(27, 25, 22, 0.42) calc(var(--cd, 0) * 360deg), transparent 0);
+  pointer-events: none;
+}
+.walk-skill.is-active {
+  border-color: #b93a2b;
+  background: radial-gradient(circle at 42% 36%, #fff3d6, #f6c97a 75%);
+  animation: walk-skill-glow 1s ease-in-out infinite;
+}
+@keyframes walk-skill-glow {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(255, 184, 107, 0.55), 0 0 18px 4px rgba(255, 170, 80, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(255, 184, 107, 0.3), 0 0 28px 10px rgba(255, 170, 80, 0.55); }
+}
+.walk-skill:active { transform: scale(0.92); }
+.walk-skill-tip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  right: -6px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border-radius: 999px;
+  background: rgba(27, 25, 22, 0.88);
+  color: #f6ecd9;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: walk-say-in 0.25s var(--ease, ease) both;
+}
+.walk-skill-tip b {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #b93a2b;
+  color: #fbf3e4;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* ---------- the map's waypoint list */
+.walk-map-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 6px 12px 0; list-style: none; }
+.walk-map-wp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 25, 22, 0.18);
+  color: rgba(27, 25, 22, 0.45);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+.walk-map-wp i { width: 8px; height: 8px; border-radius: 50%; border: 1.2px solid currentColor; box-sizing: border-box; }
+.walk-map-wp.is-lit { color: #1b1916; border-color: rgba(27, 25, 22, 0.35); background: rgba(255, 250, 240, 0.7); }
+.walk-map-wp.is-lit i { background: #ffb86b; border-color: #b0701f; box-shadow: 0 0 6px 1px rgba(255, 184, 107, 0.8); }
+.walk-map-wp.is-picked { border-color: #b93a2b; box-shadow: inset 0 0 0 1px #b93a2b; }
+.walk-map-place b small { font-family: var(--font-text); font-size: 13px; letter-spacing: 0.04em; color: #6a5f50; }
+.walk-map-place.is-dim b { color: rgba(27, 25, 22, 0.45); }
+.walk-map-go .brush { font-size: 17px; margin-right: 2px; }
+.walk-map-here { font-size: 13px; color: #6a5f50; white-space: nowrap; }
+
+@media (max-width: 480px) {
+  .walk-purse { padding: 0 10px; font-size: 14px; }
+  .walk-leave { padding: 0 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .walk-skill.is-active { animation: none; box-shadow: 0 0 0 4px rgba(255, 184, 107, 0.55); }
+  .walk-purse-gain { animation-duration: 1.2s; }
+}
