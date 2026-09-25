@@ -1,0 +1,299 @@
+/* 入画 mini-games: paper-and-ink overlays (fishing reel, pitch-pot aim, rowing, lanterns, the bell,
+   the daily errands chip). Mounted by the world's HUD into a pointer-transparent layer. */
+.mg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  color: #1b1916;
+  font-family: var(--font-text);
+  --mg-paper: rgba(244, 238, 226, 0.92);
+  --mg-ink: #1b1916;
+  --mg-line: rgba(27, 25, 22, 0.25);
+  --mg-red: #b93a2b;
+  --mg-jade: #5f8a6e;
+  --mg-dock: calc(env(safe-area-inset-bottom) + 34px);
+}
+.is-touch .mg { --mg-dock: calc(env(safe-area-inset-bottom) + 150px); }
+.mg button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.mg :is(button, input, .mg-live) { pointer-events: auto; }
+
+/* ---------- the dock: a status line and one big brush button, bottom centre */
+.mg-dock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--mg-dock);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: min(92vw, 420px);
+}
+.mg-status {
+  padding: 7px 16px;
+  border-radius: 999px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  box-shadow: 0 8px 20px -14px rgba(40, 30, 10, 0.6);
+  animation: mg-rise 0.35s var(--ease) both;
+}
+.mg-status:empty { display: none; }
+.mg-status small { display: block; font-size: 12px; color: #6c6358; letter-spacing: 0.04em; }
+.mg-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3a352e, #1b1916 72%) !important;
+  color: #f3ecdc !important;
+  box-shadow: 0 10px 22px -10px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(243, 236, 220, 0.12);
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s var(--ease);
+}
+.mg-btn:active, .mg-btn.is-down { transform: scale(0.93); }
+.mg-btn-glyph { font-family: var(--font-brush); font-size: 34px; line-height: 1; }
+.mg-btn-sub:empty { display: none; }
+.mg-btn-sub { position: absolute; bottom: 12px; font-size: 11px; letter-spacing: 0.08em; opacity: 0.75; font-family: var(--font-latin); }
+.mg-btn.is-hot { background: radial-gradient(circle at 40% 35%, #d25a45, #9e2f22 72%) !important; animation: mg-pulse 0.5s ease-in-out infinite alternate; }
+.mg-btn.is-quiet { width: 64px; height: 64px; }
+.mg-btn.is-quiet .mg-btn-glyph { font-size: 24px; }
+.mg-row { display: flex; gap: 14px; align-items: center; justify-content: center; }
+@keyframes mg-pulse { to { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(185, 58, 43, 0.12); } }
+@keyframes mg-rise { from { opacity: 0; transform: translateY(6px); } }
+
+.mg-x {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 104px);
+  left: calc(env(safe-area-inset-left) + 12px);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--mg-paper) !important;
+  border: 1px solid var(--mg-line) !important;
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* ---------- a charge bar (casting, the bell rope) */
+.mg-charge {
+  position: relative;
+  width: 220px;
+  height: 12px;
+  border-radius: 6px;
+  background: rgba(244, 238, 226, 0.75);
+  border: 1px solid var(--mg-line);
+  overflow: hidden;
+}
+.mg-charge i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  background: linear-gradient(90deg, #4a443c, #1b1916 70%, var(--mg-red));
+  border-radius: 6px;
+}
+.mg-charge b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--mg-red); opacity: 0.7; }
+
+/* ---------- the reel: a tall strip, the zone a jade wash, the fish a brushed 鱼 */
+.mg-reel {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 22px);
+  top: 50%;
+  transform: translateY(-58%);
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  height: min(46vh, 300px);
+  animation: mg-rise 0.3s var(--ease) both;
+}
+.is-touch .mg-reel { transform: translateY(-78%); }
+.mg-reel-track {
+  position: relative;
+  width: 54px;
+  border-radius: 27px;
+  background: linear-gradient(180deg, rgba(210, 222, 214, 0.9), rgba(160, 182, 176, 0.9));
+  border: 1.5px solid rgba(27, 25, 22, 0.45);
+  overflow: hidden;
+  box-shadow: inset 0 0 16px rgba(20, 40, 40, 0.25);
+}
+.mg-reel-zone {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border-radius: 22px;
+  background: rgba(244, 238, 226, 0.85);
+  border: 1.5px solid var(--mg-jade);
+  transition: background 0.15s;
+}
+.mg-reel-zone.is-on { background: rgba(214, 236, 214, 0.95); border-color: #3f7a55; }
+.mg-reel-fish {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-brush);
+  font-size: 28px;
+  line-height: 32px;
+  height: 32px;
+  margin-top: -16px;
+  color: var(--mg-ink);
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+}
+.mg-reel-fish.is-rare { color: var(--mg-red); }
+.mg-reel-meter {
+  position: relative;
+  width: 10px;
+  border-radius: 5px;
+  background: rgba(244, 238, 226, 0.75);
+  border: 1px solid var(--mg-line);
+  overflow: hidden;
+}
+.mg-reel-meter i { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(0deg, var(--mg-red), #d9a62e); }
+
+/* ---------- pitch-pot: arrows left, the aim arc, the power column */
+.mg-pot-top {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 112px);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.mg-pot-top b { font-family: var(--font-brush); font-size: 22px; font-weight: 400; color: var(--mg-red); font-variant-numeric: tabular-nums; }
+.mg-arrows { display: flex; gap: 3px; }
+.mg-arrows i { width: 3px; height: 18px; border-radius: 2px; background: var(--mg-ink); position: relative; }
+.mg-arrows i::before { content: ''; position: absolute; top: -3px; left: -2px; border: 3.5px solid transparent; border-bottom-color: var(--mg-red); border-top: 0; }
+.mg-arrows i.is-used { opacity: 0.18; }
+.mg-aim {
+  position: relative;
+  width: 240px;
+  height: 22px;
+}
+.mg-aim::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: 10px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(27, 25, 22, 0.5) 15%, rgba(27, 25, 22, 0.5) 85%, transparent);
+}
+.mg-aim span { position: absolute; left: 50%; top: 2px; width: 2px; height: 18px; margin-left: -1px; background: var(--mg-red); opacity: 0.5; }
+.mg-aim i {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 14px;
+  height: 22px;
+  margin-left: -7px;
+  border-radius: 7px 7px 3px 3px;
+  background: var(--mg-ink);
+  box-shadow: 0 0 0 2px rgba(244, 238, 226, 0.9);
+}
+.mg-pop {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translateX(-50%);
+  font-family: var(--font-brush);
+  font-size: 44px;
+  color: var(--mg-ink);
+  text-shadow: 0 0 12px rgba(244, 238, 226, 0.95), 0 0 2px rgba(244, 238, 226, 1);
+  white-space: nowrap;
+  animation: mg-popup 1.4s var(--ease) both;
+}
+.mg-pop.is-red { color: var(--mg-red); }
+.mg-pop.is-small { font-size: 26px; top: 40%; }
+@keyframes mg-popup { 0% { opacity: 0; transform: translate(-50%, 12px) scale(0.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.06); } 70% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -24px) scale(1); } }
+
+/* ---------- the lantern sheet */
+.mg-sheet {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  transform: translateX(-50%);
+  width: min(92vw, 380px);
+  padding: 18px 18px 16px;
+  background: radial-gradient(ellipse at 30% 10%, rgba(255, 255, 255, 0.4), transparent 60%), #f3ecdc;
+  border: 1px solid var(--mg-line);
+  border-radius: 14px;
+  box-shadow: 0 24px 50px -24px rgba(20, 15, 5, 0.6);
+  pointer-events: auto;
+  animation: mg-rise 0.4s var(--ease) both;
+}
+.mg-sheet h3 { margin: 0 0 12px; font-family: var(--font-brush); font-weight: 400; font-size: 24px; letter-spacing: 0.14em; text-align: center; }
+.mg-choices { display: flex; gap: 10px; justify-content: center; margin-bottom: 14px; }
+.mg-choice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px 8px !important;
+  border-radius: 10px;
+  border: 1.5px solid transparent !important;
+  background: rgba(27, 25, 22, 0.04) !important;
+  font-size: 14px;
+}
+.mg-choice[aria-pressed='true'] { border-color: var(--mg-ink) !important; background: rgba(255, 255, 255, 0.5) !important; }
+.mg-choice canvas { width: 56px; height: 44px; }
+.mg-wish {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--mg-line);
+  background: rgba(255, 255, 255, 0.55);
+  font: 16px var(--font-text);
+  color: var(--mg-ink);
+  outline: none;
+}
+.mg-wish:focus { border-color: var(--mg-ink); }
+.mg-note { margin: 6px 2px 14px; font-size: 12px; color: #6c6358; }
+.mg-sheet .mg-row { justify-content: space-between; }
+.mg-text-btn {
+  min-height: 42px;
+  padding: 0 20px !important;
+  border-radius: 999px;
+  border: 1px solid var(--mg-line) !important;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+}
+.mg-text-btn.is-primary { background: var(--mg-ink) !important; color: #f3ecdc !important; border-color: var(--mg-ink) !important; }
+
+/* ---------- the errands chip */
+.mg-errands {
+  position: absolute;
+  left: calc(env(safe-area-inset-left) + 12px);
+  top: calc(env(safe-area-inset-top) + 60px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px !important;
+  border-radius: 999px;
+  background: var(--mg-paper) !important;
+  border: 1px solid var(--mg-line) !important;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  box-shadow: 0 6px 18px -12px rgba(40, 30, 10, 0.5);
+}
+.mg-errands b { font-family: var(--font-brush); font-weight: 400; font-size: 17px; }
+.mg-ticks { display: inline-flex; gap: 4px; }
+.mg-ticks i { width: 9px; height: 9px; border-radius: 50%; border: 1.3px solid var(--mg-ink); box-sizing: border-box; }
+.mg-ticks i.is-done { background: var(--mg-red); border-color: var(--mg-red); }
+.mg-errands.is-all b { color: var(--mg-red); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg *, .mg { animation: none !important; transition: none !important; }
+}

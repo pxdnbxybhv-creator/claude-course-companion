@@ -121,16 +121,14 @@ export function GomokuView() {
     };
   }, [aiTurn, moves, level]);
 
-  /** Did this game end while we watched (not restored already finished)? — play events count once. */
-  const liveGame = useRef(!over);
+  /** Play events count once per game: set when this game's end is recorded (or it was restored
+   *  already finished), cleared only by startNew — so undo-and-replay of a finished game adds nothing. */
+  const counted = useRef(over);
   // game end: stroke, seal, sound, stats
   useEffect(() => {
-    if (!over) {
-      liveGame.current = true;
-      return;
-    }
-    if (liveGame.current) {
-      liveGame.current = false;
+    if (!over) return;
+    if (!counted.current) {
+      counted.current = true;
       playRecord('boardgame');
       if (vsAi && res.winner === human && level !== 'beginner') playRecord('win:club');
     }
@@ -155,6 +153,7 @@ export function GomokuView() {
     if (patch?.human) setHuman(patch.human);
     setMoves([]);
     setRecorded(false);
+    counted.current = false;
     setHint(-1);
     if (inProgress && !quiet) {
       toast(t('已开新局', 'New game started'), {

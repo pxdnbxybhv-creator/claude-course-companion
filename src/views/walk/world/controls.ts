@@ -113,6 +113,9 @@ export class Controls {
     }
   }
 
+  /** The raw, camera-relative intent of the last move(): x strafe, y forward (−1..1). */
+  readonly intent = { x: 0, y: 0, run: false };
+
   /** The move vector in world space, and whether to run. */
   move(): { x: number; z: number; run: boolean } {
     let ix = this.input.stickX, iy = this.input.stickY;
@@ -129,6 +132,7 @@ export class Controls {
     }
     const m = Math.hypot(ix, iy);
     if (m > 1) { ix /= m; iy /= m; }
+    this.intent.x = ix; this.intent.y = iy; this.intent.run = run;
     const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
     const rx = Math.cos(this.yaw), rz = -Math.sin(this.yaw);
     return { x: fx * iy + rx * ix, z: fz * iy + rz * ix, run };

@@ -1,10 +1,22 @@
-// 入画 · Into the Painting — the world core. Builds the garden in 3D (sky, mountains, land, pond,
-// pavilion, the user's own plants), the protagonist and the camera, then hands a WorldCtx to every
-// feature (festival easter eggs, critters). Loaded lazily so three.js stays out of the main chunk.
+// 入画 · Into the Painting — the world core. Builds the open world of map.ts in 3D: the sky, the far
+// mountains, the land (terrain.ts, land.ts), the lake and the river (water.ts), bridges, what grows
+// (scatter.ts), the walled garden with the half-acre pond and the user's own plants (region
+// 'garden'), then the protagonist and the camera; hands a WorldCtx to every region module
+// (regions/*) and feature (features/*). Region groups far from the player are hidden. Loaded
+// lazily so three.js stays out of the main chunk.
 import * as THREE from 'three';
-import type { FestivalKey, Hud, Interactable, WorldCtx } from '../types';
+import { effect } from '@preact/signals';
+import type { FestivalKey, Hud, Interactable, InputState as CtxInput, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
+import { REGION_MODULES } from '../regions';
+import { allDecks } from '../regions/water-decks';
+import { FACTORIES } from '../characters';
+import type { CharacterModel } from '../characters/types';
+import { ANCHORS, REGION, REGIONS, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
+import { CHARACTER, type CharacterId } from '../../../data/characters';
 import { activeHabits, refreshToday, state, toggleCheckin } from '../../../app/store';
+import { play, record, visitRegion } from '../../../app/play';
+import { music } from '../../../audio/music';
 import { go } from '../../../app/router';
 import { statsFor, type HabitStats } from '../../../core/habits';
 import type { Habit, PlantKind } from '../../../core/types';
@@ -20,26 +32,42 @@ import { Bag, nextFrame } from './kit';
 import { SkySystem } from './sky';
 import { buildMountains } from './mountains';
 import { buildGround } from './ground';
-import { buildArchitecture } from './architecture';
+import { buildArchitecture, buildGardenWall } from './architecture';
 import { buildPond, NO_REFLECT } from './pond';
 import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, rebrushTablet, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
 import { InkMarks } from './marks';
-import { Scholar } from './player';
+import { giftsOf, PlayerController, ScholarModel } from './player';
 import { Controls, type InputState } from './controls';
 import { buildAir, Bursts } from './particles';
 import { buildFlora } from './flora';
+import { terrain } from './terrain';
+import { buildLand } from './land';
+import { buildWater } from './water';
+import { buildScatter } from './scatter';
+import { buildBridges, setVillageBridgeBuilt } from './bridges';
 import {
-  BOUNDS_R, GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallSegments,
+  GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, WALL, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallPath, wallSegments, waterAt,
   type Circle, type PlantSlot,
 } from './site';
 
 export interface Prompt { labelZh: string; labelEn: string; actionZh: string; actionEn: string }
+
+/** What the arrival banner shows. */
+export interface Arrival { id: RegionId; zh: string; en: string; blurbZh: string; blurbEn: string; first: boolean }
+
+export interface SayOpts { nameZh: string; nameEn: string; zh: string; en: string; choices?: { zh: string; en: string }[] }
 
 export interface HudBridge extends Hud {
   prompt(p: Prompt | null): void;
   progress(f: number): void;
   /** A toast with one action (撤销 · Undo). */
   toastAction(zh: string, en: string, action: { zh: string; en: string; run: () => void }): void;
+  /** The player walked into a place. */
+  arrive(a: Arrival): void;
+  /** Draw (true) or lift (false) the curtain for fast travel. */
+  curtain(on: boolean): void;
+  /** The player is held by a mini-game or a boat: the action button stays live for it. */
+  frozen(on: boolean): void;
 }
 
 export interface WorldOptions {
@@ -52,12 +80,19 @@ export interface WorldOptions {
   cancelled(): boolean;
 }
 
+/** For the map screen. */
+export interface WhereAmI { x: number; z: number; heading: number; region: RegionId | null }
+
 export interface WorldHandle {
   input: InputState;
   act(): void;
   jump(): void;
   /** While a card or sheet is open the keyboard does not walk. */
   setPaused(p: boolean): void;
+  /** Where the player is (map screen). */
+  where(): WhereAmI;
+  /** Fast travel (驿站) to a place. */
+  travel(id: RegionId): Promise<void>;
   dispose(): void;
 }
 
@@ -90,7 +125,6 @@ function rayCylinder(tx: number, ty: number, tz: number, dx: number, dy: number,
   }
   f0 = Math.max(0, f0); f1 = Math.min(1, f1);
   if (f0 >= f1) return null;
-  // clip to the cylinder's height
   if (Math.abs(dy) < 1e-9) {
     if (ty < o.y0 || ty > o.y1) return null;
   } else {
@@ -99,7 +133,6 @@ function rayCylinder(tx: number, ty: number, tz: number, dx: number, dy: number,
     f0 = Math.max(f0, g0); f1 = Math.min(f1, g1);
     if (f0 >= f1) return null;
   }
-  // the player is already inside it (e.g. under a canopy): nothing to pull in for
   return f0 <= 0.02 ? null : f0;
 }
 
@@ -107,8 +140,36 @@ const WILD: { kind: PlantKind; seed: number }[] = [
   { kind: 'bamboo', seed: 71 }, { kind: 'orchid', seed: 5 }, { kind: 'pine', seed: 9 }, { kind: 'chrysanthemum', seed: 23 }, { kind: 'plum', seed: 41 },
 ];
 
+/** Where fast travel sets you down in each place (on its approach path, facing in). */
+const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ }> = {
+  garden: { x: SPAWN.x, z: SPAWN.z, face: { x: 0, z: 0 } },
+  village: { x: 1.5, z: 75, face: ANCHORS.villageSquare },
+  lake: { x: 58, z: 31, face: ANCHORS.lakeIsland },
+  bamboo: { x: -66, z: 29.5, face: ANCHORS.bambooClearing },
+  plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
+  mountain: { x: 45, z: -92.6, face: ANCHORS.templeHall },
+};
+
+/** How far beyond its radius a place stays drawn. */
+const SHOW_MARGIN = 70;
+
 function statsOf(h: Habit, day: string): HabitStats {
   return statsFor(h, state.value.checkins[h.id] ?? [], day);
+}
+
+function modelFor(id: CharacterId, reduced: boolean): CharacterModel {
+  const f = FACTORIES[id];
+  if (f && id !== 'scholar') {
+    try {
+      return f(THREE, { palette: PIGMENTS as unknown as Record<string, string> });
+    } catch (e) {
+      console.error(`[walk] character "${id}" failed to build`, e);
+    }
+  }
+  if (f && id === 'scholar') {
+    try { return f(THREE, { palette: PIGMENTS as unknown as Record<string, string> }); } catch (e) { console.error('[walk] scholar model failed', e); }
+  }
+  return new ScholarModel(reduced);
 }
 
 export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
@@ -123,7 +184,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency ?? 4;
   const lowEnd = touch && cores <= 4;
-  const dpr = Math.min(window.devicePixelRatio || 1, touch ? (lowEnd ? 1.5 : 1.75) : 2);
+  const dpr = Math.min(window.devicePixelRatio || 1, touch ? (lowEnd ? 1.5 : 1.75) : 1.75);
 
   // --- renderer
   let renderer: THREE.WebGLRenderer;
@@ -135,11 +196,12 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
+  renderer.shadowMap.enabled = false;
   const W = () => Math.max(1, host.clientWidth), H = () => Math.max(1, host.clientHeight);
   renderer.setSize(W(), H());
   const cv = renderer.domElement;
   cv.className = 'walk-canvas';
-  cv.setAttribute('aria-label', lang === 'zh' ? '入画：可行走的立体园子' : 'Into the Painting: a garden you can walk in');
+  cv.setAttribute('aria-label', lang === 'zh' ? '入画：可行走的立体山水' : 'Into the Painting: a landscape you can walk in');
   cv.setAttribute('role', 'img');
   cv.style.touchAction = 'none';
 
@@ -149,6 +211,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     cv.remove();
   };
   const bail = () => { bag.dispose(); disposeRenderer(); };
+  const check = () => { if (o.cancelled()) { bail(); throw new Error('cancelled'); } };
 
   // --- the day
   const now = new Date();
@@ -168,26 +231,73 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const camera = new THREE.PerspectiveCamera(aspect < 0.8 ? 62 : 50, aspect, 0.1, 600);
   camera.layers.enable(NO_REFLECT);
   const sky = new SkySystem(scene, bag, base.tod, base.hour, base.moonPhase);
-  scene.add(buildMountains(bag));
-  hud.progress(0.1);
+  const mountains = buildMountains(bag);
+  scene.add(mountains);
+  hud.progress(0.06);
   await nextFrame();
-  if (o.cancelled()) { bail(); throw new Error('cancelled'); }
+  check();
 
-  // --- where everything goes
+  // --- the land of the whole world (baked once per session)
+  terrain();
+  hud.progress(0.14);
+  await nextFrame();
+  check();
+
+  // --- one group per place; far ones are hidden
+  const regionGroups = new Map<RegionId, THREE.Group>();
+  const regionGroup = (id: RegionId): THREE.Group => {
+    let g = regionGroups.get(id);
+    if (!g) {
+      g = new THREE.Group();
+      g.name = 'region:' + id;
+      scene.add(g);
+      regionGroups.set(id, g);
+    }
+    return g;
+  };
+  for (const r of REGIONS) regionGroup(r.id);
+  const garden = regionGroup('garden');
+
+  const land = buildLand(bag, base.season);
+  land.warm();
+  scene.add(land.group);
+  hud.progress(0.22);
+  await nextFrame();
+  check();
+  const openWater = buildWater(bag, reduced);
+  scene.add(openWater.group);
+  const hasVillage = REGION_MODULES.some((m) => m.id === 'village');
+  const bridges = buildBridges(bag, !hasVillage);
+  bridges.traverse((o) => o.layers.set(NO_REFLECT));
+  scene.add(bridges);
+  const scatter = buildScatter(bag, base.season, reduced);
+  scene.add(scatter.group);
+  // the open country stays out of the pond's mirror (it would cost every draw twice)
+  for (const g of [land.group, openWater.group, scatter.group]) g.traverse((o) => o.layers.set(NO_REFLECT));
+  hud.progress(0.3);
+  await nextFrame();
+  check();
+
+  // --- the garden: where everything goes
   const items = habits.length ? habits.map((h) => ({ key: h.id, kind: h.plant })) : WILD.map((w, i) => ({ key: 'wild' + i, kind: w.kind }));
   const slots = layoutPlants(items);
   const bySlot = new Map(slots.map((s) => [s.key, s]));
   const ground = buildGround(bag, slots, base.season);
-  scene.add(ground.mesh, ground.stones);
+  // the garden's ground and wall stay drawn from afar (the land has a hole where the lawn is)
+  scene.add(ground.mesh);
+  garden.add(ground.stones);
+  const wall = buildGardenWall(bag, wallPath(), WALL.h, GATE.thick);
+  scene.add(wall);
   const arch = buildArchitecture(bag);
-  scene.add(arch.group);
+  garden.add(arch.group);
   const flora = buildFlora(bag, slots, reduced);
-  scene.add(flora.group);
+  garden.add(flora.group);
+  scene.add(flora.mist);
   const pond = buildPond(bag, habits.length ? clarity : 0.92, { lowEnd, reduced, w: W() * dpr, h: H() * dpr });
-  scene.add(pond.group);
+  garden.add(pond.group);
   // the reflection camera sees layer 0 only (no particles, ripples or shadows in the mirror)
   (pond.water.getReflectionCamera(camera) as THREE.Camera).layers.set(0);
-  hud.progress(0.25);
+  hud.progress(0.36);
   await nextFrame();
 
   // fonts for the tablets (never wait long)
@@ -197,7 +307,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       new Promise((r) => setTimeout(r, 1500)),
     ]);
   } catch { /* fall back to system fonts */ }
-  if (o.cancelled()) { bail(); throw new Error('cancelled'); }
+  check();
 
   // --- plants, one by one (each is a real ink painting)
   const plants: PlantEntity[] = [];
@@ -214,14 +324,14 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       growth: st ? st.growth : 0.72, vigor: st ? vigorFor(st.freshness) : 0.9,
     }, slot, lowEnd);
     plants.push(e);
-    scene.add(e.mesh);
-    hud.progress(0.3 + 0.55 * ((i + 1) / total));
+    garden.add(e.mesh);
+    hud.progress(0.4 + 0.45 * ((i + 1) / total));
     await nextFrame();
     if (o.cancelled()) { bail(); throw new Error('cancelled'); }
   }
 
   if (import.meta.env.DEV && plants.length !== total) console.error('[walk] a habit has no plant', plants.length, total);
-  scene.add(buildJars(bag, slots));
+  garden.add(buildJars(bag, slots));
 
   // tablets with the habits' names, and the streak brushed small in the corner
   const noteFor = (st: HabitStats): string | null => {
@@ -242,7 +352,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     tabletSpecs.push({ x: invite.x, z: invite.z, rot: 0.3, text: lang === 'zh' ? '此园尚空' : 'An empty garden', glyph: null });
   }
   const tablets = buildTablets(bag, tabletSpecs);
-  scene.add(tablets.group);
+  garden.add(tablets.group);
   const rebrush = (e: PlantEntity, st: HabitStats) => {
     const i = tabletFor.get(e.key);
     if (i === undefined) return;
@@ -252,7 +362,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
 
   // ink on the ground: the bloom of each watering, and the damp patch of plants tended today
   const marks = new InkMarks(bag, reduced);
-  scene.add(marks.group);
+  garden.add(marks.group);
   const WET_R: Record<PlantKind, number> = { pine: 1.25, bamboo: 1.05, plum: 1.15, chrysanthemum: 0.75, orchid: 0.65, lotus: 0.85 };
   const markWet = (e: PlantEntity, st: HabitStats) => {
     if (e.slot.inWater) return;
@@ -261,12 +371,32 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   for (const e of plants) if (e.habit) markWet(e, stats.get(e.habit.id)!);
   marks.settle();
 
-  // --- the protagonist and the camera
-  const player = new Scholar(bag, SPAWN.x, floorY(SPAWN.x, SPAWN.z), SPAWN.z, SPAWN.heading, reduced);
+  // --- the protagonist (whoever you walk as) and the camera
+  let charId: CharacterId = play.peek().character;
+  const player = new PlayerController(bag, SPAWN.x, floorY(SPAWN.x, SPAWN.z), SPAWN.z, SPAWN.heading, modelFor(charId, reduced));
+  player.character = charId;
+  player.gifts = giftsOf(CHARACTER[charId].ability);
   scene.add(player.root, player.shadowMesh);
+  /** The surface this walker stands on: with the gift of 凌波, water holds you up. */
+  const standY = (x: number, z: number) => {
+    const f = floorY(x, z);
+    if (!player.gifts.float) return f;
+    const w = waterAt(x, z);
+    return w === null ? f : Math.max(f, w + 0.02);
+  };
+  player.floorAt = standY;
   const controls = new Controls(cv, camera, SPAWN.heading, reduced);
-  // keep the camera on the player's side of the moon-gate wall (the round opening is fine)
-  controls.occlusion = (tx, ty, tz, cx, cy, cz) => {
+  const camY = () => player.eyeHeight;
+  const camTarget = new THREE.Vector3();
+  const camFollow = (dt: number, snap = false) => {
+    camTarget.set(player.position.x, player.position.y + camY() - 0.95, player.position.z);
+    controls.update(dt, camTarget, player.heading, player.speed, floorY, snap);
+  };
+  player.onTeleport = () => camFollow(0, true);
+  // keep the camera on the player's side of the walls (the moon gate's round opening is fine)
+  const walls = wallSegments();
+  const gateOcclusion = (tx: number, ty: number, tz: number, cx: number, cy: number, cz: number) => {
+    if (Math.abs(tx) > 40 || Math.abs(tz) > 40) return 1;
     const zw = GATE.z;
     const pad = GATE.thick / 2 + 0.3;
     const side = Math.sign(tz - zw) || 1;
@@ -279,7 +409,26 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     if (Math.hypot(x, y - GATE.holeY) < GATE.holeR - 0.35 && Math.abs(tz - zw) < 2) return 1;
     return Math.max(0.08, f);
   };
-  controls.update(0, player.position, player.heading, 0, floorY, true);
+  /** The long garden wall: where the view ray first crosses it below its top (fraction), else 1. */
+  const wallOcclusion = (tx: number, ty: number, tz: number, cx: number, cy: number, cz: number) => {
+    if (tx * tx + tz * tz > 45 * 45) return 1;
+    let best = 1;
+    const dx = cx - tx, dz = cz - tz;
+    for (let i = 2; i < walls.length; i++) {
+      const [ax, az, bx, bz] = walls[i];
+      const ex = bx - ax, ez = bz - az;
+      const den = dx * ez - dz * ex;
+      if (Math.abs(den) < 1e-9) continue;
+      const f = ((ax - tx) * ez - (az - tz) * ex) / den;
+      const u = ((ax - tx) * dz - (az - tz) * dx) / den;
+      if (f <= 0 || f >= best || u < 0 || u > 1) continue;
+      const y = ty + (cy - ty) * f;
+      if (y < terrainY(ax + ex * u, az + ez * u) + WALL.h + 0.35) best = Math.max(0.08, f - 0.4 / (Math.hypot(dx, dz) || 1));
+    }
+    return best;
+  };
+  controls.occlusion = (tx, ty, tz, cx, cy, cz) => Math.min(gateOcclusion(tx, ty, tz, cx, cy, cz), wallOcclusion(tx, ty, tz, cx, cy, cz));
+  camFollow(0, true);
 
   const air = buildAir(bag, base.season, base.tod === 'night', reduced, 1);
   if (air) scene.add(air.points);
@@ -294,21 +443,25 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   setPx();
 
-  // --- collisions (features add their props through addCollider)
+  // --- collisions (regions and features add their props through addCollider)
   const colliders: Circle[] = [...staticColliders()];
   for (const e of plants) {
     const c = plantCollider(e);
     if (c) colliders.push(c);
   }
   for (const t of tabletSpecs) colliders.push({ x: t.x, z: t.z, r: 0.3 });
-  const walls = wallSegments();
+  const walkHere = (x: number, z: number) => walkableGround(x, z) || (player.gifts.float && x * x + z * z < 172 * 172);
   const resolve = (x: number, z: number, r: number, fx: number, fz: number): [number, number] => {
+    const nearGarden = x * x + z * z < 40 * 40;
     for (let pass = 0; pass < 2; pass++) {
-      for (const c of colliders) {
-        const dx = x - c.x, dz = z - c.z;
-        const d = Math.hypot(dx, dz), m = c.r + r;
+      for (let i = 0; i < colliders.length; i++) {
+        const c = colliders[i];
+        const dx = x - c.x, dz = z - c.z, m = c.r + r;
+        if (dx > m || dx < -m || dz > m || dz < -m) continue;
+        const d = Math.sqrt(dx * dx + dz * dz);
         if (d < m && d > 1e-6) { x = c.x + (dx / d) * m; z = c.z + (dz / d) * m; }
       }
+      if (!nearGarden) continue;
       for (const [ax, az, bx, bz] of walls) {
         const sx = bx - ax, sz = bz - az;
         const tt = Math.max(0, Math.min(1, ((x - ax) * sx + (z - az) * sz) / (sx * sx + sz * sz)));
@@ -316,21 +469,30 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         const dx = x - cx, dz = z - cz, d = Math.hypot(dx, dz), m = GATE.thick / 2 + r;
         if (d < m) {
           if (d > 1e-6) { x = cx + (dx / d) * m; z = cz + (dz / d) * m; }
-          else { z = cz + (fz >= cz ? m : -m); }
+          else { x = fx; z = fz; }
         }
       }
     }
-    if (!walkableGround(x, z)) {
-      if (walkableGround(x, fz)) return [x, fz];
-      if (walkableGround(fx, z)) return [fx, z];
+    if (!walkHere(x, z)) {
+      if (walkHere(x, fz)) return [x, fz];
+      if (walkHere(fx, z)) return [fx, z];
       return [fx, fz];
     }
     return [x, z];
   };
-  // a little clearance round every trunk, stone and tablet, so features never plant a prop inside a canopy
-  const isWalkable = (x: number, z: number) => walkableGround(x, z, 0.1) && !colliders.some((c) => Math.hypot(x - c.x, z - c.z) < c.r + 0.45);
+  const nearWall = (x: number, z: number, m: number) => {
+    if (x * x + z * z > 40 * 40) return false;
+    for (const [ax, az, bx, bz] of walls) {
+      const sx = bx - ax, sz = bz - az;
+      const tt = Math.max(0, Math.min(1, ((x - ax) * sx + (z - az) * sz) / (sx * sx + sz * sz)));
+      if (Math.hypot(x - ax - sx * tt, z - az - sz * tt) < m) return true;
+    }
+    return false;
+  };
+  // a little clearance round every trunk, stone, tablet and wall, so nothing is set down inside another
+  const isWalkable = (x: number, z: number) => walkableGround(x, z, 0.1) && !nearWall(x, z, 0.7) && !colliders.some((c) => Math.abs(x - c.x) < c.r + 0.5 && Math.hypot(x - c.x, z - c.z) < c.r + 0.45);
 
-  // --- what the camera must never hide behind: tall rocks, the pavilion roof, features' big props
+  // --- what the camera must never hide behind: tall rocks, the pavilion roof, big props
   const occluders: Occluder[] = [];
   for (const r of ROCKS) if (r.h >= 0.9) { const y = terrainY(r.x, r.z); occluders.push({ x: r.x, z: r.z, r: r.w * 0.5, y0: y - 0.2, y1: y + r.h }); }
   occluders.push({ x: PAVILION.x, z: PAVILION.z, r: PAVILION.r + 0.55, y0: PAVILION_Y + 2.3, y1: PAVILION_Y + 4.2 });
@@ -354,12 +516,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       offOcc = null;
     };
   };
-  const gateOcclusion = controls.occlusion!;
+  const walled = controls.occlusion!;
   controls.occlusion = (tx, ty, tz, cx, cy, cz) => {
-    let f = gateOcclusion(tx, ty, tz, cx, cy, cz);
+    let f = walled(tx, ty, tz, cx, cy, cz);
     const dx = cx - tx, dy = cy - ty, dz = cz - tz;
     const len = Math.hypot(dx, dy, dz) || 1;
     for (const o of occluders) {
+      if (Math.abs(o.x - tx) > 14 + o.r || Math.abs(o.z - tz) > 14 + o.r) continue;
       const hit = rayCylinder(tx, ty, tz, dx, dy, dz, o);
       if (hit !== null) f = Math.min(f, Math.max(0.08, hit - 0.3 / len));
     }
@@ -421,6 +584,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     const x = e.slot.x, z = e.slot.z;
     const top = Math.max(e.baseY + 0.9, e.topY());
     bursts.drops(x, top + 0.4, z, 30);
+    record('water');
+    // the gardener's gift: a shower of petals and a little extra sparkle
+    const grow = CHARACTER[player.character].ability.kind === 'grow';
     // the check-in is recorded at once; the painting catches up a moment later
     if (!toggleCheckin(h.id)) toggleCheckin(h.id);
     const st = statsOf(h, refreshToday());
@@ -431,7 +597,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       markWet(e, st);
       rebrush(e, st);
       audio.chime(st.streak);
-      bursts.petals(x, e.baseY + (top - e.baseY) * 0.75, z, BURST_COLOR[e.kind], 24);
+      bursts.petals(x, e.baseY + (top - e.baseY) * 0.75, z, BURST_COLOR[e.kind], grow ? 60 : 24);
+      if (grow) later(380, () => { bursts.petals(x, top + 0.3, z, BURST_COLOR[e.kind], 30); bursts.drops(x, top + 0.8, z, 16); });
       if (e.slot.inWater) { pond.ripple(x, z, 1.3); later(300, () => pond.ripple(x + 0.3, z - 0.2, 0.8)); }
       hud.toastAction(
         `《${h.name}》浇过了 · 连续 ${st.streak} 日`,
@@ -456,6 +623,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     player.face(e.slot.x, e.slot.z);
     lookTogether(e);
     player.emote('bow');
+    record('admire');
     audio.pluck(2, 0.7);
     later(260, () => audio.pluck(4, 0.5));
     const info = PLANT_INFO[e.kind];
@@ -486,6 +654,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       player.face(PAVILION.x, PAVILION.z - 20);
       player.emote('bow');
       audio.bell();
+      record('admire');
       const m = moonInfo(new Date());
       const lu = toLunar(new Date());
       const poem = pickPoem({ theme: 'moon', season: base.season, salt: hashString(day) + admireSalt++ });
@@ -499,11 +668,77 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     },
   });
 
-  // --- frame hooks for features
+  // --- frame hooks for regions and features
   const frameFns = new Set<(dt: number, t: number) => void>();
   const onFrame = (fn: (dt: number, t: number) => void) => {
     frameFns.add(fn);
     return () => void frameFns.delete(fn);
+  };
+
+  // --- where the player is: places, arrival, music
+  let region: RegionId | null = regionAt(player.position.x, player.position.z);
+  const regionFns = new Set<(id: RegionId | null) => void>();
+  const onRegion = (fn: (id: RegionId | null) => void) => {
+    regionFns.add(fn);
+    return () => void regionFns.delete(fn);
+  };
+  let themeOverride: MusicTheme | null | undefined;
+  const themeFor = (): MusicTheme => {
+    if (sky.isNight()) return 'night';
+    const r = region ?? lastPlace;
+    if (env.festivals.length && (r === 'garden' || r === 'village')) return 'festival';
+    return REGION[r].theme;
+  };
+  let lastPlace: RegionId = region ?? 'garden';
+  let themeNow: MusicTheme | null = null;
+  const applyTheme = () => {
+    const want = themeOverride !== undefined ? themeOverride : themeFor();
+    if (want === themeNow) return;
+    themeNow = want;
+    try { music.setTheme(want); } catch (e) { console.warn('[walk] music', e); }
+  };
+  const worldMusic = {
+    setTheme(theme: MusicTheme | null) {
+      // a feature's request holds until it passes back the place's own (or calls with the same again)
+      themeOverride = theme === themeFor() ? undefined : theme;
+      applyTheme();
+    },
+  };
+  const enter = (id: RegionId | null, announce: boolean) => {
+    region = id;
+    if (id) {
+      lastPlace = id;
+      const first = !play.peek().flags[`visit:${id}`];
+      try { visitRegion(id); } catch (e) { console.warn('[walk] visit', e); }
+      const r = REGION[id];
+      if (announce) hud.arrive({ id, zh: r.zh, en: r.en, blurbZh: r.blurbZh, blurbEn: r.blurbEn, first });
+    }
+    applyTheme();
+    for (const fn of regionFns) {
+      try { fn(id); } catch (err) { console.error('[walk] region listener failed', err); }
+    }
+  };
+  /** With a little hysteresis: leaving a place takes a few steps past its edge. */
+  const trackRegion = () => {
+    const p = player.position;
+    const at = regionAt(p.x, p.z);
+    if (at === region) return;
+    if (at === null && region) {
+      const r = REGION[region];
+      if (Math.hypot(p.x - r.center.x, p.z - r.center.z) < r.radius * 1.5) return;
+    }
+    enter(at, at !== null);
+  };
+
+  // --- the player's input, for mini-games (rowing a boat, casting a line)
+  const ctxInput = { x: 0, y: 0, run: false, actionPressed: false };
+
+  const hudApi: Hud = {
+    toast: hud.toast,
+    setCounter: hud.setCounter,
+    showCard: hud.showCard,
+    mount: hud.mount,
+    say: hud.say,
   };
 
   const ctx: WorldCtxCore = {
@@ -511,30 +746,62 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     groundY: floorY,
     isWalkable,
     pond: { center: new THREE.Vector3(POND.x, POND.waterY, POND.z), radiusX: POND.rx, radiusZ: POND.rz, waterY: POND.waterY },
-    bounds: { radius: BOUNDS_R },
+    // features dress the walled garden: keep them well inside its wall
+    bounds: { radius: 21 },
     player,
     env,
     addInteractable,
     addCollider,
     addOccluder,
-    hud: { toast: hud.toast, setCounter: hud.setCounter, showCard: hud.showCard },
+    hud: hudApi,
     audio,
     rng: makeRng(hashString('walk:' + day)),
     onFrame,
     sky,
     palette: PIGMENTS,
     lang,
+    input: ctxInput as CtxInput,
+    currentRegion: () => region,
+    onRegion,
+    regionGroup,
+    waterAt,
+    anchor: (a: XZ) => {
+      const w = waterAt(a.x, a.z);
+      const g = terrainY(a.x, a.z);
+      return new THREE.Vector3(a.x, w === null ? g : Math.max(g, w), a.z);
+    },
+    music: worldMusic,
   };
+
+  let playerMirrored = true;
+  // --- who you walk as follows the choice made in the character picker
+  const disposeCharacter = effect(() => {
+    const id = play.value.character;
+    if (id === charId) return;
+    charId = id;
+    const model = modelFor(id, reduced);
+    player.setModel(model, id, giftsOf(CHARACTER[id].ability));
+    // the next check puts the new model on the right layer
+    player.root.traverse((o) => o.layers.set(0));
+    playerMirrored = true;
+    player.emote('bow');
+    // off the water if the new walker cannot stand on it
+    if (!player.gifts.float && !walkableGround(player.position.x, player.position.z)) {
+      const a = ARRIVE[lastPlace];
+      player.teleport(a.x, a.z, Math.atan2(a.face.x - a.x, a.face.z - a.z));
+    }
+  });
 
   // --- the loop
   let raf = 0;
   let last = performance.now();
   let running = true;
   let paused = false;
+  let traveling = false;
   // real frame times (ms), for the adaptive pixel ratio and the DEV readout
   const deltas = new Float32Array(120);
   let nDeltas = 0;
-  let adaptAt = 6; // past the start-up hitches (shader compiles, features dressing the garden)
+  let adaptAt = 6; // past the start-up hitches (shader compiles, regions dressing the world)
   const minPr = Math.min(dpr, touch ? 1 : 0.75);
   const frameStats = () => {
     const n = Math.min(nDeltas, deltas.length);
@@ -557,42 +824,83 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     }
   };
   const camPos = new THREE.Vector3();
+  let frameNo = 0;
+  /** Show the places near the player, hide the far ones (their groups and interactables). */
+  const stream = () => {
+    const p = player.position;
+    for (const r of REGIONS) {
+      const g = regionGroups.get(r.id)!;
+      g.visible = Math.hypot(p.x - r.center.x, p.z - r.center.z) < r.radius + SHOW_MARGIN;
+    }
+  };
+  const regionOf = new Map<Interactable, RegionId | null>();
+  let frozenShown = false;
   const step = (dt: number, t: number) => {
+    frameNo++;
     const mv = controls.move();
     const inp = controls.input;
-    player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused }, { floorY, resolve });
+    ctxInput.x = controls.intent.x;
+    ctxInput.y = controls.intent.y;
+    ctxInput.run = controls.intent.run;
+    ctxInput.actionPressed = inp.actQueued && !paused;
+    player.update(dt, { x: mv.x, z: mv.z, run: mv.run, jump: inp.jumpQueued && !paused && !player.isFrozen }, { floorY: standY, resolve });
     inp.jumpQueued = false;
-    controls.update(dt, player.position, player.heading, player.speed, floorY);
+    camFollow(dt);
     sky.update(dt, camera);
     camPos.copy(camera.position);
-    for (const e of plants) tickPlant(e, dt, t, camPos, sky.tint, reduced);
-    for (const f of tablets.faces) (f.material as THREE.MeshBasicMaterial).color.copy(sky.tint);
-    arch.setNight(sky.night01, t);
-    flora.update(t, sky.tint, sky.fogColor);
-    pond.update(dt, t, sky.fogColor, sky.night01);
+    mountains.follow(camPos);
+    flora.mist.position.set(camPos.x, 0, camPos.z);
+    const far = sky.fog.far;
+    land.update(camPos, far);
+    scatter.update(t, camPos, sky.tint, far);
+    openWater.update(t, sky.fogColor, sky.night01);
+    if (frameNo % 12 === 1) {
+      stream();
+      trackRegion();
+      applyTheme();
+      // the walker shows in the pond only when near it (a character can be dozens of draws)
+      const mirrored = Math.hypot(player.position.x - POND.x, player.position.z - POND.z) < 16;
+      if (mirrored !== playerMirrored) {
+        playerMirrored = mirrored;
+        player.root.traverse((o) => o.layers.set(mirrored ? 0 : NO_REFLECT));
+      }
+    }
+    if (garden.visible) {
+      for (const e of plants) tickPlant(e, dt, t, camPos, sky.tint, reduced);
+      for (const f of tablets.faces) (f.material as THREE.MeshBasicMaterial).color.copy(sky.tint);
+      arch.setNight(sky.night01, t);
+      flora.update(t, sky.tint, sky.fogColor);
+      pond.update(dt, t, sky.fogColor, sky.night01);
+      marks.update(dt, sky.night01);
+    } else flora.update(t, sky.tint, sky.fogColor);
     if (air) air.update(t, camPos, sky.night01);
     bursts.update(dt, t);
-    marks.update(dt, sky.night01);
     for (const fn of frameFns) {
-      try { fn(dt, t); } catch (err) { console.error('[walk] feature frame failed', err); frameFns.delete(fn); }
+      try { fn(dt, t); } catch (err) { console.error('[walk] frame hook failed', err); frameFns.delete(fn); }
     }
-    // the nearest thing to do
+    // the nearest thing to do (things in hidden places do not prompt)
     let best: Interactable | null = null, bd = Infinity;
+    const px = player.position.x, pz = player.position.z;
     for (const i of interactables) {
-      let d = Math.hypot(i.position.x - player.position.x, i.position.z - player.position.z);
+      let d = Math.hypot(i.position.x - px, i.position.z - pz);
       const alt = alsoAt.get(i);
-      if (alt) d = Math.min(d, Math.hypot(alt.x - player.position.x, alt.z - player.position.z));
-      if (d < i.radius && d < bd && Math.abs(i.position.y - player.position.y) < 3) { best = i; bd = d; }
+      if (alt) d = Math.min(d, Math.hypot(alt.x - px, alt.z - pz));
+      if (d >= i.radius || d >= bd || Math.abs(i.position.y - player.position.y) >= 3) continue;
+      let rid = regionOf.get(i);
+      if (rid === undefined) { rid = regionAt(i.position.x, i.position.z); regionOf.set(i, rid); }
+      if (rid && !regionGroups.get(rid)!.visible) continue;
+      best = i; bd = d;
     }
-    nearest = best;
-    const sig = best ? `${best.id}|${best.labelZh}|${best.labelEn}|${best.actionZh}|${best.actionEn}` : '';
+    nearest = player.isFrozen || traveling ? null : best;
+    if (player.isFrozen !== frozenShown) { frozenShown = player.isFrozen; hud.frozen(frozenShown); }
+    const sig = nearest ? `${nearest.id}|${nearest.labelZh}|${nearest.labelEn}|${nearest.actionZh}|${nearest.actionEn}` : '';
     if (sig !== shown) {
       shown = sig;
-      hud.prompt(best ? { labelZh: best.labelZh, labelEn: best.labelEn, actionZh: best.actionZh, actionEn: best.actionEn } : null);
+      hud.prompt(nearest ? { labelZh: nearest.labelZh, labelEn: nearest.labelEn, actionZh: nearest.actionZh, actionEn: nearest.actionEn } : null);
     }
     if (inp.actQueued) {
       inp.actQueued = false;
-      if (!paused) doAct();
+      if (!paused && !player.isFrozen) doAct();
     }
   };
   const doAct = () => {
@@ -640,15 +948,59 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   });
 
   // first frame: settle the sky & camera, then show
+  stream();
+  land.update(camera.position, sky.fog.far);
   step(1, 0);
   host.appendChild(cv);
   ro.observe(host);
   renderer.render(scene, camera);
   hud.progress(1);
   raf = requestAnimationFrame(frame);
+  enter(region, false);
 
-  // --- features dress the world (they decide for themselves whether today is theirs)
-  const inited: typeof FEATURES = [];
+  // --- fast travel (驿站): the curtain falls, the player is set down, it lifts
+  const travel = async (id: RegionId) => {
+    if (traveling || !running) return;
+    if (player.isFrozen) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
+    traveling = true;
+    try {
+      hud.curtain(true);
+      await new Promise((r) => later(reduced ? 120 : 520, () => r(null)));
+      if (!running) return;
+      player.ride(null);
+      player.freeze(false);
+      const a = ARRIVE[id];
+      let x = a.x, z = a.z;
+      // never set down in the water or inside a prop
+      for (let k = 0; k < 24 && !isWalkable(x, z); k++) { const ang = k * 2.4; x = a.x + Math.cos(ang) * (1 + k * 0.4); z = a.z + Math.sin(ang) * (1 + k * 0.4); }
+      const heading = Math.atan2(a.face.x - x, a.face.z - z);
+      player.teleport(x, z, heading);
+      controls.yaw = heading + Math.PI;
+      camFollow(0, true);
+      stream();
+      trackRegion();
+      await nextFrame();
+      await new Promise((r) => later(reduced ? 60 : 180, () => r(null)));
+      hud.curtain(false);
+    } finally {
+      traveling = false;
+    }
+  };
+
+  // --- the places dress themselves (regions/*), then the features (they decide whether today is theirs)
+  const builtRegions: typeof REGION_MODULES = [];
+  for (const m of REGION_MODULES) {
+    if (!running) break;
+    builtRegions.push(m);
+    const started = Promise.resolve().then(() => m.build(ctx)).catch((err) => {
+      console.error(`[walk] region "${m.id}" failed to build`, err);
+    });
+    await Promise.race([started, new Promise((r) => setTimeout(r, 6000))]);
+  }
+  // the water town brought its own bridge: the core's stand-in deck steps aside
+  const vb = ANCHORS.villageBridge;
+  setVillageBridgeBuilt(allDecks().some((d) => Math.hypot(d.cx - vb.x, d.cz - vb.z) < 8));
+  const inited: WorldFeature[] = [];
   for (const f of FEATURES) {
     if (!running) break;
     inited.push(f);
@@ -665,17 +1017,24 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     cancelAnimationFrame(raf);
     document.removeEventListener('visibilitychange', onVis);
     ro.disconnect();
+    disposeCharacter();
     for (const id of timers) clearTimeout(id);
     timers.clear();
     for (const f of inited) {
       try { f.dispose?.(); } catch (err) { console.error(`[walk] feature "${f.id}" failed to dispose`, err); }
     }
+    for (const m of builtRegions) {
+      try { m.dispose?.(); } catch (err) { console.error(`[walk] region "${m.id}" failed to dispose`, err); }
+    }
+    setVillageBridgeBuilt(false);
     frameFns.clear();
+    regionFns.clear();
     interactables.clear();
     controls.dispose();
     pond.dispose();
     for (const e of plants) freePlant(e);
-    // anything left in the scene (including what features forgot) gives its GPU memory back
+    try { player.model.dispose(); } catch { /* gone */ }
+    // anything left in the scene (including what regions and features forgot) gives its GPU memory back
     const mats = new Set<THREE.Material>();
     scene.traverse((obj) => {
       const m = obj as THREE.Mesh;
@@ -701,23 +1060,35 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       colliders: () => colliders.length,
       info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }),
       teleport(x: number, z: number, heading?: number) {
-        player.position.set(x, floorY(x, z), z);
-        if (heading !== undefined) { player.heading = heading; controls.yaw = heading + Math.PI; }
-        controls.update(0, player.position, player.heading, 0, floorY, true);
+        player.teleport(x, z, heading);
+        if (heading !== undefined) controls.yaw = heading + Math.PI;
+        camFollow(0, true);
+        stream();
+        trackRegion();
       },
+      travel,
+      region: () => region,
+      regions: () => Object.fromEntries([...regionGroups].map(([k, g]) => [k, { visible: g.visible, children: g.children.length }])),
+      where: () => ({ x: +player.position.x.toFixed(2), y: +player.position.y.toFixed(2), z: +player.position.z.toFixed(2), heading: +player.heading.toFixed(2), region, character: player.character }),
       night: (on: boolean) => sky.forceNight(on),
-      toPlant: (key: string) => { const e = plants.find((p) => p.key === key || p.habit?.name === key); if (e) { player.position.set(e.slot.tablet.x, floorY(e.slot.tablet.x, e.slot.tablet.z), e.slot.tablet.z + 0.6); } },
+      toPlant: (key: string) => { const e = plants.find((p) => p.key === key || p.habit?.name === key); if (e) player.teleport(e.slot.tablet.x, e.slot.tablet.z + 0.6); },
       act: doAct,
       nearest: () => nearest?.id ?? null,
+      water: (x: number, z: number) => waterAt(x, z),
+      ground: (x: number, z: number) => floorY(x, z),
       slots: () => slots.map((s: PlantSlot) => ({ key: s.key, kind: s.kind, x: +s.x.toFixed(2), z: +s.z.toFixed(2) })),
     };
   }
 
   return {
     input: controls.input,
-    act: () => { if (!paused) doAct(); },
+    // queued, so the world's own step and mini-games (ctx.input.actionPressed) both see it
+    act: () => { if (!paused) controls.input.actQueued = true; },
     jump: () => { controls.input.jumpQueued = true; },
     setPaused: (p: boolean) => { paused = p; controls.paused = p; },
+    where: () => ({ x: player.position.x, z: player.position.z, heading: player.heading, region }),
+    travel,
     dispose,
   };
 }
+export { paintAtlas, atlasHit } from './atlas';

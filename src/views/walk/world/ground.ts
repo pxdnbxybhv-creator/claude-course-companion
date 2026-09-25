@@ -16,12 +16,14 @@ const GROUND_COLOR: Record<Season, string> = { spring: '#dcd8c8', summer: '#d9d6
 
 const SHADOW_R: Record<PlantKind, number> = { pine: 1.6, bamboo: 1.15, plum: 1.35, chrysanthemum: 0.6, orchid: 0.5, lotus: 0 };
 
+/** The garden's lawn mesh covers ±GX m (the open land beyond is land.ts); a little finer at the middle. */
+const GX = 31;
 function warp(u: number): number {
-  return 30 * u + 120 * u * u * u;
+  return GX * (0.72 * u + 0.28 * u * u * u);
 }
 
 function terrainGeometry(bag: Bag): THREE.BufferGeometry {
-  const n = 180;
+  const n = 168;
   const verts = (n + 1) * (n + 1);
   const pos = new Float32Array(verts * 3);
   let k = 0;

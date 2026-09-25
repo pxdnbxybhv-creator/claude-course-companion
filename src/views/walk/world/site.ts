@@ -11,6 +11,10 @@
 // Units are metres; y is up. Everything here is deterministic.
 import type { PlantKind } from '../../../core/types';
 import { hashString, makeNoise2, makeRng, smoothstep } from '../../../core/rng';
+import { WORLD_RADIUS } from '../map';
+import { terrain } from './terrain';
+import { deckY } from './bridges';
+import { deckY as regionDeckY } from '../regions/water-decks';
 
 export const POND = { x: 0, z: 0, rx: 6.6, rz: 4.3, waterY: 0.1 };
 export const BOUNDS_R = 25;
@@ -38,12 +42,9 @@ export function pondQ(x: number, z: number): number {
   return Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz);
 }
 
-/** Terrain height — rolling lawn inside, hills rising beyond the garden, a basin under the pond. */
-export function terrainY(x: number, z: number): number {
-  const r = Math.hypot(x, z);
+/** The garden's own lawn: rolling a little, flattened at the gate and the pavilion, a basin under the pond. */
+function lawnY(x: number, z: number): number {
   let h = 0.5 * N.fbm(x / 17, z / 17, 3) + 0.1 * N(x / 5 + 7.3, z / 5 - 3.1);
-  const hill = smoothstep(23, 62, r);
-  if (hill > 0) h += hill * (1.6 + 3.6 * (0.5 + 0.5 * N.fbm(x / 38 + 3.7, z / 38 - 1.2, 3)));
   // flatten the gate threshold and the pavilion site
   const g = smoothstep(4.5, 2.2, Math.abs(z - GATE.z)) * smoothstep(GATE.halfW + 3, GATE.halfW + 0.5, Math.abs(x));
   h = h * (1 - g) + 0.18 * g;
@@ -57,80 +58,21 @@ export function terrainY(x: number, z: number): number {
   return h;
 }
 
+/** Terrain height anywhere: the garden's lawn, blending out into the open country (terrain.ts). */
+export function terrainY(x: number, z: number): number {
+  const r2 = x * x + z * z;
+  if (r2 > GARDEN_OUT * GARDEN_OUT) return terrain().height(x, z);
+  const lawn = lawnY(x, z);
+  if (r2 < GARDEN_IN * GARDEN_IN) return lawn;
+  const w = smoothstep(GARDEN_IN, GARDEN_OUT, Math.sqrt(r2));
+  return lawn + (terrain().height(x, z) - lawn) * w;
+}
+const GARDEN_IN = 22, GARDEN_OUT = 31;
+
 // ---------------------------------------------------------------------------------------- polylines
 
-export interface Poly {
-  x: Float64Array;
-  z: Float64Array;
-  s: Float64Array;
-  length: number;
-  closed: boolean;
-}
-
-function catmull(p0: number, p1: number, p2: number, p3: number, t: number): number {
-  const t2 = t * t, t3 = t2 * t;
-  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
-}
-
-/** Sample a Catmull-Rom spline through `pts` densely (every ~0.25 m). */
-export function spline(pts: [number, number][], closed: boolean, step = 0.25): Poly {
-  const n = pts.length;
-  const xs: number[] = [], zs: number[] = [];
-  const segs = closed ? n : n - 1;
-  const at = (i: number) => pts[closed ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i))];
-  for (let i = 0; i < segs; i++) {
-    const a = at(i - 1), b = at(i), c = at(i + 1), d = at(i + 2);
-    const len = Math.hypot(c[0] - b[0], c[1] - b[1]);
-    const k = Math.max(2, Math.ceil(len / step));
-    for (let j = 0; j < k; j++) {
-      const t = j / k;
-      xs.push(catmull(a[0], b[0], c[0], d[0], t));
-      zs.push(catmull(a[1], b[1], c[1], d[1], t));
-    }
-  }
-  if (closed) { xs.push(xs[0]); zs.push(zs[0]); } else { xs.push(pts[n - 1][0]); zs.push(pts[n - 1][1]); }
-  const s = new Float64Array(xs.length);
-  for (let i = 1; i < xs.length; i++) s[i] = s[i - 1] + Math.hypot(xs[i] - xs[i - 1], zs[i] - zs[i - 1]);
-  return { x: Float64Array.from(xs), z: Float64Array.from(zs), s, length: s[s.length - 1], closed };
-}
-
-/** Point and unit tangent at arc length s. */
-export function polyAt(p: Poly, s: number): { x: number; z: number; tx: number; tz: number } {
-  if (p.closed) s = ((s % p.length) + p.length) % p.length;
-  else s = Math.max(0, Math.min(p.length, s));
-  let lo = 0, hi = p.s.length - 1;
-  while (hi - lo > 1) {
-    const m = (lo + hi) >> 1;
-    if (p.s[m] <= s) lo = m; else hi = m;
-  }
-  const seg = p.s[hi] - p.s[lo] || 1;
-  const t = (s - p.s[lo]) / seg;
-  const dx = p.x[hi] - p.x[lo], dz = p.z[hi] - p.z[lo];
-  const l = Math.hypot(dx, dz) || 1;
-  return { x: p.x[lo] + dx * t, z: p.z[lo] + dz * t, tx: dx / l, tz: dz / l };
-}
-
-function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
-  const dx = bx - ax, dz = bz - az;
-  const l2 = dx * dx + dz * dz || 1;
-  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / l2));
-  return Math.hypot(px - ax - dx * t, pz - az - dz * t);
-}
-
-export function polyDist(p: Poly, x: number, z: number): number {
-  let best = Infinity;
-  for (let i = 1; i < p.x.length; i++) {
-    const d = segDist(x, z, p.x[i - 1], p.z[i - 1], p.x[i], p.z[i]);
-    if (d < best) best = d;
-  }
-  return best;
-}
-
-function rawPolyDist(pts: [number, number][], x: number, z: number): number {
-  let best = Infinity;
-  for (let i = 1; i < pts.length; i++) best = Math.min(best, segDist(x, z, pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1]));
-  return best;
-}
+import { polyAt, polyDist, rawPolyDist, spline, type Poly } from './geom';
+export { polyAt, polyDist, spline, type Poly };
 
 /** The winding path around the pond (closed loop), starting just inside the gate and heading west. */
 export const LOOP = spline(
@@ -198,26 +140,78 @@ export function onPavilion(x: number, z: number): boolean {
   return Math.hypot(x - PAVILION.x, z - PAVILION.z) < PAVILION.r - 0.05;
 }
 
-/** The surface you stand on: terrain, the bridge deck or the pavilion floor. */
+/** The surface you stand on: terrain, a bridge deck or the pavilion floor. */
 export function floorY(x: number, z: number): number {
   let y = terrainY(x, z);
-  if (onPavilion(x, z)) y = Math.max(y, PAVILION_Y);
-  if (onBridge(x, z)) y = Math.max(y, BRIDGE_Y);
-  return y;
+  if (x * x + z * z < 900) {
+    if (onPavilion(x, z)) y = Math.max(y, PAVILION_Y);
+    if (onBridge(x, z)) y = Math.max(y, BRIDGE_Y);
+    return y;
+  }
+  const d = deckY(x, z);
+  if (d !== null) y = Math.max(y, d);
+  const r = regionDeckY(x, z);
+  return r === null ? y : Math.max(y, r);
 }
 
-/** Walkable ground: inside the garden, not in the water (the bridge is fine). */
+/** Water surface at (x, z) — the half-acre pond, the lake, the river, the waterfall pool — or null on land. */
+export function waterAt(x: number, z: number): number | null {
+  if (x * x + z * z < 900) {
+    if (pondQ(x, z) < 1.0) return POND.waterY;
+    return null;
+  }
+  return terrain().waterAt(x, z);
+}
+
+/** Walkable ground: inside the world, not in the water (bridges and decks are fine). */
 export function walkableGround(x: number, z: number, margin = 0.28): boolean {
-  if (Math.hypot(x, z) > BOUNDS_R) return false;
-  if (onBridge(x, z) || onPavilion(x, z)) return true;
-  const q = Math.hypot((x - POND.x) / (POND.rx + margin), (z - POND.z) / (POND.rz + margin));
-  return q > 1.0;
+  const r2 = x * x + z * z;
+  if (r2 > (WORLD_RADIUS - 2) * (WORLD_RADIUS - 2)) return false;
+  if (r2 < 900) {
+    if (onBridge(x, z) || onPavilion(x, z)) return true;
+    const q = Math.hypot((x - POND.x) / (POND.rx + margin), (z - POND.z) / (POND.rz + margin));
+    return q > 1.0;
+  }
+  if (deckY(x, z) !== null || regionDeckY(x, z) !== null) return true;
+  return terrain().waterAt(x, z) === null;
 }
 
-/** Signed distance to the moon-gate wall (two segments either side of the round opening). */
+/** The garden wall: the moon-gate front and the long white wall round the rest (粉墙). */
+export const WALL = { cx: 0, cz: -3.2, rx: 24.5, rz: 19.7, n: 4, h: 2.3 };
+
+/** Points round the enclosure, from the gate's east end the long way round to its west end. */
+export function wallPath(): [number, number][] {
+  const out: [number, number][] = [[GATE.halfW, GATE.z]];
+  const steps = 72;
+  // superellipse; t = 0 points east (+x), π/2 south (+z) where the gate is. Start at the gate's east
+  // end and go the long way round (through the north) to its west end.
+  const te = Math.acos(Math.pow(GATE.halfW / WALL.rx, WALL.n / 2));
+  const sweep = Math.PI * 2 - 2 * (Math.PI / 2 - te);
+  for (let i = 1; i < steps; i++) {
+    const t = te - (i / steps) * sweep;
+    const c = Math.cos(t), s = Math.sin(t);
+    const x = WALL.cx + WALL.rx * Math.sign(c) * Math.pow(Math.abs(c), 2 / WALL.n);
+    const z = WALL.cz + WALL.rz * Math.sign(s) * Math.pow(Math.abs(s), 2 / WALL.n);
+    out.push([x, Math.min(GATE.z, z)]);
+  }
+  out.push([-GATE.halfW, GATE.z]);
+  return out;
+}
+
+/** Wall segments for collision: the moon-gate wall either side of its opening, and the enclosure. */
 export function wallSegments(): [number, number, number, number][] {
   const o = GATE.holeR * 0.82;
-  return [[-GATE.halfW, GATE.z, -o, GATE.z], [o, GATE.z, GATE.halfW, GATE.z]];
+  const segs: [number, number, number, number][] = [[-GATE.halfW, GATE.z, -o, GATE.z], [o, GATE.z, GATE.halfW, GATE.z]];
+  const p = wallPath();
+  for (let i = 1; i < p.length; i++) segs.push([p[i - 1][0], p[i - 1][1], p[i][0], p[i][1]]);
+  return segs;
+}
+
+/** Is (x, z) inside the garden wall? */
+export function insideWall(x: number, z: number, margin = 0): boolean {
+  if (z > GATE.z - margin) return false;
+  const dx = Math.abs(x - WALL.cx) / (WALL.rx - margin), dz = Math.abs(z - WALL.cz) / (WALL.rz - margin);
+  return Math.pow(dx, WALL.n) + Math.pow(dz, WALL.n) < 1;
 }
 
 // ------------------------------------------------------------------------------------ plant layout
@@ -256,6 +250,7 @@ export function layoutPlants(items: LayoutItem[]): PlantSlot[] {
   const taken: Circle[] = [];
   const clear = (x: number, z: number, r: number, relax = 0) => {
     if (Math.hypot(x, z) > BOUNDS_R - 2.5) return false;
+    if (!insideWall(x, z, r + 0.9)) return false;
     if (pondQ(x, z) < 1.0 + (r + 0.5) / Math.min(POND.rx, POND.rz)) return false;
     if (Math.abs(z - GATE.z) < r + 0.8 && Math.abs(x) < GATE.halfW + 0.5) return false;
     if (Math.hypot(x - PAVILION.x, z - PAVILION.z) < PAVILION.r + r + 0.4) return false;

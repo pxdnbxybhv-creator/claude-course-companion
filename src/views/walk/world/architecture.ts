@@ -174,7 +174,7 @@ function plaqueCanvas(): HTMLCanvasElement {
 
 // ------------------------------------------------------------------------------------------- rocks
 
-function rockGeometry(seed: number, w: number, h: number): THREE.BufferGeometry {
+export function rockGeometry(seed: number, w: number, h: number): THREE.BufferGeometry {
   let g: THREE.BufferGeometry = new THREE.IcosahedronGeometry(1, 3);
   g.deleteAttribute('normal');
   g.deleteAttribute('uv');
@@ -398,3 +398,125 @@ export function buildArchitecture(bag: Bag): Architecture {
   };
 }
 
+
+// ------------------------------------------------------------------------------------ garden wall
+
+/** Lattice for the leak windows (漏窗): a cracked-ice pattern in a round frame. */
+function latticeCanvas(): HTMLCanvasElement {
+  const S = 256;
+  const c = canvas(S, S);
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, S, S);
+  g.save();
+  g.beginPath();
+  g.arc(S / 2, S / 2, S * 0.46, 0, Math.PI * 2);
+  g.clip();
+  g.fillStyle = 'rgba(60,58,54,1)';
+  g.fillRect(0, 0, S, S);
+  // openings: cracked ice (冰裂纹) — random convex cells cut out
+  const r = makeRng(5121);
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 0; i < 26; i++) {
+    const cx = r.range(20, S - 20), cy = r.range(20, S - 20), rad = r.range(14, 30);
+    const n = 3 + Math.floor(r() * 3);
+    g.beginPath();
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + r.range(-0.3, 0.3);
+      const px = cx + Math.cos(a) * rad, py = cy + Math.sin(a) * rad;
+      if (k) g.lineTo(px, py); else g.moveTo(px, py);
+    }
+    g.closePath();
+    g.fill();
+  }
+  g.restore();
+  // the frame
+  g.globalCompositeOperation = 'source-over';
+  g.strokeStyle = 'rgba(70,68,64,1)';
+  g.lineWidth = 14;
+  g.beginPath();
+  g.arc(S / 2, S / 2, S * 0.46, 0, Math.PI * 2);
+  g.stroke();
+  return c;
+}
+
+/** The long white wall round the garden (粉墙黛瓦), following the land, with a few leak windows. */
+export function buildGardenWall(bag: Bag, path: [number, number][], h: number, thick: number): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'garden-wall';
+  const n = path.length;
+  // per point: position, outward normal (averaged), ground height
+  const P = path.map(([x, z], i) => {
+    const [ax, az] = path[Math.max(0, i - 1)], [bx, bz] = path[Math.min(n - 1, i + 1)];
+    const tx = bx - ax, tz = bz - az, l = Math.hypot(tx, tz) || 1;
+    return { x, z, nx: tz / l, nz: -tx / l, y: terrainY(x, z) };
+  });
+  const pos: number[] = [], col: number[] = [], idx: number[] = [];
+  const white = new THREE.Color(WHITEWASH), foot = new THREE.Color('#d9d3c6'), tile = new THREE.Color(TILE), ridge = new THREE.Color('#4a4947');
+  const quadStrip = (a: (p: typeof P[0]) => [number, number, number], b: (p: typeof P[0]) => [number, number, number], ca: THREE.Color, cb: THREE.Color) => {
+    const base = pos.length / 3;
+    for (const p of P) {
+      pos.push(...a(p), ...b(p));
+      col.push(ca.r, ca.g, ca.b, cb.r, cb.g, cb.b);
+    }
+    for (let i = 0; i < n - 1; i++) {
+      const v = base + i * 2;
+      idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3);
+    }
+  };
+  const t2 = thick / 2, c2 = thick / 2 + 0.2;
+  // outer and inner faces, the top of the wall
+  quadStrip((p) => [p.x + p.nx * t2, p.y - 0.5, p.z + p.nz * t2], (p) => [p.x + p.nx * t2, p.y + h, p.z + p.nz * t2], foot, white);
+  quadStrip((p) => [p.x - p.nx * t2, p.y + h, p.z - p.nz * t2], (p) => [p.x - p.nx * t2, p.y - 0.5, p.z - p.nz * t2], white, foot);
+  // coping: two sloping tile faces meeting at a ridge, overhanging both sides
+  quadStrip((p) => [p.x + p.nx * c2, p.y + h - 0.02, p.z + p.nz * c2], (p) => [p.x, p.y + h + 0.26, p.z], tile, ridge);
+  quadStrip((p) => [p.x, p.y + h + 0.26, p.z], (p) => [p.x - p.nx * c2, p.y + h - 0.02, p.z - p.nz * c2], ridge, tile);
+  // eave undersides
+  quadStrip((p) => [p.x + p.nx * t2, p.y + h - 0.02, p.z + p.nz * t2], (p) => [p.x + p.nx * c2, p.y + h - 0.02, p.z + p.nz * c2], tile, tile);
+  quadStrip((p) => [p.x - p.nx * c2, p.y + h - 0.02, p.z - p.nz * c2], (p) => [p.x - p.nx * t2, p.y + h - 0.02, p.z - p.nz * t2], tile, tile);
+  const geo = bag.add(new THREE.BufferGeometry());
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, toon(bag, '#ffffff', { vertexColors: true, side: THREE.DoubleSide }));
+  mesh.name = 'wall';
+  group.add(mesh);
+  // ink: the eave lines on both sides, the ridge, a line at the foot
+  const lines: number[] = [];
+  const line = (f: (p: typeof P[0]) => [number, number, number]) => {
+    for (let i = 1; i < n; i++) lines.push(...f(P[i - 1]), ...f(P[i]));
+  };
+  line((p) => [p.x + p.nx * c2, p.y + h - 0.02, p.z + p.nz * c2]);
+  line((p) => [p.x - p.nx * c2, p.y + h - 0.02, p.z - p.nz * c2]);
+  line((p) => [p.x, p.y + h + 0.27, p.z]);
+  line((p) => [p.x + p.nx * (t2 + 0.01), p.y + h - 0.1, p.z + p.nz * (t2 + 0.01)]);
+  line((p) => [p.x - p.nx * (t2 + 0.01), p.y + h - 0.1, p.z - p.nz * (t2 + 0.01)]);
+  const lg = bag.add(new THREE.BufferGeometry());
+  lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+  group.add(new THREE.LineSegments(lg, bag.add(new THREE.LineBasicMaterial({ color: INK, transparent: true, opacity: 0.7 }))));
+  // leak windows on both faces, all in one draw
+  const tex = canvasTexture(bag, latticeCanvas());
+  const wpos: number[] = [], wuv: number[] = [], widx: number[] = [];
+  for (const f of [0.14, 0.3, 0.5, 0.7, 0.86]) {
+    const i = Math.round(f * (n - 1));
+    const p = P[i];
+    const tx = -p.nz, tz = p.nx; // along the wall
+    const sz = 0.62, cy = p.y + h * 0.58;
+    for (const side of [1, -1]) {
+      const o = t2 + 0.012;
+      const base = wpos.length / 3;
+      for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
+        const a = (u - 0.5) * 2 * sz, b = (v - 0.5) * 2 * sz;
+        wpos.push(p.x + p.nx * o * side + tx * a, cy + b, p.z + p.nz * o * side + tz * a);
+        wuv.push(u, v);
+      }
+      widx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
+  }
+  const wg = bag.add(new THREE.BufferGeometry());
+  wg.setAttribute('position', new THREE.Float32BufferAttribute(wpos, 3));
+  wg.setAttribute('uv', new THREE.Float32BufferAttribute(wuv, 2));
+  wg.setIndex(widx);
+  group.add(new THREE.Mesh(wg, bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }))));
+  return group;
+}

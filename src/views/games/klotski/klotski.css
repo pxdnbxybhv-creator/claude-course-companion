@@ -1,0 +1,77 @@
+/* 华容道 — a rosewood tray on paper; quiet controls and the layouts beside it. */
+.game-page.klotski-page { max-width: 1000px; }
+.klt { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.klt-board {
+  position: relative;
+  width: min(100%, 420px, calc((100dvh - 230px) * 0.7));
+  min-width: 260px;
+}
+.klt-board canvas {
+  display: block; width: 100%; aspect-ratio: 4.6 / 6.32; border-radius: 10px;
+  /* a finger on a tile drags it (touchstart is held in JS); elsewhere the page scrolls */
+  touch-action: pan-y pinch-zoom; cursor: grab; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+.klt-board canvas:active { cursor: grabbing; }
+.klt-board canvas:focus { outline: none; }
+.klt-board canvas:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 4px; }
+.klt-board.is-done canvas { cursor: default; }
+.klt-held {
+  position: absolute; left: 50%; top: 6px; transform: translateX(-50%); padding: 2px 10px; border-radius: 999px;
+  background: rgba(27, 25, 22, 0.72); color: #f1e9d8; font-size: 12.5px; letter-spacing: 0.08em; pointer-events: none;
+}
+
+.klt-side { width: 100%; max-width: 460px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.klt-goal { margin: 0; text-align: center; font-size: 14.5px; color: var(--ink-2); line-height: 1.6; letter-spacing: 0.04em; }
+.klt-opt { display: block; font-size: 13px; color: var(--ink-3); font-variant-numeric: lining-nums tabular-nums; }
+.klt-controls { display: flex; gap: 10px; justify-content: center; }
+.klt-controls .btn { min-width: 104px; min-height: 44px; }
+
+.klt-layouts { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; width: 100%; }
+.klt-layout {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; align-items: center; gap: 0 8px;
+  min-height: 52px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink-2);
+  text-align: left; cursor: pointer; transition: border-color 0.2s, background 0.2s;
+}
+@media (hover: hover) { .klt-layout:hover { border-color: var(--line-strong); } }
+.klt-layout.is-on { border-color: var(--cinnabar); background: var(--cinnabar-soft); color: var(--ink); }
+.klt-mini { grid-row: span 2; width: 26px; height: 32px; }
+.klt-mini-cao { fill: #8a3522; }
+.klt-mini-gen { fill: #c89e62; }
+.klt-mini-bing { fill: #dcc398; }
+.klt-layout-name { font-size: 14px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* English names are longer: wrap at spaces, hyphenate a long word, never cut it off */
+:lang(en) .klt-layout-name { min-width: 0; font-size: 13px; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; hyphens: auto; }
+@media (max-width: 380px) { :lang(en) .klt-layout-name { font-size: 12px; letter-spacing: -0.005em; } }
+.klt-layout-meta { font-size: 12px; color: var(--ink-3); font-variant-numeric: lining-nums tabular-nums; }
+.klt-done { color: var(--cinnabar); margin-right: 2px; }
+.klt-keys { margin: 0; text-align: center; font-size: 12.5px; line-height: 1.6; letter-spacing: 0.04em; }
+@media (pointer: coarse) { .klt-kbd { display: none; } }
+
+.klt-result {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 8px 16px; padding: 14px 16px;
+  border-radius: 8px; background: var(--paper-2); border: 1px solid var(--line);
+  animation: klt-rise 0.6s var(--ease) both;
+}
+.klt-seal { width: 64px; height: 64px; }
+.klt-verdict { margin: 0; font-family: var(--font-brush); font-size: 26px; line-height: 1.2; color: var(--ink); }
+:lang(en) .klt-verdict { font-family: var(--font-latin); font-weight: 500; }
+.klt-score { margin: 2px 0 0; font-size: 14px; color: var(--ink-2); font-variant-numeric: lining-nums tabular-nums; }
+.klt-poem { grid-column: 1 / -1; margin: 4px 0 0; padding: 0; font-size: 15px; line-height: 1.7; color: var(--ink-2); }
+.klt-poem span { display: block; }
+.klt-poem cite { display: block; margin-top: 2px; font-style: normal; font-size: 12.5px; color: var(--ink-3); }
+.klt-again { grid-column: 1 / -1; display: flex; gap: 10px; justify-content: center; margin-top: 4px; }
+.klt-again .btn { min-height: 44px; min-width: 110px; }
+@keyframes klt-rise { from { opacity: 0; transform: translateY(8px); } }
+
+@media (min-width: 900px) {
+  .klt { flex-direction: row; align-items: flex-start; justify-content: center; gap: 40px; }
+  .klt-board { width: min(440px, calc((100dvh - 150px) * 0.728)); flex: none; }
+  .klt-side { width: 340px; flex: none; align-items: stretch; padding-top: 8px; }
+  .klt-goal { text-align: left; }
+  .klt-controls { justify-content: flex-start; }
+  .klt-keys { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .klt-result { animation: none; }
+}
+.klt-n, .klt-opt, .klt-score, .klt-layout-meta, .klt-keys { font-variant-numeric: lining-nums tabular-nums; font-feature-settings: 'lnum' 1, 'tnum' 1; }

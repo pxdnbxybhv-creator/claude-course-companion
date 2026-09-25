@@ -226,8 +226,8 @@ export class SkySystem implements Sky {
     (u.uGlowColor.value as THREE.Color).copy(c.glow);
     this.fog.color.copy(c.fog);
     // by night the near garden stays clear and the dark gathers further off
-    this.fog.near = 20 + 6 * this.night01;
-    this.fog.far = 115 - 30 * this.night01;
+    this.fog.near = 30 - 4 * this.night01;
+    this.fog.far = 150 - 40 * this.night01;
     this.fogColor.copy(c.fog);
     this.hemi.color.copy(c.hemiSky);
     this.hemi.groundColor.copy(c.hemiGround);

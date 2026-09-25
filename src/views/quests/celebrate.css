@@ -1,0 +1,143 @@
+/* 贺 · the celebration overlay. The leaf is always xuan paper (a painting), in dark mode too. */
+.cel {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom)); outline: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.cel-veil { position: absolute; inset: 0; background: rgba(16, 13, 10, 0.5); animation: cel-fade 0.5s var(--ease) both; }
+.cel.is-out .cel-veil { animation: cel-fade-out 0.42s var(--ease) both; }
+
+.cel-leaf {
+  position: relative; width: min(100%, 360px); max-height: calc(100dvh - 32px); overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 26px 22px 16px; border-radius: 4px; background: #f1e9d8; color: #1b1916;
+  box-shadow: 0 0 0 1px rgba(27, 25, 22, 0.12), 0 30px 80px -24px rgba(0, 0, 0, 0.6);
+  cursor: default;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: 50% 42%, 30% 62%, 72% 60%; mask-position: 50% 42%, 30% 62%, 72% 60%;
+  animation: cel-bleed 1s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+/* ink spreading on paper: three soft blots grow and merge */
+@keyframes cel-bleed {
+  from {
+    -webkit-mask-image: radial-gradient(closest-side, #000 70%, transparent 100%), radial-gradient(closest-side, #000 64%, transparent 100%), radial-gradient(closest-side, #000 66%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 70%, transparent 100%), radial-gradient(closest-side, #000 64%, transparent 100%), radial-gradient(closest-side, #000 66%, transparent 100%);
+    -webkit-mask-size: 4% 3%, 0% 0%, 0% 0%; mask-size: 4% 3%, 0% 0%, 0% 0%;
+    opacity: 0.4;
+  }
+  35% { opacity: 1; }
+  to {
+    -webkit-mask-image: radial-gradient(closest-side, #000 70%, transparent 100%), radial-gradient(closest-side, #000 64%, transparent 100%), radial-gradient(closest-side, #000 66%, transparent 100%);
+    mask-image: radial-gradient(closest-side, #000 70%, transparent 100%), radial-gradient(closest-side, #000 64%, transparent 100%), radial-gradient(closest-side, #000 66%, transparent 100%);
+    -webkit-mask-size: 300% 300%, 220% 200%, 220% 210%; mask-size: 300% 300%, 220% 200%, 220% 210%;
+    opacity: 1;
+  }
+}
+.cel.is-out .cel-leaf { animation: cel-leave 0.42s var(--ease) both; }
+@keyframes cel-leave { to { opacity: 0; transform: translateY(8px) scale(0.985); } }
+.cel.is-stamped .cel-leaf.is-seal { animation: cel-bleed 1s cubic-bezier(0.22, 0.8, 0.3, 1) both, cel-thud 0.24s 0.3s ease-out; }
+.cel.is-stamped.is-out .cel-leaf { animation: cel-leave 0.42s var(--ease) both; }
+@keyframes cel-thud { 30% { transform: translateY(2px) scale(0.996); } }
+
+.cel-paper { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+.cel-frame { position: absolute; inset: 9px; border: 1px solid rgba(27, 25, 22, 0.14); pointer-events: none; }
+.cel-leaf > :not(.cel-paper):not(.cel-frame):not(.cel-timer) { position: relative; }
+
+.cel-kicker { margin: 0; font-size: 12.5px; letter-spacing: 0.4em; color: #b93a2b; text-indent: 0.4em; }
+.cel-quest { margin: 2px 0 0; font-size: 26px; font-weight: 400; line-height: 1.25; color: #1b1916; }
+.cel-quest.latin { font-size: 24px; font-weight: 500; }
+
+.cel-stage { position: relative; width: 236px; height: 212px; display: grid; place-items: center; margin: 4px 0 2px; }
+.cel-bloom {
+  position: absolute; left: 50%; top: 50%; width: 300px; height: 300px; margin: -150px 0 0 -150px; pointer-events: none;
+  animation: cel-bloom 1.6s 0.15s cubic-bezier(0.16, 0.8, 0.3, 1) both;
+}
+@keyframes cel-bloom { from { opacity: 0; transform: scale(0.35); } 40% { opacity: 1; } }
+.cel-fan { position: relative; border-radius: 50%; box-shadow: 0 12px 30px -12px rgba(30, 20, 10, 0.55); animation: cel-rise 0.9s 0.35s var(--ease) both; }
+.cel-fan .qb-portrait { display: block; border-radius: 50%; }
+@keyframes cel-rise { from { opacity: 0; transform: translateY(10px) scale(0.94); } }
+
+.cel-petals { position: absolute; inset: -30px -60px auto; height: 420px; pointer-events: none; }
+.cel-petals i {
+  position: absolute; top: -12px; width: 9px; height: 7px; border-radius: 60% 40% 60% 40%; background: #b83a4b; opacity: 0;
+  transform: scale(var(--s, 1)); animation: cel-petal 4s ease-in-out both;
+}
+.cel-petals i:nth-child(3n) { background: #d98a95; }
+.cel-petals i:nth-child(4n) { background: #f4efe4; box-shadow: 0 0 0 0.5px rgba(184, 58, 75, 0.5); }
+@keyframes cel-petal {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(var(--s, 1)); }
+  12% { opacity: 0.85; }
+  85% { opacity: 0.7; }
+  100% { opacity: 0; transform: translate(var(--drift, 20px), 400px) rotate(var(--spin, 200deg)) scale(var(--s, 1)); }
+}
+
+.cel-new { margin: 2px 0 0; font-size: 12px; letter-spacing: 0.3em; text-indent: 0.3em; color: #857c6e; animation: cel-rise 0.8s 0.55s var(--ease) both; }
+.cel-names { display: flex; align-items: baseline; gap: 10px; animation: cel-rise 0.8s 0.6s var(--ease) both; }
+.cel-name.brush { font-size: 46px; line-height: 1.1; }
+.cel-name.latin { font-size: 32px; font-weight: 500; line-height: 1.2; }
+.cel-name2 { color: #857c6e; }
+.cel-name2.latin { font-style: italic; font-size: 17px; }
+.cel-name2.brush { font-size: 22px; }
+.cel-title { margin: 2px 0 0; font-size: 15px; color: #4a443c; animation: cel-rise 0.8s 0.7s var(--ease) both; }
+.cel-ability { margin: 6px 0 0; font-size: 13.5px; color: #4a443c; animation: cel-rise 0.8s 0.75s var(--ease) both; }
+.cel-ability span { color: #b93a2b; }
+
+/* the seal slams down */
+.cel-stage.is-seal { height: 190px; }
+.cel-stamp { opacity: 0; transform-origin: 50% 55%; }
+.cel-stamp .qb-seal { display: block; mix-blend-mode: multiply; }
+.cel.is-stamped .cel-stamp { animation: cel-slam 0.46s cubic-bezier(0.6, 0, 0.9, 0.45) both; }
+@keyframes cel-slam {
+  0% { opacity: 0; transform: translateY(-26px) scale(1.9) rotate(-15deg); }
+  30% { opacity: 0.75; }
+  66% { opacity: 1; transform: translateY(0) scale(0.965) rotate(-5deg); }
+  100% { opacity: 1; transform: scale(1) rotate(-5deg); }
+}
+.cel-ring {
+  position: absolute; left: 50%; top: 50%; width: 150px; height: 150px; margin: -75px 0 0 -75px; border-radius: 22px;
+  border: 2px solid rgba(185, 58, 43, 0.35); opacity: 0; pointer-events: none;
+}
+.cel-ring.is-round { border-radius: 50%; }
+.cel-ring.is-oval { border-radius: 50%; width: 112px; margin-left: -56px; }
+.cel.is-stamped .cel-ring { animation: cel-ring 0.7s 0.3s ease-out both; }
+@keyframes cel-ring { from { opacity: 0.7; transform: scale(0.8) rotate(-5deg); } to { opacity: 0; transform: scale(1.45) rotate(-5deg); } }
+.cel-sealnote { margin: 4px 0 0; font-size: 15px; color: #4a443c; line-height: 1.6; max-width: 26em; }
+
+.cel-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; justify-content: center; }
+.cel-btn {
+  min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid rgba(27, 25, 22, 0.3); color: #1b1916; background: transparent;
+  font-size: 15px; letter-spacing: 0.08em; cursor: pointer; transition: background 0.2s, transform 0.15s var(--ease);
+}
+.cel-btn:hover { background: rgba(185, 58, 43, 0.1); }
+.cel-btn:active { transform: scale(0.97); }
+.cel-btn:focus-visible { outline: 2px solid #1b1916; outline-offset: 2px; }
+.cel-btn.is-seal { background: #b93a2b; border-color: #b93a2b; color: #fbf5ea; padding: 0 26px; }
+.cel-btn.is-seal:hover { background: #a3321f; }
+.cel-dismiss { margin: 12px 0 2px; font-size: 11.5px; letter-spacing: 0.14em; color: #a39884; }
+
+.cel-timer { position: absolute; left: 22px; right: 22px; bottom: 6px; height: 1.5px; overflow: hidden; pointer-events: none; }
+.cel-timer i { display: block; height: 100%; background: rgba(185, 58, 43, 0.45); transform-origin: left; animation: cel-timer linear both; }
+.cel.is-paused .cel-timer i { animation-play-state: paused; }
+@keyframes cel-timer { to { transform: scaleX(0); } }
+
+@keyframes cel-fade { from { opacity: 0; } }
+@keyframes cel-fade-out { to { opacity: 0; } }
+
+@media (max-height: 620px) {
+  .cel-stage { height: 170px; }
+  .cel-fan .qb-portrait { width: 132px !important; height: 132px !important; }
+  .cel-name.brush { font-size: 38px; }
+}
+
+/* reduced motion: a quiet cross-fade, nothing slams or drifts */
+.cel.is-reduced .cel-leaf,
+.cel.is-reduced.is-stamped .cel-leaf.is-seal { animation: cel-fade 0.2s linear both; -webkit-mask-image: none; mask-image: none; }
+.cel.is-reduced.is-out .cel-leaf, .cel.is-reduced.is-out .cel-veil { animation: cel-fade-out 0.16s linear both; }
+.cel.is-reduced .cel-bloom, .cel.is-reduced .cel-fan, .cel.is-reduced .cel-new, .cel.is-reduced .cel-names,
+.cel.is-reduced .cel-title, .cel.is-reduced .cel-ability, .cel.is-reduced .cel-ring { animation: none; }
+.cel.is-reduced.is-stamped .cel-stamp { animation: none; opacity: 1; transform: rotate(-5deg); }
+.cel.is-reduced .cel-timer { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .cel-leaf { animation: cel-fade 0.2s linear both; }
+  .cel-petals { display: none; }
+}
