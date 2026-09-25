@@ -3,6 +3,7 @@ import {
   BONUS_EVERY, BONUS_POINTS, BONUS_TTL, QUEUE_MAX, createGame, freeCell, queueTurn, sameCell, step, tickMs,
   type Cell, type Dir, type SnakeState,
 } from '../src/views/games/snake/logic';
+import { festivalFor } from '../src/views/games/snake/festival';
 
 /** Queue a turn, failing the test if it was rejected. */
 function turn(s: SnakeState, d: Dir): SnakeState {
@@ -21,9 +22,9 @@ describe('snake · setup', () => {
   it('starts centred, moving right, with food off the snake', () => {
     const s = createGame({ seed: 7 });
     expect(s.cols).toBe(17);
-    expect(s.body).toHaveLength(4);
+    expect(s.body).toHaveLength(5);
     expect(s.body[0]).toEqual({ x: 7, y: 8 });
-    expect(s.body[3]).toEqual({ x: 4, y: 8 });
+    expect(s.body[4]).toEqual({ x: 3, y: 8 });
     expect(s.food).not.toBeNull();
     expect(s.body.some((b) => sameCell(b, s.food))).toBe(false);
     expect(s.alive).toBe(true);
@@ -245,5 +246,24 @@ describe('snake · bonus', () => {
     expect(r.state.eaten).toBe(0);
     expect(r.state.body).toHaveLength(4);
     expect(r.state.bonus).toBeNull();
+  });
+});
+
+describe('snake · festivals', () => {
+  it('finds 中秋 on its lunar date and no festival on an ordinary day', () => {
+    const f = festivalFor(new Date(2026, 8, 25)); // 2026-09-25 is 八月十五
+    expect(f?.key).toBe('midautumn');
+    expect(f?.moon).toBe(true);
+    expect(festivalFor(new Date(2026, 8, 1))).toBeNull();
+  });
+
+  it('names every treat in English without a stray plural s', () => {
+    for (const d of [new Date(2026, 8, 25), new Date(2026, 5, 19), new Date(2026, 9, 18), new Date(2026, 2, 3), new Date(2026, 1, 17)]) {
+      const f = festivalFor(d);
+      if (!f) continue;
+      expect(f.treatsEn).toBeTruthy();
+      expect(f.treatsEn).not.toMatch(/(zongzis|tangyuans)$/);
+      expect(BONUS_POINTS[f.bonus]).toBe(5);
+    }
   });
 });

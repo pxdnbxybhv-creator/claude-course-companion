@@ -23,7 +23,7 @@ export interface SnakeConfig {
   /** true: leaving one edge enters from the opposite edge (穿墙); false: the edge kills (有墙). */
   wrap?: boolean;
   seed?: number;
-  /** Starting length (cells). Default 4. */
+  /** Starting length (cells). Default 5. */
   length?: number;
   /** Which golden bonus appears (osmanthus normally; festival treats on festival days). */
   bonusKind?: BonusKind;
@@ -151,7 +151,7 @@ export function createGame(cfg: SnakeConfig = {}): SnakeState {
   let body: Cell[];
   if (cfg.body?.length) body = cfg.body.map((c) => ({ x: c.x, y: c.y }));
   else {
-    const len = Math.max(1, Math.min(cfg.length ?? 4, cols - 2));
+    const len = Math.max(1, Math.min(cfg.length ?? 5, cols - 2));
     const hy = Math.floor(rows / 2);
     const hx = Math.floor(cols / 2) - 1;
     const d = DIRS[dir];

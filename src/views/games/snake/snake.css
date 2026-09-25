@@ -1,0 +1,97 @@
+/* 贪吃蛇 — the board is a sheet of paper; the chrome stays quiet around it. */
+.snake-page .game-body { gap: 12px; }
+.snake-stage {
+  position: relative;
+  width: min(100%, 560px, max(280px, calc(100dvh - 330px)));
+  aspect-ratio: 1;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px var(--line), 0 14px 34px -22px rgba(40, 30, 10, 0.55);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  overflow: hidden;
+  background: #f1e9d8;
+}
+.snake-canvas { display: block; width: 100%; height: 100%; }
+
+.snake-veil {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(241, 233, 216, 0.3);
+  animation: snake-fade 0.45s var(--ease);
+}
+.snake-veil.is-soft { background: none; align-items: flex-end; padding-bottom: 12%; pointer-events: none; }
+/* the hint keeps to the half of the board without the first blossom */
+.snake-veil.is-soft.at-top { align-items: flex-start; padding-bottom: 0; padding-top: 6%; }
+.snake-veil.is-over { background: none; animation-delay: 0.3s; animation-fill-mode: backwards; padding: 7% 0; }
+.snake-veil.is-over.at-top { align-items: flex-start; }
+.snake-veil.is-over.at-bottom { align-items: flex-end; }
+.snake-veil.is-over .snake-card { flex-direction: row; flex-wrap: wrap; justify-content: center; column-gap: 16px; row-gap: 2px; padding: 12px 18px 14px; max-width: 88%; }
+.snake-veil.is-over .snake-card-score { font-size: 52px; }
+.snake-card-meta { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.snake-veil.is-over .btn { margin-top: 6px; flex-basis: 100%; max-width: 240px; }
+.snake-hint {
+  margin: 0; padding: 8px 16px; border-radius: 999px; font-size: 14px; letter-spacing: 0.06em;
+  color: #4a443c; background: rgba(241, 233, 216, 0.82);
+  animation: snake-breathe 3.6s ease-in-out infinite;
+}
+.snake-card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  min-width: 200px; padding: 18px 24px 20px; border-radius: 10px;
+  /* a slip of paper laid on the painting (stays paper-coloured in dark mode, like the board) */
+  background: rgba(244, 238, 225, 0.94); color: #1b1916;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 40px -18px rgba(30, 20, 5, 0.5);
+}
+.snake-card .btn { margin-top: 8px; }
+.snake-card .btn-primary { background: #1b1916; border-color: #1b1916; color: #f1e9d8; }
+.snake-card .btn-seal { color: #fbf5ea; }
+.snake-card.is-pause { min-width: 0; flex-direction: row; gap: 16px; padding: 10px 10px 10px 22px; border-radius: 999px; }
+.snake-card.is-pause .btn { margin-top: 0; }
+.snake-card-title { margin: 0; font-size: 17px; letter-spacing: 0.14em; color: #4a443c; }
+.snake-card-score { font-size: 64px; line-height: 1; font-weight: 500; color: #1b1916; }
+.snake-card-sub { margin: 0; font-size: 14px; color: #857c6e; letter-spacing: 0.06em; }
+.snake-record { color: #b93a2b; letter-spacing: 0.2em; }
+
+.snake-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; }
+.snake-fest { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); letter-spacing: 0.06em; }
+.snake-fest-moon {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 36%, #fbefc8, #e6c07a 70%, #d4a453);
+  box-shadow: 0 0 10px rgba(217, 166, 46, 0.45);
+}
+.snake-fest-treat {
+  display: block; flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: #f1e9d8; box-shadow: 0 0 0 1px var(--line);
+}
+.snake-dot { color: var(--ink-3); }
+.snake-page .game-sub .num, .snake-card-sub .num { font-variant-numeric: lining-nums tabular-nums; }
+.snake-page .game-sub b.num { font-weight: 600; color: var(--ink); }
+.snake-card-score { font-variant-numeric: lining-nums; }
+
+/* on-screen pad: shown on touch devices */
+.snake-pad {
+  display: none;
+  grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 52px);
+  grid-template-areas: '. up .' 'left . right' '. down .';
+  gap: 2px; margin-top: 2px;
+}
+.snake-pad.is-on { display: grid; }
+@media (pointer: coarse) { .snake-pad { display: grid; } }
+.snake-key {
+  display: grid; place-items: center; border-radius: 16px; color: var(--ink-2);
+  border: 1px solid var(--line); background: var(--paper-2);
+  touch-action: none; -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, transform 0.12s var(--ease);
+}
+.snake-key:active { background: var(--paper-3); transform: scale(0.94); color: var(--ink); }
+.k-up { grid-area: up; } .k-down { grid-area: down; } .k-left { grid-area: left; } .k-right { grid-area: right; }
+
+.snake-help { margin: 0; max-width: 520px; text-align: center; font-size: 12.5px; line-height: 1.6; letter-spacing: 0.04em; font-variant-numeric: lining-nums; }
+@media (pointer: coarse) { .snake-help { display: none; } }
+.snake-pausebtn svg { display: block; }
+
+@keyframes snake-fade { from { opacity: 0; } }
+@keyframes snake-breathe { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .snake-veil, .snake-hint { animation: none; }
+}
