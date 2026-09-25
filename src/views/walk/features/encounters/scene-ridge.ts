@@ -1,12 +1,13 @@
 // 梅岭: 观棋烂柯 (two old men at go under the pine — a game that takes a thousand years) and
 // 仙鹤引路 (a white crane that will not fly far, until you follow it to a plum grove no one knew).
 import type * as T from 'three';
-import { ANCHORS, REGION } from '../../map';
+import { ANCHORS, REGION, type XZ } from '../../map';
+import { pathDist, polyDist } from '../../regions/hill-kit';
 import { stoneTable, burst } from '../props';
 import * as snd from '../minigames/sound';
 import { frameOn } from '../minigames/ui';
 import { C, L, type Scene, type Stage } from './stage';
-import { WEAR, handOf, mark, talkPrompt } from './scene-kit';
+import { WEAR, flatSpot, handOf, mark, talkPrompt } from './scene-kit';
 import { axe, crane, goBoard, goStone, gourd, mesh, peachTreeParts } from './models';
 
 // ───────────────────────────── 观棋烂柯
@@ -14,7 +15,12 @@ import { axe, crane, goBoard, goStone, gourd, mesh, peachTreeParts } from './mod
 export function lanke(s: Stage): Scene {
   const { ctx, THREE } = s;
   const b = ANCHORS.plumBench;
-  const at = s.spot(b.x - 3.5, b.z - 2.5, 6);
+  // level ground a little up-slope of the bench, clear of the bench, its stepping-stone trail (which
+  // comes in from the west) and the ridge paths — the table, both old men and the boy all on grass
+  const trail: XZ[] = [{ x: -71, z: -64.5 }, { x: -67, z: -62.4 }, { x: b.x - 1.2, z: b.z - 0.2 }];
+  const clear = (x: number, z: number) =>
+    Math.hypot(x - b.x, z - b.z) > 3.2 && polyDist(trail, x, z) > 2.8 && pathDist(x, z) > 3;
+  const at = flatSpot(s, b.x + 2.5, b.z - 4.5, 7, 1.7, clear);
   const table = stoneTable(ctx, at, 0.3, 0);
   s.bag.add(table.group, s.group);
   s.bag.onDispose(ctx.addCollider({ x: at.x, z: at.z, r: 0.6, h: 0.9 }));

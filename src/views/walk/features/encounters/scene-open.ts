@@ -7,6 +7,7 @@ import { canvasTexture } from '../kit';
 import { butterflyGeometry, instanceAttrs, wingMaterial } from '../geo';
 import { burst } from '../props';
 import { walkableNear } from '../minigames/cat';
+import { busy } from '../minigames/ui';
 import * as sfx from '../sfx';
 import { C, L, type Scene, type Stage } from './stage';
 import { WEAR, mark, raiseArm, talkPrompt } from './scene-kit';
@@ -79,7 +80,8 @@ export function liuxing(s: Stage): Scene {
     el.setAttribute('aria-label', s.tr('对流星许愿', 'Make a wish on the falling star'));
     const off = ctx.hud.mount(el);
     btn = el;
-    const key = (e: KeyboardEvent) => { if ((e.code === 'KeyE' || e.code === 'Enter') && btn) { e.preventDefault(); e.stopPropagation(); void wish(); } };
+    // E / Enter wish — unless something else has the world (a talk, a game): then the key is theirs
+    const key = (e: KeyboardEvent) => { if ((e.code === 'KeyE' || e.code === 'Enter') && btn && !busy(ctx)) { e.preventDefault(); e.stopPropagation(); void wish(); } };
     window.addEventListener('keydown', key, true);
     const remove = () => { window.removeEventListener('keydown', key, true); if (btn) { btn.classList.add('is-out'); const b2 = btn; setTimeout(() => { b2.remove(); off(); }, 500); btn = null; } };
     s.bag.onDispose(() => { window.removeEventListener('keydown', key, true); off(); });
@@ -94,9 +96,10 @@ export function liuxing(s: Stage): Scene {
     });
     const wish = async () => {
       if (wished) return;
+      // busy with something else (a talk, fishing, building): the star is still there, the button stays
+      if (!s.claim()) { ctx.hud.toast('手头的事还没完——流星可不等人。', 'You are in the middle of something — and the star won’t wait.', 2200); return; }
       wished = true;
       remove();
-      if (!s.claim()) return;
       try {
         const who = s.who;
         ctx.player.emote(who === 'rabbit' ? 'jump' : 'bow');

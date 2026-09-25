@@ -32,7 +32,8 @@ export function zhiyin(s: Stage): Scene {
     heard = true;
     const p = s.player();
     const a = Math.atan2(f.root.position.x - p.x, f.root.position.z - p.z);
-    void walkTo(s, f, p.x + Math.sin(a) * 2.2, p.z + Math.cos(a) * 2.2, 1.1).then(() => {
+    void walkTo(s, f, p.x + Math.sin(a) * 2.2, p.z + Math.cos(a) * 2.2, 1.1).then((arrived) => {
+      if (!arrived) return; // the talk (or the scene's end) took him elsewhere
       faceMe(s, f);
       s.words('巍巍乎若泰山', new THREE.Vector3(f.root.position.x, f.root.position.y + 2.1, f.root.position.z), { color: '#3d5a73', life: 4 });
       s.bag.later(2600, () => s.words('洋洋乎若江河', new THREE.Vector3(f.root.position.x, f.root.position.y + 2.1, f.root.position.z), { color: '#3f6f8f', life: 4 }));

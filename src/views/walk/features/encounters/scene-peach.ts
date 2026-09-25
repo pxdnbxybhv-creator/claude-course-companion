@@ -14,7 +14,7 @@ import { glowTexture } from '../kit';
 import { part } from '../geo';
 import { makeNoise2 } from '../../../../core/rng';
 import { C, L, type Scene, type Stage } from './stage';
-import { WEAR, faceMe, inHand, mark, talkPrompt } from './scene-kit';
+import { WEAR, faceMe, inHand, mark, nearFade, talkPrompt } from './scene-kit';
 import { COL, cottageParts, fruitBasket, mesh, peachTreeParts } from './models';
 
 /** Where the pocket valley sits: over open country east of the river, between the lake and the hills. */
@@ -37,7 +37,7 @@ export function taohua(s: Stage): Scene {
   const pgeo = new THREE.BufferGeometry();
   pgeo.setAttribute('position', new THREE.BufferAttribute(pp, 3));
   const petalTex = s.bag.own(glowTexture(THREE, 32, 0.4));
-  const petals = new THREE.Points(pgeo, new THREE.PointsMaterial({ size: 0.16, map: petalTex, color: '#f6a9bb', transparent: true, depthWrite: false }));
+  const petals = new THREE.Points(pgeo, nearFade(new THREE.PointsMaterial({ size: 0.16, map: petalTex, color: '#f6a9bb', transparent: true, depthWrite: false })));
   petals.frustumCulled = false;
   s.bag.add(petals, s.group);
   const wyPool = ctx.waterAt(pool.x, pool.z) ?? s.y(pool.x, pool.z);
@@ -79,18 +79,22 @@ export function taohua(s: Stage): Scene {
     },
   });
 
-  /** Out again: the curtain, the pool, the card — and the way closes. */
-  const leave = async (walkedOut: boolean) => {
+  /**
+   * Out again: the curtain, the pool, the card — and the way closes. 'door': out through the mouth;
+   * 'fell': off the edge somehow (back at the pool); 'away': carried off elsewhere on purpose (the
+   * map's waypoints): the valley closes behind them, and they stay where they chose to go.
+   */
+  const leave = async (how: 'door' | 'fell' | 'away') => {
     if (!inside || gone) return;
     const v = inside;
     gone = true;
     const back = async () => {
       v.dispose();
       inside = null;
-      ctx.player.teleport(door.x, door.z, doorLook + Math.PI);
+      if (how !== 'away') ctx.player.teleport(door.x, door.z, doorLook + Math.PI);
       s.releaseMusic();
     };
-    if (walkedOut) await s.curtain('既出，得其船，便扶向路，处处志之……', 'Once out, he found his boat and went back the way he came, marking the path at every turn…', back, 1400);
+    if (how === 'door') await s.curtain('既出，得其船，便扶向路，处处志之……', 'Once out, he found his boat and went back the way he came, marking the path at every turn…', back, 1400);
     else await back();
     offDoor();
     s.prompt({
@@ -107,11 +111,12 @@ export function taohua(s: Stage): Scene {
           ? { zh: '村中长者说那是一处洞天福地，送了道童一枚仙桃。', en: 'The village elder called it a Grotto-Heaven, and gave the Taoist child a peach of the immortals.', bonus: 80, seal: '桃' }
           : { seal: '桃' });
   };
-  // walked (or was carried) out some other way — the map, a fall: the valley closes all the same
+  // left some other way — the map (far off: stay there), a fall (back to the pool): it closes all the same
   s.frame(() => {
     if (!inside) return;
     const p = s.player();
-    if (Math.hypot(p.x - G.x, p.z - G.z) > R + 10 || p.y < inside.floorY - 4) void leave(false);
+    if (Math.hypot(p.x - G.x, p.z - G.z) > R + 10) void leave('away');
+    else if (p.y < inside.floorY - 4) void leave('fell');
   });
 
   /** The valley itself (people, talk, the exit), built on the way in. */
@@ -195,7 +200,7 @@ export function taohua(s: Stage): Scene {
         } finally {
           st.unclaim();
         }
-        await leave(true);
+        await leave('door');
       },
     });
     return v;
@@ -396,7 +401,7 @@ function valley(s: Stage): Valley {
   for (let i = 0; i < NP; i++) { seedV[i * 3] = (rng() - 0.5) * 2 * R; seedV[i * 3 + 1] = rng() * 7; seedV[i * 3 + 2] = (rng() - 0.5) * 2 * R; }
   const pgeo = new THREE.BufferGeometry();
   pgeo.setAttribute('position', new THREE.BufferAttribute(pp, 3));
-  const petals = new THREE.Points(pgeo, new THREE.PointsMaterial({ size: 0.14, map: s.bag.own(glowTexture(THREE, 32, 0.4)), color: '#f4a3b6', transparent: true, depthWrite: false }));
+  const petals = new THREE.Points(pgeo, nearFade(new THREE.PointsMaterial({ size: 0.14, map: s.bag.own(glowTexture(THREE, 32, 0.4)), color: '#f4a3b6', transparent: true, depthWrite: false })));
   petals.frustumCulled = false;
   root.add(petals);
 

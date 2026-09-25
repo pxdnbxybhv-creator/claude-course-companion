@@ -76,8 +76,8 @@ export function shijin(s: Stage): Scene {
           got = true;
           offPurse();
           sparkle.hide(0);
-          void walkTo(s, thief, at.x, at.z, 5.5).then(() => {
-            if (!s.alive) return;
+          void walkTo(s, thief, at.x, at.z, 5.5).then((arrived) => {
+            if (!arrived || !s.alive) return;
             hold('thief', thief);
             s.words('嘿嘿！', new THREE.Vector3(thief.root.position.x, thief.root.position.y + 1.8, thief.root.position.z), { color: '#1b1916', size: 0.3, life: 1.6 });
             ctx.hud.toast('有贼！快追——按住奔跑，或用轻功', 'A thief! After him — hold Run, or use your light-foot skill', 3600);

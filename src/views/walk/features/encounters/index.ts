@@ -22,6 +22,9 @@ import { laterGifts } from './later';
 /** Every character the scenes brush into the air: fetched as a scene is set, so its words land in brush. */
 const BRUSHED = '奇巍乎若泰山洋江河知音世所稀一蓑烟雨任平生九十疏影横斜桂举杯邀明月碧海青天夜心我的钱袋嘿谁剑来二三温酒斗诗百篇醉里且贪欢笑但得中趣哈呵别有地非人间手可摘星辰杏花村牧童遥指不知周之梦为胡蝶与愿';
 
+/** Seconds a roaming scene (the star, the herd-boy) waits to be taken up before it goes. */
+const ROAM_IDLE = 150;
+
 /** Place-bound encounters first; the ones that can happen anywhere give way to them. */
 const ORDER: EncounterDef[] = [...ENCOUNTERS.filter((d) => d.region !== 'any'), ...ENCOUNTERS.filter((d) => d.region === 'any')];
 
@@ -90,7 +93,8 @@ export const encounters = feature('encounters', (bag, ctx) => {
         const linger = scene.linger ?? 240;
         if (far > scene.r + 25 || (clock - active.at > linger && (far > 16 || scene.linger !== undefined))) takeDown();
       } else if (scene.roaming) {
-        if (!stage.engaged && far > scene.r + 60) takeDown();
+        // a roaming scene nobody has taken up in a good while (the star fell during a long talk) goes too
+        if (!stage.engaged && (far > scene.r + 60 || clock - active.at > ROAM_IDLE)) takeDown();
       } else if (far > scene.r + (stage.engaged ? 90 : 45)) takeDown();
       return;
     }
@@ -131,8 +135,10 @@ export const encounters = feature('encounters', (bag, ctx) => {
     if (r === null) return;
     bag.later(4200, () => {
       if (mine !== rumourTimer || ctx.currentRegion() !== r) return;
+      // nobody gossips about a wonder that is already in front of you (or while one is under way)
+      if (active && !active.stage.finished && (active.def.region === r || active.def.region === 'any' || active.stage.engaged)) return;
       const m = moment();
-      const d = rumourFor(ORDER, m, mem, met);
+      const d = rumourFor(ORDER, m, mem, (id) => met(id) || active?.def.id === id);
       if (!d) return;
       put(noteRumour(mem, d.id, day));
       const rm = RUMOURS[d.id];

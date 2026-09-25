@@ -34,6 +34,31 @@ function moonOnWater(s: Stage, r: number): T.Mesh {
 
 // ───────────────────────────── 捞月
 
+/**
+ * The (frozen) walker hops to (x, y, z) in an arc `peak` m high over `dur` s, facing where it goes
+ * (or `face` on landing). Resolves on landing, or at once when the scene goes.
+ */
+function hop(s: Stage, x: number, y: number, z: number, dur: number, peak: number, face?: number): Promise<void> {
+  const { ctx } = s;
+  const p = ctx.player.position;
+  const x0 = p.x, y0 = p.y, z0 = p.z;
+  const heading = Math.atan2(x - x0, z - z0);
+  const T0 = s.still ? 0.35 : dur;
+  return new Promise((res) => {
+    let t = 0, done = false;
+    const end = () => { if (done) return; done = true; off(); res(); };
+    const off = ctx.onFrame((dt) => {
+      if (done) return;
+      t += dt;
+      const k = Math.min(1, t / T0);
+      const arc = s.still ? 0 : 4 * peak * k * (1 - k);
+      ctx.player.teleport(x0 + (x - x0) * k, z0 + (z - z0) * k, k < 1 ? heading : face ?? heading, y0 + (y - y0) * k + arc);
+      if (k >= 1) end();
+    });
+    s.bag.onDispose(end);
+  });
+}
+
 export function laoyue(s: Stage): Scene {
   const { ctx, THREE } = s;
   // the dock's far end, and a spot of open water beyond it
@@ -46,8 +71,12 @@ export function laoyue(s: Stage): Scene {
   moon.position.set(mx, wy + 0.03, mz);
   s.bag.add(moon, s.group);
   s.glow(new THREE.Vector3(mx, wy + 0.2, mz), '#fff1c8', 3.2, 0.35);
-  // no moon tonight (a new moon)? then the sky keeps one for this — the water has one, after all
-  if (Math.abs(ctx.env.moonPhase - 0.5) > 0.44) ctx.sky.setMoon({ visible: true });
+  // no moon tonight (a new moon)? then the sky keeps one for this — the water has one, after all —
+  // and hands it back when the scene goes (null: the sky's own reckoning again)
+  if (Math.abs(ctx.env.moonPhase - 0.5) > 0.44) {
+    ctx.sky.setMoon({ visible: true });
+    s.bag.onDispose(() => ctx.sky.setMoon({ visible: null } as unknown as { visible: boolean }));
+  }
   const rip = ripples(s.bag, s.group, 6);
   // a willow leaning out from the bank beside the dock, and three monkeys hanging from it in a chain
   const side = { x: -dz, z: dx };
@@ -147,12 +176,33 @@ export function laoyue(s: Stage): Scene {
         }
         if (who === 'rabbit') {
           await s.say(null, C('玉兔', 'Jade Rabbit'), [L('那是……我家！', 'That’s… my home!')]);
-          ctx.player.impulse(dx * 2.5, 4.2, dz * 2.5);
-          ctx.player.setMoveMods({ float: true, glide: true });
-          s.bag.later(5000, () => ctx.player.setMoveMods(null));
-          await s.wait(1200);
-          await scoop();
+          // one hop from the end of the dock onto the moon on the water: the moonlight holds it up
+          // (held in place while it stands there), then one hop back onto the boards
+          ctx.player.emote('jump');
+          ctx.player.freeze(true);
+          onMoon = true;
+          // it lands turned toward the willow: the camera behind it looks at the monkeys reaching down
+          const toBank = Math.atan2(side.x, side.z);
+          await hop(s, mx, wy + 0.02, mz, 0.8, 1.5, toBank);
+          if (!s.alive) return;
+          // standing on it (as on a boat's deck: feet down, not mid-leap)
+          const perch = new THREE.Object3D();
+          perch.position.set(mx, wy + 0.02, mz);
+          perch.rotation.y = toBank;
+          s.bag.add(perch, ctx.scene);
+          ctx.player.ride(perch);
+          const at = new THREE.Vector3(mx, wy + 0.1, mz);
+          burst(s.bag, at, '#fff1c8', 24, { speed: 1.2, size: 0.035, life: 1.8 });
+          for (let i = 0; i < 2; i++) rip.spawn(mx, wy, mz, 0.8 + i * 0.5, 0.35);
+          sfx.chirps(4, 0.5);
           await s.say(null, name, [L('吱吱！兔子站在月亮上了！', 'Eek! The rabbit is standing on the moon!')]);
+          await s.say(null, C('玉兔', 'Jade Rabbit'), [L('……不是这个月亮。天上那个，才是我家。', '…Not this moon. The one up there is home.')]);
+          ctx.player.ride(null);
+          ctx.player.emote('jump');
+          await hop(s, standX, standY, standZ, 0.8, 1.3, Math.atan2(mx - standX, mz - standZ));
+          ctx.player.freeze(false);
+          onMoon = false;
+          if (!s.alive) return;
           s.finish({ zh: '玉兔跳进了水中的月亮——月光托住了它，一步也没沉。', en: 'The Jade Rabbit jumped into the moon on the water — and the moonlight held it up; it did not sink a step.', bonus: 60, seal: '兔' });
           return;
         }
@@ -179,10 +229,21 @@ export function laoyue(s: Stage): Scene {
         s.finish();
       } finally {
         reach = 0;
+        backOnDock();
         s.unclaim();
       }
     },
   });
+  // however the scene ends, the rabbit is never left standing (or sinking) on the water
+  let onMoon = false;
+  const backOnDock = () => {
+    if (!onMoon) return;
+    onMoon = false;
+    ctx.player.ride(null);
+    ctx.player.teleport(standX, standZ, Math.atan2(mx - standX, mz - standZ));
+    ctx.player.freeze(false);
+  };
+  s.bag.onDispose(backOnDock);
   return { x: standX, z: standZ, r: 14 };
 }
 

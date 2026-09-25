@@ -29,12 +29,13 @@ export const WEAR = {
 
 /**
  * Open, level ground near (x, z): walkable, and flat within `r` metres (no stair, wall foot or bank),
- * searched in widening rings out to `maxR`; falls back to the nearest walkable point.
+ * and `ok` (e.g. off a path), searched in widening rings out to `maxR`; falls back to the nearest
+ * walkable point.
  */
-export function flatSpot(s: Stage, x: number, z: number, maxR = 8, r = 1.2): T.Vector3 {
+export function flatSpot(s: Stage, x: number, z: number, maxR = 8, r = 1.2, ok?: (x: number, z: number) => boolean): T.Vector3 {
   const { ctx } = s;
   const flat = (px: number, pz: number) => {
-    if (!ctx.isWalkable(px, pz)) return false;
+    if (!ctx.isWalkable(px, pz) || (ok && !ok(px, pz))) return false;
     const y0 = ctx.groundY(px, pz);
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2;
@@ -72,18 +73,34 @@ export function raiseArm(f: Figure, k: number, forward = 0.9): void {
   f.armR.rotation.z = -0.18 - 1.1 * k;
 }
 
-/** Walk someone to (x, z) at `speed` m/s (they stride and follow the ground); resolves on arrival. */
-export function walkTo(s: Stage, f: Figure, x: number, z: number, speed = 1.3): Promise<void> {
+/** The walk each figure is on now (a newer walk on the same figure ends the older one). */
+const walking = new WeakMap<Figure, () => void>();
+
+/**
+ * Walk someone to (x, z) at `speed` m/s (they stride and follow the ground). Resolves true on
+ * arrival — or false when a newer walk on the same figure took over, or the scene went.
+ */
+export function walkTo(s: Stage, f: Figure, x: number, z: number, speed = 1.3): Promise<boolean> {
+  walking.get(f)?.();
   return new Promise((res) => {
     const r = f.root;
     let done = false;
-    const finish = () => { if (done) return; done = true; f.walking = 0; res(); };
-    s.bag.onDispose(finish);
-    const off = s.ctx.onFrame((dt) => {
-      if (done) { off(); return; }
+    let off: () => void = () => {};
+    const finish = (arrived: boolean) => {
+      if (done) return;
+      done = true;
+      off();
+      if (walking.get(f) === cancel) { walking.delete(f); f.walking = 0; }
+      res(arrived);
+    };
+    const cancel = () => finish(false);
+    walking.set(f, cancel);
+    s.bag.onDispose(cancel);
+    off = s.ctx.onFrame((dt) => {
+      if (done) return;
       const dx = x - r.position.x, dz = z - r.position.z;
       const d = Math.hypot(dx, dz);
-      if (d < 0.08) { off(); finish(); return; }
+      if (d < 0.08) { finish(true); return; }
       const step = Math.min(d, speed * dt);
       r.position.x += (dx / d) * step;
       r.position.z += (dz / d) * step;
@@ -97,6 +114,23 @@ export function walkTo(s: Stage, f: Figure, x: number, z: number, speed = 1.3): 
     });
     s.bag.onDispose(off);
   });
+}
+
+/**
+ * Petals, motes, sparks as Points that never swell into a blob at the lens: nearer than about two
+ * metres a point stops growing, and inside about a metre and a half it fades out.
+ */
+export function nearFade(mat: T.PointsMaterial): T.PointsMaterial {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vNear;')
+      .replace('#include <logdepthbuf_vertex>', 'gl_PointSize = min(gl_PointSize, size * scale * 0.5);\n\tvNear = smoothstep(0.7, 1.6, -mvPosition.z);\n\t#include <logdepthbuf_vertex>');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vNear;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\n\tdiffuseColor.a *= vNear;');
+  };
+  mat.customProgramCacheKey = () => 'qiyu-near-fade';
+  return mat;
 }
 
 /** Vanish in a puff of paper-white (and optionally a colour), fading out. */
