@@ -272,7 +272,15 @@
   animation: walk-rise 0.6s var(--ease) 0.4s both;
 }
 .walk-hint small { display: block; margin-top: 4px; color: #d9c7a5; font-size: 12px; letter-spacing: 0.2em; }
-.is-touch .walk-hint { bottom: calc(env(safe-area-inset-bottom) + 180px); }
+/* on a phone the thumbs and the walker own the lower half: the hint sits up under the top bar */
+.is-touch .walk-hint {
+  top: calc(env(safe-area-inset-top) + 118px);
+  bottom: auto;
+  max-width: min(calc(100vw - 32px), 300px);
+  padding: 10px 14px 8px;
+  font-size: 13px;
+  line-height: 1.75;
+}
 
 /* ---------- card: a small hanging scroll */
 .walk-card-wrap {
@@ -420,9 +428,10 @@
   .walk-title { display: none; }
 }
 
-/* ---------- the layer mini-games mount their overlays in */
+/* ---------- the layer mini-games mount their overlays in: it and what is mounted in it stay
+   pointer-transparent (a mounted overlay is full-screen); each overlay turns pointer events back on
+   for its own buttons and panels (hud.mount's contract, see types.ts) */
 .walk-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
-.walk-layer > * { pointer-events: auto; }
 
 /* ---------- arriving somewhere: a name brushed on the sky */
 .walk-arrive {

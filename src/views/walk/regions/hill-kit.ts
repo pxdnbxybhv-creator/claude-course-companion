@@ -12,7 +12,8 @@ import { PATHS } from '../map';
 import { makeNoise2, makeRng, type Rng } from '../../../core/rng';
 import type { Drawing, Stroke, StrokeKind } from '../../../ink/types';
 import { rasterize } from '../../../ink/brush';
-import { registerClearing, registerDeck, type Clearing, type Deck } from './water-decks';
+import { registerClearing, registerDeck, segmentDeck, type Clearing, type Deck } from './water-decks';
+import { NIGHT_SHADE } from './water-kit';
 
 export type Three = WorldCtx['THREE'];
 type BG = T.BufferGeometry;
@@ -77,6 +78,9 @@ export class Hill {
   private grad: T.DataTexture | null = null;
   private disposed = false;
 
+  /** Lit materials that dim with the night like the painted ones (their day colour × paper). */
+  private shaded: { m: { color: T.Color }; base: T.Color }[] = [];
+
   constructor(readonly ctx: WorldCtx, readonly id: RegionId) {
     TH = ctx.THREE;
     this.THREE = ctx.THREE;
@@ -84,15 +88,26 @@ export class Hill {
     this.group.name = `region:${id}`;
     ctx.regionGroup(id).add(this.group);
     this.paper = new TH.Color('#ffffff');
-    const day = new TH.Color('#ffffff'), nightC = new TH.Color('#9eabbf');
-    let first = true;
+    const day = new TH.Color('#ffffff'), nightC = new TH.Color(NIGHT_SHADE);
+    let first = true, last = -1;
     this.frame((dt, t) => {
       this.time.value = t;
       const n = ctx.sky.isNight() ? 1 : 0;
       this.night = first ? n : this.night + (n - this.night) * (1 - Math.exp(-1.6 * Math.min(dt, 0.1)));
       first = false;
       this.paper.copy(day).lerp(nightC, this.night);
+      if (Math.abs(this.night - last) < 1e-3) return;
+      last = this.night;
+      for (const s of this.shaded) s.m.color.copy(s.base).multiply(this.paper);
     });
+  }
+
+  /** Let a lit material dim with the night, as the land and the painted cards do (emissive lanterns keep their glow). Returns it. */
+  nightShade<M extends { color: T.Color }>(m: M): M {
+    const base = m.color.clone();
+    this.shaded.push({ m, base });
+    m.color.copy(base).multiply(this.paper);
+    return m;
   }
 
   own<D extends { dispose(): void }>(d: D): D {
@@ -155,13 +170,13 @@ export class Hill {
    * outline for thin things (culms, branches) that costs no extra draw call.
    */
   toon(color: T.ColorRepresentation, o: { vc?: boolean; side?: T.Side; rim?: number; emissive?: T.ColorRepresentation } = {}): T.MeshToonMaterial {
-    const m = this.own(new TH.MeshToonMaterial({
+    const m = this.nightShade(this.own(new TH.MeshToonMaterial({
       color,
       gradientMap: this.gradient(),
       vertexColors: !!o.vc,
       side: o.side ?? TH.FrontSide,
       ...(o.emissive !== undefined ? { emissive: new TH.Color(o.emissive) } : {}),
-    }));
+    })));
     const rim = o.rim ?? 0;
     if (rim > 0) {
       m.onBeforeCompile = (sh) => {
@@ -1090,7 +1105,8 @@ export function mistCards(h: Hill, items: { p: T.Vector3; w: number; h: number }
 /**
  * Stone steps that follow the ground along a polyline: level slabs every `run` metres, each seated
  * into the slope, so the risers come out of the terrain itself. `endTop` lifts the last steps to
- * meet a platform.
+ * meet a platform. Every slab is registered as a walkable deck at the height it is drawn, and no
+ * riser is taller than a walker's step (STEP_UP in world/player.ts).
  */
 export function stepPath(b: Batch, h: Hill, pts: XZ[], o: { width?: number; run?: number; color?: string; seed?: number; endTop?: number; startTop?: number } = {}): void {
   const rng = makeRng(o.seed ?? 5);
@@ -1115,7 +1131,12 @@ export function stepPath(b: Batch, h: Hill, pts: XZ[], o: { width?: number; run?
     const k = Math.min(n, Math.ceil(Math.max(0, o.startTop - tops[0]) / 0.16) + 2);
     for (let i = 0; i < k; i++) tops[i] = Math.max(tops[i], lerp(o.startTop, tops[Math.min(n - 1, k)], i / k));
   }
+  // where the slope is steep, lift the lower slab so no riser is taller than one stride
+  const MAX_RISE = 0.3;
+  for (let i = n - 2; i >= 0; i--) tops[i] = Math.max(tops[i], tops[i + 1] - MAX_RISE);
+  for (let i = 1; i < n; i++) tops[i] = Math.max(tops[i], tops[i - 1] - MAX_RISE);
   // steps are level and never climb less than a few cm (else they read as paving)
+  const L = total / n;
   for (let i = 0; i < n; i++) {
     const p = along(pts, (i + 0.5) / n);
     const g = h.y(p.x, p.z);
@@ -1123,5 +1144,8 @@ export function stepPath(b: Batch, h: Hill, pts: XZ[], o: { width?: number; run?
     const H = tops[i] - lo;
     const col = new TH.Color(o.color ?? COL.stone).multiplyScalar(rng.range(0.88, 1.05));
     b.add(place(new TH.BoxGeometry(width + rng.range(-0.1, 0.1), H, run * 1.02), p.x + rng.range(-0.04, 0.04), lo + H / 2, p.z, p.dir + rng.range(-0.03, 0.03)), col, { edge: 40 });
+    // the slab's tread, a hair longer so neighbours meet without a gap
+    const ux = Math.sin(p.dir) * (L / 2 + 0.02), uz = Math.cos(p.dir) * (L / 2 + 0.02);
+    h.deck(segmentDeck(`${h.id}:steps${o.seed ?? 5}:${i}`, { x: p.x - ux, z: p.z - uz }, { x: p.x + ux, z: p.z + uz }, width / 2 - 0.05, tops[i]));
   }
 }

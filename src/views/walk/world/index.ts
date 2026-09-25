@@ -37,6 +37,7 @@ import { buildPond, NO_REFLECT } from './pond';
 import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, growPlant, interactRadius, plantCollider, rebrushTablet, releasePlantBitmaps, repaint, tickPlant, vigorFor, type PlantEntity, type TabletSpec } from './plants';
 import { InkMarks } from './marks';
 import { giftsOf, PlayerController, ScholarModel } from './player';
+import { DriftingVerses, SongBirds } from './gifts';
 import { Controls, type InputState } from './controls';
 import { buildAir, Bursts } from './particles';
 import { buildFlora } from './flora';
@@ -327,13 +328,16 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     }, slot, lowEnd);
     plants.push(e);
     garden.add(e.mesh);
-    hud.progress(0.4 + 0.45 * ((i + 1) / total));
+    hud.progress(0.4 + 0.2 * ((i + 1) / total));
     await nextFrame();
     if (o.cancelled()) { bail(); throw new Error('cancelled'); }
   }
 
   if (import.meta.env.DEV && plants.length !== total) console.error('[walk] a habit has no plant', plants.length, total);
-  garden.add(buildJars(bag, slots));
+  // small things on the land stay out of the pond's mirror (each reflected mesh is a second draw)
+  const jars = buildJars(bag, slots);
+  jars.traverse((o) => o.layers.set(NO_REFLECT));
+  garden.add(jars);
 
   // tablets with the habits' names, and the streak brushed small in the corner
   const noteFor = (st: HabitStats): string | null => {
@@ -354,6 +358,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     tabletSpecs.push({ x: invite.x, z: invite.z, rot: 0.3, text: lang === 'zh' ? '此园尚空' : 'An empty garden', glyph: null });
   }
   const tablets = buildTablets(bag, tabletSpecs);
+  tablets.group.traverse((o) => o.layers.set(NO_REFLECT));
   garden.add(tablets.group);
   const rebrush = (e: PlantEntity, st: HabitStats) => {
     const i = tabletFor.get(e.key);
@@ -493,6 +498,28 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   // a little clearance round every trunk, stone, tablet and wall, so nothing is set down inside another
   const isWalkable = (x: number, z: number) => walkableGround(x, z, 0.1) && !nearWall(x, z, 0.7) && !colliders.some((c) => Math.abs(x - c.x) < c.r + 0.5 && Math.hypot(x - c.x, z - c.z) < c.r + 0.45);
+
+  // --- the companions' gifts that live in the world: the qin player's listeners, the poet's verses
+  const songBirds = new SongBirds(bag, floorY, isWalkable);
+  scene.add(songBirds.mesh);
+  const verses = new DriftingVerses(bag);
+  verses.setPoem(pickPoem({ season: base.season, salt: hashString('poet:' + day) }).lines);
+  scene.add(verses.group);
+  const QIN = [[0, 2, 4, 5, 4, 2, 1, 0], [4, 5, 7, 5, 4, 2, 4], [2, 4, 5, 7, 9, 7, 5, 4], [7, 5, 4, 2, 0, 2, 4]];
+  let qinN = 0;
+  /** 琴师 plays: a phrase on the qin, and the birds come down to listen. */
+  const playQin = () => {
+    if (player.busy || player.isFrozen) return;
+    player.emote('play');
+    const phrase = QIN[qinN++ % QIN.length];
+    phrase.forEach((d, i) => later(260 + i * (i === phrase.length - 1 ? 330 : 300), () => audio.pluck(d, i === phrase.length - 1 ? 0.75 : 0.5 + (i % 2) * 0.12)));
+    const t = (performance.now() - t0) / 1000;
+    const p = player.position;
+    songBirds.call(p.x, p.z, t, 9);
+    for (let i = 0; i < 4; i++) later(300 + i * 600, () => bursts.sparks(p.x, p.y + 0.9, p.z, '#dfe6d8', 6));
+    if (qinN === 1) later(1400, () => hud.toast('琴声一起，鸟儿都飞来听了', 'At the first notes, the birds come down to listen', 2800));
+  };
+  let stillFor = 0;
 
   // --- what the camera must never hide behind: tall rocks, the pavilion roof, big props
   const occluders: Occluder[] = [];
@@ -700,9 +727,17 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     try { music.setTheme(want); } catch (e) { console.warn('[walk] music', e); }
   };
   const worldMusic = {
+    /**
+     * A feature's request holds until it hands the music back: by passing null, the place's own theme
+     * (whatever the hour or the day makes of it) or what is playing anyway, or by calling release().
+     */
     setTheme(theme: MusicTheme | null) {
-      // a feature's request holds until it passes back the place's own (or calls with the same again)
-      themeOverride = theme === themeFor() ? undefined : theme;
+      const place = REGION[region ?? lastPlace].theme;
+      themeOverride = theme === null || theme === place || theme === themeFor() ? undefined : theme;
+      applyTheme();
+    },
+    release() {
+      themeOverride = undefined;
       applyTheme();
     },
   };
@@ -800,6 +835,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   let running = true;
   let paused = false;
   let traveling = false;
+  /** While the world is still being dressed (behind the loading screen) the loop steps but does not draw. */
+  let warming = true;
   // real frame times (ms), for the adaptive pixel ratio and the DEV readout
   const deltas = new Float32Array(120);
   let nDeltas = 0;
@@ -827,14 +864,48 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   const camPos = new THREE.Vector3();
   let frameNo = 0;
-  /** Show the places near the player, hide the far ones (their groups and interactables). */
+  /**
+   * Show the places near the player, hide the far ones (their groups and interactables). A far place
+   * keeps its landmarks (children with userData.landmark = true: a pagoda, a tall gate) drawn out to
+   * the fog's edge, as a faint silhouette on the skyline.
+   */
+  const near = new Map<RegionId, boolean>();
+  const hiddenFar = new Map<RegionId, Set<THREE.Object3D>>();
   const stream = () => {
     const p = player.position;
+    const fogFar = sky.fog.far;
     for (const r of REGIONS) {
       const g = regionGroups.get(r.id)!;
-      g.visible = Math.hypot(p.x - r.center.x, p.z - r.center.z) < r.radius + SHOW_MARGIN;
+      const d = Math.hypot(p.x - r.center.x, p.z - r.center.z);
+      const isNear = d < r.radius + SHOW_MARGIN;
+      near.set(r.id, isNear);
+      const hid = hiddenFar.get(r.id);
+      if (isNear) {
+        if (hid) { for (const c of hid) c.visible = true; hiddenFar.delete(r.id); }
+        g.visible = true;
+        continue;
+      }
+      g.visible = d < r.radius + fogFar && holdsLandmark(g);
+      if (!g.visible) continue;
+      // only the landmarks stay: hide the rest (and remember what we hid, to show it again)
+      const set = hid ?? new Set<THREE.Object3D>();
+      hideAllBut(g, set);
+      hiddenFar.set(r.id, set);
     }
   };
+  function holdsLandmark(o: THREE.Object3D): boolean {
+    let found = false;
+    o.traverse((c) => { if (c !== o && c.userData.landmark === true) found = true; });
+    return found;
+  }
+  /** Hide everything under `o` except its landmarks (at any depth) and what leads down to them. */
+  function hideAllBut(o: THREE.Object3D, set: Set<THREE.Object3D>): void {
+    for (const c of o.children) {
+      if (c.userData.landmark === true) continue;
+      if (holdsLandmark(c)) { hideAllBut(c, set); continue; }
+      if (c.visible) { c.visible = false; set.add(c); }
+    }
+  }
   const regionOf = new Map<Interactable, RegionId | null>();
   let frozenShown = false;
   const step = (dt: number, t: number) => {
@@ -867,7 +938,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         player.root.traverse((o) => o.layers.set(mirrored ? 0 : NO_REFLECT));
       }
     }
-    if (garden.visible) {
+    if (near.get('garden')) {
       for (const e of plants) tickPlant(e, dt, t, camPos, sky.tint, reduced);
       for (const f of tablets.faces) (f.material as THREE.MeshBasicMaterial).color.copy(sky.tint);
       arch.setNight(sky.night01, t);
@@ -877,6 +948,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     } else flora.update(t, sky.tint, sky.fogColor);
     if (air) air.update(t, camPos, sky.night01);
     bursts.update(dt, t);
+    songBirds.update(dt, t, player.position.x, player.position.z);
+    verses.update(dt, player.character === 'poet' && player.speed > 0.8 && !player.isFrozen, player.position.x, player.position.y, player.position.z, player.heading, sky.night01, camPos);
     for (const fn of frameFns) {
       try { fn(dt, t); } catch (err) { console.error('[walk] frame hook failed', err); frameFns.delete(fn); }
     }
@@ -890,15 +963,19 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       if (d >= i.radius || d >= bd || Math.abs(i.position.y - player.position.y) >= 3) continue;
       let rid = regionOf.get(i);
       if (rid === undefined) { rid = regionAt(i.position.x, i.position.z); regionOf.set(i, rid); }
-      if (rid && !regionGroups.get(rid)!.visible) continue;
+      if (rid && !near.get(rid)) continue;
       best = i; bd = d;
     }
     nearest = player.isFrozen || traveling ? null : best;
     if (player.isFrozen !== frozenShown) { frozenShown = player.isFrozen; hud.frozen(frozenShown); }
-    const sig = nearest ? `${nearest.id}|${nearest.labelZh}|${nearest.labelEn}|${nearest.actionZh}|${nearest.actionEn}` : '';
+    // the qin player, standing still with nothing else to do, may play
+    stillFor = player.speed < 0.2 ? stillFor + dt : 0;
+    const qin = !nearest && !player.isFrozen && !traveling && stillFor > 1.2 && !player.busy && CHARACTER[player.character].ability.kind === 'music';
+    const sig = nearest ? `${nearest.id}|${nearest.labelZh}|${nearest.labelEn}|${nearest.actionZh}|${nearest.actionEn}` : qin ? 'qin' : '';
     if (sig !== shown) {
       shown = sig;
-      hud.prompt(nearest ? { labelZh: nearest.labelZh, labelEn: nearest.labelEn, actionZh: nearest.actionZh, actionEn: nearest.actionEn } : null);
+      hud.prompt(nearest ? { labelZh: nearest.labelZh, labelEn: nearest.labelEn, actionZh: nearest.actionZh, actionEn: nearest.actionEn }
+        : qin ? { labelZh: '琴师 · 古琴', labelEn: 'Qin Player · guqin', actionZh: '抚琴', actionEn: 'Play' } : null);
     }
     if (inp.actQueued) {
       inp.actQueued = false;
@@ -907,7 +984,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   const doAct = () => {
     const i = nearest;
-    if (!i) return;
+    if (!i) {
+      if (CHARACTER[player.character].ability.kind === 'music') playQin();
+      return;
+    }
     player.face(i.position.x, i.position.z);
     try {
       const r = i.act();
@@ -926,6 +1006,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     if (raw > 0 && raw < 2000) deltas[nDeltas++ % deltas.length] = raw;
     const t = (nowMs - t0) / 1000;
     step(dt, t);
+    if (warming) return;
     renderer.render(scene, camera);
     adapt(t);
   };
@@ -949,14 +1030,51 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     setPx();
   });
 
+  /**
+   * Compile the shaders of everything under `root` a piece at a time (and wait for each program to
+   * link), so the loading bar moves and the page stays alive instead of one long freeze at the first
+   * frame; with KHR_parallel_shader_compile the linking even runs in the background.
+   */
+  const warmed = new WeakSet<THREE.Material>();
+  const parallel = renderer.extensions.has('KHR_parallel_shader_compile');
+  const warm = async (roots: THREE.Object3D[], from: number, to: number) => {
+    const parts: THREE.Object3D[] = [];
+    for (const r of roots) {
+      if (r.name.startsWith('region:')) parts.push(...r.children);
+      else parts.push(r);
+    }
+    let yielded = performance.now();
+    for (let i = 0; i < parts.length && running; i++) {
+      try {
+        if (parallel) await renderer.compileAsync(parts[i], camera, scene);
+        else renderer.compile(parts[i], camera, scene);
+        // link now (a program's first use is where WebGL blocks), a piece at a time
+        if (!parallel) parts[i].traverse((o) => {
+          const m = (o as THREE.Mesh).material;
+          if (!m) return;
+          for (const x of Array.isArray(m) ? m : [m]) {
+            if (warmed.has(x)) continue;
+            warmed.add(x);
+            (renderer.properties.get(x) as { currentProgram?: { getUniforms(): unknown } }).currentProgram?.getUniforms();
+          }
+        });
+      } catch (e) {
+        if (import.meta.env.DEV) console.warn('[walk] warm', e);
+      }
+      hud.progress(from + ((to - from) * (i + 1)) / parts.length);
+      if (performance.now() - yielded > 30) { await nextFrame(); yielded = performance.now(); }
+    }
+  };
+
   // first frame: settle the sky & camera, then show
   stream();
   land.update(camera.position, sky.fog.far);
   step(1, 0);
   host.appendChild(cv);
   ro.observe(host);
+  await warm(scene.children, 0.6, 0.7);
+  check();
   renderer.render(scene, camera);
-  hud.progress(1);
   raf = requestAnimationFrame(frame);
   enter(region, false);
 
@@ -991,13 +1109,18 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
 
   // --- the places dress themselves (regions/*), then the features (they decide whether today is theirs)
   const builtRegions: typeof REGION_MODULES = [];
-  for (const m of REGION_MODULES) {
+  for (let i = 0; i < REGION_MODULES.length; i++) {
+    const m = REGION_MODULES[i];
     if (!running) break;
     builtRegions.push(m);
     const started = Promise.resolve().then(() => m.build(ctx)).catch((err) => {
       console.error(`[walk] region "${m.id}" failed to build`, err);
     });
     await Promise.race([started, new Promise((r) => setTimeout(r, 6000))]);
+    const at = 0.7 + (0.18 * i) / REGION_MODULES.length;
+    hud.progress(at + 0.06 / REGION_MODULES.length);
+    // its shaders now, behind the loading screen, not as a stall the first time you walk there
+    await warm([regionGroup(m.id)], at + 0.06 / REGION_MODULES.length, at + 0.18 / REGION_MODULES.length);
   }
   // the water town brought its own bridge: the core's stand-in deck steps aside
   for (const b of bridgeSpecs()) {
@@ -1008,7 +1131,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // the places stay out of the garden pond's mirror (they would cost every draw twice)
   for (const [id, g] of regionGroups) if (id !== 'garden') g.traverse((o) => { if (!o.userData.reflect) o.layers.set(NO_REFLECT); });
   const inited: WorldFeature[] = [];
-  for (const f of FEATURES) {
+  for (let i = 0; i < FEATURES.length; i++) {
+    const f = FEATURES[i];
     if (!running) break;
     inited.push(f);
     // a slow feature never holds the garden back: after a few seconds we go on without waiting
@@ -1016,7 +1140,18 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       console.error(`[walk] feature "${f.id}" failed to start`, err);
     });
     await Promise.race([started, new Promise((r) => setTimeout(r, 4000))]);
+    hud.progress(0.88 + (0.07 * (i + 1)) / FEATURES.length);
   }
+  // whatever the features brought (and anything not yet seen), then the first real frame
+  await warm(scene.children, 0.95, 0.995);
+  if (running) {
+    warming = false;
+    nDeltas = 0;
+    adaptAt = (performance.now() - t0) / 1000 + 6;
+    last = performance.now();
+    renderer.render(scene, camera);
+  }
+  hud.progress(1);
 
   const dispose = () => {
     if (!running) return;
@@ -1065,7 +1200,20 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       fps: () => { const f = frameStats(); return { median: +f.median.toFixed(1), p90: +f.p90.toFixed(1), fps: f.median ? Math.round(1000 / f.median) : 0, pr }; },
       occluders: () => occluders.length,
       colliders: () => colliders.length,
-      info: () => ({ calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries }),
+      /**
+       * One frame's real cost. The pond's mirror renders the scene again from inside the frame, and that
+       * nested render resets the counters half-way (autoReset), so count one frame by hand.
+       */
+      info: () => {
+        const ri = renderer.info;
+        const auto = ri.autoReset;
+        ri.autoReset = false;
+        ri.reset();
+        renderer.render(scene, camera);
+        const out = { calls: ri.render.calls, triangles: ri.render.triangles, textures: ri.memory.textures, geometries: ri.memory.geometries, programs: ri.programs?.length ?? 0 };
+        ri.autoReset = auto;
+        return out;
+      },
       teleport(x: number, z: number, heading?: number) {
         player.teleport(x, z, heading);
         if (heading !== undefined) controls.yaw = heading + Math.PI;
@@ -1075,7 +1223,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       },
       travel,
       region: () => region,
-      regions: () => Object.fromEntries([...regionGroups].map(([k, g]) => [k, { visible: g.visible, children: g.children.length }])),
+      regions: () => Object.fromEntries([...regionGroups].map(([k, g]) => [k, { visible: g.visible, near: near.get(k) ?? false, shown: g.children.filter((c) => c.visible).length, children: g.children.length }])),
       where: () => ({ x: +player.position.x.toFixed(2), y: +player.position.y.toFixed(2), z: +player.position.z.toFixed(2), heading: +player.heading.toFixed(2), region, character: player.character }),
       night: (on: boolean) => sky.forceNight(on),
       toPlant: (key: string) => { const e = plants.find((p) => p.key === key || p.habit?.name === key); if (e) player.teleport(e.slot.tablet.x, e.slot.tablet.z + 0.6); },

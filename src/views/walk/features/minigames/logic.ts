@@ -52,6 +52,22 @@ export const FISH: FishSpecies[] = [
     verseZh: '北冥有鱼，其名为鲲。鲲之大，不知其几千里也。', srcZh: '《庄子·逍遥游》', verseEn: 'In the northern dark there is a fish called Kun. How big? Nobody knows how many thousand li.' },
 ];
 
+/** One page of the fish album (鱼谱): caught or not, the best length, a hint for the missing. */
+export interface AlbumPage { species: FishSpecies; caught: boolean; bestCm: number; hintZh: string; hintEn: string }
+
+/** The fish album from the play record's flags (fish:<id>) and bests (fishcm:<id>). */
+export function fishAlbum(flags: Record<string, unknown>, best: Record<string, number>): AlbumPage[] {
+  return FISH.map((species) => {
+    const hint = species.night ? ['夜里才肯上钩', 'Bites only after dark']
+      : species.peak ? ['春水涨时更多', 'Commoner in spring']
+      : species.rarity === 'legend' ? ['传说湖底有它', 'Only a legend… so far']
+      : species.rarity === 'rare' ? ['难得一见', 'Seldom seen']
+      : species.rarity === 'junk' ? ['总有人把它丢进湖里', 'Someone always drops one in']
+      : ['耐心些，总会来', 'Be patient — it will come'];
+    return { species, caught: !!flags[`fish:${species.id}`], bestCm: best[`fishcm:${species.id}`] ?? 0, hintZh: hint[0], hintEn: hint[1] };
+  });
+}
+
 export const FISH_BY_ID: Record<string, FishSpecies> = Object.fromEntries(FISH.map((f) => [f.id, f]));
 
 /** The chance of each species right now (sums to 1). */
@@ -302,8 +318,10 @@ export const CAT_SPOTS: CatSpot[] = [
     clueZh: '老渔翁说，他的鱼篓最近总是轻了。', clueEn: 'The old fisherman says his creel keeps getting lighter.' },
   { id: 'pavilion', region: 'lake', ...off(ANCHORS.waterPavilion, -3, 3), whereZh: '水榭边的荷叶下', whereEn: 'under the lotus leaves by the water pavilion',
     clueZh: '荷塘水榭那边，荷叶底下有什么在打呼噜。', clueEn: 'Over at the water pavilion, something under the lotus leaves is snoring.' },
-  { id: 'clearing', region: 'bamboo', ...off(ANCHORS.bambooClearing, 3, -3.2), whereZh: '竹林石桌下', whereEn: 'under the stone table in the bamboo',
-    clueZh: '竹林里的琴声停了一会儿——有只猫跳上了琴桌。', clueEn: 'The qin in the bamboo stopped for a moment — a cat had jumped onto the table.' },
+  // curled up between two drum stools at the stone go table (bamboo.ts: table at the clearing's
+  // centre, stools 1.05 m out at 0.3 + π/4 + k·π/2 rad; between them at 0.3 rad, 1.35 m out)
+  { id: 'clearing', region: 'bamboo', ...off(ANCHORS.bambooClearing, 1.29, 0.4), whereZh: '竹林石桌边的石凳间', whereEn: 'between the stools at the stone table in the bamboo',
+    clueZh: '竹林里那张下棋的石桌边，有团橘色的东西在打盹。', clueEn: 'By the stone go table in the bamboo, something orange is dozing.' },
   { id: 'shrine', region: 'bamboo', ...off(ANCHORS.bambooShrine, 2.6, 2), whereZh: '竹林小祠旁', whereEn: 'beside the little shrine in the bamboo',
     clueZh: '竹林深处的小祠，供果少了一个。', clueEn: 'At the shrine deep in the bamboo, one offering has vanished.' },
   { id: 'bench', region: 'plum', ...off(ANCHORS.plumBench, 2.2, 1.8), whereZh: '梅岭石凳旁', whereEn: 'by the stone bench on Plum Ridge',

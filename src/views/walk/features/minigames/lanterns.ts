@@ -8,7 +8,7 @@ import { feature, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { record } from '../../../../app/play';
 import { lanternDrift, lowerRiver } from './logic';
-import { begin, end, h, night, panel, tr, type Panel } from './ui';
+import { begin, end, frameOn, h, night, onEscape, panel, tr, type Panel } from './ui';
 import { glowSprite, ripples } from './fx';
 import * as snd from './sound';
 
@@ -61,7 +61,9 @@ export const riverLanterns = feature('mg-lanterns', (bag, ctx) => {
 
   function spawn(style: number, s: number, lane: number, mine: boolean, t: number): Floating | null {
     if (floating.length >= MAX) {
-      const old = floating.findIndex((f) => !f.mine);
+      // make room: a passer-by's lantern first; for yours, your own oldest (far downstream by now)
+      let old = floating.findIndex((f) => !f.mine);
+      if (old < 0 && mine) old = floating.reduce((o, f, i) => (f.born < floating[o].born ? i : o), 0);
       if (old < 0) return null;
       bag.drop(floating[old].g);
       floating.splice(old, 1);
@@ -82,7 +84,7 @@ export const riverLanterns = feature('mg-lanterns', (bag, ctx) => {
   }
 
   // ── the sheet: pick a lantern, write a wish
-  let ui: { p: Panel } | null = null;
+  let ui: { p: Panel; offEsc: () => void } | null = null;
   let clock = 0;
   let released = 0;
 
@@ -120,11 +122,12 @@ export const riverLanterns = feature('mg-lanterns', (bag, ctx) => {
     cancel.type = go.type = 'button';
     cancel.addEventListener('click', close);
     go.addEventListener('click', () => { const w = wish.value.trim().slice(0, 24); close(); float(pick, w); });
-    ui = { p };
+    ui = { p, offEsc: onEscape(close) };
   }
 
   function close() {
     if (!ui) return;
+    ui.offEsc();
     ui.p.close();
     ui = null;
     ctx.player.freeze(false);
@@ -138,6 +141,8 @@ export const riverLanterns = feature('mg-lanterns', (bag, ctx) => {
     if (!f) return;
     f.fade = 0;
     const at = path.at(s0);
+    const on = path.at(Math.min(path.length, s0 + 4));
+    frameOn(ctx, on.x, on.z, steps.y + 0.3, 3.2);
     rip.spawn(at.x, steps.y, at.z, 0.9, 0.5);
     snd.splash(0.12);
     ctx.audio.pluck(4, 0.4);

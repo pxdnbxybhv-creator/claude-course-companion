@@ -1,6 +1,6 @@
 // The in-world mini-games' rules: the fish of the lake and the reel, pitch-pot flight and scoring,
 // the river a lantern floats down, where the cat hides, and the poet's 飞花令 lines.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import { makeRng } from '../src/core/rng';
 import { addDays } from '../src/core/date';
 import { LAKE, RIVER, RIVER_LAKE_BREAK, REGION, ANCHORS } from '../src/views/walk/map';
@@ -9,8 +9,10 @@ import {
   POT, throwFlight, flightAt, idealPower, classifyThrow, scoreRound,
   makePath, lowerRiver, lanternDrift,
   CAT_SPOTS, catSpotFor,
-  clauses, feihuaTurns, playableLing,
+  clauses, feihuaTurns, playableLing, fishAlbum,
 } from '../src/views/walk/features/minigames/logic';
+import { hold, modalOpen } from '../src/views/walk/features/minigames/ui';
+import { findMooring } from '../src/views/walk/features/minigames/boat';
 
 describe('fishing', () => {
   it('odds are a distribution; rare fish are rare, legends rarer', () => {
@@ -254,5 +256,109 @@ describe('飞花令 with the poet', () => {
         }
       }
     }
+  });
+});
+
+describe('hold-to-charge input', () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+  const setup = () => {
+    const win = new EventTarget();
+    vi.stubGlobal('window', win);
+    const el = new EventTarget() as unknown as HTMLElement;
+    const key = (type: 'keydown' | 'keyup', code = 'Space') => {
+      const e = new Event(type, { cancelable: true });
+      Object.assign(e, { code, repeat: false });
+      win.dispatchEvent(e);
+      return e;
+    };
+    const ptr = (type: string) => (type === 'pointerdown' ? el : win).dispatchEvent(new Event(type, { cancelable: true }));
+    return { H: hold(el), key, ptr };
+  };
+
+  it('a new press forgets the release of the last one (no instant, powerless throw)', () => {
+    const { H, key, ptr } = setup();
+    key('keydown');
+    expect(H.down).toBe(true);
+    expect(H.pressed()).toBe(true);
+    key('keyup'); // released while a phase that only asks pressed() is running
+    expect(H.down).toBe(false);
+    key('keydown');
+    expect(H.pressed()).toBe(true);
+    expect(H.released()).toBe(false); // the charge must go on
+    expect(H.down).toBe(true);
+    key('keyup');
+    expect(H.released()).toBe(true);
+    // the same with a finger
+    ptr('pointerdown'); ptr('pointerup');
+    ptr('pointerdown');
+    expect(H.pressed()).toBe(true);
+    expect(H.released()).toBe(false);
+    ptr('pointerup');
+    expect(H.released()).toBe(true);
+    H.dispose();
+  });
+
+  it('keys go to a card or dialogue that is open, not to the game behind it', () => {
+    const { H, key } = setup();
+    let open = true;
+    vi.stubGlobal('document', { querySelector: () => (open ? {} : null) });
+    expect(modalOpen()).toBe(true);
+    const e = key('keydown');
+    expect(e.defaultPrevented).toBe(false); // left for the card to close itself
+    expect(H.pressed()).toBe(false);
+    expect(H.down).toBe(false);
+    key('keyup');
+    open = false;
+    key('keydown');
+    expect(H.pressed()).toBe(true);
+    // a key held when the card opens still lets go
+    open = true;
+    key('keyup');
+    expect(H.down).toBe(false);
+    expect(H.released()).toBe(true);
+    H.dispose();
+  });
+});
+
+describe('the fish album', () => {
+  it('has a page per species, caught or with a hint', () => {
+    const pages = fishAlbum({ 'fish:carp': true, 'fish:kun': true }, { 'fishcm:carp': 41.5 });
+    expect(pages.length).toBe(FISH.length);
+    const carp = pages.find((p) => p.species.id === 'carp')!;
+    expect(carp.caught).toBe(true);
+    expect(carp.bestCm).toBe(41.5);
+    expect(pages.filter((p) => p.caught).length).toBe(2);
+    for (const p of pages) expect(p.hintZh.length && p.hintEn.length).toBeTruthy();
+    expect(pages.find((p) => p.species.id === 'blackcarp')!.hintZh).toMatch(/夜/);
+  });
+});
+
+describe('the boat berth', () => {
+  // a jetty 1.1 m either side of the x axis from x = 0 to x = 10 (the angler stands at its end),
+  // and a T across its end; water everywhere else
+  const onJetty = (x: number, z: number) => (x >= 0 && x <= 10 && Math.abs(z) <= 1.1) || (x >= 8.2 && x <= 10.2 && Math.abs(z) <= 3);
+  const stand = { x: 10, z: 0 }, dir = { x: 1, z: 0 };
+  const hullClear = (x: number, z: number, hd: number) => {
+    const fx = Math.sin(hd), fz = Math.cos(hd);
+    for (const [f, q] of [[0, 0], [1.75, 0], [-1.75, 0], [1, 0.62], [1, -0.62], [-1, 0.62], [-1, -0.62]]) {
+      if (onJetty(x + fx * f + fz * q, z + fz * f - fx * q) || x + fx * f + fz * q < 2) return false;
+    }
+    return true;
+  };
+
+  it('ties up alongside the planks, boardable from them and clear of the angler', () => {
+    const m = findMooring(stand, dir, hullClear, onJetty)!;
+    expect(m).not.toBeNull();
+    expect(onJetty(m.plank.x, m.plank.z)).toBe(true);
+    const dStand = Math.hypot(m.plank.x - stand.x, m.plank.z - stand.z);
+    expect(dStand).toBeGreaterThanOrEqual(2.2);
+    expect(dStand).toBeLessThanOrEqual(6);
+    // the boat lies just off the edge: its centre within 2 m of the plank (the prompt radius)
+    expect(Math.hypot(m.boat.x - m.plank.x, m.boat.z - m.plank.z)).toBeLessThan(2);
+    expect(hullClear(m.boat.x, m.boat.z, Math.atan2(dir.x, dir.z))).toBe(true);
+    // it can row straight out: not tucked behind the T's crossbar
+    for (let k = 0.25; k <= 6; k += 0.25) expect(hullClear(m.boat.x + k, m.boat.z, Math.atan2(dir.x, dir.z))).toBe(true);
+    // which, with a T across the end, means lying off the T's end rather than the stem
+    expect(Math.abs(m.boat.z)).toBeGreaterThan(3);
   });
 });

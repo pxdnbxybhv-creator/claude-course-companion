@@ -117,11 +117,8 @@ export function WalkView() {
         if (cancelled) { resolve(-1); return; }
         setDialogs((ds) => [...ds, { ...o, id: ++dialogSeq.current, resolve }]);
       }),
-      arrive: (a) => {
-        clearTimeout(arrivalTimer.current);
-        setArrival({ ...a, key: Date.now() });
-        arrivalTimer.current = setTimeout(() => setArrival(null), 5200);
-      },
+      // the banner's own clock starts when it is actually on screen (after the travel curtain lifts)
+      arrive: (a) => setArrival({ ...a, key: Date.now() }),
       curtain: (on) => setCurtain(on),
       frozen: (on) => setFrozen(on),
     };
@@ -157,7 +154,13 @@ export function WalkView() {
     };
   }, [festival, time, lang]);
 
-  useEffect(() => () => clearTimeout(arrivalTimer.current), []);
+  // an arrival banner shows once the curtain is up, and goes when its brushed-in animation is done
+  const arrivalShown = !!arrival && !curtain;
+  useEffect(() => {
+    if (!arrivalShown) return;
+    arrivalTimer.current = setTimeout(() => setArrival(null), 5200);
+    return () => clearTimeout(arrivalTimer.current);
+  }, [arrivalShown, arrival?.key]);
 
   // the dialogue box: Esc steps away, Enter / Space / E goes on, number keys choose
   useEffect(() => {
@@ -211,14 +214,34 @@ export function WalkView() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [card]);
 
-  // the first-visit hint fades after a while, or on the first key press
+  // the first-visit hint fades after a while, or once you start moving: a walking key, the joystick,
+  // or dragging the view round
+  const hintOff = useRef<(() => void) | null>(null);
   useEffect(() => {
     if (!hint || phase !== 'ready') return;
-    const done = () => { setHint(false); writeHintSeen(); };
+    const done = () => { hintOff.current = null; setHint(false); writeHintSeen(); };
+    hintOff.current = done;
     const id = setTimeout(done, 12000);
     const onKey = (e: KeyboardEvent) => { if (/^(Key[WASDE]|Arrow)/.test(e.code)) done(); };
+    const stage = hostRef.current;
+    let from: [number, number] | null = null;
+    const down = (e: PointerEvent) => { from = [e.clientX, e.clientY]; };
+    const drag = (e: PointerEvent) => { if (from && Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 14) done(); };
+    const up = () => { from = null; };
     window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(id); window.removeEventListener('keydown', onKey); };
+    stage?.addEventListener('pointerdown', down);
+    window.addEventListener('pointermove', drag);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    return () => {
+      clearTimeout(id);
+      if (hintOff.current === done) hintOff.current = null;
+      window.removeEventListener('keydown', onKey);
+      stage?.removeEventListener('pointerdown', down);
+      window.removeEventListener('pointermove', drag);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
   }, [hint, phase]);
 
   const lunar = toLunar(new Date());
@@ -305,7 +328,7 @@ export function WalkView() {
         </div>
       )}
 
-      {phase === 'ready' && touch && <Joystick world={worldRef} />}
+      {phase === 'ready' && touch && <Joystick world={worldRef} onStart={() => hintOff.current?.()} />}
       {phase === 'ready' && touch && (
         <div class="walk-buttons">
           <button type="button" class="walk-jump" aria-label={t('跳', 'Jump')} onPointerDown={(e) => { e.preventDefault(); worldRef.current?.jump(); }}>
@@ -341,7 +364,7 @@ export function WalkView() {
       <div class="walk-layer" ref={layerRef} />
 
       {/* --- arriving somewhere: the place's name brushed across the sky */}
-      {arrival && !curtain && (
+      {arrival && arrivalShown && (
         <div class="walk-arrive" key={arrival.key} role="status" aria-live="polite">
           <span class="walk-arrive-name brush">{arrival.zh}</span>
           <span class="walk-arrive-en latin">{arrival.en}</span>
@@ -510,7 +533,7 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
 }
 
 /** A virtual joystick: an ink ring and a knob; push to the edge to run. */
-function Joystick(props: { world: { current: WorldHandle | null } }) {
+function Joystick(props: { world: { current: WorldHandle | null }; onStart?(): void }) {
   const t = useT();
   const baseRef = useRef<HTMLDivElement>(null);
   const [knob, setKnob] = useState<[number, number]>([0, 0]);
@@ -551,6 +574,7 @@ function Joystick(props: { world: { current: WorldHandle | null } }) {
       onPointerDown={(e) => {
         e.preventDefault();
         active.current = e.pointerId;
+        props.onStart?.();
         try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* synthetic or stale pointer */ }
         move(e);
       }}

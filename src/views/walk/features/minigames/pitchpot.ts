@@ -8,7 +8,7 @@ import { feature, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { record, recordMax, play } from '../../../../app/play';
 import { POT, classifyThrow, flightAt, scoreRound, HIT_POINTS, type PotHit } from './logic';
-import { ability, begin, button, closeButton, end, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
+import { ability, begin, button, closeButton, end, frameOn, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import * as snd from './sound';
 
 const ARROWS = 8;
@@ -128,6 +128,7 @@ export const pitchPot = feature('mg-pitchpot', (bag, ctx) => {
     ctx.player.freeze(true);
     // stand a little left of the line, so the pot shows past your shoulder (you throw from the right hand)
     ctx.player.teleport(stand.x - right.x * 0.45, stand.z - right.z * 0.45, heading);
+    frameOn(ctx, pot.x, pot.z, pot.y + 0.5);
     const p = panel(bag, 'mg-pitchpot');
     const top = h('div', 'mg-pot-top mg-live', undefined, p.root);
     h('span', '', tr(ctx, '投壶', 'Pitch-pot'), top);

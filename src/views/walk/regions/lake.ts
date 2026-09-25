@@ -226,7 +226,7 @@ async function buildLake(k: Kit): Promise<void> {
     solid.add(k.box(2.8, 0.26, 0.28, RIDGE, px, eaveY + 2.18, pz), 30);
     for (const s of [-1, 1]) solid.add(k.box(0.46, 0.2, 0.2, RIDGE, px + s * 1.5, eaveY + 2.36, pz, 0, 0, 0, s * 0.75), 30);
     // plaque over the east opening, lanterns at the east corners
-    const plaque = new THREE.Mesh(k.own(new THREE.PlaneGeometry(1.4, 0.44)), k.own(new THREE.MeshBasicMaterial({ map: plaqueTex })));
+    const plaque = new THREE.Mesh(k.own(new THREE.PlaneGeometry(1.4, 0.44)), k.nightShade(k.own(new THREE.MeshBasicMaterial({ map: plaqueTex }))));
     plaque.position.set(px + h - 0.1, PY + CH - 0.62, pz);
     plaque.rotation.y = Math.PI / 2;
     plaque.name = 'lake-plaque';
@@ -255,22 +255,45 @@ async function buildLake(k: Kit): Promise<void> {
         const y = p === a ? ya : yb;
         solid.add(k.box(1.3, y - (WY - 1.1), 0.5, '#a39d90', p.x, (y + WY - 1.1) / 2 - 0.2, p.z, ry, 0.05), 25);
       }
-      // low railing: posts and a rail on both sides
+      // low railing: posts and a rail on both sides. The bends are sharp, so near each one a side's
+      // rail stops where it would stand in the neighbouring run's walkway (keeps the turn open).
       const px2 = Math.cos(ry) * 0.72, pz2 = -Math.sin(ry) * 0.72;
-      for (const s of [-1, 1]) {
-        const n = Math.max(2, Math.round(len / 1.2));
-        for (let j = 0; j <= n; j++) {
-          const t = 0.08 + (0.84 * j) / n;
-          const x = a.x + (b.x - a.x) * t + s * px2, z = a.z + (b.z - a.z) * t + s * pz2;
-          solid.add(k.box(0.14, 0.5, 0.14, '#c9c2b3', x, ya + (yb - ya) * t + 0.25, z, ry), 30);
+      const inNeighbour = (x: number, z: number) => {
+        for (const j of [i - 1, i + 1]) {
+          if (j < 1 || j >= ZIG.length) continue;
+          if (segDist(x, z, ZIG[j - 1].x, ZIG[j - 1].z, ZIG[j].x, ZIG[j].z) < 0.9) return true;
         }
-        const t0 = 0.08, t1 = 0.92;
-        solid.add(k.beam(
-          { x: a.x + (b.x - a.x) * t0 + s * px2, y: ya + (yb - ya) * t0 + 0.42, z: a.z + (b.z - a.z) * t0 + s * pz2 },
-          { x: a.x + (b.x - a.x) * t1 + s * px2, y: ya + (yb - ya) * t1 + 0.42, z: a.z + (b.z - a.z) * t1 + s * pz2 }, 0.1, '#d2cbbb'), 30);
+        return false;
+      };
+      const railAt = (t: number, side: number) => ({ x: a.x + (b.x - a.x) * t + side * px2, z: a.z + (b.z - a.z) * t + side * pz2, y: ya + (yb - ya) * t });
+      for (const side of [-1, 1]) {
+        let t0 = 0.08, t1 = 0.92;
+        while (t0 < 0.5 && inNeighbour(railAt(t0, side).x, railAt(t0, side).z)) t0 += 0.02;
+        while (t1 > 0.5 && inNeighbour(railAt(t1, side).x, railAt(t1, side).z)) t1 -= 0.02;
+        const n = Math.max(2, Math.round((len * (t1 - t0)) / 1.0));
+        for (let j = 0; j <= n; j++) {
+          const p = railAt(t0 + ((t1 - t0) * j) / n, side);
+          solid.add(k.box(0.14, 0.5, 0.14, '#c9c2b3', p.x, p.y + 0.25, p.z, ry), 30);
+        }
+        const p0 = railAt(t0, side), p1 = railAt(t1, side);
+        solid.add(k.beam({ x: p0.x, y: p0.y + 0.42, z: p0.z }, { x: p1.x, y: p1.y + 0.42, z: p1.z }, 0.1, '#d2cbbb'), 30);
+        // and solid: the walker's body stays between the rails
+        const m = Math.max(2, Math.ceil((len * (t1 - t0)) / 0.35));
+        for (let j = 0; j <= m; j++) {
+          const p = railAt(t0 + ((t1 - t0) * j) / m, side);
+          k.collider({ x: p.x, z: p.z, r: 0.1, h: 0.5 });
+        }
       }
-      const ext = 0.8 / len;
-      k.deck(segmentDeck(`lake-zigzag-${i}`, { x: a.x - (b.x - a.x) * ext, z: a.z - (b.z - a.z) * ext }, { x: b.x + (b.x - a.x) * ext, z: b.z + (b.z - a.z) * ext }, 0.8, (s) => ya + (yb - ya) * Math.max(0, Math.min(1, (s + len / 2 + 0.8) / (len + 1.6)))));
+      // walkable: the slabs themselves (the land end starts a little on the bank, the last run meets the pavilion floor)
+      const ux = (b.x - a.x) / len, uz = (b.z - a.z) / len;
+      const e0 = i === 1 ? 0.4 : 0, e1 = i === ZIG.length - 1 ? 0.1 : 0;
+      k.deck(segmentDeck(`lake-zigzag-${i}`, { x: a.x - ux * e0, z: a.z - uz * e0 }, { x: b.x + ux * e1, z: b.z + uz * e1 }, 0.5,
+        (s) => ya + (yb - ya) * Math.max(0, Math.min(1, (s + (len + e0 + e1) / 2 - e0) / len))));
+      // a square landing slab at each bend fills the notch the two runs leave on the outer side
+      if (i < ZIG.length - 1) {
+        solid.add(k.box(1.6, 0.2, 1.6, '#bfb8a8', b.x, zy - 0.112, b.z, ry, 0.05), 25);
+        k.deck(segmentDeck(`lake-zigzag-bend-${i}`, { x: b.x - ux * 0.62, z: b.z - uz * 0.62 }, { x: b.x + ux * 0.62, z: b.z + uz * 0.62 }, 0.62, zy));
+      }
     }
   }
 
@@ -534,9 +557,6 @@ async function buildLake(k: Kit): Promise<void> {
   glows.name = 'lake-glows';
   glows.visible = false;
   k.add(glows);
-  const lamp = new THREE.PointLight('#ffb870', 0, 10, 1.6);
-  lamp.position.set(PAV.x, PY + 2.2, PAV.z);
-  k.add(lamp);
   let night = ctx.sky.isNight() ? 1 : 0;
   k.frame((dt, t) => {
     night += ((ctx.sky.isNight() ? 1 : 0) - night) * Math.min(1, dt * 1.5);
@@ -544,8 +564,6 @@ async function buildLake(k: Kit): Promise<void> {
     lanternMat.emissive.setRGB(0.6 * night * flick, 0.22 * night * flick, 0.08 * night);
     glowMat.opacity = 0.6 * night;
     glows.visible = night > 0.02;
-    lamp.intensity = 5 * night * flick;
-    lamp.visible = night > 0.02;
   });
 }
 
@@ -691,22 +709,22 @@ function leafCanvas(seed: number): HTMLCanvasElement {
   return c;
 }
 
-/** A floating pad: a disc with the notch, rims turned up slightly. uv = planar. */
+/**
+ * A floating pad: a disc with the notch, the rim turned up slightly (a very shallow cone). uv = planar.
+ * One fan of 14 triangles: hundreds float on the lake, so every triangle counts.
+ */
 function padGeometry(k: Kit): T.BufferGeometry {
   const THREE = k.T;
-  const N = 12, notch = 0.34;
+  const N = 14, notch = 0.34;
   const pos: number[] = [0, 0, 0], uv: number[] = [0.5, 0.5], idx: number[] = [];
   for (let i = 0; i <= N; i++) {
     const a = notch / 2 + (i / N) * (TAU - notch);
     const r = 1 + 0.04 * Math.sin(a * 5);
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    pos.push(x * 0.55, 0.012, z * 0.55, x, 0.035, z);
-    uv.push(0.5 + x * 0.275, 0.5 - z * 0.275, 0.5 + x * 0.5, 0.5 - z * 0.5);
+    pos.push(x, 0.035, z);
+    uv.push(0.5 + x * 0.5, 0.5 - z * 0.5);
   }
-  for (let i = 0; i < N; i++) {
-    const a = 1 + i * 2, b = a + 1, c = a + 2, d = a + 3;
-    idx.push(0, c, a, a, c, b, b, c, d);
-  }
+  for (let i = 0; i < N; i++) idx.push(0, i + 2, i + 1);
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
@@ -715,11 +733,11 @@ function padGeometry(k: Kit): T.BufferGeometry {
   return k.own(g);
 }
 
-/** An upright leaf: a shallow cup with a wavy rim, centred at the origin (the stem is separate). */
+/** An upright leaf: a shallow cup with a wavy rim, centred at the origin (the stem is separate). A fan round the centre, then one band. */
 function cupGeometry(k: Kit): T.BufferGeometry {
   const THREE = k.T;
-  const N = 13, rings = [0, 0.4, 1];
-  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  const N = 13, rings = [0.4, 1];
+  const pos: number[] = [0, 0, 0], uv: number[] = [0.5, 0.5], idx: number[] = [];
   for (let j = 0; j < rings.length; j++) {
     const r = rings[j];
     for (let i = 0; i <= N; i++) {
@@ -730,8 +748,9 @@ function cupGeometry(k: Kit): T.BufferGeometry {
       uv.push(0.5 + Math.cos(a) * r * 0.5, 0.5 - Math.sin(a) * r * 0.5);
     }
   }
-  for (let j = 0; j < rings.length - 1; j++) for (let i = 0; i < N; i++) {
-    const a = j * (N + 1) + i, b = a + 1, c = a + N + 1, d = c + 1;
+  for (let i = 0; i < N; i++) idx.push(0, 1 + i, 2 + i);
+  for (let i = 0; i < N; i++) {
+    const a = 1 + i, b = a + 1, c = a + N + 1, d = c + 1;
     idx.push(a, c, b, b, c, d);
   }
   const g = new THREE.BufferGeometry();
@@ -796,14 +815,15 @@ function budGeometry(k: Kit): T.BufferGeometry {
 
 function podGeometry(k: Kit): T.BufferGeometry {
   const THREE = k.T;
-  const g = new THREE.CylinderGeometry(0.13, 0.05, 0.13, 10);
+  // an inverted cone with a flat top (the narrow end sits on the stem, so no bottom cap)
+  const g = new THREE.CylinderGeometry(0.13, 0.05, 0.13, 8, 1, true);
   g.translate(0, 0.065, 0);
   const t = k.tint(g, '#8f9a62', 0.08, 3);
-  // seed holes: little dark discs on the flat top
-  const holes: T.BufferGeometry[] = [t];
+  const holes: T.BufferGeometry[] = [t, k.tint(new THREE.CircleGeometry(0.13, 8).rotateX(-Math.PI / 2).translate(0, 0.13, 0), '#8f9a62', 0.08, 4)];
+  // seed holes: little dark dots on the flat top
   for (let i = 0; i < 7; i++) {
     const a = (i / 7) * TAU, r = i === 0 ? 0 : 0.075;
-    holes.push(k.tint(new THREE.CircleGeometry(0.018, 5).rotateX(-Math.PI / 2).translate(Math.cos(a) * r, 0.131, Math.sin(a) * r), '#3d3a26'));
+    holes.push(k.tint(new THREE.CircleGeometry(0.02, 3).rotateX(-Math.PI / 2).translate(Math.cos(a) * r, 0.131, Math.sin(a) * r), '#3d3a26'));
   }
   const P = new Parts(k);
   P.addAll(holes, false);
@@ -949,7 +969,7 @@ function buildLotus(k: Kit, WY: number, season: string): void {
   instanced(podGeometry(k), flowerMat, pods, 'lotus-pods');
   // stems: unit cylinders from the water to each head (bent over in winter)
   if (stems.length) {
-    const sg = k.tint(new THREE.CylinderGeometry(1, 1, 1, 5, 1, true).translate(0, 0.5, 0), '#6d7a4e', 0.08);
+    const sg = k.tint(new THREE.CylinderGeometry(1, 1, 1, 4, 1, true).translate(0, 0.5, 0), '#6d7a4e', 0.08);
     const im = new THREE.InstancedMesh(k.own(sg), stemMat, stems.length);
     const up = new THREE.Vector3(0, 1, 0);
     stems.forEach((s, i) => {

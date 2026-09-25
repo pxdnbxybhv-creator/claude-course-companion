@@ -294,6 +294,49 @@
 .mg-ticks i.is-done { background: var(--mg-red); border-color: var(--mg-red); }
 .mg-errands.is-all b { color: var(--mg-red); }
 
+/* ---------- while a game is up, the walk's own chrome steps aside: the arrival banner (it sat under
+   the pitch-pot score) and the touch jump / act buttons (the game has its own big button) */
+.walk:has(.walk-layer > .mg.is-game) .walk-arrive { visibility: hidden !important; }
+.walk:has(.walk-layer > .mg.is-game) .walk-buttons { visibility: hidden; pointer-events: none; }
+
+/* ---------- 鱼谱, the fish album (from the ✕'s neighbour while fishing) */
+.mg-album-btn {
+  left: calc(env(safe-area-inset-left) + 60px);
+  font-family: var(--font-brush);
+  font-size: 20px;
+}
+.mg-album { bottom: auto; top: 50%; transform: translate(-50%, -50%); width: min(94vw, 460px); max-height: 82vh; display: flex; flex-direction: column; animation: none; }
+.mg-album h3 small { font-family: var(--font-latin); font-size: 15px; letter-spacing: 0.04em; color: #6c6358; }
+.mg-album-grid {
+  list-style: none;
+  margin: 0 0 14px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.mg-album-grid li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgba(27, 25, 22, 0.04);
+  border: 1px dashed rgba(27, 25, 22, 0.2);
+}
+.mg-album-grid li.is-caught { background: rgba(255, 255, 255, 0.5); border-style: solid; }
+.mg-album-grid canvas { width: 72px; height: 36px; }
+.mg-album-grid b { font-family: var(--font-brush); font-weight: 400; font-size: 18px; letter-spacing: 0.08em; }
+[lang='en'] .mg-album-grid b { font-family: var(--font-latin); font-size: 14px; letter-spacing: 0.02em; }
+.mg-album-grid small { font-size: 11px; color: var(--mg-red); }
+.mg-album-grid p { margin: 2px 0 0; font-size: 11px; line-height: 1.45; color: #4a443c; }
+.mg-album-grid p.is-hint { color: #8a8174; font-style: italic; }
+.mg-album .mg-row { justify-content: center; }
+
 @media (prefers-reduced-motion: reduce) {
   .mg *, .mg { animation: none !important; transition: none !important; }
 }

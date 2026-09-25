@@ -11,6 +11,12 @@ import { registerClearing, registerDeck, type Clearing, type Deck } from './wate
 
 export type Three = WorldCtx['THREE'];
 export const INK = '#1b1916';
+/**
+ * What the night does to a built place's lit surfaces (a multiplier on their day colour). The
+ * core's night light is nearly as strong as the day's, so without it the white walls and pale
+ * paving of the towns stay day-bright on a dark land and the lit windows have nothing to glow against.
+ */
+export const NIGHT_SHADE = '#9eabbf';
 
 export function reducedMotion(): boolean {
   try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -26,10 +32,33 @@ export class Kit {
   /** Shared uniform: seconds since start (sway shaders). */
   readonly time = { value: 0 };
   readonly reduced = reducedMotion();
+  /** 0 day … 1 night, eased like the sky's own turn. */
+  night = 0;
+  /** Materials that dim with the night: their day colour, multiplied by NIGHT_SHADE as night falls. */
+  private shaded: { m: { color: T.Color }; base: T.Color }[] = [];
+  private shade: T.Color;
   constructor(readonly ctx: WorldCtx, id: Parameters<WorldCtx['regionGroup']>[0]) {
     this.T = ctx.THREE;
     this.group = ctx.regionGroup(id);
-    this.frame((_dt, t) => { this.time.value = this.reduced ? 0 : t; });
+    this.shade = new ctx.THREE.Color('#ffffff');
+    const day = new ctx.THREE.Color('#ffffff'), nightC = new ctx.THREE.Color(NIGHT_SHADE);
+    let first = true, last = -1;
+    this.frame((dt, t) => {
+      this.time.value = this.reduced ? 0 : t;
+      const n = ctx.sky.isNight() ? 1 : 0;
+      this.night = first ? n : this.night + (n - this.night) * (1 - Math.exp(-1.6 * Math.min(dt, 0.1)));
+      first = false;
+      if (Math.abs(this.night - last) < 1e-3) return;
+      last = this.night;
+      this.shade.copy(day).lerp(nightC, this.night);
+      for (const s of this.shaded) s.m.color.copy(s.base).multiply(this.shade);
+    });
+  }
+  /** Let a lit (or painted) material dim with the night, as the land around it does. Returns it. */
+  nightShade<M extends { color: T.Color }>(m: M): M {
+    this.shaded.push({ m, base: m.color.clone() });
+    m.color.copy(this.shaded[this.shaded.length - 1].base).multiply(this.shade);
+    return m;
   }
   own<D extends { dispose(): void }>(d: D): D { this.owned.add(d); return d; }
   frame(fn: (dt: number, t: number) => void): void { this.offs.push(this.ctx.onFrame(fn)); }
@@ -74,14 +103,15 @@ export class Kit {
     t.needsUpdate = true;
     return (this.grad = t);
   }
+  /** Toon wash; it dims with the night (emissive windows and lanterns keep their glow, so they read). */
   toon(color: T.ColorRepresentation, o: { vertexColors?: boolean; side?: T.Side; map?: T.Texture; emissive?: T.ColorRepresentation; alphaTest?: number } = {}): T.MeshToonMaterial {
     const { T: THREE } = this;
-    return this.own(new THREE.MeshToonMaterial({
+    return this.nightShade(this.own(new THREE.MeshToonMaterial({
       color, gradientMap: this.gradient(), vertexColors: !!o.vertexColors, side: o.side ?? THREE.FrontSide,
       ...(o.map ? { map: o.map } : {}),
       ...(o.alphaTest ? { alphaTest: o.alphaTest } : {}),
       ...(o.emissive !== undefined ? { emissive: new THREE.Color(o.emissive) } : {}),
-    }));
+    })));
   }
   lineMat(opacity = 0.72, color = INK): T.LineBasicMaterial {
     return this.own(new this.T.LineBasicMaterial({ color, transparent: true, opacity }));

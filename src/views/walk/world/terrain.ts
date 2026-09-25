@@ -274,7 +274,29 @@ export function terrain(): Terrain {
   });
   const pathD = new Float32Array(N * N).fill(99);
   const pathY = new Float32Array(N * N);
-  for (const list of paths) for (const p of list) splat(p.x, p.z, 12, (c, d) => { if (d < pathD[c]) { pathD[c] = d; pathY[c] = p.y; } });
+  const pathL = new Int8Array(N * N).fill(-1);
+  const pathK = new Int32Array(N * N);
+  paths.forEach((list, li) => list.forEach((p, k) => splat(p.x, p.z, 12, (c, d) => { if (d < pathD[c]) { pathD[c] = d; pathL[c] = li; pathK[c] = k; } })));
+  // the height a cell takes from its path: projected onto the nearer of the two segments beside its
+  // nearest sample, so it runs on smoothly along the path (a nearest-sample height steps up a whole
+  // sample's rise from one cell to the next wherever a walker cuts across a bend)
+  for (let c = 0; c < N * N; c++) {
+    const li = pathL[c];
+    if (li < 0) continue;
+    const list = paths[li], k = pathK[c];
+    const x = GRID_MIN + (c % N), z = GRID_MIN + Math.floor(c / N);
+    let bd = Infinity, by = list[k].y;
+    for (const [a, b] of [[k - 1, k], [k, k + 1]]) {
+      if (a < 0 || b >= list.length) continue;
+      const A = list[a], B = list[b];
+      const ex = B.x - A.x, ez = B.z - A.z, e2 = ex * ex + ez * ez || 1;
+      const t = Math.max(0, Math.min(1, ((x - A.x) * ex + (z - A.z) * ez) / e2));
+      const d = hyp(x - A.x - ex * t, z - A.z - ez * t);
+      if (d < bd) { bd = d; by = A.y + (B.y - A.y) * t; }
+    }
+    pathD[c] = Math.min(pathD[c], bd);
+    pathY[c] = by;
+  }
   for (let c = 0; c < N * N; c++) {
     const d = pathD[c];
     if (d >= 8.5) continue;

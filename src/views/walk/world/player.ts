@@ -32,6 +32,15 @@ export interface Physics {
 
 /** The highest single step a walker takes onto a built surface (a stair riser, a quay lip). */
 const STEP_UP = 0.34;
+/**
+ * The steepest bare ground a walker climbs (rise per metre, ~37°). Paths are graded far below it
+ * (terrain.ts); hillsides steeper than this are cliffs.
+ */
+const MAX_GRADE = 0.75;
+/** How far ahead the slope underfoot is judged: a fixed distance, so the answer never depends on the frame rate. */
+const LOOK = 0.3;
+/** The jade rabbit's slowest fall (m/s): a jump turns into a drift. */
+const GLIDE_FALL = 0.9;
 
 function lathe(points: [number, number][], segs = 20): THREE.LatheGeometry {
   return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segs);
@@ -286,7 +295,8 @@ export interface Gifts { speed: number; jump: number; glide: boolean; float: boo
 export function giftsOf(a: Ability): Gifts {
   return {
     speed: a.kind === 'speed' ? a.factor : 1,
-    jump: a.kind === 'jump' ? Math.pow(a.factor, 0.75) : 1,
+    // a glider hops a little higher, so the drift down lasts about a second
+    jump: a.kind === 'jump' ? Math.pow(a.factor, 0.75) : a.kind === 'glide' ? 1.12 : 1,
     glide: a.kind === 'glide',
     float: a.kind === 'float',
   };
@@ -311,7 +321,8 @@ export class PlayerController implements Player {
   private targetHeading: number | null = null;
   private frozen = false;
   private riding: THREE.Object3D | null = null;
-  private jumped = false;
+  /** The height the walker last stood at: a jump or a fall never lands higher up a cliff than this. */
+  private standY = 0;
   speed = 0;
   running = false;
   /** Called after teleport() so the camera can snap along. */
@@ -327,6 +338,7 @@ export class PlayerController implements Player {
   constructor(bag: Bag, x: number, y: number, z: number, heading: number, model: CharacterModel) {
     this.position = this.root.position;
     this.position.set(x, y, z);
+    this.standY = y;
     this.heading = heading;
     this.root.name = 'player';
     // models face −z; the heading convention faces +z at 0
@@ -382,6 +394,11 @@ export class PlayerController implements Player {
     this.emoteT = 0;
   }
 
+  /** The emote under way, if any (features may listen: the koi come to the qin, 'play'). */
+  get emoting(): EmoteKind | null {
+    return this.emoteKind;
+  }
+
   get busy(): boolean {
     return this.emoteKind !== null && this.emoteKind !== 'jump' && this.emoteKind !== 'wave';
   }
@@ -396,19 +413,20 @@ export class PlayerController implements Player {
     this.vx = this.vz = this.vy = 0;
     this.grounded = y === undefined;
     if (y !== undefined && Math.abs(y - this.floorAt(x, z)) < 0.05) this.grounded = true;
+    this.standY = this.position.y;
     this.onTeleport?.();
   }
 
   freeze(on: boolean): void {
     this.frozen = on;
     this.vx = this.vz = 0;
-    if (!on) { this.vy = 0; this.grounded = false; }
+    if (!on) { this.vy = 0; this.grounded = false; this.standY = this.position.y; }
   }
 
   ride(obj: THREE.Object3D | null): void {
     this.riding = obj;
     this.vx = this.vz = this.vy = 0;
-    if (!obj) { this.grounded = false; }
+    if (!obj) { this.grounded = false; this.standY = this.position.y; }
   }
 
   get isFrozen(): boolean {
@@ -459,6 +477,46 @@ export class PlayerController implements Player {
     (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.32 / (1 + lift);
   }
 
+  /**
+   * May the walker go from (px, pz) to (x, z)? Measured over a fixed look-ahead, never over the frame's
+   * own step, so a fast frame rate or a run climbs nothing a slow walk would not.
+   *  - bare ground: no rise steeper than MAX_GRADE (no scrambling up cliffs; slide along them instead);
+   *  - built surfaces (stairs, quay lips, bridge decks): a stair-sized step up is fine;
+   *  - in the air: you land on whatever your jump clears (a ledge, a deck, a wall top), but never higher
+   *    up a cliff face than where you took off from.
+   */
+  private blocked(x: number, z: number, px: number, pz: number, f0: number, phys: Physics): boolean {
+    const dx = x - px, dz = z - pz, l = Math.hypot(dx, dz);
+    if (l < 1e-6) return false;
+    const ux = dx / l, uz = dz / l;
+    const ft = phys.floorY(x, z);
+    const built = phys.built?.(x, z) ?? false;
+    /** Does bare ground rise too steeply just beyond (x, z)? */
+    const faceAhead = () => phys.floorY(x + ux * LOOK, z + uz * LOOK) - ft > LOOK * MAX_GRADE;
+    let steep: boolean;
+    if (built) {
+      // onto a stair, a quay or a bridge deck: a stair-sized step is fine
+      steep = ft - f0 > STEP_UP;
+    } else if (phys.built?.(px, pz)) {
+      // off a deck or a stair onto the land: the lip by its step, then the ground's own grade
+      steep = ft - f0 > STEP_UP || faceAhead();
+    } else {
+      // bare ground: the grade from here to a point LOOK ahead (or the step itself, if longer);
+      // a stair or quay just ahead is judged by its step when you reach it, till then by the ground's grade
+      const sd = Math.max(LOOK, l);
+      const ax = px + ux * sd, az = pz + uz * sd;
+      const fa = sd > l && phys.built?.(ax, az) ? ft + ((ft - f0) / l) * (sd - l) : phys.floorY(ax, az);
+      steep = Math.max(ft, fa) - f0 > sd * MAX_GRADE;
+    }
+    if (this.grounded) return steep;
+    // airborne: nowhere higher than you last stood → only walls stop you
+    if (ft <= this.standY) return false;
+    if (!steep) return false;
+    if (ft > this.position.y + 0.05) return true;           // the feet do not clear it
+    if (built) return false;                                // land on a deck, a stair, a wall top
+    return faceAhead();                                     // a ledge you can stand on, never a cliff face
+  }
+
   private walk(dt: number, input: MoveInput, phys: Physics): number {
     const mag = Math.min(1, Math.hypot(input.x, input.z));
     if (mag > 0.25 && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
@@ -473,19 +531,11 @@ export class PlayerController implements Player {
     const px = this.position.x, pz = this.position.z;
     let nx = px + this.vx * dt, nz = pz + this.vz * dt;
     [nx, nz] = phys.resolve(nx, nz, 0.3, px, pz);
-    // no scrambling up cliffs: on the ground, a rise steeper than ~35° stops you (slide along it)
     const f0 = phys.floorY(px, pz);
-    const tooSteep = (x: number, z: number) => {
-      const rise = phys.floorY(x, z) - f0;
-      if (rise <= 0.05) return false;
-      // stairs, quay lips and bridge ends: a stair-sized step onto something built is fine
-      if (this.grounded && rise <= STEP_UP && phys.built?.(x, z)) return false;
-      const run = Math.hypot(x - px, z - pz);
-      return rise > (this.grounded ? 0.5 : 0.25) || (this.grounded && rise > run * 0.72);
-    };
-    if (tooSteep(nx, nz)) {
-      if (!tooSteep(nx, pz)) nz = pz;
-      else if (!tooSteep(px, nz)) nx = px;
+    if (this.blocked(nx, nz, px, pz, f0, phys)) {
+      // slide along what stopped you, one axis at a time
+      if (!this.blocked(nx, pz, px, pz, f0, phys)) nz = pz;
+      else if (!this.blocked(px, nz, px, pz, f0, phys)) nx = px;
       else { nx = px; nz = pz; }
     }
     const moved = Math.hypot(nx - px, nz - pz);
@@ -496,25 +546,23 @@ export class PlayerController implements Player {
     if (input.jump && this.grounded) {
       this.vy = 4.1 * this.gifts.jump;
       this.grounded = false;
-      this.jumped = true;
     }
     const floor = phys.floorY(nx, nz);
     if (!this.grounded) {
       this.vy -= 12.5 * dt;
-      // the jade rabbit floats down
-      if (this.gifts.glide && this.vy < -1.3) this.vy = damp(this.vy, -1.3, 10, dt);
+      // the jade rabbit drifts down
+      if (this.gifts.glide && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
       this.position.y += this.vy * dt;
       if (this.position.y <= floor) {
         this.position.y = floor;
         this.grounded = true;
         this.vy = 0;
-        this.jumped = false;
       }
     } else {
       if (floor < this.position.y - 0.35) { this.grounded = false; this.vy = 0; }
       else this.position.y = damp(this.position.y, floor, 25, dt);
     }
-    void this.jumped;
+    if (this.grounded) this.standY = floor;
 
     if (moved > 0.002 && mag > 0.05) {
       this.targetHeading = null;

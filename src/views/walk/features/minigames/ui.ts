@@ -25,7 +25,8 @@ export interface Panel {
 
 /** A full-screen overlay layer (pointer-transparent except its interactive parts) for a game. */
 export function panel(bag: Bag, cls: string): Panel {
-  const root = h('div', `mg ${cls}`);
+  // is-game: the walk's own chrome (the arrival banner, the touch act button) steps aside for it
+  const root = h('div', `mg is-game ${cls}`);
   root.lang = bag.ctx.lang === 'zh' ? 'zh' : 'en';
   let off: (() => void) | null = bag.ctx.hud.mount(root);
   const close = () => { off?.(); off = null; };
@@ -52,14 +53,27 @@ export interface Hold {
   dispose(): void;
 }
 
+/**
+ * Is a card, a dialogue, a sheet or the map up over the world? Keys then belong to it, not to the
+ * game behind it (Space closes the catch card; it must not also cast).
+ */
+export function modalOpen(): boolean {
+  return typeof document !== 'undefined' && !!document.querySelector('.walk-card-wrap, .walk-say-wrap, .sheet-backdrop, [aria-modal="true"]');
+}
+
 /** Hold-to-charge input on an element plus the keyboard (Space / E / Enter). */
 export function hold(el: HTMLElement): Hold {
   let down = false, p = false, r = false;
-  const press = (e: Event) => { e.preventDefault(); if (!down) { down = true; p = true; } };
+  // a new press starts afresh: a release left over from an earlier hold must not end this one
+  const press = (e: Event) => { e.preventDefault(); if (!down) { down = true; p = true; r = false; } };
   const release = () => { if (down) { down = false; r = true; } };
   const isKey = (e: KeyboardEvent) => e.code === 'Space' || e.code === 'KeyE' || e.code === 'Enter';
-  const kd = (e: KeyboardEvent) => { if (isKey(e) && !e.repeat) { e.preventDefault(); e.stopPropagation(); press(e); } };
-  const ku = (e: KeyboardEvent) => { if (isKey(e)) { e.preventDefault(); e.stopPropagation(); release(); } };
+  const kd = (e: KeyboardEvent) => {
+    if (!isKey(e) || e.repeat || modalOpen()) return;
+    e.preventDefault(); e.stopPropagation(); press(e);
+  };
+  // a release always counts (the key may go up while a card is open), but only a held key is ours
+  const ku = (e: KeyboardEvent) => { if (isKey(e) && down) { e.preventDefault(); e.stopPropagation(); release(); } };
   el.addEventListener('pointerdown', press);
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
@@ -81,7 +95,8 @@ export function hold(el: HTMLElement): Hold {
 
 /** Escape (or the ✕) to leave a game. */
 export function onEscape(fn: () => void): () => void {
-  const k = (e: KeyboardEvent) => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); fn(); } };
+  // Esc on a card closes the card only; the game behind it goes on
+  const k = (e: KeyboardEvent) => { if (e.code === 'Escape' && !modalOpen()) { e.preventDefault(); e.stopPropagation(); fn(); } };
   window.addEventListener('keydown', k, true);
   return () => window.removeEventListener('keydown', k, true);
 }
@@ -93,6 +108,20 @@ export function closeButton(parent: HTMLElement, ctx: WorldCtx, fn: () => void):
   b.setAttribute('aria-label', tr(ctx, '离开', 'Leave'));
   b.addEventListener('click', (e) => { e.stopPropagation(); fn(); });
   return b;
+}
+
+/** Is this a touch device (a joystick, not WASD)? */
+export function touchInput(): boolean {
+  try { return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches; } catch { return false; }
+}
+
+/**
+ * Swing the camera round to show the walker and a thing (the pot, the float, the bell) together at
+ * a game's start, where the core offers it (WorldCtx.frameCamera); a no-op until then.
+ */
+export function frameOn(ctx: WorldCtx, x: number, z: number, y: number, secs = 2.6): void {
+  const f = (ctx as WorldCtx & { frameCamera?: (x: number, z: number, y: number, secs?: number) => void }).frameCamera;
+  try { f?.call(ctx, x, z, y, secs); } catch { /* framing is a nicety */ }
 }
 
 // ───────────────────────────── one game at a time ─────────────────────────────

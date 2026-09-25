@@ -8,6 +8,7 @@ import type { RegionModule, WorldCtx } from '../types';
 import { ANCHORS, REGION, type XZ } from '../map';
 import { makeNoise2, makeRng } from '../../../core/rng';
 import { rasterize } from '../../../ink/brush';
+import { segmentDeck } from './water-decks';
 import {
   Batch, COL, Hill, mistCards, Painter, TAU, canvas, clamp, glowCanvas, hipRoof, lit, pathDist, particles, place, plaqueCanvas,
   polyDist, puffCanvas, rockGeometry, steppingStones, three, windCards, windProject, wind,
@@ -17,11 +18,19 @@ const R = REGION.bamboo;
 const CLEAR = ANCHORS.bambooClearing;
 const SHRINE = ANCHORS.bambooShrine;
 const HUT = { x: -69.5, z: 40.5, ry: -0.5 };
+/** Half width / depth of the hut's floor frame; the open front faces local +z. */
+const HUT_W = 1.9, HUT_D = 1.5;
+/** A point in the hut's own frame (x across, z toward the open front) in world coordinates. */
+const hutAt = (lx: number, lz: number): XZ => ({
+  x: HUT.x + lx * Math.cos(HUT.ry) + lz * Math.sin(HUT.ry),
+  z: HUT.z - lx * Math.sin(HUT.ry) + lz * Math.cos(HUT.ry),
+});
 
 /** Winding stone paths inside the grove (the world's PATHS are laid by the core). */
 const TRAILS: XZ[][] = [
   wind([{ x: CLEAR.x - 3.5, z: CLEAR.z + 3 }, { x: -89, z: 34.5 }, { x: -91.5, z: 36 }, { x: SHRINE.x + 2.2, z: SHRINE.z - 1.8 }], 0.7),
-  wind([{ x: CLEAR.x + 3.2, z: CLEAR.z + 3.4 }, { x: -76.5, z: 35 }, { x: -73.5, z: 36.5 }, { x: HUT.x - 1.5, z: HUT.z - 2 }], 0.7),
+  // round the hut's west corner to the stone step at its open front
+  wind([{ x: CLEAR.x + 3.2, z: CLEAR.z + 3.4 }, { x: -76.5, z: 35 }, { x: -73.5, z: 36.5 }, hutAt(-3.3, 0.9), hutAt(-0.9, HUT_D + 1.75)], 0.7),
   wind([{ x: CLEAR.x - 0.5, z: CLEAR.z - 4.5 }, { x: -85.5, z: 19.5 }, { x: -82.5, z: 15 }, { x: -84, z: 10.5 }], 0.7),
 ];
 
@@ -427,8 +436,9 @@ function build(ctx: WorldCtx): void {
   {
     const { x, z, ry } = HUT;
     const top = h.span(x, z, 2.4).hi + 0.45;
-    const W = 1.9, D = 1.5;
-    const corner = (lx: number, lz: number) => ({ x: x + lx * Math.cos(ry) + lz * Math.sin(ry), z: z - lx * Math.sin(ry) + lz * Math.cos(ry) });
+    const W = HUT_W, D = HUT_D;
+    const corner = hutAt;
+    const floorTop = top + 0.05;
     // stilts and floor
     for (const [lx, lz] of [[-W, -D], [W, -D], [W, D], [-W, D], [0, -D], [0, D]]) {
       const c = corner(lx, lz);
@@ -473,6 +483,33 @@ function build(ctx: WorldCtx): void {
       const c = corner(lx, 0);
       b.add(place(new THREE.BoxGeometry(0.06, 0.3, 0.44), c.x, top + 0.17, c.z, ry), COL.woodDark);
     }
+    // stone steps up to the open front: risers no taller than a walker's stride (≤ 0.3 m)
+    const stepDepth = 0.44;
+    const frontY = h.y(corner(0, D + 0.5).x, corner(0, D + 0.5).z);
+    const risers = Math.max(1, Math.ceil((floorTop - frontY) / 0.3));
+    for (let i = 1; i < risers; i++) {
+      const sTop = floorTop - ((floorTop - frontY) * i) / risers;
+      const lz0 = D + 0.15 + (i - 1) * stepDepth, lz1 = lz0 + stepDepth;
+      const c = corner(0, (lz0 + lz1) / 2);
+      const lo = Math.min(h.y(c.x, c.z), sTop) - 0.35;
+      b.add(place(new THREE.BoxGeometry(1.25 - i * 0.06, sTop - lo, stepDepth + 0.02), c.x, (sTop + lo) / 2, c.z, ry), COL.stoneWarm, { edge: 30, jitter: 0.06, seed: 40 + i });
+      h.deck(segmentDeck(`bamboo:hut-step${i}`, corner(0, lz0), corner(0, lz1), 0.6, sTop));
+    }
+    // walkable floor; the back wall, the side rails and the table are solid (the front stays open)
+    h.deck(segmentDeck('bamboo:hut', corner(0, -D - 0.15), corner(0, D + 0.15), W + 0.15, floorTop));
+    const colLine = (a: XZ, c: XZ, r: number, hgt: number) => {
+      const n = Math.max(1, Math.round(Math.hypot(c.x - a.x, c.z - a.z) / 0.4));
+      for (let i = 0; i <= n; i++) h.collide({ x: a.x + ((c.x - a.x) * i) / n, z: a.z + ((c.z - a.z) * i) / n, r, h: hgt });
+    };
+    colLine(corner(-W, -D), corner(W, -D), 0.16, 2.4);
+    for (const side of [-1, 1]) {
+      colLine(corner(side * W, -D), corner(side * W, D), 0.16, 1);
+      // the floor's front lip either side of the step: too high to climb, so keep the body off it
+      colLine(corner(side * (W + 0.1), D + 0.15), corner(side * 0.72, D + 0.15), 0.12, 0.6);
+    }
+    for (const lx of [-0.22, 0.22]) { const c = corner(lx, 0); h.collide({ x: c.x, z: c.z, r: 0.3, h: 0.45 }); }
+    const foot = corner(0, 0.2 + (risers - 1) * stepDepth * 0.5);
+    h.clearing({ cx: foot.x, cz: foot.z, ax: Math.sin(ry), az: Math.cos(ry), hl: D + 0.6 + (risers - 1) * stepDepth * 0.5, hw: W + 0.5 });
     // thatch roof: a steep hip roof, soft and shaggy (straw colour, dark underside)
     hipRoof(b, x, z, ry, W + 0.75, D + 0.8, top + postH, 1.55, { curl: 0.12, flare: 0.1, color: COL.thatch, ridge: false });
     const rc = corner(0, 0);
@@ -492,6 +529,7 @@ function build(ctx: WorldCtx): void {
       const fy = h.y(f.x, f.z);
       const hh = 0.9 + rng() * 0.25;
       b.add(place(new THREE.CylinderGeometry(0.03, 0.035, hh, 5), f.x, fy + hh / 2, f.z), rng() < 0.5 ? COL.bambooDry : '#8e8a66', { rim: true });
+      h.collide({ x: f.x, z: f.z, r: 0.1, h: hh });
     }
     for (let i = 1; i < fence.length; i++) {
       const a = fence[i - 1], c = fence[i];

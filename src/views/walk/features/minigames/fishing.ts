@@ -8,8 +8,8 @@ import { ANCHORS, LAKE } from '../../map';
 import { feature, reducedMotion } from '../kit';
 import { burst } from '../props';
 import { record, recordMax, flag, play } from '../../../../app/play';
-import { FISH, biteDelay, newReel, reelZone, rollFish, stepReel, inZone, type Catch, type Reel } from './logic';
-import { ability, begin, button, closeButton, end, h, hold, night, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
+import { FISH, biteDelay, fishAlbum, newReel, reelZone, rollFish, stepReel, inZone, type Catch, type Reel } from './logic';
+import { ability, begin, button, closeButton, end, frameOn, h, hold, night, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import { fishMesh, ripples } from './fx';
 import * as snd from './sound';
 
@@ -108,14 +108,18 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
 
   const fishFactor = () => { const a = ability(ctx); return a.kind === 'fish' ? a.factor : 1; };
 
+  // the hand the rod is in: re-found whenever the walker changes (a new model has a new hand)
   let handObj: T.Object3D | null = null;
+  let handOf: string | null = null;
+  const takeRod = () => { handObj = ctx.player.holdProp('rod'); handOf = ctx.player.character; };
   function start() {
     if (!begin(ctx, 'fishing')) return;
     ctx.player.freeze(true);
     ctx.player.teleport(stand.x, stand.z, heading);
     rodYaw.visible = true;
     // the rod goes in the walker's own hand (the fisher's own rod is put away meanwhile)
-    handObj = ctx.player.holdProp('rod');
+    takeRod();
+    frameOn(ctx, stand.x + dir.x * 5, stand.z + dir.z * 5, stand.y + 0.4);
     const p = panel(bag, 'mg-fishing');
     const dock = h('div', 'mg-dock', undefined, p.root);
     const status = h('div', 'mg-status mg-live', '', dock);
@@ -131,13 +135,56 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     const meter = h('i', '', undefined, meterBox);
     reelBox.style.display = 'none';
     closeButton(p.root, ctx, stop);
+    const albumBtn = h('button', 'mg-x mg-album-btn', '谱', p.root);
+    albumBtn.type = 'button';
+    albumBtn.setAttribute('aria-label', tr(ctx, '鱼谱', 'Fish album'));
+    albumBtn.title = tr(ctx, '鱼谱', 'Fish album');
+    albumBtn.addEventListener('click', (e) => { e.stopPropagation(); openAlbum(); });
     ui = { p, status, btn, charge, chargeFill, reelBox, zone, fish, meter, hold: hold(btn), offEsc: onEscape(stop) };
     toReady();
     if (fishFactor() > 1) ctx.hud.toast('渔翁在此，鱼儿闻讯而来', 'The old fisherman is here — the fish come sooner', 2200);
   }
 
+  // ── 鱼谱: every fish of the lake, caught or still to come
+  let album: { el: HTMLElement; off: () => void } | null = null;
+  function openAlbum() {
+    if (!ui || album) return;
+    const pages = fishAlbum(play.value.flags, play.value.best);
+    const got = pages.filter((pg) => pg.caught).length;
+    const el = h('div', 'mg-sheet mg-album', undefined, ui.p.root);
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-label', tr(ctx, '鱼谱', 'Fish album'));
+    const head = h('h3', '', tr(ctx, '鱼谱', 'Fish album'), el);
+    h('small', '', ` ${got}/${pages.length}`, head);
+    const grid = h('ul', 'mg-album-grid', undefined, el);
+    for (const pg of pages) {
+      const s = pg.species;
+      const li = h('li', pg.caught ? 'is-caught' : '', undefined, grid);
+      const c = h('canvas', '', undefined, li);
+      c.width = 96; c.height = 48;
+      paintFish(c, pg.caught ? s.color : '#b9b1a2', s.id, pg.caught);
+      h('b', '', pg.caught ? tr(ctx, s.zh, s.en) : '？？', li);
+      if (pg.caught) {
+        const size = s.id === 'kun' ? tr(ctx, '不知其几千里', 'beyond measure') : s.rarity === 'junk' ? '' : pg.bestCm ? tr(ctx, `最长 ${pg.bestCm} 厘米`, `best ${pg.bestCm} cm`) : '';
+        if (size) h('small', '', size, li);
+        h('p', '', ctx.lang === 'zh' ? s.verseZh : s.verseEn, li);
+      } else h('p', 'is-hint', tr(ctx, pg.hintZh, pg.hintEn), li);
+    }
+    const row = h('div', 'mg-row', undefined, el);
+    const close = h('button', 'mg-text-btn is-primary', tr(ctx, '收起', 'Close'), row);
+    close.type = 'button';
+    const shut = () => { if (!album) return; album.off(); album.el.remove(); album = null; };
+    close.addEventListener('click', (e) => { e.stopPropagation(); shut(); });
+    const k = (e: KeyboardEvent) => { if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); shut(); } };
+    window.addEventListener('keydown', k, true);
+    album = { el, off: () => window.removeEventListener('keydown', k, true) };
+    close.focus();
+  }
+
   function stop() {
     if (!ui) return;
+    if (album) { album.off(); album = null; }
     ui.hold.dispose();
     ui.offEsc();
     ui.p.close();
@@ -148,6 +195,7 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     rodYaw.visible = false;
     ctx.player.holdProp(null);
     handObj = null;
+    handOf = null;
     ctx.player.freeze(false);
     end(ctx, 'fishing');
   }
@@ -300,6 +348,8 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     const pp = ctx.player.position;
     const hd = ctx.player.heading;
     const rx = Math.cos(hd), rz = -Math.sin(hd); // the walker's right
+    // a different walker now (the picker, or 与之同游 on a celebration): the rod goes to the new hand
+    if (ui && handOf !== ctx.player.character) takeRod();
     if (handObj) {
       handObj.getWorldPosition(handW);
       rodYaw.position.copy(handW);
@@ -425,3 +475,35 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     }
   });
 });
+
+/** A little brushed fish (or a sandal) for the album. */
+function paintFish(c: HTMLCanvasElement, color: string, id: string, caught: boolean): void {
+  const g = c.getContext('2d');
+  if (!g) return;
+  const W = c.width, H = c.height;
+  g.clearRect(0, 0, W, H);
+  g.globalAlpha = caught ? 1 : 0.55;
+  g.fillStyle = color;
+  g.strokeStyle = 'rgba(27,25,22,0.7)';
+  g.lineWidth = 1.4;
+  if (id === 'sandal') {
+    g.beginPath(); g.ellipse(W / 2, H / 2, 30, 11, -0.15, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(W / 2 - 14, H / 2 - 6); g.quadraticCurveTo(W / 2, H / 2 + 8, W / 2 + 14, H / 2 - 8); g.stroke();
+    return;
+  }
+  const L = id === 'kun' ? 40 : 30, T = id === 'dace' ? 7 : id === 'kun' ? 13 : 10;
+  const cx = W / 2 - 4, cy = H / 2;
+  g.beginPath();
+  g.moveTo(cx - L, cy);
+  g.quadraticCurveTo(cx - L * 0.2, cy - T * 1.5, cx + L * 0.7, cy - 1);
+  g.lineTo(cx + L + 6, cy - T);
+  g.lineTo(cx + L + 3, cy);
+  g.lineTo(cx + L + 6, cy + T);
+  g.lineTo(cx + L * 0.7, cy + 1);
+  g.quadraticCurveTo(cx - L * 0.2, cy + T * 1.4, cx - L, cy);
+  g.closePath();
+  g.fill(); g.stroke();
+  g.fillStyle = caught ? '#1b1916' : 'rgba(27,25,22,0.4)';
+  g.beginPath(); g.arc(cx - L * 0.72, cy - 2, 1.8, 0, Math.PI * 2); g.fill();
+  if (id === 'dragon') { g.strokeStyle = '#1b1916'; g.beginPath(); g.moveTo(cx - L + 2, cy + 2); g.quadraticCurveTo(cx - L - 8, cy + 8, cx - L - 10, cy + 2); g.stroke(); }
+}

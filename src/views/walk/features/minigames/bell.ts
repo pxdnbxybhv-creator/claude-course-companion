@@ -7,7 +7,7 @@ import { ANCHORS } from '../../map';
 import { feature, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { flag } from '../../../../app/play';
-import { begin, button, closeButton, end, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
+import { begin, button, closeButton, end, frameOn, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import { chirps } from '../sfx';
 import * as snd from './sound';
 
@@ -36,10 +36,11 @@ export const templeBell = feature('mg-bell', (bag, ctx) => {
   const centre = new THREE.Vector3();
   let radius = 0.75, bottom = 0, top = 0;
   if (bell) {
+    // heights from the world box; the axis from the bell's own origin (it hangs from it), not from
+    // the box — a turned bell's box is wider than the bronze, and the boss makes it lopsided
     const box = new THREE.Box3().setFromObject(bell);
-    box.getCenter(centre);
-    const size = box.getSize(new THREE.Vector3());
-    radius = Math.max(0.3, Math.min(1.5, Math.max(size.x, size.z) / 2));
+    bell.getWorldPosition(centre);
+    centre.y = (box.min.y + box.max.y) / 2;
     bottom = box.min.y;
     top = box.max.y;
   } else {
@@ -83,51 +84,70 @@ export const templeBell = feature('mg-bell', (bag, ctx) => {
   const bellObj = bell;
   const restQ = bellObj.quaternion.clone();
 
-  // ── where you stand, and the log between you and the bronze (toward the hall, else east)
-  let u = { x: hall.x - centre.x, z: hall.z - centre.z };
+  // ── where you stand, and the log between you and the bronze: the side the scenery cast the boss
+  // on (userData.strikeDir), else toward the hall (else the first open side)
+  const sd = bellObj.userData?.strikeDir as T.Vector3 | undefined;
+  let u = sd && Math.hypot(sd.x, sd.z) > 0.1 ? { x: sd.x, z: sd.z } : { x: hall.x - centre.x, z: hall.z - centre.z };
   let L = Math.hypot(u.x, u.z) || 1;
   u = { x: u.x / L, z: u.z / L };
-  const tryDirs = [u, { x: -u.z, z: u.x }, { x: u.z, z: -u.x }, { x: -u.x, z: -u.z }];
-  for (const d of tryDirs) {
-    const k = radius + 2.1;
-    if (ctx.isWalkable(centre.x + d.x * k, centre.z + d.z * k)) { u = d; break; }
+  if (!sd) {
+    const tryDirs = [u, { x: -u.z, z: u.x }, { x: u.z, z: -u.x }, { x: -u.x, z: -u.z }];
+    for (const d of tryDirs) {
+      const k = radius + 2.1;
+      if (ctx.isWalkable(centre.x + d.x * k, centre.z + d.z * k)) { u = d; break; }
+    }
   }
-  // beside the log (the ringer stands to one side and hauls the rope), facing the bell
-  L = radius + 1.5;
-  const perp = { x: -u.z, z: u.x };
-  let sideK = 1;
-  if (!ctx.isWalkable(centre.x + u.x * L + perp.x, centre.z + u.z * L + perp.z)) sideK = -1;
-  const stand = new THREE.Vector3(centre.x + u.x * L + perp.x * sideK, 0, centre.z + u.z * L + perp.z * sideK);
-  stand.y = ctx.groundY(stand.x, stand.z);
-  const heading = Math.atan2(centre.x - stand.x, centre.z - stand.z);
   const strikeY = bottom + (centre.y - bottom) * 0.55;
   const pivotY = strikeY + 1.5;
+  // the bronze (or its boss) where the log meets it: cast a ray in along the swing at strike height
+  bellObj.updateWorldMatrix(true, true);
+  const probe = new THREE.Raycaster(new THREE.Vector3(centre.x + u.x * 6, strikeY, centre.z + u.z * 6), new THREE.Vector3(-u.x, 0, -u.z), 0, 6);
+  probe.params.Line = { threshold: 0.001 };
+  probe.layers.enableAll(); // the regions' scenery keeps off the reflection layer
+  const hit = probe.intersectObject(bellObj, true).find((i) => (i.object as T.Mesh).isMesh);
+  const surface = hit ? Math.max(0.3, 6 - hit.distance) : radius;
 
   if (ownFrame) {
     // our frame's posts stand across the swing, clear of the log
     ownFrame.rotation.y = Math.atan2(u.x, u.z);
     for (const sgn of [-1, 1]) bag.onDispose(ctx.addCollider({ x: centre.x + u.z * 1.4 * sgn, z: centre.z - u.x * 1.4 * sgn, r: 0.3, h: 3 }));
   }
-  // the log swings in the plane of u about a pivot above; at rest its head just clears the bell
+  // the log swings in the plane of u about a pivot above; at rest (angle 0, where a strike lands)
+  // its head sits 2 cm off the bronze. The mountain hangs the timber for it at radius 0.8 + 0.95 m
+  // (userData.strikerRestD when it says so): the log is cut to reach from there.
   const logPivot = new THREE.Group();
-  const restD = radius + 0.95;
+  logPivot.name = 'bell-striker';
+  const GAP = 0.02;
+  const sceneryD = (bellObj.userData?.strikerRestD as number | undefined) ?? (ours ? 0 : 0.8 + 0.95);
+  const logLen = sceneryD ? Math.max(1.3, Math.min(2.6, 2 * (sceneryD - surface - GAP))) : 1.6;
+  const restD = surface + GAP + logLen / 2;
   logPivot.position.set(centre.x + u.x * restD, pivotY, centre.z + u.z * restD);
   logPivot.rotation.y = Math.atan2(u.x, u.z);
-  const logLen = 1.6;
+  const ropeZ = Math.min(0.6, logLen / 2 - 0.35);
   const logGeo = merge(THREE, [
     part(THREE, new THREE.CylinderGeometry(0.11, 0.12, logLen, 10), '#7a5a3c', { p: [0, -1.5, 0], r: [Math.PI / 2, 0, 0] }),
     part(THREE, new THREE.CircleGeometry(0.11, 10), '#b89a70', { p: [0, -1.5, -logLen / 2 - 0.001], r: [Math.PI, 0, 0] }),
-    part(THREE, new THREE.TorusGeometry(0.12, 0.018, 4, 12), P.cinnabar, { p: [0, -1.5, 0.35] }),
-    part(THREE, new THREE.TorusGeometry(0.12, 0.018, 4, 12), P.cinnabar, { p: [0, -1.5, -0.35] }),
+    part(THREE, new THREE.TorusGeometry(0.12, 0.018, 4, 12), P.cinnabar, { p: [0, -1.5, ropeZ] }),
+    part(THREE, new THREE.TorusGeometry(0.12, 0.018, 4, 12), P.cinnabar, { p: [0, -1.5, -ropeZ] }),
     // two ropes to the beam
-    part(THREE, new THREE.CylinderGeometry(0.012, 0.012, 1.5, 4), '#c9b27a', { p: [0, -0.75, 0.45] }),
-    part(THREE, new THREE.CylinderGeometry(0.012, 0.012, 1.5, 4), '#c9b27a', { p: [0, -0.75, -0.45] }),
-    // a tail rope to pull
-    part(THREE, new THREE.CylinderGeometry(0.014, 0.014, 0.9, 4), '#c9b27a', { p: [0, -1.85, logLen / 2 + 0.05], r: [0.5, 0, 0] }),
+    part(THREE, new THREE.CylinderGeometry(0.012, 0.012, 1.5, 4), '#c9b27a', { p: [0, -0.75, ropeZ] }),
+    part(THREE, new THREE.CylinderGeometry(0.012, 0.012, 1.5, 4), '#c9b27a', { p: [0, -0.75, -ropeZ] }),
+    // a tail rope to pull, tied round the butt and hanging back toward the ringer
+    part(THREE, new THREE.TorusGeometry(0.12, 0.02, 4, 12), '#c9b27a', { p: [0, -1.5, logLen / 2 - 0.08] }),
+    part(THREE, new THREE.CylinderGeometry(0.014, 0.014, 0.86, 4), '#c9b27a', { p: [0, -1.92, logLen / 2 + 0.08], r: [-0.38, 0, 0] }),
   ]);
   const log = inked(ctx, logGeo, { width: 0.01 });
   logPivot.add(log);
   bag.add(logPivot, group);
+
+  // beside the log's butt (the ringer stands to one side and hauls the rope), facing the bell
+  L = Math.max(surface + 1.5, restD + logLen / 2 - 0.45);
+  const perp = { x: -u.z, z: u.x };
+  let sideK = 1;
+  if (!ctx.isWalkable(centre.x + u.x * L + perp.x, centre.z + u.z * L + perp.z)) sideK = -1;
+  const stand = new THREE.Vector3(centre.x + u.x * L + perp.x * sideK, 0, centre.z + u.z * L + perp.z * sideK);
+  stand.y = ctx.groundY(stand.x, stand.z);
+  const heading = Math.atan2(centre.x - stand.x, centre.z - stand.z);
 
   // a ring of sound spreading over the ground
   const ringMat = new THREE.MeshBasicMaterial({ color: '#f4efe4', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
@@ -150,6 +170,7 @@ export const templeBell = feature('mg-bell', (bag, ctx) => {
     if (!begin(ctx, 'bell')) return;
     ctx.player.freeze(true);
     ctx.player.teleport(stand.x, stand.z, heading);
+    frameOn(ctx, centre.x, centre.z, strikeY);
     const p = panel(bag, 'mg-bell');
     const dock = h('div', 'mg-dock', undefined, p.root);
     const status = h('div', 'mg-status mg-live', tr(ctx, '按住，把撞木拉回来；松手撞钟', 'Hold to haul the log back; let go to strike'), dock);

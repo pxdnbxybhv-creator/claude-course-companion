@@ -24,9 +24,16 @@ const toEast = (() => {
   const dx = -60 - SUMMIT.x, dz = -80 - SUMMIT.z, l = Math.hypot(dx, dz);
   return { x: dx / l, z: dz / l };
 })();
-const UP_STEPS: XZ[] = wind([{ x: -72, z: -65.2 }, { x: -71.2, z: -68 }, { x: -72.2, z: -70.6 }, { x: SUMMIT.x, z: SUMMIT.z + PAV_R - 0.1 }], 0.5);
+/** How far the hexagonal platform (corners on ±x) reaches from its centre in direction (dx, dz). */
+const hexReach = (dx: number, dz: number) => {
+  const a = Math.atan2(dz, dx);
+  const off = ((((a % (Math.PI / 3)) + Math.PI / 3) % (Math.PI / 3))) - Math.PI / 6; // from the nearest side's normal (sides face 30° + k·60°)
+  return (PAV_R * Math.cos(Math.PI / 6)) / Math.cos(off);
+};
+// both flights start just inside the platform's edge, so the last slab meets the paving without a gap
+const UP_STEPS: XZ[] = wind([{ x: -72, z: -65.2 }, { x: -71.2, z: -68 }, { x: -72.2, z: -70.6 }, { x: SUMMIT.x, z: SUMMIT.z + hexReach(0, 1) - 0.05 }], 0.5);
 const EAST_STEPS: XZ[] = wind([
-  { x: SUMMIT.x + toEast.x * (PAV_R - 0.1), z: SUMMIT.z + toEast.z * (PAV_R - 0.1) },
+  { x: SUMMIT.x + toEast.x * (hexReach(toEast.x, toEast.z) - 0.05), z: SUMMIT.z + toEast.z * (hexReach(toEast.x, toEast.z) - 0.05) },
   { x: -65, z: -79.2 }, { x: -60.5, z: -80.2 },
 ], 0.5);
 const BENCH_TRAIL: XZ[] = wind([{ x: -71, z: -64.5 }, { x: -67, z: -62.4 }, { x: BENCH.x - 1.2, z: BENCH.z - 0.2 }], 0.6);
@@ -144,7 +151,12 @@ function build(ctx: WorldCtx): void {
       }
       b.segs(fret);
       if (!open) {
-        // 美人靠: a seat and a back that leans out over the view
+        // 美人靠: a seat and a back that leans out over the view — solid, so the open sides are the only ways in
+        const nIn = 0.1 / Math.hypot((cx + dx) / 2, (cz + dz) / 2);
+        for (let k = 1; k < 6; k++) {
+          const u = k / 6;
+          h.collide({ x: x + (cx + (dx - cx) * u) * (1 - nIn), z: z + (cz + (dz - cz) * u) * (1 - nIn), r: 0.25, h: 1 });
+        }
         const inX = Math.cos(mid) * -0.12, inZ = Math.sin(mid) * -0.12;
         b.add(place(new THREE.BoxGeometry(len, 0.08, 0.38), mx + inX, top + 0.45, mz + inZ, ry), COL.wood, { edge: 30 });
         b.add(place(new THREE.BoxGeometry(len, 0.4, 0.06), mx + inX, top + 0.22, mz + inZ, ry), '#6a4a38', { edge: 30 });
@@ -191,6 +203,12 @@ function build(ctx: WorldCtx): void {
     plaque.name = 'plum:plaque';
     h.add(plaque);
     h.occlude({ x, z, r: 3.2, y0: beamY, y1: e2 + 2 });
+    // the platform is walkable: a hexagon (corners on ±x) as three rectangles turned by 60°
+    for (let k = 0; k < 3; k++) {
+      const a = (k * Math.PI) / 3;
+      h.deck({ id: `plum:platform${k}`, cx: x, cz: z, ax: Math.cos(a), az: Math.sin(a), hl: PAV_R / 2, hw: PAV_R * Math.cos(Math.PI / 6), y: () => top + 0.03 });
+    }
+    h.clearing({ cx: x, cz: z, ax: 1, az: 0, hl: PAV_R + 0.3, hw: PAV_R + 0.3 });
     // two red lanterns at the south opening (the cinnabar accent of the ridge)
     const lanMat = h.toon('#b0473a', { emissive: '#000000' });
     const capMat = h.toon('#2b2724');

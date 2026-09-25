@@ -8,7 +8,7 @@ import { dayRng, feature, inked, reducedMotion, reflects } from '../kit';
 import { merge, part } from '../geo';
 import { burst } from '../props';
 import { record } from '../../../../app/play';
-import { begin, button, end, h, hold, onEscape, panel, tr, type Hold, type Panel } from './ui';
+import { begin, button, end, h, hold, onEscape, panel, touchInput, tr, type Hold, type Panel } from './ui';
 import { ripples } from './fx';
 import { dockSpot } from './fishing';
 import * as snd from './sound';
@@ -27,22 +27,29 @@ export const boating = feature('mg-boat', (bag, ctx) => {
   const group = ctx.regionGroup('lake');
   const still = reducedMotion();
   const rip = ripples(bag, group, 10);
-  const inLake = (x: number, z: number, m = 0.94) => ((x - LAKE.x) / LAKE.rx) ** 2 + ((z - LAKE.z) / LAKE.rz) ** 2 < m * m && ctx.waterAt(x, z) !== null;
+  const lakeK = (x: number, z: number) => Math.hypot((x - LAKE.x) / LAKE.rx, (z - LAKE.z) / LAKE.rz);
+  const inLake = (x: number, z: number, m = 0.94) => lakeK(x, z) < m && ctx.waterAt(x, z) !== null;
 
-  // ── the mooring: open water a few metres off the dock, to one side of the fishing spot
+  // ── the mooring: tied up alongside the jetty, bow to the lake, a short step down from the
+  // planks and a few metres back from the angler's spot at the end (so the two prompts never fight)
   const { stand: dockStand, dir } = dockSpot(ctx);
-  const side = { x: -dir.z, z: dir.x };
-  let moor = { x: dockStand.x + dir.x * 3, z: dockStand.z + dir.z * 3 };
-  outer: for (const sd of [-3.5, 3.5, -2, 2, 0]) {
-    for (const fw of [2.5, 3.5, 4.5]) {
-      const x = dockStand.x + dir.x * fw + side.x * sd, z = dockStand.z + dir.z * fw + side.z * sd;
-      if (inLake(x, z, 0.97)) { moor = { x, z }; break outer; }
-    }
-  }
-  const moorHeading = Math.atan2(side.x, side.z);
+  const moorHeading = Math.atan2(dir.x, dir.z);
+  const HULL: [number, number][] = [[0, 0], [1.75, 0], [-1.75, 0], [1, 0.62], [1, -0.62], [-1, 0.62], [-1, -0.62], [0, 0.62], [0, -0.62]];
+  /** The hull at (x, z) sits all in open lake water, touching no deck or bank. */
+  const hullClear = (x: number, z: number, hd: number) => {
+    const fx = Math.sin(hd), fz = Math.cos(hd);
+    return HULL.every(([f, q]) => {
+      const px = x + fx * f + fz * q, pz = z + fz * f - fx * q;
+      return inLake(px, pz, 0.99) && !ctx.isWalkable(px, pz);
+    });
+  };
+  const mooring = findMooring(dockStand, dir, hullClear, (x, z) => ctx.isWalkable(x, z));
+  const moor = mooring?.boat ?? { x: dockStand.x + dir.x * 3, z: dockStand.z + dir.z * 3 };
+  /** Where you step aboard from (and ashore to) at the dock. */
+  const plank = mooring?.plank ?? { x: dockStand.x, z: dockStand.z };
   const pav = ctx.anchor(ANCHORS.waterPavilion);
   const landings = [
-    { x: dockStand.x, z: dockStand.z, zh: '渡口', en: 'the dock' },
+    { x: plank.x, z: plank.z, zh: '渡口', en: 'the dock' },
     { x: pav.x, z: pav.z, zh: '水榭', en: 'the water pavilion' },
   ];
 
@@ -117,7 +124,9 @@ export const boating = feature('mg-boat', (bag, ctx) => {
   let escaped = false;
   let shore: { x: number; z: number; zh: string; en: string } | null = null, shoreT = 0;
   let heading = moorHeading, speed = 0, strokeT = 0, wakeT = 0, awayT = 0, picked = 0, songI = Math.floor(rng() * SONGS.length);
-  const boardSpot = new THREE.Vector3(moor.x, 0, moor.z);
+  // the prompt stands on the planks by the boat (or wherever you last stepped ashore from it)
+  const plankSpot = new THREE.Vector3(plank.x, ctx.groundY(plank.x, plank.z), plank.z);
+  const boardSpot = plankSpot.clone();
 
   function board() {
     if (!begin(ctx, 'boat')) return;
@@ -127,7 +136,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     snd.splash(0.2);
     const p = panel(bag, 'mg-boat');
     const dock = h('div', 'mg-dock', undefined, p.root);
-    const status = h('div', 'mg-status mg-live', tr(ctx, '推动摇杆划船', 'Push the stick to row'), dock);
+    const status = h('div', 'mg-status mg-live', touchInput() ? tr(ctx, '推动摇杆划船', 'Push the stick to row') : tr(ctx, 'WASD 或方向键划船', 'Row with WASD or the arrow keys'), dock);
     h('small', '', tr(ctx, '靠近莲蓬可采；到渡口或水榭可上岸', 'Row up to a lotus pod to pick it; land at the dock or the pavilion'), status);
     const row = h('div', 'mg-row', undefined, dock);
     const pick = button(row, '采', tr(ctx, '', 'Pick'));
@@ -153,6 +162,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
       tz += (boat.position.z - to.z) * -0.05 + Math.sin(k) * 0.4;
     }
     ctx.player.teleport(tx, tz, Math.atan2(tx - boat.position.x, tz - boat.position.z));
+    boardSpot.set(tx, ctx.groundY(tx, tz), tz);
     ctx.player.freeze(false);
     end(ctx, 'boat');
     ctx.hud.toast(`在${to.zh}上岸`, `Ashore at ${to.en}`, 1600);
@@ -180,7 +190,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
   }
 
   bag.interact({
-    id: 'mg-boat', position: boardSpot, radius: 3.2,
+    id: 'mg-boat', position: boardSpot, radius: 2,
     labelZh: '乌篷船', labelEn: 'Little boat', actionZh: '上船', actionEn: 'Board',
     act() { board(); },
   });
@@ -193,7 +203,6 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     boat.position.y = wy + 0.12 + (still ? 0 : Math.sin(t * 1.3) * 0.02);
     hull.rotation.z = still ? 0 : Math.sin(t * 0.9) * 0.025 + (riding ? Math.sin(t * 1.7) * 0.01 : 0);
     hull.rotation.x = still ? 0 : Math.sin(t * 0.7 + 1) * 0.015 - speed * 0.01;
-    boardSpot.set(boat.position.x, boat.position.y, boat.position.z);
     // lotus pods sway a little
     if (!still) for (let i = 0; i < pods.length; i++) pods[i].g.children[0].rotation.x = Math.sin(t * 0.8 + i) * 0.04;
 
@@ -202,7 +211,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
       const d = Math.hypot(ctx.player.position.x - boat.position.x, ctx.player.position.z - boat.position.z);
       if (Math.hypot(boat.position.x - moor.x, boat.position.z - moor.z) > 1 && d > 25) {
         awayT += dt;
-        if (awayT > 15) { boat.position.x = moor.x; boat.position.z = moor.z; heading = moorHeading; boat.rotation.y = heading; awayT = 0; }
+        if (awayT > 15) { boat.position.x = moor.x; boat.position.z = moor.z; heading = moorHeading; boat.rotation.y = heading; boardSpot.copy(plankSpot); awayT = 0; }
       } else awayT = 0;
       return;
     }
@@ -226,7 +235,11 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     speed += (thrust * 2.4 - speed * 0.7) * dt;
     speed = Math.max(0, Math.min(3, speed));
     const nx = boat.position.x + Math.sin(heading) * speed * dt, nz = boat.position.z + Math.cos(heading) * speed * dt;
-    if (inLake(nx, nz) && !pods.some((p) => !p.picked && Math.hypot(p.x - nx, p.z - nz) < 0.9)) {
+    // open water ahead: in the lake, clear of the pods, and not through the dock or the zigzag bridge
+    const bx = nx + Math.sin(heading) * 1.6, bz = nz + Math.cos(heading) * 1.6;
+    // (the berth lies near the bank, past the rowing ring: heading out toward the middle is always fine)
+    const open = inLake(nx, nz) || (inLake(nx, nz, 0.995) && lakeK(nx, nz) < lakeK(boat.position.x, boat.position.z));
+    if (open && !ctx.isWalkable(bx, bz) && !pods.some((p) => !p.picked && Math.hypot(p.x - nx, p.z - nz) < 0.9)) {
       boat.position.x = nx;
       boat.position.z = nz;
     } else if (speed > 0.4) {
@@ -282,3 +295,44 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     }
   });
 });
+
+/**
+ * A berth for the boat beside the jetty: walk back from the angler's spot along the planks, find the
+ * jetty's edge on either side, and lay the hull parallel just off it, with open water straight ahead
+ * of the bow. The plank is the walkable point at the edge beside the hull, 2.2–6 m from the angler
+ * (nearest 3.5 m wins): the nearer prompt shows, so on the plank it is always the boat's.
+ */
+export function findMooring(
+  stand: { x: number; z: number }, dir: { x: number; z: number },
+  hullClear: (x: number, z: number, heading: number) => boolean, walkable: (x: number, z: number) => boolean,
+): { boat: { x: number; z: number }; plank: { x: number; z: number } } | null {
+  const side = { x: -dir.z, z: dir.x };
+  const heading = Math.atan2(dir.x, dir.z);
+  let best: { boat: { x: number; z: number }; plank: { x: number; z: number }; score: number } | null = null;
+  for (const sgn of [1, -1]) {
+    for (let fw = -1; fw >= -9; fw -= 0.25) {
+      const cx = stand.x + dir.x * fw, cz = stand.z + dir.z * fw;
+      if (!walkable(cx, cz)) continue;
+      // the edge of the planks on this side
+      let edge = 0;
+      for (let q = 0.05; q <= 4; q += 0.05) { if (walkable(cx + side.x * sgn * q, cz + side.z * sgn * q)) edge = q; else break; }
+      for (const gap of [0.85, 1.0, 1.2]) {
+        const q = edge + gap;
+        const bx = cx + side.x * sgn * q, bz = cz + side.z * sgn * q;
+        if (!hullClear(bx, bz, heading)) continue;
+        // and a clear run out onto the lake, bow first (not tucked in behind the T's crossbar)
+        let run = true;
+        for (let k = 0.25; k <= 6 && run; k += 0.25) run = hullClear(bx + dir.x * k, bz + dir.z * k, heading);
+        if (!run) continue;
+        const pq = Math.max(0, edge - 0.3);
+        const plank = { x: cx + side.x * sgn * pq, z: cz + side.z * sgn * pq };
+        const dStand = Math.hypot(plank.x - stand.x, plank.z - stand.z);
+        if (dStand < 2.2 || dStand > 6) break;
+        const score = Math.abs(dStand - 3.5) + (gap - 0.85);
+        if (!best || score < best.score) best = { boat: { x: bx, z: bz }, plank, score };
+        break;
+      }
+    }
+  }
+  return best && { boat: best.boat, plank: best.plank };
+}
