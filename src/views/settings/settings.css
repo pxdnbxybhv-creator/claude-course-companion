@@ -1,0 +1,99 @@
+/* 设置 · Settings */
+.settings-view .topbar { max-width: 680px; }
+.settings-view .topbar-title { align-items: center; gap: 6px; }
+.set-back { margin-left: -10px; }
+.set-page { padding-bottom: 28px; }
+.set-section .section-title { margin-top: 26px; }
+.set-section .section-title::before { display: none; }
+.set-glyph {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 30% 42% 36% 40%;
+  background: var(--cinnabar); color: #fbf5ea; font-size: 16px; letter-spacing: 0; transform: rotate(-4deg);
+}
+.set-card { padding: 4px 16px; }
+.set-row { gap: 10px 12px; }
+.set-row-wrap { flex-wrap: wrap; }
+.set-row-wrap > .row-main { flex: 1 1 180px; }
+.set-row .seg { flex: none; }
+.set-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.set-btns .btn-small, .set-row .btn-small, .set-manual .btn-small { min-height: 44px; padding: 0 16px; }
+.set-row .seg button { min-height: 40px; }
+.set-row .seg { padding: 2px; }
+/* the kit's switch is 28 px tall; widen its hit area to 44 px without changing its look */
+.set-row .toggle::before { content: ''; position: absolute; inset: -9px -4px; }
+.set-hint { display: block; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+
+/* seal */
+.set-seal { display: flex; align-items: center; gap: 18px; padding: 6px 0 12px; flex-wrap: wrap; }
+.set-seal-field { flex: 1 1 180px; margin: 8px 0; }
+.set-seal-field input { font-size: 26px; letter-spacing: 0.3em; font-family: var(--font-brush); }
+.set-seal-previews { display: flex; gap: 14px; margin: 0 auto; }
+.set-seal-previews figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.set-seal-previews figcaption { font-size: 12px; color: var(--ink-3); letter-spacing: 0.14em; }
+.set-paper {
+  width: 92px; height: 92px; display: grid; place-items: center; border-radius: 6px;
+  background: #f1e9d8; box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 6px 14px -8px rgba(40, 30, 10, 0.45);
+}
+.set-paper .seal-stamp { mix-blend-mode: multiply; transform: rotate(-1.5deg); }
+.set-seal-previews figure + figure .seal-stamp { transform: rotate(1.2deg); }
+.seal-stamp { display: grid; place-items: center; flex: none; }
+.seal-stamp canvas { display: block; }
+
+/* volume */
+.set-volume { flex-wrap: wrap; }
+.set-volume-label { flex: 0 0 auto; display: flex; flex-direction: column; min-width: 64px; }
+.set-volume.is-off .set-volume-label { opacity: 0.5; }
+.set-range {
+  flex: 1 1 140px; min-width: 120px; height: 44px; background: transparent; -webkit-appearance: none; appearance: none; margin: 0;
+  --fill: 70%;
+}
+.set-range::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 4px;
+  background: linear-gradient(to right, var(--cinnabar) var(--fill), var(--paper-3) var(--fill));
+}
+.set-range::-moz-range-track { height: 4px; border-radius: 4px; background: var(--paper-3); }
+.set-range::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--cinnabar); }
+.set-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; margin-top: -9px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--cinnabar); box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.35);
+}
+.set-range::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--paper); border: 2px solid var(--cinnabar); }
+.set-range:disabled { opacity: 0.4; }
+.set-range:focus-visible { outline-offset: 0; }
+.set-preview { flex: none; }
+
+/* location */
+.set-manual { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 14px; padding: 4px 0 12px; border-bottom: 1px solid var(--line); }
+.set-manual .field { flex: 1 1 110px; margin: 8px 0; }
+.set-manual .field input { font-size: 17px; font-family: var(--font-latin); }
+.set-manual .field input[aria-invalid='true'] { border-bottom-color: var(--cinnabar); }
+.set-manual .set-hint { flex-basis: 100%; margin-top: 6px; }
+
+/* data */
+.set-summary { margin: 10px 0 2px; font-size: 13px; color: var(--ink-3); letter-spacing: 0.06em; }
+.set-danger { color: var(--cinnabar); border-color: color-mix(in srgb, var(--cinnabar) 55%, transparent); }
+.set-danger-text { color: var(--cinnabar); }
+.set-danger-solid { background: var(--cinnabar); border-color: var(--cinnabar); color: #fbf5ea; }
+.set-sheet p { margin: 8px 0; line-height: 1.7; }
+.set-warn { color: var(--cinnabar); }
+.set-warn-big { font-size: 18px; }
+.set-sheet-btns { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.set-sheet-btns .btn { flex: 1 1 140px; }
+.set-json {
+  width: 100%; min-height: 140px; max-height: 40dvh; padding: 10px; border-radius: 10px; resize: vertical;
+  border: 1px solid var(--line-strong); background: var(--paper-2); color: var(--ink);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* about */
+.set-poem { margin: 14px 0 6px; display: flex; flex-direction: row-reverse; justify-content: center; align-items: flex-end; gap: 6px; }
+.set-poem-cols { writing-mode: vertical-rl; text-orientation: upright; }
+.set-poem-cols p { margin: 0; font-size: 25px; line-height: 1.6; letter-spacing: 0.16em; color: var(--ink); white-space: nowrap; }
+.set-poem-cols .set-poem-by { font-family: var(--font-text); font-size: 13px; line-height: 2.2; letter-spacing: 0.22em; color: var(--ink-3); padding-inline-start: 5.2em; }
+.set-poem .seal-stamp { margin-bottom: 4px; mix-blend-mode: multiply; }
+:root[data-theme='dark'] .set-poem .seal-stamp { mix-blend-mode: normal; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .set-poem .seal-stamp { mix-blend-mode: normal; } }
+.set-poem-en { margin: 8px 0; font-size: 16px; font-style: italic; color: var(--ink-2); line-height: 1.55; text-align: center; }
+.set-about-line { margin: 10px 0; font-size: 14.5px; color: var(--ink-2); line-height: 1.75; text-align: center; }
+.set-privacy { color: var(--ink); }
+.set-about-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0 12px; border-top: 1px solid var(--line); margin-top: 8px; }
+.set-about-foot .btn-small { min-height: 44px; }

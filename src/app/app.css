@@ -1,0 +1,27 @@
+.shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.view { flex: 1; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); animation: view-in 0.5s var(--ease); }
+@keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  display: flex; justify-content: center; gap: 4px;
+  padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--paper) 86%, transparent);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+}
+.tab { flex: 0 1 96px; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 0; color: var(--ink-3); transition: color 0.3s; }
+.tab-glyph { font-size: 26px; line-height: 1.2; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; transition: background 0.3s, color 0.3s, transform 0.3s var(--ease); }
+.tab-label { font-size: 11px; letter-spacing: 0.08em; }
+.tab.is-active { color: var(--ink); }
+.tab.is-active .tab-glyph { background: var(--cinnabar); color: #fbf5ea; transform: rotate(-4deg); border-radius: 30% 42% 36% 40%; }
+
+@media (min-width: 900px) {
+  .tabbar {
+    left: 50%; right: auto; bottom: 18px; transform: translateX(-50%);
+    border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px;
+    box-shadow: var(--shadow);
+  }
+  .tab { flex: 0 0 88px; }
+  .view { padding-bottom: 110px; }
+}

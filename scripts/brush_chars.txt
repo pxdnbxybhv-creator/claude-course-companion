@@ -1,0 +1,29 @@
+# The Ma Shan Zheng *display* set: every character the UI shows in the brush face (`.brush`,
+# --font-brush, seals). These go into mashanzheng.woff2, which loads with the first screen.
+# Every other hanzi in the source (e.g. the poems brushed onto the scroll poster) goes into
+# mashanzheng-ext.woff2, fetched on demand. `npm run fonts` also puts all of these into WenKai.
+# Add a character here when you show it in brush; lines starting with # and whitespace are ignored.
+
+# brand · the poem it comes from
+半亩方塘一鉴开天光云影共徘徊问渠那得清如许为有源头活水来观书有感朱熹
+# tabs and titles
+园圃香一炷历时令卷长设置专注节气农历画轴印章落款岁记尽种照
+# the six plants, and the ambient sounds of the focus room
+梅兰竹菊松荷莲柏石苔
+无声雨溪山风琴音
+# leisure seals and 宜 / 忌
+日好新惜阴寒知白守黑宜忌
+# seasons, directions, times of day
+春夏秋冬晨昼暮夜晴雪霜露雾
+# the 24 solar terms
+立春雨水惊蛰春分清明谷雨立夏小满芒种夏至小暑大暑
+立秋处暑白露秋分寒露霜降立冬小雪大雪冬至小寒大寒
+# numerals and date words
+〇零一二三四五六七八九十廿卅百千万两年月日时分秒周星期天今明昨初上中下旬
+# lunar months and days
+正腊闰冬月初
+# heavenly stems, earthly branches, zodiac
+甲乙丙丁戊己庚辛壬癸子丑寅卯辰巳午未申酉戌亥
+鼠牛虎兔龙蛇马羊猴鸡狗猪
+# the pentads' verbs
+候始生鸣至见降

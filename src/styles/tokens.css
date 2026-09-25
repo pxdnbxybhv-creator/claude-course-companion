@@ -1,0 +1,61 @@
+/* Design tokens. Light = xuan paper; dark = the painting mounted on dark silk (装裱). */
+:root {
+  --paper: #f1e9d8;
+  --paper-2: #e8dec9;
+  --paper-3: #ded2b9;
+  --ink: #1b1916;
+  --ink-2: #4a443c;
+  --ink-3: #857c6e;
+  --line: rgba(27, 25, 22, 0.14);
+  --line-strong: rgba(27, 25, 22, 0.32);
+  --cinnabar: #b93a2b;
+  --cinnabar-soft: rgba(185, 58, 43, 0.12);
+  --gamboge: #c9952a;
+  --indigo: #3d5a73;
+  --malachite: #5f8a6e;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 8px 24px -12px rgba(40, 30, 10, 0.25);
+  --mount: #e2d8c3; /* the mounting around the painting */
+
+  --font-brush: 'Cormorant Garamond', 'Ma Shan Zheng', 'LXGW WenKai', 'STXingkai', 'Xingkai SC', 'KaiTi', 'STKaiti', cursive;
+  --font-text: 'LXGW WenKai', 'Kaiti SC', 'STKaiti', 'KaiTi', 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --font-latin: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+
+  --radius: 14px;
+  --gutter: 16px;
+  --tabbar-h: 68px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #1b1814;
+    --paper-2: #231f1a;
+    --paper-3: #2c2721;
+    --ink: #ece4d2;
+    --ink-2: #bfb5a2;
+    --ink-3: #8a8272;
+    --line: rgba(236, 228, 210, 0.12);
+    --line-strong: rgba(236, 228, 210, 0.3);
+    --cinnabar: #c04a37;
+    --cinnabar-soft: rgba(192, 74, 55, 0.16);
+    --shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+    --mount: #2b251e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --paper: #1b1814;
+  --paper-2: #231f1a;
+  --paper-3: #2c2721;
+  --ink: #ece4d2;
+  --ink-2: #bfb5a2;
+  --ink-3: #8a8272;
+  --line: rgba(236, 228, 210, 0.12);
+  --line-strong: rgba(236, 228, 210, 0.3);
+  --cinnabar: #c04a37;
+  --cinnabar-soft: rgba(192, 74, 55, 0.16);
+  --shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7);
+  --mount: #2b251e;
+  color-scheme: dark;
+}

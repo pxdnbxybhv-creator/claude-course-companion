@@ -1,0 +1,23 @@
+{
+  "name": "半亩 · Half-Acre",
+  "short_name": "半亩",
+  "description": "半亩方塘一鉴开 — a habit garden painted in Chinese ink, with an incense-stick focus timer and a solar-term almanac.",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1e9d8",
+  "theme_color": "#f1e9d8",
+  "categories": ["lifestyle", "productivity", "health"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "一炷香 · Focus", "short_name": "一炷香", "url": "./#focus", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "节气 · Almanac", "short_name": "节气", "url": "./#almanac", "icons": [{ "src": "icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}
