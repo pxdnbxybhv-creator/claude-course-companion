@@ -1,7 +1,9 @@
 // Small shared toolkit for world features: lifetime bookkeeping, ink-palette materials, canvas
 // textures, placement on the land, and proximity. Runtime three.js objects come from ctx.THREE.
 import type * as T from 'three';
-import type { Interactable, WorldCtx } from '../types';
+import type { Interactable, WorldCtx, WorldFeature } from '../types';
+import { activeHabits } from '../../../app/store';
+import { hashString, makeRng, type Rng } from '../../../core/rng';
 
 export type Three = WorldCtx['THREE'];
 
@@ -14,6 +16,12 @@ export function reducedMotion(): boolean {
 }
 
 export const tr = (ctx: WorldCtx, zh: string, en: string) => (ctx.lang === 'zh' ? zh : en);
+
+/** A generator of this feature's own, seeded from the day: the same garden all day long. */
+export function dayRng(ctx: WorldCtx, salt: string): Rng {
+  const d = ctx.env.date;
+  return makeRng(hashString(`${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}:${salt}`));
+}
 
 // ───────────────────────────── lifetime ─────────────────────────────
 
@@ -40,11 +48,25 @@ export class Bag {
     return d;
   }
   frame(fn: (dt: number, t: number) => void): void {
+    if (import.meta.env.DEV) {
+      // DEV: window.__walkFeatureMs — a running average of all features' per-frame work
+      const w = window as unknown as { __walkFeatureMs?: { ms: number; acc: number; last: number } };
+      const stat = (w.__walkFeatureMs ??= { ms: 0, acc: 0, last: 0 });
+      const inner = fn;
+      fn = (dt, t) => {
+        const t0 = performance.now();
+        inner(dt, t);
+        const now = performance.now();
+        if (now - stat.last > 4) { stat.ms = stat.ms * 0.95 + stat.acc * 0.05; stat.acc = 0; stat.last = now; }
+        stat.acc += now - t0;
+      };
+    }
     this.offs.push(this.ctx.onFrame(fn));
   }
   interact(i: Interactable): () => void {
     let off: (() => void) | null = this.ctx.addInteractable(i);
-    const once = () => { off?.(); off = null; };
+    if (import.meta.env.DEV) devList().set(i.id, i);
+    const once = () => { off?.(); off = null; if (import.meta.env.DEV) devList().delete(i.id); };
     this.offs.push(once);
     return once;
   }
@@ -88,6 +110,12 @@ export class Bag {
 
 type Disposable = { dispose(): void };
 
+/** DEV only: every live feature interactable, for scripted tests (window.__walkFeatures). */
+function devList(): Map<string, Interactable> {
+  const w = window as unknown as { __walkFeatures?: Map<string, Interactable> };
+  return (w.__walkFeatures ??= new Map());
+}
+
 function freeMaterial(m: T.Material, seen: Set<unknown>) {
   if (seen.has(m)) return;
   seen.add(m);
@@ -118,6 +146,29 @@ export function freeTree(root: T.Object3D, seen = new Set<unknown>()): void {
     const inst = o as T.InstancedMesh;
     if (inst.isInstancedMesh && !seen.has(inst)) { seen.add(inst); inst.dispose(); }
   });
+}
+
+/** A feature whose whole lifetime lives in one Bag. `build` may be async (fonts). */
+export function feature(id: string, build: (bag: Bag, ctx: WorldCtx) => void | Promise<void>): WorldFeature {
+  let bag: Bag | null = null;
+  return {
+    id,
+    async init(ctx) {
+      bag?.dispose();
+      const b = new Bag(ctx);
+      bag = b;
+      try {
+        await build(b, ctx);
+      } catch (e) {
+        console.warn(`[walk] feature ${id} failed`, e);
+        b.dispose();
+      }
+    },
+    dispose() {
+      bag?.dispose();
+      bag = null;
+    },
+  };
 }
 
 // ───────────────────────────── colour & materials ─────────────────────────────
@@ -186,16 +237,34 @@ export async function loadBrush(chars: string): Promise<void> {
 export interface Spot { x: number; z: number; r: number }
 
 const occupied = new WeakMap<WorldCtx, Spot[]>();
+const arrival = new WeakMap<WorldCtx, { x: number; z: number; dx: number; dz: number; d: number }>();
 
-/** Places claimed by features (and landmarks) in this world, so props do not pile on each other. */
+/**
+ * Places claimed by features (and landmarks) in this world, so props do not pile on each other.
+ * The way in — from where the visitor arrives to the pond — is kept clear.
+ */
 export function claims(ctx: WorldCtx): Spot[] {
   let list = occupied.get(ctx);
   if (!list) {
     list = [];
     occupied.set(ctx, list);
-    for (const l of landmarks(ctx)) list.push({ x: l.position.x, z: l.position.z, r: l.radius });
+    for (const l of landmarks(ctx)) list.push({ x: l.position.x, z: l.position.z, r: l.radius + (l.kind === 'plant' ? 1.3 : 0.3) }); // plants keep their name tablets clear
+    const a = entry(ctx);
+    for (let s = 0; s < a.d; s += 1.4) list.push({ x: a.x - a.dx * s, z: a.z - a.dz * s, r: 1.1 });
   }
   return list;
+}
+
+/** Where the visitor arrived (the player's position when features start) and the way to the pond. */
+export function entry(ctx: WorldCtx): { x: number; z: number; dx: number; dz: number; d: number } {
+  let a = arrival.get(ctx);
+  if (!a) {
+    const p = ctx.player.position, c = ctx.pond.center;
+    const d = Math.hypot(p.x - c.x, p.z - c.z) || 1;
+    a = { x: p.x, z: p.z, dx: (p.x - c.x) / d, dz: (p.z - c.z) / d, d };
+    arrival.set(ctx, a);
+  }
+  return a;
 }
 
 /** Normalised elliptic distance from the pond centre (1 = the shoreline). */
@@ -245,6 +314,16 @@ export function findSpot(ctx: WorldCtx, rng: () => number, o: FindOpts = {}): T.
     if (!ctx.isWalkable(x, z)) continue;
     if (pondDist(ctx, x, z, margin) < 1) continue;
     if (Math.hypot(x, z) > R * 0.94) continue;
+    // stay on the garden side of the way in (a gate usually stands between the arrival and the pond)
+    const a = entry(ctx);
+    if ((x - ctx.pond.center.x) * a.dx + (z - ctx.pond.center.z) * a.dz > a.d * 0.7) continue;
+    // the whole footprint on open ground
+    let open = true;
+    for (let k = 0; k < 6 && open; k++) {
+      const ang = (k / 6) * Math.PI * 2;
+      if (!ctx.isWalkable(x + Math.cos(ang) * clear * 0.75, z + Math.sin(ang) * clear * 0.75)) open = false;
+    }
+    if (!open) continue;
     let crowd = Infinity;
     for (const s of list) crowd = Math.min(crowd, Math.hypot(s.x - x, s.z - z) - s.r - clear);
     if (crowd >= 0) { best = { x, z, score: crowd }; break; }
@@ -272,8 +351,9 @@ export interface Landmark {
   position: T.Vector3;
   radius: number;
   object: T.Object3D;
-  /** For plants: the habit and plant kind, when the core tags them. */
+  /** For plants: the habit, its name and plant kind (from the core's tags, or the store). */
   habitId?: string;
+  habitName?: string;
   plant?: string;
 }
 
@@ -291,10 +371,13 @@ export function landmarks(ctx: WorldCtx): Landmark[] {
   const { THREE } = ctx;
   const box = new THREE.Box3();
   const size = new THREE.Vector3();
+  const habits = activeHabits.value;
   ctx.scene.traverse((o) => {
     const ud = o.userData ?? {};
     let kind: string | undefined = typeof ud.landmark === 'string' ? ud.landmark : undefined;
     if (!kind && typeof ud.habitId === 'string') kind = 'plant';
+    let key: string | undefined;
+    if (!kind && /^plant:/.test(o.name || '')) { kind = 'plant'; key = o.name.slice(6); }
     if (!kind) {
       const n = (o.name || '').toLowerCase();
       const m = /^(plant|pavilion|bridge|rock|gate|moongate|table|bench|stone|path|tree|shrine)\b/.exec(n);
@@ -309,10 +392,12 @@ export function landmarks(ctx: WorldCtx): Landmark[] {
       box.getSize(size);
       radius = Math.max(0.4, Math.min(6, Math.max(size.x, size.z) / 2));
     }
+    const habitId = typeof ud.habitId === 'string' ? ud.habitId : key;
+    const habit = habitId ? habits.find((h) => h.id === habitId) : undefined;
     out.push({
-      kind, position: pos, radius, object: o,
-      habitId: typeof ud.habitId === 'string' ? ud.habitId : undefined,
-      plant: typeof ud.plant === 'string' ? ud.plant : typeof ud.plantKind === 'string' ? ud.plantKind : undefined,
+      kind, position: pos, radius, object: o, habitId,
+      habitName: habit?.name,
+      plant: typeof ud.plant === 'string' ? ud.plant : typeof ud.plantKind === 'string' ? ud.plantKind : habit?.plant,
     });
   });
   landmarkCache.set(ctx, out);
