@@ -53,8 +53,28 @@ inscription is placed in empty sky, and the date and your record are written in 
 phrasing, followed by your own seal. There is also a *Year in Ink* poster with one ink dot per
 day. You can save or share either one.
 
+**入画 Into the Painting.** Step inside your garden in 3D, as a small scholar in a white robe.
+Enter through a moon gate. Inside is a pond with a zigzag bridge and the 问月亭 pavilion, under
+ink-wash mountains, with light that follows the real clock. Each of your habits stands there as
+its own plant, painted from the same drawing as the 2D garden. Walk up to one and water it to
+check the habit in, and the plant grows in front of you. Festivals have easter eggs. On 中秋 a
+huge moon rises and eight mooncakes are hidden around the garden, each with a flavour and a
+verse; eat all eight and you get 苏轼's 但愿人长久. 春节, 元宵, 清明, 端午, 七夕, 重阳, 冬至,
+腊八 and 元旦 each have their own, and a picker lets you preview any of them. Every day there
+are koi that dart away, fireflies and a crane, plus a sleeping ginger cat, a shrine that draws
+you a daily fortune, and a bridge that plays the qin as you cross. On a phone you steer with a
+joystick; on a computer, with WASD.
+
+**弈 Play.** 五子棋 Gomoku against a friend or an AI with three levels (the AI thinks in a
+background worker). 贪吃蛇 Snake, drawn as one long ink stroke that eats plum blossoms to a
+rising guqin melody. 井字棋 Tic-tac-toe, whose circles and crosses are brushed in stroke by
+stroke; on Hard the AI never loses.
+
+Moving between pages, the new page spreads in like a drop of ink from the point you tapped.
+
 Everything is painted live. The plants, the landscape, the seals and the censer are procedural
-Canvas 2D, and every sound is synthesised with Web Audio. The app has no image or audio files.
+Canvas 2D, the walk is three.js, and every sound is synthesised with Web Audio. The app has no
+image or audio files.
 
 - **Private by design.** Your data stays in your browser. There are no accounts, no server and no tracking. You can export or import a JSON backup, and open tabs stay in sync with each other.
 - **Offline.** It installs as a PWA and keeps working without a network.

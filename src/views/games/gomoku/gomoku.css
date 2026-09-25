@@ -1,0 +1,87 @@
+/* 五子棋 — a wooden board on paper, quiet controls beside it. */
+.game-page.gomoku-page { max-width: 1040px; }
+
+.gmk { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.gmk-board {
+  width: 100%; max-width: 620px; aspect-ratio: 1; position: relative;
+  border-radius: 6px; overflow: hidden;
+  box-shadow: 0 1px 0 rgba(255, 244, 220, 0.45) inset, 0 2px 3px rgba(60, 38, 12, 0.18), 0 18px 34px -18px rgba(60, 38, 12, 0.55);
+}
+.gmk-board canvas { display: block; width: 100%; height: 100%; touch-action: pan-y pinch-zoom; /* swipes scroll; a resting finger is held in JS */ cursor: pointer; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+.gmk-board canvas:focus { outline: none; }
+.gmk-board canvas:focus-visible { outline: 2px solid var(--cinnabar); outline-offset: 3px; }
+.gmk-board:has(canvas:focus-visible) { overflow: visible; }
+
+/* Phones: let the board use (almost) the whole width. */
+@media (max-width: 520px) {
+  .gmk-board { width: calc(100% + 2 * var(--gutter) - 8px); max-width: none; margin: 0 calc(-1 * var(--gutter) + 4px); border-radius: 4px; }
+}
+
+.gmk-side { width: 100%; max-width: 620px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+.gmk-status { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 40px; font-size: 16px; color: var(--ink-2); letter-spacing: 0.06em; }
+.gmk-count { font-size: 14px; color: var(--ink-3); font-variant-numeric: lining-nums; }
+.gmk-turn-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: background 0.3s var(--ease); }
+.gmk-turn-dot.is-black { background: radial-gradient(circle at 35% 30%, #5f5c58, #141312 70%); }
+.gmk-turn-dot.is-white { background: radial-gradient(circle at 35% 30%, #fffdf8, #d9d2c2 80%); }
+.gmk-turn-dot:not(.is-black):not(.is-white) { visibility: hidden; width: 0; }
+
+/* a stick of incense while the machine thinks */
+.gmk-incense { width: 14px; height: 36px; flex: none; margin-top: -8px; overflow: visible; }
+.gmk-incense .stick { stroke: var(--ink-2); stroke-width: 1.4; stroke-linecap: round; }
+.gmk-incense .ember { fill: var(--cinnabar); animation: gmk-ember 1.6s ease-in-out infinite; }
+.gmk-incense .smoke { fill: none; stroke: var(--ink-3); stroke-width: 1; stroke-linecap: round; stroke-dasharray: 10 40; animation: gmk-smoke 2.4s linear infinite; opacity: 0.8; }
+@keyframes gmk-smoke { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -50; } }
+@keyframes gmk-ember { 50% { opacity: 0.55; } }
+
+.gmk-controls { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.gmk-controls .btn { min-width: 88px; }
+
+.gmk-setup { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; }
+.gmk-setup .seg { max-width: 100%; flex-wrap: wrap; justify-content: center; }
+.gmk-note { margin: 0; font-size: 13.5px; text-align: center; letter-spacing: 0.04em; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 12px; }
+.gmk-link { position: relative; min-height: 32px; padding: 0 4px; color: var(--ink-2); font-size: 13.5px; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 4px; }
+.gmk-link::before { content: ''; position: absolute; inset: -6px -4px; }
+.gmk-link:hover { color: var(--cinnabar); }
+
+/* the result: a seal, a line of verse, one hero button */
+.gmk-result {
+  width: 100%; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 6px 16px;
+  padding: 14px 16px; border-radius: 6px; background: var(--paper-2); border: 1px solid var(--line);
+  animation: gmk-rise 0.6s var(--ease) both; animation-delay: 0.5s;
+}
+.gmk-seal { width: 60px; height: 60px; grid-row: span 1; }
+.gmk-result-text { min-width: 0; }
+.gmk-verdict { margin: 0 0 2px; font-family: var(--font-brush); font-size: 24px; line-height: 1.2; color: var(--ink); }
+:lang(en) .gmk-verdict { font-family: var(--font-latin); font-weight: 500; }
+.gmk-poem { margin: 0; font-size: 15px; color: var(--ink-2); line-height: 1.55; }
+.gmk-poet { display: inline-block; margin-left: 8px; font-size: 12.5px; color: var(--ink-3); }
+.gmk-record { margin: 4px 0 0; font-size: 12.5px; }
+.gmk-again { grid-column: 1 / -1; justify-self: center; margin-top: 6px; }
+@keyframes gmk-rise { from { opacity: 0; transform: translateY(8px); } }
+
+.gmk-sheet { display: flex; flex-direction: column; gap: 14px; padding: 6px 0 4px; }
+.gmk-field { display: flex; flex-direction: column; gap: 6px; }
+.gmk-field > span { font-size: 13px; color: var(--ink-3); letter-spacing: 0.08em; }
+.gmk-field .seg { align-self: flex-start; max-width: 100%; flex-wrap: wrap; }
+.gmk-start { align-self: stretch; margin-top: 6px; }
+
+/* Wide screens: board on the left, everything else beside it. */
+@media (min-width: 900px) {
+  .gmk { flex-direction: row; align-items: flex-start; justify-content: center; gap: 36px; }
+  .gmk-board { width: min(620px, calc(100dvh - 200px)); min-width: 420px; flex: none; }
+  .gmk-side { width: 300px; flex: none; align-items: stretch; padding-top: 12px; }
+  .gmk-status { justify-content: flex-start; }
+  .gmk-controls { justify-content: flex-start; }
+  .gmk-controls .btn { flex: 1; min-width: 0; padding: 0 10px; }
+  .gmk-setup { align-items: stretch; }
+  .gmk-setup .seg { align-self: flex-start; }
+  .gmk-note { justify-content: flex-start; text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gmk-incense .ember, .gmk-incense .smoke { animation: none; }
+  .gmk-incense .smoke { stroke-dasharray: none; opacity: 0.4; }
+  .gmk-result { animation: none; }
+}

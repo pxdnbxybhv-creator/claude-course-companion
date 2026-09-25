@@ -1,0 +1,102 @@
+// Distant mountains: three rings of ink-wash silhouettes around the garden, each paler than the
+// one before (远山淡), dissolving downward into mist so the land meets them in 留白.
+import * as THREE from 'three';
+import { makeNoise2, makeRng } from '../../../core/rng';
+import { Bag, canvas, canvasTexture } from './kit';
+
+interface Layer { R: number; H: number; alpha: number; color: string; seed: number; rough: number; dots: boolean }
+
+const LAYERS: Layer[] = [
+  { R: 210, H: 50, alpha: 0.2, color: '#65727e', seed: 31, rough: 0.35, dots: false },
+  { R: 150, H: 40, alpha: 0.32, color: '#4a5258', seed: 17, rough: 0.5, dots: false },
+  { R: 100, H: 26, alpha: 0.46, color: '#2e3236', seed: 5, rough: 0.7, dots: true },
+];
+
+/** Where the moon hangs (u around the ring, see CylinderGeometry): keep the ridges low there. */
+const MOON_U = 0.48;
+
+function paintLayer(L: Layer, W: number, H: number): HTMLCanvasElement {
+  const c = canvas(W, H);
+  const g = c.getContext('2d')!;
+  const period = 8;
+  const n = makeNoise2(L.seed, period);
+  const rng = makeRng(L.seed * 7 + 1);
+  const ridge = new Float32Array(W);
+  for (let x = 0; x < W; x++) {
+    const u = x / W;
+    let v = 0.5 + 0.5 * n.fbm(u * period, 0.37, 4, 2, 0.5 + L.rough * 0.1);
+    v = Math.pow(v, 1.7);
+    // gaps between ranges and a low saddle where the moon rises
+    const du = Math.min(Math.abs(u - MOON_U), 1 - Math.abs(u - MOON_U));
+    const saddle = 1 - 0.6 * Math.exp(-(du * du) / 0.004);
+    ridge[x] = H * (1 - (0.14 + 0.84 * v) * saddle);
+  }
+  // body: a wash from the ridge fading into mist
+  const [r, gg, b] = [1, 3, 5].map((i) => parseInt(L.color.slice(i, i + 2), 16));
+  for (let x = 0; x < W; x++) {
+    const top = ridge[x];
+    const fade = top + (H - top) * 0.78;
+    const grd = g.createLinearGradient(0, top, 0, fade);
+    grd.addColorStop(0, `rgba(${r},${gg},${b},${L.alpha})`);
+    grd.addColorStop(0.35, `rgba(${r},${gg},${b},${L.alpha * 0.55})`);
+    grd.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+    g.fillStyle = grd;
+    g.fillRect(x, top, 1, fade - top + 1);
+  }
+  // ridge line: a dry brush that thickens and breaks
+  g.lineCap = 'round';
+  for (let x = 0; x < W - 3; x += 3) {
+    const w = 1 + 2.5 * (0.5 + 0.5 * n(x / 40, 3.3));
+    const a = L.alpha * (0.5 + 0.5 * n(x / 25, 7.1));
+    if (a < L.alpha * 0.25) continue;
+    g.strokeStyle = `rgba(${r},${gg},${b},${Math.min(0.9, a * 1.3)})`;
+    g.lineWidth = w;
+    g.beginPath();
+    g.moveTo(x, ridge[x] + 0.5);
+    g.lineTo(x + 3, ridge[x + 3] + 0.5);
+    g.stroke();
+  }
+  // texture strokes (披麻皴): short, falling from the ridge
+  const count = Math.round(W / 14);
+  for (let i = 0; i < count; i++) {
+    const x = rng() * W;
+    const top = ridge[Math.floor(x)];
+    const len = (H - top) * rng.range(0.1, 0.3);
+    const lean = (ridge[Math.min(W - 1, Math.floor(x) + 6)] - ridge[Math.max(0, Math.floor(x) - 6)]) * 0.6;
+    g.strokeStyle = `rgba(${r},${gg},${b},${L.alpha * rng.range(0.08, 0.22)})`;
+    g.lineWidth = rng.range(0.6, 1.3);
+    g.beginPath();
+    g.moveTo(x, top + 3);
+    g.quadraticCurveTo(x + lean * 0.3, top + len * 0.5, x + lean * 0.6 + rng.range(-2, 2), top + len);
+    g.stroke();
+  }
+  // 米点: horizontal blots along the nearest ridge
+  if (L.dots) {
+    for (let i = 0; i < W / 3; i++) {
+      const x = rng() * W;
+      const top = ridge[Math.floor(x)];
+      const y = top + rng.range(0, 10) * rng();
+      g.fillStyle = `rgba(${r},${gg},${b},${L.alpha * rng.range(0.2, 0.55)})`;
+      g.beginPath();
+      g.ellipse(x, y, rng.range(2, 5), rng.range(1, 2.4), 0, 0, Math.PI * 2);
+      g.fill();
+    }
+  }
+  return c;
+}
+
+export function buildMountains(bag: Bag): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'mountains';
+  for (const L of LAYERS) {
+    const tex = canvasTexture(bag, paintLayer(L, 2048, 256));
+    tex.wrapS = THREE.RepeatWrapping;
+    const mat = bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: false, side: THREE.BackSide }));
+    const geo = bag.add(new THREE.CylinderGeometry(L.R, L.R, L.H, 96, 1, true));
+    geo.translate(0, L.H / 2 - 3.5, 0);
+    const m = new THREE.Mesh(geo, mat);
+    m.renderOrder = -5;
+    group.add(m);
+  }
+  return group;
+}

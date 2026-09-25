@@ -1,0 +1,25 @@
+.hall { padding-top: calc(12px + env(safe-area-inset-top)); }
+.hall-head { display: flex; align-items: baseline; gap: 14px; margin: 6px 0 18px; }
+.hall-head h1 { margin: 0; font-size: 34px; font-weight: 400; }
+.hall-lead { margin: 0; font-size: 14px; letter-spacing: 0.06em; }
+.hall-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.hall-card {
+  position: relative; display: flex; flex-direction: column; text-align: left; overflow: hidden;
+  min-height: 210px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper-2);
+  transition: transform 0.25s var(--ease), border-color 0.25s;
+}
+.hall-card:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+.hall-card:active { transform: scale(0.985); }
+.hall-card.is-wide { grid-column: 1 / -1; min-height: 240px; }
+.hall-preview { display: block; width: 100%; height: 120px; flex: none; }
+.hall-card.is-wide .hall-preview { height: 150px; }
+.hall-glyph { position: absolute; top: 8px; right: 10px; font-size: 22px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line-strong); color: var(--ink-2); background: color-mix(in srgb, var(--paper) 80%, transparent); }
+.hall-text { display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 14px; }
+.hall-name { font-size: 22px; line-height: 1.2; }
+.hall-name.latin { font-weight: 500; }
+.hall-desc { font-size: 13.5px; color: var(--ink-3); line-height: 1.5; }
+.hall-stat { margin-top: 4px; font-size: 12.5px; color: var(--ink-2); letter-spacing: 0.04em; }
+@media (min-width: 720px) {
+  .hall-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hall-card.is-wide .hall-preview { height: 200px; }
+}

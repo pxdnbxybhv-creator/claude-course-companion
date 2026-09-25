@@ -1,8 +1,12 @@
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
-.view { flex: 1; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); animation: view-in 0.5s var(--ease); }
-@keyframes view-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+/* The 3D walk is immersive: no tab bar (it has its own way back). */
+.shell[data-route='walk'] .tabbar { display: none; }
+.shell[data-route='walk'] .view { padding-bottom: 0; }
+.view { flex: 1; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); animation: view-in 0.6s var(--ease); }
+@keyframes view-in { from { opacity: 0; } to { opacity: 1; } }
 
 .tabbar {
+  view-transition-name: tabbar;
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
   display: flex; justify-content: center; gap: 4px;
   padding: 6px 12px calc(6px + env(safe-area-inset-bottom));
@@ -10,7 +14,7 @@
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid var(--line);
 }
-.tab { flex: 0 1 96px; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 0; color: var(--ink-3); transition: color 0.3s; }
+.tab { flex: 0 1 88px; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 0; padding: 4px 0; color: var(--ink-3); transition: color 0.3s; }
 .tab-glyph { font-size: 26px; line-height: 1.2; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; transition: background 0.3s, color 0.3s, transform 0.3s var(--ease); }
 .tab-label { font-size: 11px; letter-spacing: 0.08em; }
 .tab.is-active { color: var(--ink); }
@@ -24,4 +28,98 @@
   }
   .tab { flex: 0 0 88px; }
   .view { padding-bottom: 110px; }
+}
+
+/* ------------------------------------------------------------------------------------------------
+   Page transitions — the new page spreads in like a drop of ink on xuan paper, from where you tapped.
+   transition.ts sets --vt-x / --vt-y (origin) and --vt-reach (radius that covers the screen).
+   The blot is four soft radial gradients a little off-centre from one another, each growing at its
+   own pace, so the edge is organic rather than a perfect circle.
+   ------------------------------------------------------------------------------------------------ */
+@property --ink-p { syntax: '<number>'; inherits: false; initial-value: 0; }
+
+:root { --vt-x: 50vw; --vt-y: 50vh; --vt-reach: 150vmax; }
+
+:root[data-vt-seq='0']::view-transition-new(root),
+:root[data-vt-seq='0'][data-vt-fallback] .view {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.72), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.16 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.1 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.68), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.05 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8));
+  mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.72), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.16 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.1 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.68), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.05 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8));
+}
+
+:root[data-vt-seq='1']::view-transition-new(root),
+:root[data-vt-seq='1'][data-vt-fallback] .view {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.2 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.08 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.85)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.12 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.16 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82));
+  mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.2 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.08 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.85)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.12 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.16 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82));
+}
+
+:root[data-vt-seq='2']::view-transition-new(root),
+:root[data-vt-seq='2'][data-vt-fallback] .view {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.88), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.1 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.64), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.14 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.14 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86));
+  mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.88), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.1 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.2 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.64), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.82)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.14 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.14 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.7), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.86));
+}
+
+:root[data-vt-seq='3']::view-transition-new(root),
+:root[data-vt-seq='3'][data-vt-fallback] .view {
+  -webkit-mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.22 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.06 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.08 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.18 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.6), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.78));
+  mask-image:
+    radial-gradient(circle at var(--vt-x) var(--vt-y), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.9), transparent calc((var(--ink-p) * var(--vt-reach)) * 1.0)),
+    radial-gradient(circle at calc(var(--vt-x) + 0.22 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.06 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.62), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.8)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.08 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + -0.18 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.66), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.84)),
+    radial-gradient(circle at calc(var(--vt-x) + -0.18 * (var(--ink-p) * var(--vt-reach))) calc(var(--vt-y) + 0.12 * (var(--ink-p) * var(--vt-reach))), #000 calc((var(--ink-p) * var(--vt-reach)) * 0.6), transparent calc((var(--ink-p) * var(--vt-reach)) * 0.78));
+}
+
+@keyframes ink-spread { from { --ink-p: 0; } to { --ink-p: 1; } }
+@keyframes page-settle { from { transform: scale(1.012); } to { transform: none; } }
+/* Freshly spread ink is a little darker, then dries into the paper. */
+@keyframes ink-dry { from { filter: brightness(0.8) saturate(0.8); } 55% { filter: brightness(0.95); } to { filter: none; } }
+@keyframes page-recede { from { opacity: 1; transform: none; } to { opacity: 0.35; transform: scale(0.992); } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+@keyframes vt-fade-out { to { opacity: 0; } }
+
+::view-transition-old(root) { animation: page-recede 640ms cubic-bezier(0.4, 0, 0.2, 1) both; }
+::view-transition-new(root) {
+  animation: ink-spread 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, page-settle 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, ink-dry 760ms ease-out both;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+/* The tab bar stays put; only its active mark changes. */
+::view-transition-group(tabbar) { animation-duration: 300ms; }
+
+/* Browsers without View Transitions: the incoming view plays the same ink bleed on its own. */
+:root[data-vt-fallback] .view {
+  animation: ink-spread 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both, page-settle 760ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Reduced motion: a quick cross-fade, no spreading. */
+:root[data-vt-reduced]::view-transition-new(root) { animation: vt-fade-in 180ms ease both; -webkit-mask-image: none; mask-image: none; }
+:root[data-vt-reduced]::view-transition-old(root) { animation: vt-fade-out 180ms ease both; }
+:root[data-vt-reduced][data-vt-fallback] .view { animation: vt-fade-in 180ms ease both; -webkit-mask-image: none; mask-image: none; }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(root), ::view-transition-old(root) { animation-duration: 180ms; }
 }
