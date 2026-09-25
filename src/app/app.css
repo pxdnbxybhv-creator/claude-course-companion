@@ -1,4 +1,6 @@
 .shell { min-height: 100dvh; display: flex; flex-direction: column; }
+/* A page whose code is still loading. */
+.view-loading { min-height: 60vh; display: grid; place-items: center; font-size: 22px; color: var(--ink-3); letter-spacing: 0.3em; }
 /* The 3D walk is immersive: no tab bar (it has its own way back). */
 .shell[data-route='walk'] .tabbar { display: none; }
 .shell[data-route='walk'] .view { padding-bottom: 0; }

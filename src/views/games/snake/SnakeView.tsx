@@ -422,3 +422,4 @@ function AgainIcon() {
     </svg>
   );
 }
+export default SnakeView;

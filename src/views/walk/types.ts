@@ -6,6 +6,8 @@ import type { SceneEnv } from '../../ink/scene-types';
 import type { AudioEngine } from '../../audio/engine';
 import type { Rng } from '../../core/rng';
 import type { PIGMENTS } from '../../ink/types';
+import type { RegionId, MusicTheme, XZ } from './map';
+import type { CharacterId } from '../../data/characters';
 
 /** Festivals that have an easter egg. */
 export type FestivalKey =
@@ -39,18 +41,49 @@ export interface Interactable {
 export interface Hud {
   /** A short message floating near the top of the screen. */
   toast(zh: string, en: string, ms?: number): void;
+  /**
+   * Put a mini-game overlay (a power bar, a reel meter, a dialogue) above the world. The node is
+   * appended to a full-screen, pointer-transparent layer; give interactive parts pointer-events: auto.
+   * Returns a remover.
+   */
+  mount(node: HTMLElement): () => void;
+  /** A dialogue line from a character in the world (NPC), with optional choices. Resolves with the chosen index (or -1). */
+  say(o: { nameZh: string; nameEn: string; zh: string; en: string; choices?: { zh: string; en: string }[] }): Promise<number>;
   /** A small persistent counter in the HUD (e.g. mooncakes eaten 2/6). Pass null to remove. */
   setCounter(id: string, label: { zh: string; en: string } | null, value?: string): void;
   /** A centred card, like a small hanging scroll (a poem, a riddle, a festival greeting). */
   showCard(o: { titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; seal?: string }): void;
 }
 
+export type EmoteKind = 'eat' | 'bow' | 'jump' | 'wave' | 'throw' | 'cast' | 'row' | 'sit' | 'play' | 'water';
+
 export interface Player {
   readonly position: THREE_NS.Vector3;
   /** Facing angle around +Y, radians. */
   readonly heading: number;
+  /** Who the player is walking as. */
+  readonly character: CharacterId;
   /** A small expressive animation. */
-  emote(kind: 'eat' | 'bow' | 'jump' | 'wave'): void;
+  emote(kind: EmoteKind): void;
+  /** Move the player (e.g. fast travel, getting into a boat). y is taken from the ground unless given. */
+  teleport(x: number, z: number, heading?: number, y?: number): void;
+  /**
+   * Stop normal walking (mini-games, riding a boat). While frozen the core still animates the
+   * character and follows it with the camera; features drive position via teleport().
+   */
+  freeze(on: boolean): void;
+  /** Sit in / stand on a moving object; the character is placed at the object's origin each frame. Pass null to get off. */
+  ride(obj: THREE_NS.Object3D | null): void;
+}
+
+/** The movement intent from keys / joystick, readable by features (e.g. rowing a boat). */
+export interface InputState {
+  /** −1..1 strafe (right positive) and forward (forward positive), camera-relative. */
+  readonly x: number;
+  readonly y: number;
+  readonly run: boolean;
+  /** True on the frame the action button / E is pressed. */
+  readonly actionPressed: boolean;
 }
 
 export interface Sky {
@@ -103,6 +136,30 @@ export interface WorldCtx {
   sky: Sky;
   palette: typeof PIGMENTS;
   lang: 'zh' | 'en';
+  /** Movement intent (joystick / keys). */
+  input: InputState;
+  /** The region the player is in (null on the paths between). */
+  currentRegion(): RegionId | null;
+  /** Called when the player enters a region; returns an unsubscribe. */
+  onRegion(fn: (id: RegionId | null) => void): () => void;
+  /**
+   * A group for a region's content. The core hides groups of far-away regions (and their
+   * interactables stop prompting), so put everything region-specific in here.
+   */
+  regionGroup(id: RegionId): THREE_NS.Group;
+  /** Water in the world (pond, lake, river): its surface height at (x, z), or null on land. */
+  waterAt(x: number, z: number): number | null;
+  /** World position of a named spot from map.ts ANCHORS, with y on the ground (or water). */
+  anchor(x: XZ): THREE_NS.Vector3;
+  /** Background music: request a theme (the core already sets one per region; features may override briefly). */
+  music: { setTheme(theme: MusicTheme | null): void };
+}
+
+/** Builds one region's scenery (see map.ts REGIONS). Content goes into ctx.regionGroup(id). */
+export interface RegionModule {
+  id: RegionId;
+  build(ctx: WorldCtx): void | Promise<void>;
+  dispose?(): void;
 }
 
 export interface WorldFeature {

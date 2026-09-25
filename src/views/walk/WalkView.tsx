@@ -359,3 +359,4 @@ function Joystick(props: { world: { current: WorldHandle | null } }) {
     </div>
   );
 }
+export default WalkView;

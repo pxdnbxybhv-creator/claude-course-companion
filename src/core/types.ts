@@ -44,6 +44,9 @@ export interface Settings {
   sealName: string;
   sound: boolean;
   volume: number; // 0..1
+  /** Background music (generative, see audio/music.ts). */
+  music: boolean;
+  musicVolume: number; // 0..1
   ambient: AmbientKind;
   focusMinutes: number;
   theme: 'auto' | 'light' | 'dark';

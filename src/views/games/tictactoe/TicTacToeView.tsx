@@ -320,3 +320,4 @@ export function TicTacToeView() {
     </GameShell>
   );
 }
+export default TicTacToeView;

@@ -642,3 +642,4 @@ function Board(props: {
     </div>
   );
 }
+export default GomokuView;

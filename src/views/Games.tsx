@@ -7,6 +7,11 @@ import * as gomoku from './games/gomoku/preview';
 import * as tictactoe from './games/tictactoe/preview';
 import * as snake from './games/snake/preview';
 import * as walk from './walk/preview';
+import * as xiangqi from './games/xiangqi/preview';
+import * as klotski from './games/klotski/preview';
+import * as tangram from './games/tangram/preview';
+import * as feihua from './games/feihua/preview';
+import * as quests from './quests/preview';
 import './games/games.css';
 import './games/hall.css';
 
@@ -23,7 +28,12 @@ interface Card {
 
 const CARDS: Card[] = [
   { route: 'walk', glyph: '画', zh: '入画', en: 'Into the Painting', descZh: '走进你的园子，四处看看。逢年过节，园中另有惊喜。', descEn: 'Step inside your garden and wander. On festival days, something special is waiting.', preview: walk, wide: true },
+  { route: 'quests', glyph: '簿', zh: '任务簿', en: 'Quest Book', descZh: '做任务，结识同伴；在入画里换一个人去走走。', descEn: 'Finish quests, meet companions, and walk the painting as someone new.', preview: quests },
   { route: 'gomoku', glyph: '弈', zh: '五子棋', en: 'Gomoku', descZh: '纵横十五路，与人或与机器对弈。', descEn: 'Five in a row on a 15×15 board — against a friend or the machine.', preview: gomoku },
+  { route: 'xiangqi', glyph: '帅', zh: '象棋', en: 'Xiangqi', descZh: '楚河汉界，与电脑对弈三级。', descEn: 'Chinese chess across the river, against three levels of AI.', preview: xiangqi },
+  { route: 'klotski', glyph: '华', zh: '华容道', en: 'Huarong Pass', descZh: '横刀立马，助曹操脱身。', descEn: 'Slide the generals aside and let Cao Cao escape.', preview: klotski },
+  { route: 'tangram', glyph: '巧', zh: '七巧板', en: 'Tangram', descZh: '七块板，拼万物。', descEn: 'Seven pieces, ten thousand shapes.', preview: tangram },
+  { route: 'feihua', glyph: '花', zh: '飞花令', en: 'Flying Flowers', descZh: '一字为令，接一句诗。', descEn: 'One character, one line of poetry — keep the chain going.', preview: feihua },
   { route: 'tictactoe', glyph: '井', zh: '井字棋', en: 'Tic-tac-toe', descZh: '三横三竖，圈叉之间。', descEn: 'Three by three, circles and crosses.', preview: tictactoe },
   { route: 'snake', glyph: '蛇', zh: '贪吃蛇', en: 'Snake', descZh: '一笔长蛇，衔梅而行。', descEn: 'One long brushstroke, gathering plum blossoms.', preview: snake },
 ];

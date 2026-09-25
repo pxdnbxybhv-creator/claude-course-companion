@@ -24,6 +24,8 @@ export function defaultSettings(): Settings {
     sealName: '',
     sound: true,
     volume: 0.7,
+    music: true,
+    musicVolume: 0.5,
     ambient: 'none',
     focusMinutes: 30,
     theme: 'auto',
@@ -77,6 +79,8 @@ export function sanitize(raw: unknown): AppState {
     ...(s.lang === 'zh' || s.lang === 'en' ? { lang: s.lang } : {}),
     sealName: typeof s.sealName === 'string' ? s.sealName.slice(0, 4) : '',
     sound: s.sound !== false,
+    music: s.music !== false,
+    musicVolume: Number.isFinite(s.musicVolume) ? Math.min(1, Math.max(0, s.musicVolume!)) : base.settings.musicVolume,
     volume: Number.isFinite(s.volume) ? Math.min(1, Math.max(0, s.volume!)) : base.settings.volume,
     ambient: ['none', 'rain', 'stream', 'pines', 'qin'].includes(s.ambient as string) ? s.ambient! : 'none',
     theme: s.theme === 'light' || s.theme === 'dark' ? s.theme : 'auto',
@@ -256,8 +260,15 @@ export function setOnboarded(): void {
   update((s) => ({ ...s, onboarded: true }));
 }
 
+/**
+ * Other stores that want to ride along in backups (e.g. play progress) register here, so the
+ * backup file stays one file without this module importing them.
+ */
+export const backupExtras: { key: string; get(): unknown; set(raw: unknown): void }[] = [];
+
 export function exportJSON(): string {
-  return JSON.stringify({ app: 'banmu', exportedAt: new Date().toISOString(), ...state.value }, null, 2);
+  const extras = Object.fromEntries(backupExtras.map((b) => [b.key, b.get()]));
+  return JSON.stringify({ app: 'banmu', exportedAt: new Date().toISOString(), ...state.value, ...extras }, null, 2);
 }
 
 /** Replace all data with an imported backup. Returns false if the file is not a 半亩 backup. */
@@ -266,6 +277,7 @@ export function importJSON(text: string): boolean {
     const raw = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.habits)) return false;
     state.value = sanitize(raw);
+    for (const b of backupExtras) if (b.key in raw) b.set((raw as Record<string, unknown>)[b.key]);
     return true;
   } catch {
     return false;
