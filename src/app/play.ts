@@ -207,6 +207,9 @@ export const CHECKIN_COINS = 5;
 export const INCENSE_COINS = 15;
 /** The first time the purse sees your habit history it pays for at most this many past deeds. */
 const BACKPAY_MAX = 300;
+/** More new check-ins (or incense sticks) than this in one step is a bulk import: nothing is paid. */
+const BULK_CHECKINS = 3;
+const BULK_INCENSE = 2;
 
 function lifeCounts(a: AppState): { checkins: number; incense: number } {
   let checkins = 0;
@@ -224,8 +227,10 @@ function payDue(p: PlayState, a: AppState, day: DateKey): PlayState {
     coins += Math.min(BACKPAY_MAX, now.checkins * CHECKIN_COINS + now.incense * INCENSE_COINS);
     life = now;
   } else {
-    if (now.checkins > life.checkins) coins += (now.checkins - life.checkins) * CHECKIN_COINS;
-    if (now.incense > life.incense) coins += (now.incense - life.incense) * INCENSE_COINS;
+    // deeds come one at a time: a jump by many at once is an import or the demo garden, not work done
+    const dc = now.checkins - life.checkins, di = now.incense - life.incense;
+    if (dc > 0 && dc <= BULK_CHECKINS) coins += dc * CHECKIN_COINS;
+    if (di > 0 && di <= BULK_INCENSE) coins += di * INCENSE_COINS;
     // the mark only rises: undoing a check-in takes no coins back, and redoing it pays nothing extra
     life = { checkins: Math.max(life.checkins, now.checkins), incense: Math.max(life.incense, now.incense) };
   }
@@ -258,10 +263,24 @@ function evaluate(p: PlayState, a: AppState, day: DateKey): PlayState {
   return payDue(next, a, day);
 }
 
+/** While set, a rise in coins is not income (a code, a refund). */
+let untracked = false;
+
+/** Coins that came in between two states count as today's (and all-time) earnings. */
+function tracked(prev: PlayState, next: PlayState): PlayState {
+  const gain = next.coins - prev.coins;
+  if (untracked || gain <= 0) return next;
+  return {
+    ...next,
+    counters: { ...next.counters, earned: (next.counters.earned ?? 0) + gain },
+    daily: { ...next.daily, counts: { ...next.daily.counts, earned: (next.daily.counts.earned ?? 0) + gain } },
+  };
+}
+
 function update(fn: (p: PlayState) => PlayState): void {
   const day = today.value;
   const cur = rollDaily(play.value, day);
-  play.value = evaluate(fn(cur), appState.value, day);
+  play.value = tracked(cur, evaluate(fn(cur), appState.value, day));
 }
 
 // Real-life quests (streaks, incense) complete as the habit data changes.
@@ -279,7 +298,8 @@ if (typeof window !== 'undefined') {
       return;
     }
     const p = play.peek();
-    const next = evaluate(rollDaily(p, day), a, day);
+    const rolled = rollDaily(p, day);
+    const next = tracked(rolled, evaluate(rolled, a, day));
     if (next !== p) play.value = next;
   });
 }
@@ -348,7 +368,12 @@ export function redeemCode(raw: string): 'ok' | 'already' | 'invalid' {
   const k = codeKey(raw);
   if (!k || !CODES.has(k)) return 'invalid';
   if (play.value.flags[ALL_COMPANIONS_FLAG]) return 'already';
-  update((p) => ({ ...p, flags: { ...p.flags, [ALL_COMPANIONS_FLAG]: true }, coins: p.coins + CODE_COINS }));
+  untracked = true;
+  try {
+    update((p) => ({ ...p, flags: { ...p.flags, [ALL_COMPANIONS_FLAG]: true }, coins: p.coins + CODE_COINS }));
+  } finally {
+    untracked = false;
+  }
   return 'ok';
 }
 
@@ -372,6 +397,18 @@ export function earn(n: number): void {
   const k = Math.floor(n);
   if (!(k > 0)) return;
   update((p) => ({ ...p, coins: Math.min(1e9, p.coins + k) }));
+}
+
+/** Give coins back (selling something back, undoing a purchase): not counted as earnings. */
+export function refund(n: number): void {
+  const k = Math.floor(n);
+  if (!(k > 0)) return;
+  untracked = true;
+  try {
+    update((p) => ({ ...p, coins: Math.min(1e9, p.coins + k) }));
+  } finally {
+    untracked = false;
+  }
 }
 
 /** Pay coins if there are enough; false (and nothing taken) otherwise. */
@@ -407,7 +444,13 @@ export function encounterMet(p: PlayState, id: string): boolean {
 /** A 奇遇 happened: remembered (for the 奇遇录) and, the first time, its coins paid. Returns whether it was the first time. */
 export function markEncounter(id: string, coinsFirst = 0): boolean {
   if (encounterMet(play.value, id)) return false;
-  update((p) => ({ ...p, flags: { ...p.flags, [`qy:${id}`]: true }, coins: p.coins + Math.max(0, Math.floor(coinsFirst)) }));
+  update((p) => ({
+    ...p,
+    flags: { ...p.flags, [`qy:${id}`]: true },
+    // the day it happened, for the 奇遇录 (quests only read done[q.id], so this key is free)
+    done: { ...p.done, [`qy:${id}`]: today.value },
+    coins: p.coins + Math.max(0, Math.floor(coinsFirst)),
+  }));
   record('qiyu');
   return true;
 }

@@ -224,6 +224,11 @@ export function petPet(uid: string, n = 1): void {
   set((h) => ({ ...h, pets: h.pets.map((x) => (x.uid === uid ? { ...x, love: Math.min(100, x.love + n) } : x)) }));
 }
 
+/** Set a pet's affection outright (0…100) — the daily settling of affection uses this. */
+export function setPetLove(uid: string, love: number): void {
+  set((h) => ({ ...h, pets: h.pets.map((x) => (x.uid === uid ? { ...x, love: int(love, 0, 100) } : x)) }));
+}
+
 /** This pet walks with you out in the world (any other stops following); null: none does. */
 export function setFollower(uid: string | null): void {
   set((h) => ({ ...h, pets: h.pets.map((x) => ({ ...x, follow: x.uid === uid })) }));

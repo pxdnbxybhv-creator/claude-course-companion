@@ -48,13 +48,13 @@ export const HOME_PLOT = { x: -50, z: -24, size: 24, cell: 1, gate: { x: -38, z:
  */
 export interface Waypoint { id: RegionId; x: number; z: number; zh: string; en: string }
 export const WAYPOINTS: Waypoint[] = [
-  { id: 'garden', x: 5, z: 27, zh: '园门', en: 'Garden Gate' },
+  { id: 'garden', x: 5, z: 27.5, zh: '园门', en: 'Garden Gate' },
   { id: 'village', x: 3, z: 49, zh: '小桥流水', en: 'The Archway' },
   { id: 'lake', x: 58, z: 34, zh: '荷塘渡口', en: 'Lotus Dock' },
-  { id: 'bamboo', x: -66, z: 32, zh: '竹林口', en: 'Grove Edge' },
-  { id: 'plum', x: -77, z: -57, zh: '梅岭山道', en: 'Ridge Path' },
-  { id: 'mountain', x: 25, z: -86, zh: '云深寺山门', en: 'Temple Gate' },
-  { id: 'home', x: -35, z: -24, zh: '家园', en: 'Homestead' },
+  { id: 'bamboo', x: -67.4, z: 30.6, zh: '竹林口', en: 'Grove Edge' },
+  { id: 'plum', x: -77.7, z: -57.7, zh: '梅岭山道', en: 'Ridge Path' },
+  { id: 'mountain', x: 25, z: -85, zh: '云深寺山门', en: 'Temple Gate' },
+  { id: 'home', x: -34.2, z: -20.6, zh: '家园', en: 'Homestead' },
 ];
 export const WAYPOINT: Record<RegionId, Waypoint> = Object.fromEntries(WAYPOINTS.map((w) => [w.id, w])) as Record<RegionId, Waypoint>;
 
