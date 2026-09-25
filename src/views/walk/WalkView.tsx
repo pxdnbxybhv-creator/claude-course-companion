@@ -82,8 +82,10 @@ export function WalkView() {
   // coins arriving: the purse shows +N floating up
   const purse = play.value.coins;
   const lastPurse = useRef(purse);
-  const [gains, setGains] = useState<{ id: number; n: number }[]>([]);
+  const [gains, setGains] = useState<{ id: number; n: number; lane: number }[]>([]);
   const gainSeq = useRef(0);
+  /** Each +N goes away on its own clock (a second gain never cancels the first one's). */
+  const gainTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const dialogSeq = useRef(0);
   const [mapOpen, setMapOpen] = useState(false);
@@ -224,10 +226,23 @@ export function WalkView() {
     lastPurse.current = purse;
     if (d <= 0 || phase !== 'ready') return;
     const id = ++gainSeq.current;
-    setGains((g) => [...g.slice(-2), { id, n: d }]);
-    const tm = setTimeout(() => setGains((g) => g.filter((x) => x.id !== id)), 1900);
-    return () => clearTimeout(tm);
+    // gains close together take the next free lane (one under another), never the same spot
+    setGains((g) => {
+      const kept = g.slice(-2);
+      let lane = 0;
+      while (kept.some((x) => x.lane === lane)) lane++;
+      return [...kept, { id, n: d, lane }];
+    });
+    const tm = setTimeout(() => {
+      gainTimers.current.delete(tm);
+      setGains((g) => g.filter((x) => x.id !== id));
+    }, 1900);
+    gainTimers.current.add(tm);
   }, [purse]);
+  useEffect(() => () => {
+    for (const tm of gainTimers.current) clearTimeout(tm);
+    gainTimers.current.clear();
+  }, []);
 
   // leaving the walk gives the painted plant bitmaps back (they are kept between rebuilds only)
   useEffect(() => () => {
@@ -239,17 +254,19 @@ export function WalkView() {
     worldRef.current?.setPaused(!!card || sheet || mapOpen || charOpen || !!dialog);
   }, [card, sheet, phase, mapOpen, charOpen, dialog]);
 
-  // M opens the map
+  // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
+  // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready') return;
+    if (phase !== 'ready' || card || dialog || sheet || charOpen || frozen || mapOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.code === 'KeyM' && !e.metaKey && !e.ctrlKey && !card && !dialog) setMapOpen((v) => !v);
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || t.closest?.('.sheet, [aria-modal="true"], [role="dialog"]'))) return;
+      setMapOpen(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog]);
+  }, [phase, card, dialog, sheet, charOpen, frozen, mapOpen]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -295,7 +312,9 @@ export function WalkView() {
     };
   }, [hint, phase]);
 
-  const showSkill = phase === 'ready' && !!skillUi && !frozen && !card && !dialog && !mapOpen && !charOpen;
+  // the skills feature hides the button itself while a game or a boat holds the walker; on its own
+  // mount (Red Hare) it stays, to get off again
+  const showSkill = phase === 'ready' && !!skillUi && !card && !dialog && !mapOpen && !charOpen;
   const lunar = toLunar(new Date());
   const todayFest = coreFestivals(new Date())[0];
   const preview = festival ? FESTIVALS.find((f) => f.key === festival) : null;
@@ -314,7 +333,7 @@ export function WalkView() {
           </button>
           <span class="walk-chip walk-purse" role="status" aria-live="polite">
             <CoinBadge size={17} />
-            {gains.map((g) => <span key={g.id} class="walk-purse-gain num" aria-hidden="true">+{fmtCoins(g.n)}</span>)}
+            {gains.map((g) => <span key={g.id} class="walk-purse-gain num" style={{ '--lane': String(g.lane) }} aria-hidden="true">+{fmtCoins(g.n)}</span>)}
           </span>
         </div>
         <div class="walk-title">
@@ -582,11 +601,16 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
     // fonts may arrive a moment later
     document.fonts?.ready.then(draw).catch(() => {});
   }, [lang, pick]);
+  /** Standing at that very stele (in its place and within a few steps): nowhere to travel. */
+  const isHere = (id: RegionId | null) => {
+    const w = id ? wps.find((x) => x.id === id) : null;
+    return !!w && id === here.region && Math.hypot(here.x - w.x, here.z - w.z) < 12;
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code === 'Escape' || e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); props.onClose(); return; }
-      // Enter travels to the picked, lit stele
-      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && pick && wps.find((w) => w.id === pick)?.lit && pick !== here.region) {
+      // Enter travels to the picked, lit stele (just as the 传送 button would)
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && pick && wps.find((w) => w.id === pick)?.lit && !isHere(pick)) {
         e.preventDefault(); e.stopPropagation(); props.onTravel(pick);
       }
     };
@@ -604,7 +628,7 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
   const wp = pick ? wps.find((w) => w.id === pick) ?? null : null;
   const lit = !!wp?.lit;
   const known = pick ? visited.has(pick) : false;
-  const hereNow = !!pick && pick === here.region && !!wp && Math.hypot(here.x - wp.x, here.z - wp.z) < 12;
+  const hereNow = isHere(pick);
   return (
     <div class="walk-map-wrap" onClick={(e) => e.target === e.currentTarget && props.onClose()}>
       <div class="walk-map" role="dialog" aria-modal="true" aria-label={t('舆图', 'Map of the world')}>

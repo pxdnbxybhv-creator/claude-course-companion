@@ -1,11 +1,11 @@
 // What the people of the painting say — to whom. Chinese first; each person has lines of their own
 // for several companions (关公 is bowed to, the cat is scolded and fed, 嫦娥 is stared at…).
 import type { CharacterId } from '../../../../data/characters';
-import { L, type Line, type PerCompanion } from './logic';
+import { L, WARES, forCompanion, ownFlag, type Line, type PerCompanion, type WareId } from './logic';
 
 // ───────────────────────────── the crowd's barks (short, over their heads) ─────────────────────────────
 
-export type CrowdRole = 'villager' | 'vendor' | 'tea' | 'washer' | 'child' | 'boatman' | 'fisher' | 'farmer' | 'monk' | 'woodfish' | 'scholar' | 'pilgrim' | 'watchman' | 'lantern';
+export type CrowdRole = 'villager' | 'vendor' | 'tea' | 'washer' | 'child' | 'boatman' | 'fisher' | 'farmer' | 'monk' | 'woodfish' | 'scholar' | 'pilgrim' | 'watchman' | 'lantern' | 'snack';
 
 /** What each kind of person calls out now and then, unasked. */
 export const CALLS: Partial<Record<CrowdRole, Line[]>> = {
@@ -21,7 +21,19 @@ export const CALLS: Partial<Record<CrowdRole, Line[]>> = {
   scholar: [L('疏影横斜水清浅……', 'Sparse shadows slant over shallow water…'), L('好一树梅花！', 'What a plum tree!'), L('暗香浮动月黄昏', 'Faint fragrance in the dusk moon')],
   pilgrim: [L('还有几级台阶……', 'How many more steps…'), L('求个平安', 'For a safe year'), L('心诚则灵', 'Sincerity is answered')],
   watchman: [L('天干物燥，小心火烛——', 'Dry weather — mind your candles!'), L('关门关窗，防偷防盗——', 'Shut your doors, bar your windows!'), L('平安无事——', 'All is well!')],
-  lantern: [L('夜深了，慢些走', 'It’s late — go gently'), L('月亮真圆', 'What a moon')],
+  lantern: [L('夜深了，慢些走', 'It’s late — go gently'), L('月亮真圆', 'What a moon'), L('这盏灯真好看', 'What a pretty lantern'), L('看，河上也有灯', 'Look — lanterns on the river too'), L('再走一圈吧', 'One more round?')],
+  // the night market (夜市)
+  snack: [L('馄饨——热乎乎的小馄饨！', 'Wontons! Piping-hot wontons!'), L('桂花酒酿圆子——', 'Rice balls in sweet osmanthus wine!'), L('烤红薯，又香又甜！', 'Roast sweet potatoes, sweet and smoky!'), L('桂花糕，刚出笼！', 'Osmanthus cakes, fresh from the steamer!'), L('夜宵嘞——暖暖身子！', 'A late bite — warm you right up!'), L('糖炒栗子，一包三文！', 'Sugar-roasted chestnuts, three coins a bag!')],
+};
+
+/** What the night market and the lantern walkers call on a festival night. */
+export const FEST_CALLS: Partial<Record<string, Line[]>> = {
+  midautumn: [L('月饼——五仁、豆沙、蛋黄的月饼！', 'Mooncakes — five-nut, red bean, salted yolk!'), L('赏月喽——今晚的月亮最圆！', 'Moon-viewing! Tonight’s moon is the roundest!'), L('兔儿灯，兔儿灯——', 'Rabbit lanterns! Rabbit lanterns!'), L('但愿人长久……', 'May we all live long…')],
+  lantern: [L('元宵，热腾腾的元宵！', 'Sweet dumplings, steaming hot!'), L('猜灯谜喽——猜中有赏！', 'Lantern riddles — prizes for the right answer!'), L('走百病喽——', 'Walk off the year’s ills!')],
+  spring: [L('过年好！', 'Happy New Year!'), L('恭喜发财！', 'Wealth and luck to you!'), L('守岁喽——', 'Seeing the old year out!')],
+  newyear: [L('新年好！', 'Happy New Year!'), L('又是一年', 'Another year')],
+  qixi: [L('乞巧果子——', 'Qiqiao pastries!'), L('看，牛郎织女星！', 'Look — the Herdsman and the Weaver!'), L('穿针乞巧喽', 'Thread the needle by moonlight!')],
+  chongyang: [L('菊花酒——', 'Chrysanthemum wine!'), L('重阳糕，步步高！', 'Double Ninth cake — higher every year!')],
 };
 
 /** A hello when you pass by, by who you are (any = everyone else); a few per kind. */
@@ -41,6 +53,9 @@ export const HELLO: PerCompanion<Line[]> = {
   guan: [L('关老爷！', 'Lord Guan!'), L('拜见关老爷', 'We greet you, Lord Guan')],
   change: [L('仙女……下凡了？', 'A fairy… come down?'), L('是嫦娥！', 'It’s Chang’e!'), L('……（看呆了）', '…(staring)')],
 };
+
+/** A hello after dark, from someone with nothing of their own to say to your companion. */
+export const HELLO_NIGHT: Line[] = [L('晚上好', 'Good evening'), L('出来赏灯？', 'Out to see the lanterns?'), L('月色真好', 'Lovely moonlight'), L('夜里凉，多穿点', 'Chilly tonight — wrap up'), L('慢走，看着脚下', 'Mind your step')];
 
 /** Children, to a cat or a rabbit they want to catch. */
 export const CHASE: Partial<Record<CharacterId, Line[]>> = {
@@ -69,6 +84,34 @@ export const PEDDLER_HELLO: PerCompanion<Line> = {
   scholar: L('公子，赶考的路上提盏灯笼，夜里也好赶路。', 'Young sir, a lantern for the road to the exams — you can travel by night.'),
   fisher: L('老哥，买顶……哦，你有斗笠了。来串糖葫芦？', 'Old man, a hat… oh, you’ve got one. Candied haws, then?'),
 };
+
+/** The kept ware each companion's hello pitches (owned already, and he pitches something else). */
+export const PEDDLER_PITCH: Partial<Record<CharacterId, WareId>> = { change: 'lantern', rabbit: 'pinwheel', poet: 'umbrella', swordsman: 'umbrella', taoist: 'kite', scholar: 'lantern' };
+/** A pitch for one ware, to anyone. */
+export const WARE_PITCH: Record<WareId, Line> = {
+  haws: L('客官，来串糖葫芦？冰糖脆，山楂酸，走路上吃正好。', 'Candied haws, friend? Crisp sugar, sour haw — just the thing on the road.'),
+  pinwheel: L('来只风车吧！举着跑两步，转得可欢了。', 'How about a pinwheel? Hold it up and run — it spins like mad.'),
+  umbrella: L('油纸伞要不要？晴天遮阳，雨天听雨。', 'An oil-paper umbrella? Shade on sunny days, a drum for the rain.'),
+  lantern: L('提盏灯笼吧？天一黑，它自己就亮。', 'A lantern for you? When night falls, it lights itself.'),
+  kite: L('纸鸢！沙燕纸鸢！风一来，它就在你头顶上飞。', 'A kite! A swallow kite! When the wind comes it flies right over your head.'),
+};
+/** Everything he sells for keeps already bought: a greeting for an old customer. */
+export const PEDDLER_REGULAR: PerCompanion<Line> = {
+  any: L('老主顾来啦！风车、伞、灯笼、纸鸢，您都置办齐了——来串糖葫芦解解馋？', 'My best customer! Pinwheel, umbrella, lantern, kite — you have the lot. A stick of haws for the road?'),
+  cat: L('猫大爷，我这担子上的您都玩过了吧？……糖葫芦还是不能给你吃。', 'Master Cat, you’ve played with everything on my pole by now… and still no haws for you.'),
+  guan: L('关老爷又来照顾生意！小的这点家当，您都买遍啦。', 'Lord Guan, back again! You’ve bought up my whole stock.'),
+  change: L('仙子提着我的灯笼回月宫，月亮上也该红彤彤的了。', 'Fair lady, with my lantern in the moon palace, the moon must glow red by now.'),
+};
+
+/** The peddler's hello: the companion's own, unless it pitches a ware already owned. */
+export function peddlerHello(who: CharacterId, flags: Record<string, true | undefined>): Line {
+  const kept = WARES.filter((w) => w.keep);
+  if (kept.every((w) => flags[ownFlag(w.id)])) return forCompanion(PEDDLER_REGULAR, who);
+  const pitch = PEDDLER_PITCH[who];
+  if (!pitch || !flags[ownFlag(pitch)]) return forCompanion(PEDDLER_HELLO, who);
+  const next = kept.find((w) => !flags[ownFlag(w.id)])!;
+  return WARE_PITCH[next.id];
+}
 
 export const WARE_SOLD: Record<string, Line> = {
   haws: L('好嘞！冰糖脆，山楂酸，一口下去，眼睛都眯起来。', 'Here you go! Crisp sugar, sour haw — one bite and your eyes screw up.'),
@@ -241,7 +284,16 @@ export const CAT_PAW = L('嗯……爪纹清晰，肉垫饱满。今日宜晒太
 
 // ───────────────────────────── 糖人, the sugar-figure stall ─────────────────────────────
 
-export const SUGAR_HELLO = L('吹糖人、画糖人——五文钱一个，照着客官的样子来！', 'Blown sugar, drawn sugar — five coins, made in your likeness!');
+export const SUGAR_HELLO: PerCompanion<Line> = {
+  any: L('吹糖人、画糖人——五文钱一个，照着客官的样子来！', 'Blown sugar, drawn sugar — five coins, made in your likeness!'),
+  guan: L('关、关老爷！吹您老人家可得用上好的糖稀——红脸得熬得透透的。五文，不，这是小的荣幸……还是五文。', 'L-Lord Guan! You deserve the best syrup — that red face must be boiled just right. Five coins — no, it’s an honour… still five coins.'),
+  cat: L('去去，别舔我的糖锅！……好吧，给你吹一个胖猫，五文钱，爪子印也算数。', 'Shoo — don’t lick my syrup pot! …All right: one fat cat, five coins. A paw print will do for payment.'),
+  change: L('仙子！我这手艺，吹过兔子吹过月亮，还没吹过真嫦娥呢——五文，您坐着别动。', 'Fair lady! I’ve blown rabbits and moons, but never Chang’e herself — five coins; please hold still.'),
+  rabbit: L('哎哟，真兔子来了！我吹了一辈子糖兔子，今天可算见着真的了。五文，照着你吹！', 'Well I never — a real rabbit! A lifetime of sugar rabbits and here’s the real thing. Five coins, blown in your likeness!'),
+  poet: L('诗仙！吹一个举杯的，杯里给您添一滴桂花蜜。五文钱，诗就不用付了。', 'The Poet! One raising his cup, with a drop of osmanthus honey in it. Five coins — keep your poems.'),
+  swordsman: L('大侠要吹个什么？舞剑的！剑要长，要亮——五文钱，保证比真剑还威风。', 'What shall it be, hero? Mid-sword-dance! Long blade, bright blade — five coins, grander than the real thing.'),
+  taoist: L('小道长，吹个踏云的？糖稀拉成云，您踩在上头。五文钱。', 'Little Taoist, one riding a cloud? I’ll pull the syrup into a cloud under your feet. Five coins.'),
+};
 export const SUGAR_MAKE: PerCompanion<Line> = {
   any: L('来——照着客官的样子，一勺糖稀，走！', 'Here — in your likeness: a ladle of hot syrup, and… go!'),
   guan: L('关公！得配一把青龙偃月刀——刀比人还长，糖多加一勺。', 'Lord Guan! With the Green Dragon blade — longer than the man. An extra ladle of sugar.'),
@@ -290,6 +342,28 @@ export const FLOWER_THANKS: Record<string, FlowerThanks> = {
 };
 
 // ───────────────────────────── 老农, the old farmer ─────────────────────────────
+
+/** A second flower the same day: thanks, but the gift was already given. */
+export const FLOWER_AGAIN: Record<string, Line> & { any: Line } = {
+  any: L('又是一枝？今天的心意，我已经收到啦。这枝……就插在这儿吧。', 'Another? I had your kindness already today. This one… goes right here.'),
+  tea: L('又送花？壶边都插满啦！心意领了，心意领了。', 'Another flower? The teapot’s crowded with them! Thank you, thank you.'),
+  fisher: L('斗笠上已经插不下啦！留给鱼看吧。', 'No room left on my hat! Let the fish admire this one.'),
+  monk: L('一花一世界。今日已供过一枝，这枝便放在阶前吧。', 'One flower, one world. One is already before the Buddha today; this one can rest on the steps.'),
+  poet: L('今日诗已赠过，再赠便俗了。花嘛，我留着下酒。', 'I gave you a poem today; a second would be vulgar. The flower I’ll keep — with my wine.'),
+  kite: L('又一枝！娘说一天收一枝就够啦……这枝送给我的风筝吧！', 'Another! Mama says one a day is plenty… this one’s for my kite!'),
+  storyteller: L('一日两花——「花开两朵，各表一枝」！赏钱嘛……明儿请早。', 'Two flowers in a day — “two blossoms open; let us tell of each in turn”! As for tips… come early tomorrow.'),
+  fortune: L('老朽今日已为你卜过一卦，天机不可多泄。花，收下了。', 'I have read your fortune once today; heaven’s secrets are not to be spilled twice. The flower I’ll keep.'),
+  peddler: L('又一枝！插满担子，我就成卖花郎了。糖葫芦嘛，一天一串哟。', 'Another! One more and I’ll be a flower seller. Haws, though — one stick a day.'),
+  farmer: L('哈哈，一天两枝，老伴要吃醋啦！心意领了，钱就不给啦。', 'Ha! Two in one day — the wife will get jealous! Thank you — but no more coins.'),
+  master: L('又是一枝……今日的春色，都让你送给我了。', 'Another… you’ve given me all of today’s spring.'),
+  sugar: L('又送花？糖人今天已经送过你啦——花我收下，糖稀可不能白给哟。', 'Another flower? You had your free sugar figure today — I’ll take the flower, but syrup isn’t free.'),
+};
+/** 嫦娥 and the gardener come back for a second flower the same day. */
+export const FLOWER_HELLO_AGAIN: PerCompanion<Line> = {
+  any: L('今天那枝是送的，再要的话，三文一枝哦。', 'That one today was a gift — another is three coins.'),
+  change: L('姐姐又来啦！今天那枝是送你的，这枝……就收三文吧，嘻嘻。', 'You’re back! This morning’s was a gift — this one’s three coins, hee hee.'),
+  gardener: L('园丁伯伯，送您的那枝可要养好哦！再要的话，三文一枝。', 'Take good care of the one I gave you, gardener! Another is three coins.'),
+};
 
 export const FARMER_HELLO: PerCompanion<Line> = {
   any: L('后生，来看地啊？那边那片空地，就是你的家园了。', 'Come to look at the land, young one? That open ground there is your homestead.'),

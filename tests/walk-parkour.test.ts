@@ -3,9 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DAILY_SPOTS, FIRST_FINISH_COINS, MIN_CHALLENGES, PoleRun, RECORD_COINS, RUN_LIMIT,
-  finishReward, fmtTime, inRect, pickDaily, poleScore, poleTime, stoneLine, type SpotLike,
+  coinReached, finishReward, fmtTime, inRect, pickDaily, poleScore, poleTime, stoneLine, type SpotLike,
 } from '../src/views/walk/features/parkour/logic';
-import { SITES, DECK_COINS } from '../src/views/walk/features/parkour/sites';
+import { SITES, DECK_COINS, HIGH_LIFT } from '../src/views/walk/features/parkour/sites';
 import { POLE_COINS } from '../src/views/walk/features/parkour/poles';
 
 const spots: SpotLike[] = [];
@@ -147,5 +147,34 @@ describe('geometry', () => {
     const k = Math.SQRT1_2;
     expect(inRect(1, 1, 0, 0, k, k, 2, 0.5)).toBe(true);
     expect(inRect(1, -1, 0, 0, k, k, 2, 0.5)).toBe(false);
+  });
+});
+
+describe('coin reach', () => {
+  const g = 10;
+  it('a coin on a low jar is a hop, not a walk past', () => {
+    const top = g + 0.55, coin = top + 0.6;
+    // walking by on the ground, right beside it
+    expect(coinReached(0.3, 0.3, coin, g, top)).toBe(false);
+    expect(coinReached(0.1, 0, coin, g, top)).toBe(false);
+    // a hop past it, and standing on the jar
+    expect(coinReached(0.3, 0.3, coin, g + 0.45, top)).toBe(true);
+    expect(coinReached(0, 0.2, coin, top, top)).toBe(true);
+    // out of reach sideways
+    expect(coinReached(0.8, 0, coin, top, top)).toBe(false);
+  });
+  it('a coin on the ground or a deck is picked by walking', () => {
+    expect(coinReached(0.4, 0, g + 0.6, g, g)).toBe(true);
+  });
+  it('a high coin wants more than a plain jump from its surface', () => {
+    const coin = g + HIGH_LIFT;
+    expect(coinReached(0, 0, coin, g + 0.706, g)).toBe(false); // everyone's jump (~0.7 m)
+    expect(coinReached(0, 0, coin, g + 1.1, g)).toBe(true); // Big Ginger's (~1.1 m)
+  });
+  it('a coin out over a drop is reached only near the height you left from', () => {
+    const edge = g, coin = edge + 0.1;
+    expect(coinReached(0.2, 0, coin, edge - 0.2, edge)).toBe(true); // a slow float
+    expect(coinReached(0.2, 0, coin, edge - 0.6, edge)).toBe(false); // a high arc already falling
+    expect(coinReached(0.2, 0, coin, edge + 0.6, edge)).toBe(false); // still going over it
   });
 });

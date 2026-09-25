@@ -47,19 +47,20 @@ export const gardener: CharacterFactory = (THREE, opts) => {
   const swing = new Spring(26, 3.2);
   kit.keep(...drops);
   h.handProps.push(can);
-  const want = new THREE.Quaternion(), tmpQ = new THREE.Quaternion(), eul = new THREE.Euler();
+  const want = new THREE.Quaternion(), tmpQ = new THREE.Quaternion(), eul = new THREE.Euler(), hoeQ = new THREE.Quaternion();
 
   // the hoe: across his back, or in both hands for the skill
   const hoe = kit.group();
   const wood = kit.toon('#a57443'), iron = kit.toon('#5c5550');
-  put(hoe, kit.mesh(kit.cyl(0.014, 0.016, 1.05, 7), wood, OL * 0.55), 0, 0.3, 0);
-  put(hoe, kit.mesh(kit.box(0.14, 0.012, 0.13), iron, OL * 0.55), 0, 0.82, 0.07, 0.25, 0, 0);
-  put(hoe, new THREE.Mesh(kit.cyl(0.02, 0.02, 0.05, 8), iron), 0, 0.8, 0.0);
+  // (gripped near the butt, so no handle is left to poke into his belly on the stroke)
+  put(hoe, kit.mesh(kit.cyl(0.014, 0.016, 1.05, 7), wood, OL * 0.55), 0, 0.4, 0);
+  put(hoe, kit.mesh(kit.box(0.14, 0.012, 0.13), iron, OL * 0.55), 0, 0.92, 0.07, 0.25, 0, 0);
+  put(hoe, new THREE.Mesh(kit.cyl(0.02, 0.02, 0.05, 8), iron), 0, 0.9, 0.0);
   let inHands = false;
   const stow = (hands: boolean) => {
     inHands = hands;
     if (hands) { hoe.position.set(0, -0.02, 0.01); hoe.rotation.set(-1.25, 0, 0); h.armR.hand.add(hoe); }
-    else { hoe.position.set(0.1, -0.16, -0.07); hoe.rotation.set(0, 0, -0.95); h.back.add(hoe); }
+    else { hoe.position.set(0.02, -0.22, -0.07); hoe.rotation.set(0, 0, -0.95); h.back.add(hoe); }
   };
   stow(false);
 
@@ -109,20 +110,31 @@ export const gardener: CharacterFactory = (THREE, opts) => {
       m('shRx', -1.1); m('shRz', -0.1); m('elRx', -0.2);
       m('shLx', -0.4); m('shLz', 0.2); m('elLx', -0.9);
     } else if (f.emote === 'skill') {
-      // 催花: hoe up over the right shoulder, a great sweep down and across, a scrape, recover
+      // 催花: wound up with the hoe high over the right shoulder (0–.3), a step and a great sweep
+      // down in front (.32–.46), a scrape back along the ground, and up again (.78–1)
       const m = h.mx.set(p, f.env).m;
-      const up = smooth(f.u / 0.3), hit = smooth((f.u - 0.32) / 0.14), rec = smooth((f.u - 0.78) / 0.2);
-      const arm = mix(mix(-0.6, -2.7, up), -0.75, hit) * (1 - rec) + -0.5 * rec;
-      m('shRx', arm); m('shRz', 0.25 * (1 - hit) + 0.05); m('elRx', mix(-0.9, -0.15, hit));
-      m('shLx', arm + 0.25); m('shLz', -0.35); m('elLx', mix(-1.1, -0.45, hit));
-      m('torsoY', mix(0.45 * up, -0.35, hit) * (1 - rec)); m('torsoX', mix(-0.15 * up, 0.3, hit) * (1 - rec));
-      m('bodyX', 0.08 * hit * (1 - rec)); m('headX', mix(-0.15 * up, 0.25, hit));
-      m('hipLx', -0.45); m('hipRx', 0.3); m('knL', 0.3);
+      const up = smooth(f.u / 0.3), hit = smooth((f.u - 0.32) / 0.14), rec = smooth((f.u - 0.8) / 0.18);
+      const scrape = smooth((f.u - 0.48) / 0.28) * (1 - rec);
+      const k = 1 - rec;
+      m('shRx', mix(mix(-0.5, -2.65, up), -0.95 + scrape * 0.25, hit) * k - 0.45 * rec); m('shRz', mix(mix(-0.1, -0.25, up), 0.12, hit));
+      m('elRx', mix(mix(-0.9, -0.85, up), -0.25 - scrape * 0.2, hit));
+      m('shLx', mix(mix(-0.6, -2.25, up), -0.75 + scrape * 0.2, hit) * k - 0.5 * rec); m('shLz', mix(0.3 * up, -0.28, hit));
+      m('elLx', mix(mix(-1.0, -1.15, up), -0.4, hit));
+      m('torsoY', mix(-0.5 * up, 0.35 - scrape * 0.15, hit) * k); m('torsoX', mix(-0.18 * up, 0.42 - scrape * 0.1, hit) * k);
+      m('bodyX', mix(-0.04 * up, 0.12, hit) * k); m('bodyY', -0.06 * hit * k); m('headX', mix(-0.2 * up, 0.18, hit) * k);
+      m('hipLx', mix(-0.1, -0.7, hit) * k - 0.1); m('knL', mix(0.1, 0.65, hit) * k); m('hipRx', mix(0.1, 0.4, hit) * k); m('knR', 0.15 + 0.2 * hit * k);
     }
   };
   h.onAfter = (f) => {
     const wantHoe = f.emote === 'skill' && f.env > 0.2;
     if (wantHoe !== inHands) stow(wantHoe);
+    if (inHands) {
+      // the hoe's pitch in the body's frame, whatever the arms do: blade back over the shoulder,
+      // then down in front, dragged along the ground, and planted there as he straightens
+      const up = smooth(f.u / 0.3), hit = smooth((f.u - 0.32) / 0.14), rec = smooth((f.u - 0.8) / 0.18);
+      const pitch = mix(mix(0.4, -0.55, up), 2.3 + smooth((f.u - 0.48) / 0.28) * 0.25, hit) + rec * 0.1;
+      holdLevel(hoe, h.body, hoeQ.setFromEuler(eul.set(pitch, 0, 0)), tmpQ);
+    }
     can.visible = !wantHoe && !h.holding && !h.mallet.visible;
     const pour = f.emote === 'water' ? f.env : 0;
     // the can hangs plumb from the hand wherever the arm goes (a wave lifts it, never flips it),

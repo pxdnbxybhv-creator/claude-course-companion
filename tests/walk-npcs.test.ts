@@ -4,12 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { regionAt } from '../src/views/walk/map';
 import { CHARACTERS, type CharacterId } from '../src/data/characters';
 import {
-  WARES, WARE, bagChoices, canBuy, clockSeconds, dayPart, forCompanion, onDuty, ownFlag, ownedWares, pickDaily, pingPong, routeAt, routeCycle,
-  seasonOf, shutongDay, slipFor, special, sugarCount, taleFor, type RouteStop,
+  WARES, WARE, bagChoices, canBuy, clockSeconds, countToday, dayPart, flowerReward, forCompanion, giftKey, onDuty, ownFlag, ownedWares, pickDaily,
+  pingPong, routeAt, routeCycle, seasonOf, shutongDay, shutongStage, slipFor, special, sugarCount, taleFor, FLOWER_PRICE, SHUTONG_NOTE, SHUTONG_SEEK,
+  type RouteStop,
 } from '../src/views/walk/features/npcs/logic';
 import {
-  CALLS, FARMER_HELLO, FLOWER_HELLO, FLOWER_THANKS, FORTUNE_HELLO, HELLO, KITE_HELLO, MASTER_FOUND, MONK_HELLO, PEDDLER_HELLO, POET_NPC_HELLO,
-  SHUTONG_ASK, SHUTONG_CLUE, SLIPS, SUGAR_MAKE, TALES, TALE_SPOTTED, TEA_HELLO, FISHER_HELLO,
+  CALLS, FARMER_HELLO, FEST_CALLS, FLOWER_AGAIN, FLOWER_HELLO, FLOWER_HELLO_AGAIN, FLOWER_THANKS, FORTUNE_HELLO, HELLO, HELLO_NIGHT, KITE_HELLO,
+  MASTER_FOUND, MONK_HELLO, PEDDLER_HELLO, PEDDLER_REGULAR, POET_NPC_HELLO, SHUTONG_ASK, SHUTONG_CLUE, SLIPS, SUGAR_HELLO, SUGAR_MAKE, TALES,
+  TALE_SPOTTED, TEA_HELLO, FISHER_HELLO, WARE_PITCH, peddlerHello,
 } from '../src/views/walk/features/npcs/lines';
 import { PEDDLER_ROUTE, PEDDLER_SPEED, SHUTONG_SPOTS } from '../src/views/walk/features/npcs/places';
 
@@ -39,6 +41,16 @@ describe('the hours', () => {
     expect(onDuty('dawn', 13, false)).toBe(false);
     expect(onDuty('dawn', 17, false)).toBe(true);
     expect(onDuty('dawn', 6, true)).toBe(false);
+    // the night market: after dark until ten (midnight on a festival night), not in the small hours
+    expect(onDuty('evening', 20, true)).toBe(true);
+    expect(onDuty('evening', 20, false)).toBe(false);
+    expect(onDuty('evening', 22.5, true)).toBe(false);
+    expect(onDuty('evening', 22.5, true, true)).toBe(true);
+    expect(onDuty('evening', 2, true, true)).toBe(false);
+    expect(onDuty('evening', 14, true)).toBe(true); // a festival forcing the night by day
+    expect(onDuty('fest', 21, true)).toBe(false);
+    expect(onDuty('fest', 21, true, true)).toBe(true);
+    expect(onDuty('fest', 21, false, true)).toBe(false);
   });
   it('counts the clock from midnight', () => {
     expect(clockSeconds(new Date(2026, 8, 25, 1, 2, 3))).toBe(3723);
@@ -143,7 +155,7 @@ describe('lines for each companion', () => {
     expect(forCompanion(TEA_HELLO, 'painter')).toBeNull();
   });
   it('gives every new and upgraded person their own words for at least four companions', () => {
-    const tables = { PEDDLER_HELLO, FORTUNE_HELLO, FLOWER_HELLO, FARMER_HELLO, SUGAR_MAKE, SHUTONG_ASK, MASTER_FOUND, TALE_SPOTTED, TEA_HELLO, FISHER_HELLO, MONK_HELLO, POET_NPC_HELLO, KITE_HELLO, HELLO };
+    const tables = { SUGAR_HELLO, PEDDLER_HELLO, FORTUNE_HELLO, FLOWER_HELLO, FARMER_HELLO, SUGAR_MAKE, SHUTONG_ASK, MASTER_FOUND, TALE_SPOTTED, TEA_HELLO, FISHER_HELLO, MONK_HELLO, POET_NPC_HELLO, KITE_HELLO, HELLO };
     for (const [name, t] of Object.entries(tables)) {
       const own = CHARACTERS.filter((c) => special(t as never, c.id)).length;
       expect(own, name).toBeGreaterThanOrEqual(4);
@@ -153,6 +165,29 @@ describe('lines for each companion', () => {
     expect(HELLO.guan!.some((l) => l.zh.includes('关老爷'))).toBe(true);
     expect(HELLO.change!.some((l) => l.zh.includes('嫦娥') || l.zh.includes('仙女'))).toBe(true);
     expect(FORTUNE_HELLO.guan!.zh).toContain('将军何须问卜');
+  });
+  it('never pitches a ware you already own', () => {
+    expect(peddlerHello('scholar', {})).toBe(PEDDLER_HELLO.scholar);
+    // the scholar's lantern is bought: he pitches the first kept ware not yet owned
+    expect(peddlerHello('scholar', { [ownFlag('lantern')]: true })).toBe(WARE_PITCH.pinwheel);
+    expect(peddlerHello('scholar', { [ownFlag('lantern')]: true, [ownFlag('pinwheel')]: true })).toBe(WARE_PITCH.umbrella);
+    // a hello that pitches nothing kept stays the companion's own
+    expect(peddlerHello('guan', { [ownFlag('lantern')]: true })).toBe(PEDDLER_HELLO.guan);
+    const all = Object.fromEntries(WARES.filter((w) => w.keep).map((w) => [ownFlag(w.id), true as const]));
+    for (const c of CHARACTERS) {
+      const l = peddlerHello(c.id, all);
+      expect(l === PEDDLER_REGULAR.any || l === PEDDLER_REGULAR[c.id], c.id).toBe(true);
+    }
+    // every per-companion pitch names a ware that is on sale and kept
+    for (const c of CHARACTERS) for (const w of WARES.filter((x) => x.keep)) {
+      const l = peddlerHello(c.id, Object.fromEntries(WARES.filter((x) => x.keep && x.id !== w.id).map((x) => [ownFlag(x.id), true as const])));
+      expect(l.zh.length).toBeGreaterThan(0);
+    }
+  });
+  it('says good evening after dark, and fills festival nights with their own calls', () => {
+    expect(HELLO_NIGHT.some((l) => l.zh.includes('晚上'))).toBe(true);
+    expect(FEST_CALLS.midautumn!.some((l) => l.zh.includes('月饼'))).toBe(true);
+    expect(CALLS.snack!.length).toBeGreaterThanOrEqual(4);
   });
   it('lets the watchman call the night watch', () => {
     expect(CALLS.watchman!.some((l) => l.zh.includes('天干物燥，小心火烛'))).toBe(true);
@@ -207,5 +242,43 @@ describe('today’s picks', () => {
   it('counts the sugar figures kept, and thanks everyone who can be given a flower', () => {
     expect(sugarCount({ 'sugar:guan': true, 'sugar:cat': true, sugar: true })).toBe(2);
     for (const k of ['tea', 'fisher', 'monk', 'poet', 'kite', 'storyteller', 'fortune', 'peddler', 'farmer', 'master', 'sugar']) expect(FLOWER_THANKS[k], k).toBeTruthy();
+  });
+  it('rewards only the first flower each person gets in a day, so flowers never farm coins', () => {
+    const day = '2026-09-25';
+    for (const [who, th] of Object.entries(FLOWER_THANKS)) {
+      const first = flowerReward(th, 0);
+      expect(first.first).toBe(true);
+      expect(first.coins).toBe(th.coins ?? 0);
+      // every later flower that day: thanks only
+      for (const n of [1, 2, 10]) {
+        const r = flowerReward(th, n);
+        expect(r.first, who).toBe(false);
+        expect(r.coins, who).toBe(0);
+        expect(r.card, who).toBeUndefined();
+      }
+      expect(FLOWER_AGAIN[who] ?? FLOWER_AGAIN.any).toBeTruthy();
+    }
+    // ten rounds of buy-and-give to the best payer: one reward, then only flowers paid for
+    let purse = 100;
+    const counts: Record<string, number> = {};
+    for (let i = 0; i < 10; i++) {
+      purse -= FLOWER_PRICE;
+      const r = flowerReward(FLOWER_THANKS.farmer, countToday({ day, counts }, day, giftKey('farmer')));
+      purse += r.coins;
+      counts[giftKey('farmer')] = (counts[giftKey('farmer')] ?? 0) + 1;
+    }
+    expect(purse).toBe(100 - 10 * FLOWER_PRICE + (FLOWER_THANKS.farmer.coins ?? 0));
+    expect(purse).toBeLessThan(100);
+    // another day starts afresh
+    expect(countToday({ day: '2026-09-24', counts }, day, giftKey('farmer'))).toBe(0);
+    expect(FLOWER_HELLO_AGAIN.change!.zh).toContain('三文');
+  });
+  it('keeps the page boy’s errand through the day, and forgets it the next', () => {
+    const day = '2026-09-25';
+    expect(shutongStage(false, { day, counts: {} }, day)).toBe('idle');
+    expect(shutongStage(false, { day, counts: { [SHUTONG_SEEK]: 1 } }, day)).toBe('seeking');
+    expect(shutongStage(false, { day, counts: { [SHUTONG_SEEK]: 1, [SHUTONG_NOTE]: 1 } }, day)).toBe('note');
+    expect(shutongStage(true, { day, counts: { [SHUTONG_SEEK]: 1, [SHUTONG_NOTE]: 1 } }, day)).toBe('done');
+    expect(shutongStage(false, { day: '2026-09-24', counts: { [SHUTONG_NOTE]: 1 } }, day)).toBe('idle');
   });
 });

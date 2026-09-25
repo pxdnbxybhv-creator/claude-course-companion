@@ -20,20 +20,22 @@ import { begin, end } from '../minigames/ui';
 import { walkableNear } from '../minigames/cat';
 import { Bubbles } from './bubbles';
 import {
-  CAT_AFTER, CAT_HECKLE, CAT_PAW, FARMER_HELLO, FARMER_TIPS, FLOWERS, FLOWER_HELLO, FORTUNE_HELLO, GUAN_GIFT, MASTER_FOUND, PEDDLER_HELLO,
-  PEDDLER_ROUND, POET_CORRECTS, POET_VERSE, SHUTONG_ASK, SHUTONG_CLUE, SHUTONG_DONE, SLIPS, STORY_END, SUGAR_HELLO, SUGAR_MAKE, TALES,
+  CAT_AFTER, CAT_HECKLE, CAT_PAW, FARMER_HELLO, FARMER_TIPS, FLOWERS, FLOWER_HELLO, FLOWER_HELLO_AGAIN, FORTUNE_HELLO, GUAN_GIFT, MASTER_FOUND,
+  PEDDLER_ROUND, peddlerHello, POET_CORRECTS, POET_VERSE, SHUTONG_ASK, SHUTONG_CLUE, SHUTONG_DONE, SLIPS, STORY_END, SUGAR_HELLO, SUGAR_MAKE, TALES,
   TALE_AFTER, TALE_SPOTTED, WARE_SOLD,
 } from './lines';
 import {
-  FLOWER_PRICE, FORTUNE_PRICE, SHUTONG_COINS, SUGAR_PRICE, WARES, canBuy, clockSeconds, forCompanion, routeAt, seasonOf, shutongDay, slipFor,
-  sugarCount, taleFor, type Line,
+  FLOWER_PRICE, FORTUNE_PRICE, FREE_FLOWER_KEY, SHUTONG_COINS, SHUTONG_NOTE, SHUTONG_SEEK, SUGAR_PRICE, WARES, canBuy, clockSeconds, countToday,
+  forCompanion, routeAt, seasonOf, shutongDay, shutongStage, slipFor, sugarCount, taleFor, type Line,
 } from './logic';
 import { receive } from './carry';
 import { PEDDLER_ROUTE, PEDDLER_SPEED, SHUTONG_SPOTS } from './places';
 import { offerFlower } from './gift';
+import { blockedAlong } from './crowd';
 import * as snd from './sound';
 
 const who = (ctx: WorldCtx): CharacterId => ctx.player.character;
+const night = (ctx: WorldCtx): boolean => { try { return ctx.sky.isNight(); } catch { return false; } };
 const coinsNow = () => play.value.coins;
 const L2 = (l: Line) => ({ zh: l.zh, en: l.en });
 /** A line said by the walker's companion (their own name on the dialogue). */
@@ -70,6 +72,11 @@ const PEDDLER_CALLS: Line[] = [
 export const peddler = feature('npc-peddler', async (bag, ctx) => {
   const { THREE } = ctx;
   const still = reducedMotion();
+  if (import.meta.env.DEV) {
+    // his round is laid by hand: check it against the ground as it is now (a new region or building)
+    const b = blockedAlong(ctx, PEDDLER_ROUTE, 0.5, true);
+    if (b.bad) console.info(`[npcs] the peddler's round is blocked (${b.bad}/${b.n}) at ${b.where.join(' ')}`);
+  }
   const bubbles = new Bubbles(bag, 1);
   const pos = routeAt(PEDDLER_ROUTE, PEDDLER_SPEED, clockSeconds(ctx.env.date));
   const f = figure(bag, ctx.scene, { robe: '#9a6a3c', trim: '#3a2e28', hat: 'bamboo', hatColor: '#c9ad72', apron: '#e9dcc0' }, new THREE.Vector3(pos.x, ctx.groundY(pos.x, pos.z), pos.z), pos.heading);
@@ -121,9 +128,10 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
       talking = true;
       try {
         record('npc:peddler');
-        if (await offerFlower(ctx, f, name, 'peddler')) {
-          receive('haws');
-          ctx.hud.toast('得了一串糖葫芦', 'A stick of candied haws for you', 1800);
+        const gift = await offerFlower(ctx, f, name, 'peddler');
+        if (gift) {
+          // haws for the first flower of the day only
+          if (gift === 'first') { receive('haws'); ctx.hud.toast('得了一串糖葫芦', 'A stick of candied haws for you', 1800); }
           return;
         }
         let first = true;
@@ -132,9 +140,10 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
             const b = canBuy(w, coinsNow(), play.value.flags);
             return { zh: `${w.zh} · ${w.price}文${!b.ok && b.why === 'owned' ? '（已有）' : ''}`, en: `${w.en} · ${w.price}${!b.ok && b.why === 'owned' ? ' (owned)' : ''}` };
           });
+          const hi = first ? peddlerHello(who(ctx), play.value.flags) : null;
           const c = await talk(ctx, f, name, [{
-            zh: `${first ? forCompanion(PEDDLER_HELLO, who(ctx)).zh + '\n' : '还要点什么？'}（囊中 ${coinsNow()} 文）`,
-            en: `${first ? forCompanion(PEDDLER_HELLO, who(ctx)).en + '\n' : 'Anything else? '}(Purse: ${coinsNow()})`,
+            zh: `${hi ? hi.zh + '\n' : '还要点什么？'}（囊中 ${coinsNow()} 文）`,
+            en: `${hi ? hi.en + '\n' : 'Anything else? '}(Purse: ${coinsNow()})`,
             choices: [...choices, { zh: '您从哪儿来？', en: 'Where do you go?' }, { zh: '告辞', en: 'Goodbye' }],
           }]);
           first = false;
@@ -329,7 +338,8 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
       mark.set(false);
       try {
         record('npc:fortune');
-        if (await offerFlower(ctx, f, name, 'fortune')) { await drawSlip(); return; }
+        const gift = await offerFlower(ctx, f, name, 'fortune');
+        if (gift) { if (gift === 'first') await drawSlip(); return; }
         const me = who(ctx);
         const hello = forCompanion(FORTUNE_HELLO, me);
         if (me === 'guan') {
@@ -375,9 +385,11 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
       try {
         record('npc:sugar');
         const me = who(ctx);
-        const free = await offerFlower(ctx, f, name, 'sugar');
+        // a sugar figure free for the first flower of the day; after that, flowers are only thanked
+        const free = (await offerFlower(ctx, f, name, 'sugar')) === 'first';
         if (!free) {
-          const c = await talk(ctx, f, name, [{ zh: `${SUGAR_HELLO.zh}（囊中 ${coinsNow()} 文）`, en: `${SUGAR_HELLO.en} (Purse: ${coinsNow()})`, choices: [{ zh: `来一个 · ${SUGAR_PRICE}文`, en: `One, please · ${SUGAR_PRICE}` }, { zh: '看看就好', en: 'Just looking' }] }]);
+          const hi = forCompanion(SUGAR_HELLO, me);
+          const c = await talk(ctx, f, name, [{ zh: `${hi.zh}（囊中 ${coinsNow()} 文）`, en: `${hi.en} (Purse: ${coinsNow()})`, choices: [{ zh: `来一个 · ${SUGAR_PRICE}文`, en: `One, please · ${SUGAR_PRICE}` }, { zh: '看看就好', en: 'Just looking' }] }]);
           if (c !== 0) return;
           if (!spend(SUGAR_PRICE)) { await tooPoor(ctx, f, name, SUGAR_PRICE); return; }
           paid(ctx, SUGAR_PRICE);
@@ -388,7 +400,7 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
         f.armR.rotation.x = -0.6;
         const k = await ctx.hud.say({
           nameZh: name.zh, nameEn: name.en,
-          zh: `成了！一个琥珀色的小${c.zh}，在日头底下亮晶晶的。吃了，还是留着？`, en: `Done! A little amber ${c.en}, glittering in the sun. Eat it, or keep it?`,
+          zh: `成了！一个琥珀色的小${c.zh}，在${night(ctx) ? '灯下' : '日头底下'}亮晶晶的。吃了，还是留着？`, en: `Done! A little amber ${c.en}, glittering in the ${night(ctx) ? 'lamplight' : 'sun'}. Eat it, or keep it?`,
           choices: [{ zh: '吃掉', en: 'Eat it' }, { zh: '留着', en: 'Keep it' }],
         });
         if (k === 0) {
@@ -443,13 +455,17 @@ export const flowerGirl = feature('npc-flower', (bag, ctx) => {
       try {
         record('npc:flower');
         const me = who(ctx);
-        const free = me === 'change' || me === 'gardener';
+        // 嫦娥 and the gardener get one flower a day for nothing
+        const fond = me === 'change' || me === 'gardener';
+        const free = fond && countToday(play.value.daily, toKey(ctx.env.date), FREE_FLOWER_KEY) === 0;
+        const hi = fond && !free ? forCompanion(FLOWER_HELLO_AGAIN, me) : forCompanion(FLOWER_HELLO, me);
         const c = await talk(ctx, f, name, [{
-          zh: `${forCompanion(FLOWER_HELLO, me).zh}${free ? '' : `（囊中 ${coinsNow()} 文）`}`, en: `${forCompanion(FLOWER_HELLO, me).en}${free ? '' : ` (Purse: ${coinsNow()})`}`,
+          zh: `${hi.zh}${free ? '' : `（囊中 ${coinsNow()} 文）`}`, en: `${hi.en}${free ? '' : ` (Purse: ${coinsNow()})`}`,
           choices: [{ zh: free ? `收下这枝${fl.zh}` : `买一枝${fl.zh} · ${FLOWER_PRICE}文`, en: free ? `Take the ${fl.en}` : `A sprig of ${fl.en} · ${FLOWER_PRICE}` }, { zh: '告辞', en: 'Goodbye' }],
         }]);
         if (c !== 0) return;
-        if (!free) {
+        if (free) record(FREE_FLOWER_KEY);
+        else {
           if (!spend(FLOWER_PRICE)) { await tooPoor(ctx, f, name, FLOWER_PRICE); return; }
           paid(ctx, FLOWER_PRICE);
         }
@@ -525,7 +541,8 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
   fan.rotation.set(-0.3, Math.PI / 2, 0);
   master.armR.add(fan);
   master.armR.rotation.x = -0.7;
-  let stage: 'idle' | 'seeking' | 'note' | 'done' = play.value.flags[doneKey] ? 'done' : 'idle';
+  // how far today's errand got (kept in the day's counts: leaving the painting or reloading keeps it)
+  let stage = shutongStage(!!play.value.flags[doneKey], play.value.daily, day);
   const kidMark = speechMark(bag, kid, '？');
   const masterMark = speechMark(bag, master, '书');
   const marks = () => { kidMark.set(stage === 'idle' || stage === 'note'); masterMark.set(stage === 'seeking'); };
@@ -533,6 +550,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
   greet(bag, ctx, kid, 6);
   const kname = { zh: '书童', en: 'Page Boy' }, mname = { zh: '柳先生', en: 'Master Liu' };
   const note = () => bag.counter('npc-shutong', { zh: '字条', en: 'Note' }, tr(ctx, '带给书童', 'for the page boy'));
+  if (stage === 'note') note();
   bag.interact({
     id: 'npc-shutong', position: front(kid, 0.8), radius: 2,
     labelZh: '书童', labelEn: 'Page boy', actionZh: '说话', actionEn: 'Talk',
@@ -560,7 +578,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
           return;
         }
         await talk(ctx, kid, kname, [L2(forCompanion(SHUTONG_ASK, me)), L2(SHUTONG_CLUE[ms.region])]);
-        if (stage === 'idle') { stage = 'seeking'; marks(); }
+        if (stage === 'idle') { stage = 'seeking'; record(SHUTONG_SEEK); marks(); }
       } finally { end(ctx, 'talk'); }
     },
   });
@@ -576,6 +594,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
         if (stage === 'seeking') {
           await talk(ctx, master, mname, [L2(forCompanion(MASTER_FOUND, me))]);
           stage = 'note';
+          record(SHUTONG_NOTE);
           marks();
           note();
           ctx.hud.toast('收下字条，带回给书童', 'Take the note back to the page boy', 2400);

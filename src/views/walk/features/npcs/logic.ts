@@ -46,9 +46,13 @@ export function dayPart(hour: number): DayPart {
  * When someone is about. The sky decides night (the visitor may force it), the hour shades the day:
  * washing is done in the morning, the square fills in the afternoon.
  */
-export type Shift = 'always' | 'day' | 'night' | 'morning' | 'afternoon' | 'dawn';
+export type Shift = 'always' | 'day' | 'night' | 'morning' | 'afternoon' | 'dawn' | 'evening' | 'fest';
 
-export function onDuty(shift: Shift, hour: number, night: boolean): boolean {
+/**
+ * `evening`: the night market and lantern viewers, out after dark until 22:00 (midnight on a festival
+ * night), not in the small hours. `fest`: only on a festival night, until midnight.
+ */
+export function onDuty(shift: Shift, hour: number, night: boolean, fest = false): boolean {
   const h = ((hour % 24) + 24) % 24;
   switch (shift) {
     case 'always': return true;
@@ -57,8 +61,13 @@ export function onDuty(shift: Shift, hour: number, night: boolean): boolean {
     case 'morning': return !night && h < 13;
     case 'afternoon': return !night && h >= 11;
     case 'dawn': return !night && (h < 10 || h >= 16);
+    case 'evening': return night && h >= 5 && h < (fest ? 24 : 22);
+    case 'fest': return night && fest && h >= 5;
   }
 }
+
+/** Festivals whose nights bring the lanterns out (children with rabbit lanterns, more stalls). */
+export const LANTERN_NIGHTS: readonly string[] = ['newyear', 'spring', 'lantern', 'qixi', 'midautumn', 'chongyang'];
 
 // ───────────────────────────── routes ─────────────────────────────
 
@@ -256,4 +265,37 @@ export function seasonOf(month: number): 0 | 1 | 2 | 3 {
 /** Sugar figures collected (flags sugar:<companion>). */
 export function sugarCount(flags: Record<string, true | undefined>): number {
   return Object.keys(flags).filter((k) => k.startsWith('sugar:')).length;
+}
+
+// ───────────────────────────── what is kept for the day ─────────────────────────────
+
+/** Today's count of `key` in play's daily counts (0 when those counts are another day's). */
+export function countToday(daily: { day: string; counts: Record<string, number> }, day: string, key: string): number {
+  return daily.day === day ? daily.counts[key] ?? 0 : 0;
+}
+
+/** The daily count of flowers given to one person. */
+export const giftKey = (who: string) => `gift:${who}`;
+/** The daily count of free flowers (嫦娥 and the gardener get one a day). */
+export const FREE_FLOWER_KEY = 'flower-free';
+
+/**
+ * What a flower brings back: a person's coins or card (and the caller's surprise — a slip, a sugar
+ * figure, haws) only for the first flower they get each day; later ones are thanked, nothing more,
+ * so a 3-coin flower can never be turned into coins again and again.
+ */
+export function flowerReward<C>(th: { coins?: number; card?: C } | undefined, givenToday: number): { first: boolean; coins: number; card: C | undefined } {
+  const first = givenToday <= 0;
+  return { first, coins: first ? th?.coins ?? 0 : 0, card: first ? th?.card : undefined };
+}
+
+/** The page boy's errand, as far as it got today (kept in the day's counts, so leaving the painting keeps it). */
+export type ShutongStage = 'idle' | 'seeking' | 'note' | 'done';
+export const SHUTONG_SEEK = 'shutong:seek';
+export const SHUTONG_NOTE = 'shutong:note';
+export function shutongStage(done: boolean, daily: { day: string; counts: Record<string, number> }, day: string): ShutongStage {
+  if (done) return 'done';
+  if (countToday(daily, day, SHUTONG_NOTE)) return 'note';
+  if (countToday(daily, day, SHUTONG_SEEK)) return 'seeking';
+  return 'idle';
 }

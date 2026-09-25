@@ -179,6 +179,26 @@ export function fmtTime(secs: number): string {
   return m > 0 ? `${m}′${tenth.padStart(4, '0')}″` : `${tenth}″`;
 }
 
+// ───────────────────────────── coins ─────────────────────────────
+
+/** How far below a coin's own surface the feet may be and still pick it up (m). */
+export const COIN_FEET = 0.25;
+/** The pick-up reach: horizontal radius, and the body's span from the feet (below the coin) up. */
+export const COIN_REACH = 0.7;
+export const COIN_BELOW = 0.3;
+export const COIN_ABOVE = 1.4;
+
+/**
+ * Does a walker whose feet are at `feetY`, (dx, dz) from a coin at `coinY` hanging over a surface at
+ * `floorY`, pick it up? The body (feet to head) must pass through the coin with the feet up at (or
+ * above) that surface: a coin on a low jar or a parapet is a hop, never a walk past, and one hung out
+ * over a drop is reached only by keeping your height a long way out.
+ */
+export function coinReached(dx: number, dz: number, coinY: number, feetY: number, floorY: number): boolean {
+  const dy = coinY - feetY;
+  return dx * dx + dz * dz < COIN_REACH * COIN_REACH && dy > -COIN_BELOW && dy < COIN_ABOVE && feetY > floorY - COIN_FEET;
+}
+
 // ───────────────────────────── small geometry ─────────────────────────────
 
 /** Is (x, z) inside the oriented rectangle (centre, unit axis, half length, half width)? */

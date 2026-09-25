@@ -75,6 +75,9 @@ const TAU = Math.PI * 2;
  * hand's breadth beyond the edge instead, which reads as standing on it.
  */
 const EDGE = 0.18;
+/** A pine limb's walkable half width, and how far its deck reaches past the tip. */
+const LIMB_HW = 0.3;
+const LIMB_TIP = 0.15;
 
 export interface BuiltProp {
   spec: PropSpec;
@@ -82,6 +85,8 @@ export interface BuiltProp {
   base: number;
   foot: number;
   top: number;
+  /** Its walkable top, as registered (the last deck it made), for exact on-top tests. */
+  deck: Deck | null;
 }
 
 /**
@@ -145,6 +150,7 @@ export class Builder {
     const rng = makeRng(spec.seed ?? (Math.round(spec.x * 131 + spec.z * 71) | 0));
     const top = this.base + spec.h;
     const ry = spec.ry ?? 0;
+    const n0 = this.decks.length;
     let foot = top;
     switch (spec.kind) {
       case 'crate': foot = this.crate(spec, top, ry, rng); break;
@@ -160,7 +166,7 @@ export class Builder {
       case 'plank': foot = this.plank(spec, top, ry); break;
       case 'pine': foot = this.pine(spec, top, ry, rng); break;
     }
-    const b: BuiltProp = { spec, base: this.base, foot, top };
+    const b: BuiltProp = { spec, base: this.base, foot, top, deck: this.decks.length > n0 ? this.decks[this.decks.length - 1] : null };
     this.built.push(b);
     return b;
   }
@@ -467,12 +473,18 @@ export class Builder {
         this.put(new this.THREE.SphereGeometry(1, 9, 5), C.pineNeedle2, cx, y + sz * 0.12, cz, rng() * TAU, 0, 0, [sz * 0.9, sz * 0.24, sz * 0.82]);
       }
     }
-    // the walkable limb: from near the trunk (s = −half, at trunkY) down to its tip (s = +half, at top)
-    const a0 = at(t0 + 0.25), a1 = at(L);
+    // the walkable limb: from near the trunk (at trunkY) down to its tip (at top), and a foot's
+    // breadth past the tip and to either side (the walker is tested at its centre, and a jump from
+    // below rarely comes in straight along the limb), level beyond the tip
+    const x0 = t0 + 0.25, x1 = L + LIMB_TIP;
+    const a0 = at(x0), a1 = at(x1);
     const cx = (a0.x + a1.x) / 2, cz = (a0.z + a1.z) / 2;
-    const hl = (L - t0 - 0.25) / 2;
+    const hl = (x1 - x0) / 2;
     const y0 = trunkY - (trunkY - top) * (0.25 / (L - t0));
-    this.deck(cx, cz, ry, hl, 0.24, (sAlong) => y0 + (top - y0) * ((sAlong + hl) / (2 * hl)));
+    this.deck(cx, cz, ry, hl, LIMB_HW, (sAlong) => {
+      const lx = x0 + sAlong + hl;
+      return lx >= L ? top : y0 + (top - y0) * ((lx - x0) / (L - x0));
+    });
     return foot;
   }
 

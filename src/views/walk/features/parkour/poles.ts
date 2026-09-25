@@ -8,10 +8,11 @@ import type { WorldCtx } from '../../types';
 import { flag, play, record, recordMax, earn } from '../../../../app/play';
 import { type Bag, inked, reducedMotion, tr } from '../kit';
 import { merge, part } from '../geo';
+import type { Deck } from '../../regions/water-decks';
 import { Builder, C } from './build';
 import type { CoinSpot } from './coins';
 import { HIGH_LIFT } from './sites';
-import { PoleRun, finishReward, fmtTime, poleScore, poleTime, type RunPlace } from './logic';
+import { PoleRun, finishReward, fmtTime, inRect, poleScore, poleTime, type RunPlace } from './logic';
 import * as snd from './sound';
 
 const AT = { x: -74, z: 36 };
@@ -54,10 +55,11 @@ export function buildPoles(bag: Bag, ctx: WorldCtx): void {
   const { THREE } = ctx;
   const base = ctx.groundY(AT.x, AT.z);
   const b = new Builder(ctx, 'poles', base);
-  b.add({ kind: 'stone', x: START.x, z: START.z, h: START.h, r: START.r, mark: true, ry: 0.3 });
+  const startDeck = b.add({ kind: 'stone', x: START.x, z: START.z, h: START.h, r: START.r, mark: true, ry: 0.3 }).deck;
   const tops: number[] = [];
   POLES.forEach(([x, z, h], i) => { tops.push(b.add({ kind: 'pole', x, z, h, r: POLE_R, mark: i === POLES.length - 1, seed: 40 + i }).top); });
   const fin = b.add({ kind: 'plank', x: FINISH.x, z: FINISH.z, h: FINISH.h, w: FINISH.w, d: FINISH.d, ry: 0.2 });
+  const finDeck = fin.deck;
   // the stele by the start
   const stY = ctx.groundY(STELE.x, STELE.z);
   const startTop = base + START.h;
@@ -111,15 +113,22 @@ export function buildPoles(bag: Bag, ctx: WorldCtx): void {
     for (const [px, pz] of POLES) if (Math.hypot(x - px, z - pz) < m) return true;
     return false;
   };
+  /** Over a deck's walkable top (as registered), give or take a margin. */
+  const onDeck = (d: Deck | null, x: number, z: number, m: number) => !!d && inRect(x, z, d.cx, d.cz, d.ax, d.az, d.hl + m, d.hw + m);
   const place = (): RunPlace => {
     const p = P.position;
     if (P.isFrozen) return 'away';
     if (!near(p.x, p.z, 5)) return 'away';
     if (!P.grounded) return 'air';
-    if (Math.hypot(p.x - START.x, p.z - START.z) < START.r * 0.85 && Math.abs(p.y - startTop) < 0.15) return 'start';
-    const fx = p.x - FINISH.x, fz = p.z - FINISH.z;
-    if (Math.abs(fx) < FINISH.w / 2 + 0.1 && Math.abs(fz) < FINISH.d / 2 + 0.1 && Math.abs(p.y - fin.top) < 0.2) return 'finish';
+    // the stone and the platform: anywhere on their tops (the walker is tested at its centre, which may
+    // stand out on a corner), and anything at their height close by is them, never a fall
+    const atStart = Math.abs(p.y - startTop) < 0.15;
+    const atFinish = Math.abs(p.y - fin.top) < 0.2;
+    if (atStart && onDeck(startDeck, p.x, p.z, 0.1)) return 'start';
+    if (atFinish && onDeck(finDeck, p.x, p.z, 0.05)) return 'finish';
     if (poleAt(p.x, p.z, p.y) >= 0) return 'pole';
+    if (atStart && Math.hypot(p.x - START.x, p.z - START.z) < START.r + 0.4) return 'start';
+    if (atFinish && Math.hypot(p.x - FINISH.x, p.z - FINISH.z) < 1.35) return 'finish';
     // the ground among the posts is a fall; walking about well outside the course is not
     return near(p.x, p.z, 1.3) ? 'ground' : 'away';
   };

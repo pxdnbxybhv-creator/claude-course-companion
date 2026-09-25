@@ -130,7 +130,7 @@ const falls: Site = {
     { kind: 'slab', x: 54.1, z: -101.7, h: 3.0, w: 1.5, d: 1.1, ry: 0.1 },
   ],
   coins: [
-    coin(M, 'm-f1', 51.2, -98.3, 1),
+    // (none on the first stone: the slope behind it comes up level with its top)
     coin(M, 'm-f3', 51.5, -100.4, 1),
     coin(M, 'm-f5', 53.3, -100.7, 2),
     coin(M, 'm-ledge', 54.1, -101.7, 3),

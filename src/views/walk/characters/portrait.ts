@@ -217,9 +217,13 @@ const PAINT: Record<string, (p: P) => void> = {
     p.dot(33, 43.5, 2.2, 0.95);
   },
   player(p) {
-    // the go board behind the left shoulder
-    p.fill('#d7b273', [[10, 70], [32, 66], [36, 108], [14, 112]], 0.9, 0.4);
-    for (let i = 1; i < 6; i++) { p.line([[10 + i * 3.7, 70 - i * 0.7], [14 + i * 3.7, 112 - i * 0.7]], 0.3, 0.45); p.line([[10 + i * 0.7, 70 + i * 7], [32 + i * 0.7, 66 + i * 7]], 0.3, 0.45); }
+    // the go board slung on his back (its corners over both shoulders), the stone pot tied on top
+    const B: Pt[] = [[14, 70], [70, 56], [86, 104], [28, 118]];
+    const at = (a: Pt, b: Pt, k: number): Pt => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+    p.fill('#d7b273', B, 0.92, 0.4);
+    for (let i = 1; i < 8; i++) { const k = i / 8; p.line([at(B[0], B[1], k), at(B[3], B[2], k)], 0.3, 0.45); p.line([at(B[0], B[3], k), at(B[1], B[2], k)], 0.3, 0.45); }
+    p.dot(72, 53, 6.5, 0.95, '#8a5a32', false);
+    p.brush(arcW(72, 53, 6.5, 6.5, Math.PI * 1.1, Math.PI * 1.9, 0.6, 0.6), 0.6);
     bust(p, { skin: '#f0d3b4', robe: '#739c8c', trim: '#2e3a35', hair: INK, blush: 0.2, bun: false });
     // moustache, goatee
     p.brush([[49, 60, 0.8], [44, 61, 1.2], [41, 64, 0.4]], 0.9);

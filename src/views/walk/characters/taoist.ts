@@ -117,7 +117,14 @@ export const taoist: CharacterFactory = (THREE, opts) => {
       p.knL += Math.max(0, Math.sin(f.phase)) * 0.35 * g; p.knR += Math.max(0, -Math.sin(f.phase)) * 0.35 * g;
       p.headZ += Math.sin(f.phase * 0.5) * 0.06 * g;
     }
-    if (f.emote === 'play' || f.emote === 'cast') {
+    if (f.emote === 'dance') {
+      // a child's dance: hop, hop, the whisk twirled overhead
+      const m = h.mx.set(p, f.env).m;
+      const hop = Math.abs(Math.sin(f.since * 5.2)), a = f.since * 8;
+      m('bodyY', hop * 0.09); m('knL', 0.5 - hop * 0.4); m('knR', 0.5 - hop * 0.4); m('hipLx', -0.3 + hop * 0.2); m('hipRx', -0.3 + hop * 0.2);
+      m('shRx', -2.5 + Math.sin(a) * 0.3); m('shRz', -0.3 + Math.cos(a) * 0.3); m('elRx', -0.3);
+      m('shLx', -0.3); m('shLz', 0.9); m('elLx', -0.6);
+    } else if (f.emote === 'play' || f.emote === 'cast') {
       const m = h.mx.set(p, f.env).m;
       const a = f.t * 7;
       m('shRx', -1.6 + Math.sin(a) * 0.6); m('shRz', -0.3 + Math.cos(a) * 0.5); m('elRx', -0.6);
@@ -128,8 +135,8 @@ export const taoist: CharacterFactory = (THREE, opts) => {
       // flung forward (.45–.55), the arm held out after it
       const m = h.mx.set(p, f.env).m;
       const pull = smooth(f.u / 0.18), raise = smooth((f.u - 0.2) / 0.2), fling = smooth((f.u - 0.46) / 0.08);
-      m('shLx', mix(mix(-0.2, -0.9, pull), mix(-1.6, -1.75, fling), raise)); m('shLz', mix(mix(0.1, -0.7, pull), mix(-0.35, 0.1, fling), raise));
-      m('elLx', mix(mix(-0.5, -1.6, pull), mix(-1.9, -0.1, fling), raise)); m('elLz', 0);
+      m('shLx', mix(mix(-0.2, -0.9, pull), mix(-1.5, -1.75, fling), raise)); m('shLz', mix(mix(0.1, -0.7, pull), mix(-0.12, 0.1, fling), raise));
+      m('elLx', mix(mix(-0.5, -1.6, pull), mix(-1.3, -0.1, fling), raise)); m('elLz', 0);
       m('shRx', -0.6 * raise); m('shRz', -0.4 * raise); m('elRx', -0.8);
       m('headX', mix(0.1, -0.15, raise)); m('torsoY', mix(0.25 * pull, -0.3, fling)); m('bodyX', 0.1 * fling);
       m('hipLx', -0.45 * fling); m('hipRx', 0.3 * fling); m('knL', 0.3 * fling);

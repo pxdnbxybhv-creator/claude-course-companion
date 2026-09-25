@@ -239,15 +239,16 @@ export class Kit {
 
 // ------------------------------------------------------------------------------------------ bake
 
-type Part = { geo: Geo; m: THREE_NS.Matrix4; color?: THREE_NS.Color; push?: number };
+type Part = { geo: Geo; m: THREE_NS.Matrix4; color?: THREE_NS.Color; push?: number; bone: number };
 
-/** Merge parts (already in their joint's space) into one indexed geometry. */
+/** Merge parts (each in its joint's space) into one indexed geometry, each vertex bound to its joint. */
 function mergeParts(kit: Kit, parts: Part[], withColor: boolean, bare: boolean): Geo {
   const T = kit.THREE;
   let nv = 0, ni = 0;
   for (const p of parts) { nv += p.geo.attributes.position.count; ni += p.geo.index ? p.geo.index.count : p.geo.attributes.position.count; }
   const pos = new Float32Array(nv * 3), nor = bare ? null : new Float32Array(nv * 3), uv = bare ? null : new Float32Array(nv * 2);
   const col = withColor ? new Float32Array(nv * 3) : null;
+  const si = new Uint16Array(nv * 4), sw = new Float32Array(nv * 4);
   const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
   const v = new T.Vector3(), n = new T.Vector3(), nm = new T.Matrix3();
   let ov = 0, oi = 0;
@@ -267,6 +268,7 @@ function mergeParts(kit: Kit, parts: Part[], withColor: boolean, bare: boolean):
       }
       if (uv) { uv[(ov + i) * 2] = U ? U.getX(i) : 0; uv[(ov + i) * 2 + 1] = U ? U.getY(i) : 0; }
       if (col && p.color) { col[(ov + i) * 3] = p.color.r; col[(ov + i) * 3 + 1] = p.color.g; col[(ov + i) * 3 + 2] = p.color.b; }
+      si[(ov + i) * 4] = p.bone; sw[(ov + i) * 4] = 1;
     }
     if (g.index) for (let i = 0; i < g.index.count; i++) idx[oi + i] = g.index.getX(i) + ov;
     else for (let i = 0; i < P.count; i++) idx[oi + i] = i + ov;
@@ -278,30 +280,40 @@ function mergeParts(kit: Kit, parts: Part[], withColor: boolean, bare: boolean):
   if (nor) out.setAttribute('normal', new T.BufferAttribute(nor, 3));
   if (uv) out.setAttribute('uv', new T.BufferAttribute(uv, 2));
   if (col) out.setAttribute('color', new T.BufferAttribute(col, 3));
+  out.setAttribute('skinIndex', new T.Uint16BufferAttribute(si, 4));
+  out.setAttribute('skinWeight', new T.BufferAttribute(sw, 4));
   out.setIndex(new T.BufferAttribute(idx, 1));
-  out.computeBoundingSphere();
   return out;
 }
 
 /**
- * Merge the still parts under each joint into a few meshes, so a figure costs a couple of dozen
- * draw calls instead of ~80 (and twice that near the pond, where it is drawn again for the
- * reflection). Under each joint (any non-mesh object) the meshes hanging from it are gathered:
- * plain opaque toon parts become one vertex-coloured mesh (one per side mode), other materials one
- * mesh each, and every ink hull one mesh with its push baked into the geometry. Objects marked with
- * kit.keep() — and anything under them — are left alone, as are multi-material meshes.
+ * Fold the figure's still parts into a handful of draws (it is drawn again for the pond's
+ * reflection, and a crowd may stand about). Every joint (any non-mesh object: shoulder, elbow,
+ * head, a prop's group) becomes a bone of one skeleton, and the meshes hanging from the joints are
+ * merged by material across the whole figure: plain opaque toon parts into one vertex-coloured
+ * skinned mesh (one per side mode), other materials one each, and every ink hull into one with its
+ * push baked in. Each vertex follows its own joint rigidly, so the rig animates exactly as before
+ * (joints move, turn, scale, are re-parented, and a hidden joint hides its parts). Objects marked
+ * with kit.keep() — and anything under them — are left alone, as are multi-material meshes.
  */
 export function bake(kit: Kit, root: Obj): void {
   const T = kit.THREE;
-  const isMesh = (o: Obj): o is Mesh => (o as Mesh).isMesh === true;
+  const isMesh = (o: Obj): o is Mesh => (o as Mesh).isMesh === true && !(o as THREE_NS.InstancedMesh).isInstancedMesh && !(o as THREE_NS.SkinnedMesh).isSkinnedMesh;
   // a mesh can be folded in only if nothing under it is a joint or kept
   const still = (o: Obj): boolean => isMesh(o) && !o.userData.keep && !Array.isArray(o.material) && o.children.every(still);
   const joints: Obj[] = [];
-  root.traverse((o) => { if (!isMesh(o)) joints.push(o); });
+  const walk = (o: Obj) => {
+    if (o.userData.keep) return;
+    if ((o as Mesh).isMesh !== true) joints.push(o);
+    for (const c of o.children) walk(c);
+  };
+  walk(root);
   const outlineM = kit.outline(0);
+  const buckets = new Map<string, { mat: Mat; parts: Part[]; color: boolean; outline: boolean }>();
+  const bones: Obj[] = [];
   for (const j of joints) {
-    const buckets = new Map<string, { mat: Mat; parts: Part[]; color: boolean; outline: boolean }>();
     const taken: Mesh[] = [];
+    let bone = -1;
     const gather = (o: Mesh, parentM: THREE_NS.Matrix4 | null) => {
       o.updateMatrix();
       const m = parentM ? parentM.clone().multiply(o.matrix) : o.matrix.clone();
@@ -320,19 +332,43 @@ export function bake(kit: Kit, root: Obj): void {
       let b = buckets.get(key);
       if (!b) buckets.set(key, (b = { mat: bmat, parts: [], color, outline }));
       const push = outline ? (((mat as THREE_NS.MeshBasicMaterial).userData.outline as number | undefined) ?? 0) : 0;
-      b.parts.push({ geo: o.geometry, m, color: color ? toon.color : undefined, push });
+      if (bone < 0) { bone = bones.length; bones.push(j); }
+      b.parts.push({ geo: o.geometry, m, color: color ? toon.color : undefined, push, bone });
       for (const c of o.children) gather(c as Mesh, m);
     };
     for (const c of j.children) if (still(c)) { taken.push(c as Mesh); gather(c as Mesh, null); }
-    if (!taken.length) continue;
     for (const c of taken) j.remove(c);
-    for (const b of buckets.values()) {
-      const mesh = new T.Mesh(mergeParts(kit, b.parts, b.color, b.outline), b.mat);
-      mesh.name = b.outline ? 'outline' : 'baked';
-      mesh.layers.mask = j.layers.mask; // (the world moves the walker between layers for the pond)
-      if (b.outline) mesh.raycast = () => {};
-      j.add(mesh);
+  }
+  if (!bones.length) return;
+  // the bones' offsets are their world matrices (the parts are in joint space: no inverse needed),
+  // and a joint hidden anywhere up its chain folds its parts to nothing
+  const skel = kit.add(new T.Skeleton(bones as THREE_NS.Bone[], bones.map(() => new T.Matrix4())));
+  const tmp = new T.Matrix4();
+  const shown = (o: Obj): boolean => {
+    for (let p: Obj | null = o; p; p = p.parent) { if (!p.visible) return false; if (p === root) return true; }
+    return false;
+  };
+  skel.update = function update(this: THREE_NS.Skeleton) {
+    const arr = this.boneMatrices as Float32Array | null;
+    if (!arr) return;
+    for (let i = 0; i < bones.length; i++) {
+      const b = bones[i];
+      if (shown(b)) b.matrixWorld.toArray(arr, i * 16);
+      else tmp.makeScale(0, 0, 0).toArray(arr, i * 16);
     }
+    if (this.boneTexture) this.boneTexture.needsUpdate = true;
+  };
+  const ident = new T.Matrix4();
+  // a generous fixed bound in the root's space (the skinned sphere would be measured once, in one pose)
+  const bound = new T.Sphere(new T.Vector3(0, 0.9, 0), 2.4);
+  for (const b of buckets.values()) {
+    const mesh = new T.SkinnedMesh(mergeParts(kit, b.parts, b.color, b.outline), b.mat);
+    mesh.name = b.outline ? 'outline' : 'baked';
+    mesh.bind(skel, ident);
+    mesh.boundingSphere = bound;
+    mesh.layers.mask = root.layers.mask; // (the world moves the walker between layers for the pond)
+    mesh.raycast = () => {};
+    root.add(mesh);
   }
 }
 
@@ -468,6 +504,12 @@ export class Trail {
     v.setFromMatrixPosition(tip.matrixWorld);
     const sp = this.space ?? this.mesh.parent;
     if (sp) { sp.updateWorldMatrix(true, false); sp.worldToLocal(v); }
+    this.point(v.x, v.y, v.z);
+  }
+
+  /** Add a point (in the stroke's own space) to the stroke. */
+  point(x: number, y: number, z: number): void {
+    const v = this.v.set(x, y, z);
     const b = this.buf, n = this.n;
     if (this.count > 0) {
       const i = (this.count - 1) * 3;
@@ -680,6 +722,8 @@ export class Human implements CharacterModel {
   private restMouth: Mesh | null = null;
   /** A wooden mallet for 'build', in the right hand (the character's own hand props hide). */
   readonly mallet: Group;
+  /** The character builds its own way (with its own tools): no mallet, its hand props stay. */
+  ownBuild = false;
   /** Extra yaw (a dance turn), applied undamped so a full turn never unwinds. */
   private spinYaw = 0;
   private fid = -1;
@@ -794,7 +838,7 @@ export class Human implements CharacterModel {
 
     // --- arms: shoulder → upper sleeve, elbow → forearm sleeve, cuff, hand
     const sleeve = sp.sleeve ?? 'wide';
-    const inner = kit.toon('#' + new T.Color(sp.robe).lerp(new T.Color('#2a2622'), 0.32).getHexString());
+    const innerDeep = kit.toon('#' + new T.Color(sp.robe).lerp(new T.Color('#2a1f18'), 0.62).getHexString(), { double: true });
     const mkArm = (sx: number): Arm => {
       const sh = kit.group(this.chest, shoulder * sx, H.shoulder, 0);
       const up = kit.mesh(kit.cyl(0.05, 0.062, 0.18, 10, 'top'), robe);
@@ -813,9 +857,10 @@ export class Human implements CharacterModel {
         sl = kit.mesh(kit.lathe([[0, -len + 0.02], [w - 0.02, -len + 0.006], [w, -len], [w * 0.95, -len * 0.75], [0.075, -0.05], [0.06, 0.02], [0, 0.02]], 14), robe);
         const cuff = new T.Mesh(kit.torus(w - 0.006, 0.013, 6, 18).rotateX(Math.PI / 2), trim);
         cuff.position.y = -len + 0.004;
-        // the dark mouth of the sleeve
-        const hole = new T.Mesh(kit.add(new T.CircleGeometry(w - 0.016, 16).rotateX(Math.PI / 2)), inner);
-        hole.position.y = -len - 0.0015;
+        // the dark mouth of the sleeve: a shallow funnel into the dark (so a sleeve seen end-on
+        // reads as an opening with the hand in it, never a flat plate)
+        const hole = new T.Mesh(kit.cyl(0.03, w - 0.012, 0.07, 14, 'bottom', true), innerDeep);
+        hole.position.y = -len - 0.002;
         el.add(sl, cuff, hole);
       }
       const hy = sleeve === 'long' ? -0.235 : -0.2;
@@ -1042,7 +1087,8 @@ export class Human implements CharacterModel {
     // whatever the arms do, the legs stay folded on the seat
     if (seat > 0 && e && !sustained) sitPose(MX.set(p, seat).m);
     // a dance turns the whole figure once round (not under reduced motion)
-    this.spinYaw = e === 'dance' && !this.kit.reduced ? Math.PI * 2 * smooth((u - 0.18) / 0.55) : 0;
+    // (under reduced motion, a gentle sway from side to side instead: never a still, front-on pose)
+    this.spinYaw = e === 'dance' ? (this.kit.reduced ? Math.sin(this.emoteSeen * 1.55) * 0.4 * env : Math.PI * 2 * smooth((u - 0.18) / 0.55)) : 0;
     this.onPose?.(p, f);
 
     // --- apply, eased
@@ -1083,7 +1129,7 @@ export class Human implements CharacterModel {
     }
     if (this.restMouth) this.restMouth.visible = !talking;
     // building: the mallet in the hand, the character's own props (those in the hand) away
-    const building = e === 'build' && env > 0.15 && !this.holding;
+    const building = e === 'build' && env > 0.15 && !this.holding && !this.ownBuild;
     this.mallet.visible = building;
     if (!building && this.propsAway) { this.propsAway = false; if (!this.holding) for (const o of this.handProps) o.visible = true; }
     this.onAfter?.(f);
@@ -1272,13 +1318,15 @@ export function emotePose(p: Pose, e: EmoteKind, u: number, env: number, t: numb
       break;
     }
     case 'dance': {
-      // a little celebratory turn: arms up and swaying, a bounce in the knees
-      const a = Math.sin(since * 6.2), b = Math.sin(since * 6.2 + Math.PI);
-      m('shLx', -0.4); m('shLz', 1.3 + a * 0.35); m('elLx', -0.5 + a * 0.3); m('elLz', 0.2);
-      m('shRx', -0.4); m('shRz', -1.3 - b * 0.35); m('elRx', -0.5 + b * 0.3); m('elRz', -0.2);
-      m('bodyY', Math.abs(Math.sin(since * 6.2)) * 0.05); m('bodyZ', a * 0.07); m('headZ', -a * 0.1); m('headX', -0.08);
-      m('hipLx', -Math.max(0, a) * 0.5); m('knL', Math.max(0, a) * 0.8); m('hipRx', -Math.max(0, b) * 0.5); m('knR', Math.max(0, b) * 0.8);
-      m('skF', 1.08 + Math.abs(a) * 0.05);
+      // a sleeve dance (袖舞): one arm swept high, the other low and across, trading on the beat,
+      // the hips swaying toward the high arm, a step and a dip of the knees on every beat
+      const s = Math.sin(since * 3.1), k = s * 0.5 + 0.5, bob = Math.abs(Math.sin(since * 6.2));
+      m('shLx', mix(-2.2, -0.55, k)); m('shLz', mix(0.35, -0.45, k)); m('elLx', mix(-0.6, -0.95, k)); m('elLz', mix(0.25, 0, k));
+      m('shRx', mix(-0.55, -2.2, k)); m('shRz', mix(0.45, -0.35, k)); m('elRx', mix(-0.95, -0.6, k)); m('elRz', mix(0, -0.25, k));
+      m('bodyY', -0.03 + bob * 0.035); m('bodyZ', -s * 0.06); m('torsoY', -s * 0.22); m('torsoZ', s * 0.05);
+      m('headZ', s * 0.1); m('headY', -s * 0.15); m('headX', -0.06);
+      m('hipLx', -Math.max(0, s) * 0.35); m('knL', Math.max(0, s) * 0.45 + 0.1); m('hipRx', -Math.max(0, -s) * 0.35); m('knR', Math.max(0, -s) * 0.45 + 0.1);
+      m('hipLz', 0.06); m('hipRz', -0.06); m('skF', 1.06 + bob * 0.04); m('skZ', s * 0.06);
       break;
     }
     case 'sleep': {
@@ -1302,7 +1350,8 @@ export function emotePose(p: Pose, e: EmoteKind, u: number, env: number, t: numb
   }
 }
 
-function sitPose(m: (k: keyof Pose, v: number) => void): void {
+/** Seated on the ground (or a boat's floor): knees up, the robe draped over them. */
+export function sitPose(m: (k: keyof Pose, v: number) => void): void {
   // seated on the ground / a boat's floor: knees up, robe draped over them
   m('bodyY', -(H.hip - 0.07));
   m('hipLx', -1.5); m('hipRx', -1.5); m('hipLz', 0.35); m('hipRz', -0.35);

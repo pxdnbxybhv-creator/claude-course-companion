@@ -55,6 +55,8 @@ function Portrait(props: { id: CharacterId; locked: boolean; size: number; seal?
 // English: names take no article ("Walk as Big Ginger"), roles do ("Walk as the Old Fisherman")
 const PROPER_NAMES = new Set<CharacterId>(['cat', 'guan', 'change']);
 const enWho = (id: CharacterId) => (PROPER_NAMES.has(id) ? CHARACTER[id].en : `the ${CHARACTER[id].en}`);
+// the roster's small tiles take a short English name (the full one is in the label and above)
+const SHORT_EN: Partial<Record<CharacterId, string>> = { swordsman: 'Swordsman', player: 'Go Master', fisher: 'Fisherman' };
 
 export function CharacterSelect(props: { open: boolean; onClose: () => void }) {
   const t = useT();
@@ -224,7 +226,7 @@ function SelectBody(props: { onClose: () => void }) {
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (c.id === focus) choose(c.id); else setFocus(c.id); } }}
             >
               <Portrait id={c.id} locked={!has} size={64} />
-              <span class="cs-tname">{t(c.zh, c.en)}</span>
+              <span class="cs-tname" lang={t('zh', 'en')}>{t(c.zh, SHORT_EN[c.id] ?? c.en)}</span>
               {c.id === current && <span class="cs-dot" aria-hidden="true" />}
             </button>
           );

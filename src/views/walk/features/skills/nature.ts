@@ -352,7 +352,7 @@ export function makeFisher(bag: Bag): (env: SkillEnv) => Running | null {
           record('fish');
           const pool = CATCH[region ?? 'any'] ?? CATCH.any;
           const [zh, en] = pool[rng.int(0, pool.length - 1)];
-          if (inPond) ctx.hud.toast('网起两尾锦鲤，看了一眼，又放回池中', 'Two koi in the net — a look, and back into the pond they go', 3000);
+          if (inPond) ctx.hud.toast(`网起${n === 1 ? '一' : '两'}尾锦鲤，看了一眼，又放回池中`, `${n === 1 ? 'A koi' : 'Two koi'} in the net — a look, and back into the pond ${n === 1 ? 'it goes' : 'they go'}`, 3000);
           else ctx.hud.toast(`一网收起${zh}${['', '一', '两', '三', '四'][n]}${zh.length > 2 || /虾|螺|菱|鳅/.test(zh) ? '' : '尾'}`, `A haul of ${en} (${n})`, 2800);
           if (coins) {
             earn(coins);

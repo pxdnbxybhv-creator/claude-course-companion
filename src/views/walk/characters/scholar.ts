@@ -18,6 +18,12 @@ const at = (w: number): [number, number] => {
   return XY;
 };
 
+/** The column of air he writes in (the figure's own space: +z ahead, −x to his right). */
+const CX = -0.66, CY = 0.98, CZ = 0.46, SX = 0.24, SY = 0.34;
+/** He turns his shoulders this much toward it; his right shoulder (in the torso's frame). */
+const TURN = -0.3;
+const SH = [-0.155, 0.86, 0];
+
 export const scholar: CharacterFactory = (THREE, opts) => {
   const kit = new Kit(THREE, opts.reduced);
   const h = new Human(kit, {
@@ -95,12 +101,11 @@ export const scholar: CharacterFactory = (THREE, opts) => {
   const brush = kit.group(h.armR.hand, 0, -0.1, 0.02);
   put(brush, kit.mesh(kit.cyl(0.012, 0.012, 0.3, 8), kit.toon('#a9793e'), OL * 0.6), 0, 0.03, 0);
   put(brush, kit.mesh(kit.lathe([[0, -0.09], [0.022, -0.045], [0.025, 0.0], [0.014, 0.018], [0, 0.018]], 10), hair, OL * 0.6), 0, -0.13, 0);
-  const tip = kit.group(brush, 0, -0.22, 0);
   brush.rotation.x = 0.35;
   brush.visible = false;
-  const ink = new Trail(kit, '#1d1611', 72, 0.065, 0.92, 0.03);
+  const ink = new Trail(kit, '#1d1611', 96, 0.042, 0.9, 0.028);
   h.scaler.add(ink.mesh);
-  let writing = false;
+  let writing = false, inkW = 0, lastU = 0;
 
   h.fidgets = [
     {
@@ -131,6 +136,14 @@ export const scholar: CharacterFactory = (THREE, opts) => {
   ];
 
   h.onPose = (p, f) => {
+    if (f.emote === 'talk') {
+      // lecturing: the left hand behind the back, the right raised to make the point
+      const m = h.mx.set(p, f.env).m;
+      const a = Math.sin(f.since * 3.4);
+      m('shLx', 0.42); m('shLz', 0.22); m('elLx', -1.1); m('elLz', -0.5);
+      m('shRx', -1.15 + a * 0.12); m('shRz', 0.1); m('elRx', -1.35 + Math.max(0, a) * 0.2);
+      m('headX', -0.06 + Math.sin(f.since * 5) * 0.04); m('bodyX', -0.02);
+    }
     if (f.emote === 'play') {
       // reading: book held up before the face, head bowed to it, a slow nod
       const m = h.mx.set(p, f.env).m;
@@ -138,14 +151,23 @@ export const scholar: CharacterFactory = (THREE, opts) => {
       m('shLx', -0.5); m('shLz', -0.3); m('elLx', -1.3);
       m('headX', 0.34 + Math.sin(f.t * 1.4) * 0.04); m('headY', Math.sin(f.t * 0.7) * 0.1); m('torsoX', 0.06);
     } else if (f.emote === 'skill') {
-      // 题诗: brush up, one unbroken line of cursive in the air, a lift of the brush to finish
+      // 题诗: turned a little to his right, the arm reaching out to a column of air beside him (well
+      // clear of his face), one unbroken line of cursive, a lift of the brush to finish
       const m = h.mx.set(p, f.env).m;
       const [x, y] = at((f.u - 0.16) / 0.6);
-      const lift = smooth((f.u - 0.78) / 0.15);
-      m('shRx', -1.45 - y * 0.62 - lift * 0.5); m('shRz', -0.22 - x * 0.62); m('elRx', -0.2 - lift * 0.4); m('elRz', 0);
+      const lift = smooth((f.u - 0.78) / 0.15), reach = smooth(f.u / 0.16);
+      // aim the arm (and the brush along it) at the glyph's point, in the turned torso's frame
+      const cs = Math.cos(TURN), sn = Math.sin(TURN);
+      const gx = CX + x * SX, gy = CY + y * SY + lift * 0.12, gz = CZ;
+      const lx = gx * cs - gz * sn, lz = gx * sn + gz * cs;
+      let dx = lx - SH[0], dy = gy - SH[1], dz = lz - SH[2];
+      const l = Math.hypot(dx, dy, dz) || 1;
+      dx /= l; dy /= l; dz /= l;
+      const aim = Math.atan2(-dz, -dy), side = Math.asin(clamp(dx, -1, 1));
+      m('shRx', mix(-0.4, aim, reach)); m('shRz', mix(-0.15, side, reach)); m('elRx', -0.22 - lift * 0.35); m('elRz', 0);
       m('shLx', 0.3); m('shLz', 0.25); m('elLx', -1.2); m('elLz', -0.4); // the left hand holds back the sleeve
-      m('torsoY', -x * 0.14); m('headX', -0.08 - y * 0.12); m('headY', -x * 0.12); m('bodyX', 0.04);
-      m('hipLx', -0.3); m('hipRx', 0.15);
+      m('torsoY', TURN * reach); m('headX', -0.02 - y * 0.1); m('headY', (-0.32 - x * 0.1) * reach); m('bodyX', 0.03);
+      m('hipLx', -0.2); m('hipRx', 0.25); m('hipRz', -0.12);
     }
   };
   h.onAfter = (f) => {
@@ -163,10 +185,18 @@ export const scholar: CharacterFactory = (THREE, opts) => {
     // the skill: brush out, ink follows the tip while writing, then hangs and fades
     const sk = f.emote === 'skill';
     brush.visible = sk && f.u < 0.95;
-    if (sk && !writing) { writing = true; ink.reset(); }
+    // (a new stroke when the skill starts — or starts over without a pause between)
+    if (sk && (!writing || f.u < lastU - 0.3)) { writing = true; ink.reset(); inkW = 0; }
+    lastU = sk ? f.u : 0;
     if (!sk && writing) { writing = false; ink.reset(); }
     if (sk) {
-      if (f.u > 0.18 && f.u < 0.78) ink.follow(tip);
+      // the line goes down in the column in fine steps, however long the frame was (so it is the
+      // same glyph at 60 fps or at 10)
+      const w = clamp((Math.min(f.u, 0.78) - 0.16) / 0.6);
+      for (; inkW <= w; inkW += 0.006) {
+        const [x, y] = at(inkW);
+        ink.point(CX + x * SX, CY + y * SY, CZ);
+      }
       ink.draw(f.u < 0.8 ? 1 : 1 - smooth((f.u - 0.8) / 0.2));
     }
     const trail = flow.step(Math.min(1.4, f.s.speed * 0.28 + (f.air ? 0.6 : 0) + (sk ? 0.4 : 0)), f.dt);

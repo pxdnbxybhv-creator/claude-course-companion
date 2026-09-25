@@ -600,7 +600,7 @@
 .walk-purse-gain {
   position: absolute;
   left: 50%;
-  top: 100%;
+  top: calc(100% + var(--lane, 0) * 1.15em);
   margin-left: -1em;
   color: #9a6a12;
   font-size: 16px;

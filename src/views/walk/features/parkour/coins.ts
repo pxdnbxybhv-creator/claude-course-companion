@@ -5,7 +5,7 @@ import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import { earn, record } from '../../../../app/play';
 import { type Bag, glowTexture, outlineMat, reducedMotion } from '../kit';
-import type { Challenge } from './logic';
+import { coinReached, type Challenge } from './logic';
 import * as snd from './sound';
 
 export interface CoinSpot {
@@ -26,6 +26,8 @@ export interface CoinSpot {
 interface Live {
   spot: CoinSpot;
   x: number; y: number; z: number;
+  /** The surface the coin hangs over (y − lift): the feet must be up at it, not on the ground below. */
+  floor: number;
   /** 0 while waiting; counts up through the pick-up flight. */
   gone: number;
   got: boolean;
@@ -37,7 +39,7 @@ interface Live {
 const HINT: Record<Challenge, { zh: string; en: string }> = {
   high: { zh: '铜钱悬得太高——道童、大橘跳得高；侠客的「技」可二段跳。', en: 'Too high to reach — the Taoist Child and Big Ginger jump higher; the Swordsman\'s skill gives a double jump.' },
   double: { zh: '要跳两次才够得着——侠客的「技」可在空中再跃一次。', en: 'It takes two jumps — the Swordsman\'s skill lets you leap again in mid-air.' },
-  glide: { zh: '铜钱悬在半空——玉兔会缓缓飘落；嫦娥的「技」能凌空。', en: 'It hangs out over the drop — the Jade Rabbit floats down slowly; Chang\'e\'s skill lets you hover.' },
+  glide: { zh: '铜钱悬在半空，要一路不落才够得着——玉兔助跑一跃，缓缓飘去；道童的「御风符」、嫦娥的「奔月」能凌空。', en: 'It hangs far out over the drop and you must keep your height all the way — the Jade Rabbit floats there from a running jump; the Taoist Child\'s Wind Talisman or Chang\'e\'s To the Moon carries you through the air.' },
 };
 
 const R = 0.2;
@@ -69,8 +71,9 @@ export class CoinField {
     this.up = new THREE.Vector3(0, 1, 0);
     for (const spot of spots) {
       const [fx, fz] = spot.from ?? [spot.x, spot.z];
-      const y = ctx.groundY(fx, fz) + (spot.lift ?? 0.6);
-      this.live.push({ spot, x: spot.x, y, z: spot.z, gone: 0, got: taken.has(spot.id), phase: (spot.x * 0.37 + spot.z * 0.61) % (Math.PI * 2), hinted: false });
+      const floor = ctx.groundY(fx, fz);
+      const y = floor + (spot.lift ?? 0.6);
+      this.live.push({ spot, x: spot.x, y, z: spot.z, floor, gone: 0, got: taken.has(spot.id), phase: (spot.x * 0.37 + spot.z * 0.61) % (Math.PI * 2), hinted: false });
     }
     const n = Math.max(1, this.live.length);
 
@@ -146,9 +149,9 @@ export class CoinField {
         // far away: not drawn at all
         const dxc = c.x - cam.x, dzc = c.z - cam.z;
         if (dxc * dxc + dzc * dzc > 75 * 75) scale = 0;
-        // pick-up: the body (feet to head) passes through the coin
+        // pick-up: the body passes through the coin, the feet up at the surface it hangs over
         const dx = c.x - px, dz = c.z - pz, dy = c.y - py;
-        if (!P.isFrozen && dx * dx + dz * dz < 0.7 * 0.7 && dy > -0.3 && dy < 1.4) this.pick(c);
+        if (!P.isFrozen && coinReached(dx, dz, c.y, py, c.floor)) this.pick(c);
         else if (c.spot.challenge && !c.hinted && dx * dx + dz * dz < 4.5 * 4.5 && dy > 1.4 && dy < 6) this.hint(c, t);
         const tw = Math.pow(Math.max(0, Math.sin(t * 2.1 + c.phase * 3)), 8);
         glow = scale ? 0.35 + tw * 0.9 + (night ? 0.25 : 0) : 0;

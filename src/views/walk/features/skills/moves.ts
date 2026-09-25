@@ -23,7 +23,9 @@ export function swordsman(env: SkillEnv): Running {
   P.emote('skill');
   snd.blade(0.7);
   const [f0x, f0z] = forward(P.heading);
-  P.impulse(f0x * 9.5, 1.4, f0z * 9.5);
+  // a long low bound on the wind: off the ground, so the dash carries (a rail, a ditch, a gap cleared),
+  // with the second jump already his to take mid-flight
+  P.impulse(f0x * 15, 3.6, f0z * 15);
   P.setMoveMods({ airJumps: 1, speed: 1.3 });
   const p = P.position;
   // the sword-qi: a crescent of ink sweeping ahead
@@ -46,7 +48,7 @@ export function swordsman(env: SkillEnv): Running {
       const sp = dt > 0 ? Math.hypot(pp.x - lx, pp.z - lz) / dt : 0;
       lx = pp.x; lz = pp.z;
       // afterimages while the dash carries
-      if (el < 0.45 && t > ghostAt && !env.reduced) {
+      if ((el < 0.45 || (el < 0.9 && !P.grounded)) && t > ghostAt && !env.reduced) {
         ghostAt = t + 0.045;
         fx.air.emit({ x: pp.x, y: pp.y + 0.68, z: pp.z, life: 0.42, size: 1.35, color: HUE.inkSoft, alpha: 0.32, mode: MODE.puff, cell: CELL.streak, rot: 0, fadeIn: 0.01, fadeOut: 1 });
       }
@@ -333,7 +335,7 @@ export function cat(env: SkillEnv, strays: Strays, t: number): Running {
   P.emote('skill');
   snd.meow(1, 0.7);
   const [f0x, f0z] = forward(P.heading);
-  P.impulse(f0x * 4.6, 6.2, f0z * 4.6);
+  P.impulse(f0x * 7.6, 6.2, f0z * 7.6);
   P.setMoveMods({ jump: 1.6 });
   const p = P.position;
   const floor = env.floorAt(p.x, p.z);
@@ -361,7 +363,7 @@ export function rabbit(env: SkillEnv): Running {
   P.emote('skill');
   snd.shimmer(0.7);
   const [f0x, f0z] = forward(P.heading);
-  P.impulse(f0x * 2.4, 8, f0z * 2.4);
+  P.impulse(f0x * 5.2, 8.4, f0z * 5.2);
   P.setMoveMods({ glide: true });
   const p = P.position;
   const night = env.night() > 0.5;

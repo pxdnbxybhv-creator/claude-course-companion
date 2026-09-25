@@ -6,7 +6,7 @@
 // thump. His bow is a slow stroke of the beard; his skill (赤兔) raises the glaive high with a
 // shout and stamps.
 import type { CharacterFactory } from './types';
-import { Human, Kit, OL, Ribbon, Spring, bothHands, clamp, holdLevel, mix, put, smooth, type Frame } from './rig';
+import { Human, Kit, OL, Ribbon, Spring, bothHands, clamp, damp, holdLevel, mix, put, smooth, type Frame } from './rig';
 
 export const guan: CharacterFactory = (THREE, opts) => {
   const kit = new Kit(THREE, opts.reduced);
@@ -87,8 +87,14 @@ export const guan: CharacterFactory = (THREE, opts) => {
     blade.visible = true;
   };
 
-  // his bow, his wave and his eating are one-handed (the left strokes the beard)
-  const both = (f: Frame) => (f.emote === 'bow' || f.emote === 'wave' || f.emote === 'eat' ? h.seat : bothHands(f, h.seat));
+  // his bow, his wave and his eating are one-handed (the left strokes the beard); he builds with
+  // the glaive itself, driving its butt down like a rammer
+  h.ownBuild = true;
+  // astride Red Hare (his skill seats him on the horse): the glaive stays in his hand then
+  let horse = false, wasRiding = false, skillAt = -99, rideV = 0;
+  const lastW = new THREE.Vector3(), nowW = new THREE.Vector3();
+  let hadW = false;
+  const both = (f: Frame) => (f.emote === 'bow' || f.emote === 'wave' || f.emote === 'eat' || f.emote === 'build' ? h.seat : horse ? 0 : bothHands(f, h.seat));
   const stroke = (p: Parameters<NonNullable<typeof h.onPose>>[0], k: number, t: number) => {
     const m = h.mx.set(p, k).m;
     const s = (Math.sin(t * 2.2) + 1) / 2;
@@ -118,6 +124,18 @@ export const guan: CharacterFactory = (THREE, opts) => {
   ];
 
   h.onPose = (p, f) => {
+    // on the horse? (the core says so through s.mount; failing that, a ride that begins within a
+    // few seconds of his own skill is Red Hare, not a boat or a bench)
+    if (f.emote === 'skill') skillAt = f.t;
+    if (f.s.riding && !wasRiding) horse = f.s.mount === 'horse' || (f.s.mount === undefined && f.t - skillAt < 3.6);
+    if (!f.s.riding) horse = false;
+    else if (f.s.mount === 'horse') horse = true;
+    wasRiding = f.s.riding;
+    // how fast the horse carries him (the core reports no speed while he rides)
+    h.root.getWorldPosition(nowW);
+    const v = hadW && f.dt > 0 ? Math.min(12, nowW.distanceTo(lastW) / f.dt) : 0;
+    lastW.copy(nowW); hadW = true;
+    rideV = horse ? damp(rideV, v, 4, f.dt) : 0;
     // the blade hand stays low at the side, barely swinging — unless both hands are wanted
     const lock = 1 - both(f);
     p.shRx = mix(p.shRx, p.shRx * 0.35, lock); p.shRz = mix(p.shRz, -0.5, lock); p.elRx = mix(p.elRx, -0.55 + p.shRx * 0.3, lock);
@@ -130,6 +148,13 @@ export const guan: CharacterFactory = (THREE, opts) => {
       stroke(p, f.env, f.t);
       const m = h.mx.set(p, f.env).m;
       if (f.emote === 'bow') { m('torsoX', 0.2); m('bodyX', 0.03); } else m('bodyX', 0);
+    } else if (f.emote === 'build') {
+      // ramming: both hands on the shaft, heave up, drive down — thump
+      const m = h.mx.set(p, f.env).m;
+      const c = (f.since * 1.9) % 1, ram = c < 0.6 ? smooth(c / 0.6) : 1 - smooth((c - 0.6) / 0.12);
+      m('shRx', -0.55 - ram * 0.75); m('shRz', -0.2); m('elRx', -0.9 + ram * 0.35);
+      m('shLx', -0.9 - ram * 0.8); m('shLz', -0.45); m('elLx', -0.8 + ram * 0.3); m('elLz', 0);
+      m('torsoX', 0.1 - ram * 0.12); m('bodyY', -0.03 * (1 - ram)); m('knL', 0.25 * (1 - ram)); m('knR', 0.25 * (1 - ram)); m('headX', 0.12);
     } else if (f.emote === 'skill') {
       // the glaive raised high (0–.3) with a shout, held (.3–.65), then brought down and a stamp
       const m = h.mx.set(p, f.env).m;
@@ -140,13 +165,29 @@ export const guan: CharacterFactory = (THREE, opts) => {
       m('headX', -0.22 * up); m('torsoX', -0.08 * up); m('bodyX', -0.03 * up);
       m('hipLx', -0.9 * stamp); m('knL', 1.2 * stamp); m('bodyY', -0.03 * (f.u > 0.82 && f.u < 0.9 ? 1 : 0));
     }
+    if (horse && h.seat > 0) {
+      // astride: thighs over the horse's barrel, shins down its flanks, the robe spread over the
+      // saddle; the left hand on the reins, the right holding the glaive; a rise and fall with the
+      // horse's stride, a lean into the gallop
+      const m = h.mx.set(p, h.seat).m;
+      const gal = Math.min(1, rideV / 8), bob = Math.sin(f.t * (5 + gal * 6)) * (0.008 + gal * 0.025);
+      m('bodyY', -(0.36 - 0.05) + bob); m('bodyX', 0.03 + gal * 0.16); m('bodyZ', 0);
+      m('hipLx', -0.75); m('hipRx', -0.75); m('hipLz', 0.62); m('hipRz', -0.62); m('knL', 1.05); m('knR', 1.05);
+      m('skX', -0.08); m('skS', 0.6); m('skF', 1.5); m('skZ', 0);
+      m('shLx', -0.85 + bob * 3); m('shLz', -0.28); m('elLx', -0.85); m('elLz', 0.1);
+      m('shRx', -0.75); m('shRz', -0.4); m('elRx', -0.95);
+      m('torsoX', -0.02 - gal * 0.04); m('torsoY', 0); m('headX', -0.06 - gal * 0.08); m('headY', 0);
+    }
   };
   h.onAfter = (f) => {
     const want = !!h.holding || both(f) > 0.5;
     if (want !== slung) sling(want);
     // in the hand: upright whatever the arm (and the waist) are doing; tipped forward when raised
     const sk = f.emote === 'skill' ? smooth(f.u / 0.25) * (1 - smooth((f.u - 0.66) / 0.14)) * f.env : 0;
-    if (!slung) holdLevel(blade, h.body, sk > 0 ? raised.copy(upright).slerp(tmpQ.setFromEuler(eul.set(0.35, 0, -0.35)), sk) : upright, tmpQ);
+    if (!slung) {
+      if (horse && h.seat > 0.3) holdLevel(blade, h.body, raised.setFromEuler(eul.set(0.25 + Math.min(1, rideV / 8) * 0.25, 0, 0.18)), tmpQ);
+      else holdLevel(blade, h.body, sk > 0 ? raised.copy(upright).slerp(tmpQ.setFromEuler(eul.set(0.35, 0, -0.35)), sk) : upright, tmpQ);
+    }
     // the shout
     if (f.emote === 'skill' && f.u > 0.18 && f.u < 0.5) { h.talkMouth.visible = true; h.talkMouth.scale.set(1.3, 1.7, 1); }
     beard.rotation.x = beardSpring.step(-Math.min(0.5, f.s.speed * 0.09) - h.head.rotation.x * 0.8 - (h.body.rotation.x + h.torso.rotation.x) * 0.6 + (f.air ? -0.4 : 0), f.dt);
@@ -154,7 +195,7 @@ export const guan: CharacterFactory = (THREE, opts) => {
     tails.rotation.x = tailSpring.step(-f.s.speed * 0.12 + Math.sin(f.phase) * 0.1, f.dt);
     tassel.rotation.x = tasselSpring.step((slung ? 0 : -blade.rotation.x * 0.3) + Math.sin(f.phase) * 0.35 * Math.min(1, f.gait), f.dt);
     // the cape: out behind with speed (and the skill's gust), swinging with the stride
-    const out = capeFlow.step(Math.min(1.3, f.s.speed * 0.25 + (f.air ? 0.5 : 0) + sk * 0.6), f.dt);
+    const out = capeFlow.step(Math.min(1.3, f.s.speed * 0.25 + rideV * 0.15 + (f.air ? 0.5 : 0) + sk * 0.6), f.dt);
     const sw = capeSwing.step(Math.sin(f.phase) * 0.12 * Math.min(1, f.gait) - h.body.rotation.z, f.dt);
     const t = f.t;
     cape.update((u, c, s) => {

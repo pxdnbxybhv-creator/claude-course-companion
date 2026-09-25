@@ -2,8 +2,12 @@
 // bridge, vendors calling at the stalls, tea drinkers, washerwomen at the river steps, children chasing
 // round the square, a boatman poling down the river, fishermen and a lotus picker on the lake, monks
 // sweeping and one tapping a wooden fish, pilgrims on the temple stairs, scholars under the plum
-// trees, farmers by the homestead path. At night most go home: lantern carriers, the watchman with
-// his clapper (「天干物燥，小心火烛」) and the tea drinkers stay.
+// trees, farmers by the homestead path. After dark the painting keeps its life: a night market (夜市)
+// of snack stalls and lantern viewers in the market street until ten (midnight on a festival night,
+// when children run round the square with rabbit lanterns), couples strolling with lanterns round the
+// square, on the lake causeway and the plum path, a lantern boat on the lotus pond, a lantern walker in
+// the bamboo, the farmer going home with his lantern, the watchman with his clapper (「天干物燥，小心
+// 火烛」) and the tea drinkers.
 //
 // Each place's crowd is one instanced figure (crowd-geo.ts) plus its outline, blob shadows and lantern
 // halos — a handful of draws. They glance at you, some greet you, bow to 关公, stare at 嫦娥, and the
@@ -19,8 +23,8 @@ import { riverZ } from '../../regions/water-kit';
 import { walkableNear } from '../minigames/cat';
 import { BACK, CAPE, HAND, HAT, LANTERN_AT, crowdGeometry, crowdMaterials, packColor } from './crowd-geo';
 import { Bubbles, type Speaker } from './bubbles';
-import { CALLS, CHASE, HELLO, REACT, type CrowdRole } from './lines';
-import { forCompanion, onDuty, pingPong, type Line, type Shift } from './logic';
+import { CALLS, CHASE, FEST_CALLS, HELLO, HELLO_NIGHT, REACT, type CrowdRole } from './lines';
+import { LANTERN_NIGHTS, forCompanion, onDuty, pingPong, type Line, type Shift } from './logic';
 import { onSkillEvent, type SkillEvent } from './events';
 
 // ───────────────────────────── who is where ─────────────────────────────
@@ -55,6 +59,8 @@ interface Spec {
   lantern?: boolean;
   /** Face this point (for chatting, listening). */
   face?: XZ;
+  /** Walks beside the walker listed just before (a couple, friends): same shift, no way of their own. */
+  beside?: boolean;
 }
 
 const SKIN = '#f0d4b4';
@@ -110,6 +116,20 @@ function crowdOf(region: RegionId): Spec[] {
         { role: 'watchman', shift: 'night', loop: true, path: [{ x: -14, z: 84.5 }, { x: 8, z: 85 }, { x: 8.5, z: 95.5 }, { x: -8, z: 96.5 }, { x: -16, z: 93 }], speed: 0.75, look: man(C.dark, C.maroon, { hand: HAND.clapper, back: BACK.gong, hatKind: HAT.cap, hat: C.ink }) },
         { role: 'lantern', shift: 'night', path: [{ x: -34, z: 76.8 }, { x: -24, z: 76.4 }, { x: -14, z: 75 }, { x: -5, z: 73.4 }], offset: 10, speed: 0.7, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
         { role: 'lantern', shift: 'night', path: [{ x: -6, z: 96.8 }, { x: 34, z: 96.2 }], offset: 20, speed: 0.7, lantern: true, look: man(C.indigo, C.dark, { hand: HAND.lantern }) },
+        // a couple strolling round the square with a lantern, all night
+        { role: 'lantern', shift: 'night', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], offset: 12, speed: 0.55, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
+        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.sky, { hand: HAND.fan }) },
+        // the night market (夜市): snack stalls, and people come out to see the lanterns
+        ...[-1, 14.5, 27.5].map((x, i): Spec => ({ role: 'snack', shift: 'evening', act: 'vend', at: { x: x + 0.3, z: 100.4, h: Math.PI }, look: [man(C.white, C.dark, { cape: CAPE.apron, hat: C.ink }), woman(C.rouge, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, cape: CAPE.apron }), man(C.brown, C.dark, { hair: GREY, beard: true, hatKind: HAT.bamboo, hat: C.straw })][i] })),
+        { role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3, z: 97.4, h: 0.35 }, look: woman(C.gamboge, C.maroon, { hand: HAND.lantern }) },
+        { role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3.8, z: 97.1, h: 0.1 }, look: child(C.vermilion, { hand: HAND.lantern }) },
+        { role: 'lantern', shift: 'evening', act: 'admire', at: { x: 10.5, z: 97.6, h: -0.25 }, look: scholarLook(C.white, { hand: HAND.fan, beard: true }) },
+        { role: 'lantern', shift: 'evening', act: 'chat', at: { x: 19.5, z: 97.2, h: 0 }, face: { x: 20.9, z: 97.6 }, look: man(C.teal, C.dark, { hatKind: HAT.cap, hat: C.ink }) },
+        { role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: 20.9, z: 97.6, h: 0 }, face: { x: 19.5, z: 97.2 }, look: woman(C.plum, C.dark, { hand: HAND.lantern, hatKind: HAT.scarf, hat: C.rouge }) },
+        { role: 'lantern', shift: 'evening', act: 'chat', at: { x: -4.2, z: 89.8, h: 0 }, face: { x: -2.8, z: 90.6 }, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge }) },
+        { role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: -2.8, z: 90.6, h: 0 }, face: { x: -4.2, z: 89.8 }, look: man(C.ochre, C.dark, { hand: HAND.lantern, hatKind: HAT.bamboo, hat: C.straw }) },
+        // on a festival night the children run round the square with rabbit lanterns
+        ...[0, 1].map((i): Spec => ({ role: 'child', shift: 'fest', ring: { x: -2.5, z: 86.6, r: 2.5 + i * 0.5 }, offset: i * 3.3, speed: 1.3 + i * 0.2, lantern: true, look: child([C.rouge, C.gamboge][i], { hand: HAND.lantern }) })),
         // the boatman poling down the river (a lantern on his boat at night)
         { role: 'boatman', shift: 'always', boat: 'river', act: 'pole', path: riverLine(-44, 34), speed: 0.9, look: man(C.dark, C.ink, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.pole, cape: CAPE.straw }) },
       ];
@@ -121,7 +141,11 @@ function crowdOf(region: RegionId): Spec[] {
         { role: 'fisher', shift: 'always', boat: 'anchored', act: 'fish', sit: true, lantern: true, at: { x: 106, z: 25, h: -0.8 }, look: man(C.olive, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.rod }) },
         { role: 'fisher', shift: 'day', boat: 'circle', act: 'pick', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.35, look: woman(C.rouge, C.maroon, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.basket }) },
         { role: 'villager', shift: 'day', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], speed: 0.8, look: scholarLook(C.white, { hand: HAND.fan }) },
-        { role: 'villager', shift: 'day', path: [{ x: 73, z: 41.2 }, { x: 90, z: 41.2 }, { x: 108, z: 40.8 }], offset: 1.2, speed: 0.8, look: woman(C.plum, C.dark, {}) },
+        { role: 'villager', shift: 'day', beside: true, look: woman(C.plum, C.dark, {}) },
+        // by night: a couple with a lantern on the causeway, a lantern boat among the lotus
+        { role: 'lantern', shift: 'night', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], offset: 6, speed: 0.5, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
+        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.white, { hand: HAND.fan }) },
+        { role: 'lantern', shift: 'evening', boat: 'circle', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.25, lantern: true, look: woman(C.gamboge, C.maroon, { hatKind: HAT.bun }) },
       ];
     case 'mountain':
       return [
@@ -132,6 +156,7 @@ function crowdOf(region: RegionId): Spec[] {
         { role: 'pilgrim', shift: 'day', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 9, speed: 0.55, look: man(C.grey, C.dark, { hair: GREY, beard: true, back: BACK.bundle, hatKind: HAT.none }) },
         { role: 'pilgrim', shift: 'day', act: 'pray', at: { x: 40, z: -101.5, h: Math.PI }, look: woman(C.apricot, C.maroon, {}) },
         { role: 'monk', shift: 'night', path: [{ x: 36.2, z: -104 }, { x: 43.4, z: -104 }], speed: 0.5, lantern: true, look: monkLook({ hand: HAND.lantern }) },
+        { role: 'pilgrim', shift: 'evening', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 4, speed: 0.45, lantern: true, look: woman(C.plum, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, hand: HAND.lantern }) },
       ];
     case 'plum':
       return [
@@ -139,16 +164,25 @@ function crowdOf(region: RegionId): Spec[] {
         { role: 'scholar', shift: 'day', act: 'read', at: { x: -60, z: -57.5, h: 2.6 }, look: scholarLook(C.sky, { back: BACK.book }) },
         { role: 'scholar', shift: 'day', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], speed: 0.7, look: scholarLook(C.jade, { hand: HAND.fan }) },
         { role: 'scholar', shift: 'night', act: 'admire', lantern: true, at: { x: -68, z: -70, h: 0.6 }, look: scholarLook(C.white, { hand: HAND.lantern }) },
+        // a couple come up the path with a lantern to see the plum by moonlight
+        { role: 'lantern', shift: 'night', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], offset: 3, speed: 0.45, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
+        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.jade, { hand: HAND.fan }) },
       ];
     case 'bamboo':
       return [
         { role: 'villager', shift: 'day', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], speed: 0.75, look: scholarLook(C.teal, { hand: HAND.fan }) },
         { role: 'farmer', shift: 'day', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 8, speed: 0.8, look: man(C.ochre, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.carry }) },
+        // after dark: a lantern going slowly through the grove, and a woodcutter late home
+        { role: 'lantern', shift: 'night', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], offset: 5, speed: 0.5, lantern: true, look: scholarLook(C.teal, { hand: HAND.lantern }) },
+        { role: 'farmer', shift: 'evening', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 14, speed: 0.6, lantern: true, look: man(C.brown, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.bundle, hand: HAND.lantern }) },
       ];
     case 'home':
       return [
         { role: 'farmer', shift: 'dawn', act: 'hoe', at: { x: -29, z: -34, h: -1.3 }, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.hoe }) },
         { role: 'farmer', shift: 'day', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], speed: 0.8, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.carry }) },
+        // the farmer and his wife walking home with a lantern
+        { role: 'farmer', shift: 'evening', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], offset: 3, speed: 0.55, lantern: true, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.lantern }) },
+        { role: 'farmer', shift: 'evening', beside: true, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.basket }) },
       ];
     default:
       return [];
@@ -188,6 +222,14 @@ interface Person extends Speaker {
   child: boolean;
   scale: number;
   boatI: number;
+  /** Off their way (drawn to music, after the cat): walk back to it before going on. */
+  away: boolean;
+  /** Put on their way since they last came out (the first placement may jump: they were hidden). */
+  placed: boolean;
+  /** Seconds a walk back has been blocked. */
+  stuck: number;
+  /** Whom they walk beside (spec.beside). */
+  lead: Person | null;
 }
 
 const TAU = Math.PI * 2;
@@ -197,7 +239,10 @@ const lineText = (ctx: WorldCtx, l: Line) => tr(ctx, l.zh, l.en);
 export const crowd = feature('npc-crowd', (bag, ctx) => {
   const still = reducedMotion();
   const bubbles = new Bubbles(bag, 3);
-  const crowds = REGIONS_WITH_CROWDS.map((r) => buildCrowd(bag, ctx, r, bubbles, still)).filter((c): c is CrowdRuntime => !!c);
+  // a lantern festival tonight: more stalls, children with lanterns, festival calls
+  const festKey = ctx.env.festivals.find((f) => LANTERN_NIGHTS.includes(f)) ?? null;
+  const festLines = festKey ? FEST_CALLS[festKey] ?? null : null;
+  const crowds = REGIONS_WITH_CROWDS.map((r) => buildCrowd(bag, ctx, r, bubbles, still, festLines)).filter((c): c is CrowdRuntime => !!c);
   bag.onDispose(onSkillEvent((e) => { for (const c of crowds) c.event(e); }));
   // who is about depends on the night (the visitor may switch it) — look again now and then
   let check = 0;
@@ -207,27 +252,50 @@ export const crowd = feature('npc-crowd', (bag, ctx) => {
       check = now + 1500;
       const night = safeNight(ctx);
       const hour = ctx.env.hour ?? ctx.env.date.getHours();
-      for (const c of crowds) c.roster(hour, night);
+      for (const c of crowds) c.roster(hour, night, !!festKey);
     }
     for (const c of crowds) c.step(dt, t);
   });
   if (import.meta.env.DEV) {
-    (window as unknown as { __crowd?: unknown }).__crowd = { info: () => crowds.map((c) => c.info()), bubbles };
+    const w = window as unknown as { __crowd?: unknown };
+    const dev = { info: () => crowds.map((c) => c.info()), people: () => crowds.flatMap((c) => c.people()), bubbles };
+    w.__crowd = dev;
+    // don't keep a disposed crowd reachable after the walk ends
+    bag.onDispose(() => { if (w.__crowd === dev) delete w.__crowd; });
   }
 });
+
+/** Sample a way every `step` m against the ground: how many samples are blocked, and where (DEV checks). */
+export function blockedAlong(ctx: WorldCtx, pts: readonly XZ[], step = 0.8, closed = false): { bad: number; n: number; where: string[] } {
+  let bad = 0, n = 0;
+  const where: string[] = [];
+  const segs = closed ? pts.length : pts.length - 1;
+  for (let i = 0; i < segs; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], L = Math.hypot(b.x - a.x, b.z - a.z);
+    if (L < 1e-6) continue;
+    for (let s = 0; s <= L; s += step) {
+      n++;
+      const x = a.x + ((b.x - a.x) * s) / L, z = a.z + ((b.z - a.z) * s) / L;
+      if (!ctx.isWalkable(x, z)) { bad++; if (where.length < 6) where.push(`${x.toFixed(1)},${z.toFixed(1)}`); }
+    }
+  }
+  return { bad, n, where };
+}
 
 function safeNight(ctx: WorldCtx): boolean {
   try { return ctx.sky.isNight(); } catch { return false; }
 }
 
 interface CrowdRuntime {
-  roster(hour: number, night: boolean): void;
+  roster(hour: number, night: boolean, fest: boolean): void;
   step(dt: number, t: number): void;
   event(e: SkillEvent): void;
   info(): { region: RegionId; people: number; active: number };
+  /** DEV: who is who, and where. */
+  people(): { region: RegionId; i: number; role: CrowdRole; shift: Shift; active: boolean; x: number; z: number; away: boolean }[];
 }
 
-function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles, still: boolean): CrowdRuntime | null {
+function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles, still: boolean, festLines: Line[] | null): CrowdRuntime | null {
   const { THREE } = ctx;
   const specs = crowdOf(region);
   if (!specs.length) return null;
@@ -236,19 +304,15 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
 
   // ── validate the ways: every walked line on open ground (nudged, or the walker stays home)
   const people: Person[] = [];
+  let prev: Person | null = null;
   for (const spec of specs) {
+    // a companion walks beside whoever was listed before (and stays home with them)
+    const lead = spec.beside ? prev : null;
+    prev = null;
+    if (spec.beside && (!lead || !lead.spec.path)) continue;
     if (spec.path && !spec.boat) {
       const pts = spec.path.map((p) => walkableNear(ctx, p.x, p.z, 2.5));
-      let bad = 0, n = 0;
-      const where: string[] = [];
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i - 1], b = pts[i], L = Math.hypot(b.x - a.x, b.z - a.z);
-        for (let s = 0; s <= L; s += 0.8) {
-          n++;
-          const x = a.x + ((b.x - a.x) * s) / L, z = a.z + ((b.z - a.z) * s) / L;
-          if (!ctx.isWalkable(x, z)) { bad++; if (where.length < 6) where.push(`${x.toFixed(1)},${z.toFixed(1)}`); }
-        }
-      }
+      const { bad, n, where } = blockedAlong(ctx, pts, 0.8, !!spec.loop);
       if (bad > n * 0.12) {
         if (import.meta.env.DEV) console.info(`[npcs] ${region}: a ${spec.role}'s way is blocked (${bad}/${n}) at ${where.join(' ')}, left at home`);
         continue;
@@ -260,13 +324,16 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       spec.at = { ...spec.at, x: p.x, z: p.z };
     }
     const sc = spec.look.scale ?? 1;
-    people.push({
-      spec, i: people.length, x: spec.at?.x ?? spec.ring?.x ?? spec.path?.[0].x ?? 0, y: 0, z: spec.at?.z ?? spec.ring?.z ?? spec.path?.[0].z ?? 0,
+    const p0: Person = {
+      spec, i: people.length, x: lead?.x ?? spec.at?.x ?? spec.ring?.x ?? spec.path?.[0].x ?? 0, y: 0, z: lead?.z ?? spec.at?.z ?? spec.ring?.z ?? spec.path?.[0].z ?? 0,
       top: 1.24 * sc + (spec.boat ? 0.3 : 0), h: spec.at?.h ?? 0, active: false,
       d: spec.offset ?? rng() * 20, dir: 1, speed: spec.speed ?? 0.9, pause: 0, nextDwell: 8 + rng() * 25,
       amp: 0, ph: rng() * TAU, yaw: 0, seed: rng() * 100, react: 'none', reactT: 0, reactDelay: 0, src: { x: 0, z: 0 }, goal: null,
       greeted: false, bowedHere: false, nextBark: 4 + rng() * 20, moved: true, child: sc < 0.9, scale: sc, boatI: -1,
-    });
+      away: false, placed: false, stuck: 0, lead,
+    };
+    people.push(p0);
+    prev = p0;
   }
   if (!people.length) return null;
   const N = people.length;
@@ -342,17 +409,23 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const tmp = { x: 0, z: 0, heading: 0 };
+  const goal = { x: 0, z: 0 };
   let night = false;
   let anyOn = false;
   let rosterDirty = true;
 
-  function roster(hour: number, isNight: boolean) {
+  function roster(hour: number, isNight: boolean, fest: boolean) {
     if (isNight !== night) rosterDirty = true;
     night = isNight;
     let changed = false;
     for (const p of people) {
-      const on = onDuty(p.spec.shift, hour, isNight);
-      if (on !== p.active) { p.active = on; changed = true; p.moved = true; }
+      const on = onDuty(p.spec.shift, hour, isNight, fest);
+      if (on !== p.active) {
+        p.active = on; changed = true; p.moved = true;
+        // out of sight in between: they may start straight on their way
+        p.placed = false; p.away = false; p.react = 'none'; p.goal = null;
+        if (on && p.lead) { p.x = p.lead.x; p.z = p.lead.z; }
+      }
     }
     if (changed || rosterDirty) {
       rosterDirty = false;
@@ -379,7 +452,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       p.reactDelay = kind === 'listen' ? d * 0.08 : d * 0.05;
       p.src = { x: e.x, z: e.z };
       p.goal = null;
-      if (kind === 'listen' && (p.spec.path || p.spec.ring) && !p.spec.boat) {
+      if (kind === 'listen' && (p.spec.path || p.spec.ring || p.lead) && !p.spec.boat) {
         // walk over and stand in a ring round the music
         const a = Math.atan2(p.x - e.x, p.z - e.z) + (p.seed % 1 - 0.5) * 0.6;
         const rr = 2.6 + (p.seed % 1.5);
@@ -443,35 +516,76 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
         const catNear = chaseMe && Math.hypot(pp.x - c.x, pp.z - c.z) < 12;
         if (react === 'listen' && p.goal) {
           speed = walkTo(p, p.goal, 1.6, dt);
+          p.away = true;
         } else if (catNear) {
+          p.away = true;
           const back = 1.1 + (p.i % 3) * 0.5;
-          const gx = pp.x - Math.sin(ctx.player.heading + (p.i % 3 - 1) * 0.7) * back;
-          const gz = pp.z - Math.cos(ctx.player.heading + (p.i % 3 - 1) * 0.7) * back;
-          const far = Math.hypot(gx - c.x, gz - c.z) > 13;
-          speed = far ? 0 : walkTo(p, { x: gx, z: gz }, dist > 2.2 ? 2.9 : 0.9, dt);
+          goal.x = pp.x - Math.sin(ctx.player.heading + (p.i % 3 - 1) * 0.7) * back;
+          goal.z = pp.z - Math.cos(ctx.player.heading + (p.i % 3 - 1) * 0.7) * back;
+          const far = Math.hypot(goal.x - c.x, goal.z - c.z) > 13;
+          speed = far ? 0 : walkTo(p, goal, dist > 2.2 ? 2.9 : 0.9, dt);
           if (speed === 0) p.h = toMe;
           if (!p.greeted && bubbles.quiet > 2.2) { p.greeted = true; const l = CHASE[who]; if (l) bubbles.say(p, lineText(ctx, pickOf(l, p.seed)), 2.2); }
         } else {
           p.greeted = false;
-          p.d += (S.speed ?? 2.4) * dt * (still ? 0.5 : 1);
-          const a = p.d / c.r + Math.sin(p.d * 0.21 + p.seed) * 0.4;
-          const wob = 1 + Math.sin(p.d * 0.37 + p.seed) * 0.18;
-          const gx = c.x + Math.cos(a) * c.r * wob, gz = c.z + Math.sin(a) * c.r * wob;
-          if (Math.hypot(gx - p.x, gz - p.z) > 2) speed = walkTo(p, { x: gx, z: gz }, 2.6, dt);
-          else {
-            const nh = Math.atan2(gx - p.x, gz - p.z);
-            speed = Math.hypot(gx - p.x, gz - p.z) / Math.max(dt, 1e-3);
-            speed = Math.min(speed, 3.2);
-            p.x = gx; p.z = gz;
-            if (speed > 0.2) p.h = nh;
+          ringAt(c, p.d, p.seed, goal);
+          const gd = Math.hypot(goal.x - p.x, goal.z - p.z);
+          if (!p.placed) { p.x = goal.x; p.z = goal.z; p.placed = true; p.away = false; p.moved = true; }
+          else if (p.away || gd > 1) {
+            // back to the game first (running, never a jump), then round again
+            p.away = true;
+            speed = walkBack(p, goal, 2.6, dt);
+            if (gd < 0.3) p.away = false;
+          } else {
+            p.d += (S.speed ?? 2.4) * dt * (still ? 0.5 : 1);
+            ringAt(c, p.d, p.seed, goal);
+            // follow the ring's point, never faster than a child runs
+            const dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
+            const stepMax = RUN * dt;
+            const st = Math.min(d, stepMax);
+            if (d > 1e-5) { p.x += (dx / d) * st; p.z += (dz / d) * st; }
+            speed = st / Math.max(dt, 1e-3);
+            if (speed > 0.2) p.h = Math.atan2(dx, dz);
+            p.moved = true;
           }
           if (dist < 14 && p.nextBark <= 0 && bubbles.quiet > 5) { p.nextBark = 14 + (p.seed % 9); bubbles.say(p, lineText(ctx, pickOf(CALLS.child!, p.seed + t)), 2); }
+        }
+      } else if (p.lead) {
+        // beside their companion: a step to the side and a little behind; round to the other side when
+        // they turn back; face them while they stop
+        const Ld = p.lead;
+        if (react === 'listen' && p.goal) speed = walkTo(p, p.goal, 1.1, dt);
+        else if (react === 'bow' || react === 'stare' || react === 'sniff' || react === 'listen' || react === 'wave') speed = 0;
+        else {
+          const sh = Math.sin(Ld.h), ch = Math.cos(Ld.h);
+          goal.x = Ld.x + ch * 0.62 - sh * 0.28; goal.z = Ld.z - sh * 0.62 - ch * 0.28;
+          if (!ctx.isWalkable(goal.x, goal.z)) { goal.x = Ld.x - sh * 0.85; goal.z = Ld.z - ch * 0.85; }
+          if (!p.placed) { p.x = goal.x; p.z = goal.z; p.h = Ld.h; p.placed = true; p.moved = true; }
+          else {
+            // keep up smoothly (no dead zone, so no stop-start), never faster than a brisk walk
+            const dx = goal.x - p.x, dz = goal.z - p.z, d = Math.hypot(dx, dz);
+            const st = Math.min(d, Math.max(1, (Ld.spec.speed ?? 0.9) * 1.8) * dt);
+            if (d > 0.01) {
+              const nx = p.x + (dx / d) * st, nz = p.z + (dz / d) * st;
+              if (p.stuck > 2.5 || ctx.isWalkable(nx, nz)) { p.x = nx; p.z = nz; p.moved = true; speed = st / Math.max(dt, 1e-3); p.stuck = 0; }
+              else p.stuck += dt;
+            }
+            if (speed > 0.25) p.h = rotateToward(p.h, d > 0.15 ? Math.atan2(dx, dz) : Ld.h, dt * 6);
+          }
+          if (speed <= 0.25) p.h = rotateToward(p.h, Math.hypot(Ld.x - p.x, Ld.z - p.z) > 0.2 && Ld.pause > 0 ? Math.atan2(Ld.x - p.x, Ld.z - p.z) : Ld.h, dt * 3);
         }
       } else if (S.path) {
         // walkers: along the lane, pausing now and then, stopping for you
         const inFront = dist < 1.7 && Math.cos(toMe - p.h) > 0.3;
-        if (react === 'listen' && p.goal) speed = walkTo(p, p.goal, 1.1, dt);
+        if (react === 'listen' && p.goal) { speed = walkTo(p, p.goal, 1.1, dt); p.away = true; }
         else if (react === 'bow' || react === 'stare' || react === 'sniff' || react === 'listen' || react === 'wave') speed = 0;
+        else if (p.away) {
+          // drawn off their way (to hear the music): walk back to where they left it, then go on
+          if (S.loop) loopAt(S.path, p.d, tmp); else pingPong(S.path, p.d, tmp);
+          goal.x = tmp.x; goal.z = tmp.z;
+          if (Math.hypot(goal.x - p.x, goal.z - p.z) < 0.2) { p.away = false; p.stuck = 0; }
+          else speed = walkBack(p, goal, 1.1, dt);
+        }
         else if (inFront) { p.pause = Math.max(p.pause, 0.9); speed = 0; }
         else if (p.pause > 0) { p.pause -= dt; }
         else {
@@ -480,11 +594,16 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
           p.nextDwell -= sp * dt;
           if (p.nextDwell <= 0) { p.nextDwell = 14 + ((p.seed * 13.7 + p.d) % 26); p.pause = 2.5 + (p.seed % 3); }
           if (S.loop) loopAt(S.path, p.d, tmp); else pingPong(S.path, p.d, tmp);
-          const nx = tmp.x, nz = tmp.z;
-          // back where they came from if you (or someone) left the way blocked
-          p.x = nx; p.z = nz; p.h = rotateToward(p.h, tmp.heading, dt * 6);
-          speed = sp;
-          p.moved = true;
+          if (p.placed && Math.hypot(tmp.x - p.x, tmp.z - p.z) > 0.6) {
+            // never a jump: if they are somehow off their way, they walk back to it
+            p.d -= sp * dt;
+            p.away = true;
+          } else {
+            p.x = tmp.x; p.z = tmp.z; p.h = p.placed ? rotateToward(p.h, tmp.heading, dt * 6) : tmp.heading;
+            p.placed = true;
+            speed = sp;
+            p.moved = true;
+          }
         }
       }
       // turn to face: whoever calls them, you when near and interested, the partner in a chat
@@ -501,13 +620,14 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       if (dist < 3.4 && !p.greeted && react === 'none' && !S.boat && !p.child && hi === 0 && bubbles.quiet > 2.5 && (p.seed % 2) < 1.2) {
         p.greeted = true;
         hi++;
-        bubbles.say(p, lineText(ctx, pickOf(forCompanion(HELLO, who), p.seed)), 2.4);
+        bubbles.say(p, lineText(ctx, pickOf(night ? HELLO[who] ?? HELLO_NIGHT : forCompanion(HELLO, who), p.seed)), 2.4);
         if (!S.sit && S.act !== 'wash') { p.react = 'wave'; p.reactT = 1.4; p.reactDelay = 0; }
       }
       // calls: vendors, the watchman, the boatman, the wooden fish
       p.nextBark -= dt;
       if (p.nextBark <= 0 && dist < 18) {
-        const calls = CALLS[S.role];
+        const fest = festLines && night && (S.role === 'snack' || S.role === 'lantern') && Math.floor(p.seed + t * 0.37) % 2 === 0;
+        const calls = fest ? festLines : CALLS[S.role];
         if (calls && S.role !== 'child' && bubbles.quiet > 3.5) {
           p.nextBark = (S.role === 'watchman' ? 9 : 13) + (p.seed % 8);
           if (bubbles.say(p, lineText(ctx, pickOf(calls, p.seed + t * 0.37)), S.role === 'watchman' ? 3.4 : 2.6)) {
@@ -623,21 +743,33 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   }
 
   /** Walk toward a goal at `sp` m/s; returns the speed actually walked. */
-  function walkTo(p: Person, g: XZ, sp: number, dt: number): number {
+  function walkTo(p: Person, g: XZ, sp: number, dt: number, force = false): number {
     const dx = g.x - p.x, dz = g.z - p.z, d = Math.hypot(dx, dz);
     if (d < 0.15) return 0;
     const step = Math.min(d, sp * dt);
     const nx = p.x + (dx / d) * step, nz = p.z + (dz / d) * step;
-    if (!ctx.isWalkable(nx, nz)) return 0;
+    if (!force && !ctx.isWalkable(nx, nz)) return 0;
     p.x = nx; p.z = nz;
     p.h = rotateToward(p.h, Math.atan2(dx, dz), dt * 8);
     p.moved = true;
     return step / Math.max(dt, 1e-4);
   }
 
+  /**
+   * Walk back to a point on their way. They came from there, so the way back is open; if something
+   * stands in it for a while (a building set down meanwhile), they squeeze past rather than freeze.
+   */
+  function walkBack(p: Person, g: XZ, sp: number, dt: number): number {
+    const v = walkTo(p, g, sp, dt, p.stuck > 2.5);
+    if (v === 0 && Math.hypot(g.x - p.x, g.z - p.z) >= 0.15) p.stuck += dt;
+    else p.stuck = 0;
+    return v;
+  }
+
   return {
     roster, step, event,
     info: () => ({ region, people: N, active: people.filter((p) => p.active).length }),
+    people: () => people.map((p) => ({ region, i: p.i, role: p.spec.role, shift: p.spec.shift, active: p.active, x: +p.x.toFixed(2), z: +p.z.toFixed(2), away: p.away })),
   };
 }
 
@@ -651,6 +783,16 @@ function loopAt(pts: XZ[], d: number, out: { x: number; z: number; heading: numb
     if (r <= L) { const k = L ? r / L : 0; out.x = a.x + (b.x - a.x) * k; out.z = a.z + (b.z - a.z) * k; out.heading = Math.atan2(b.x - a.x, b.z - a.z); return; }
     r -= L;
   }
+}
+
+/** How fast a child runs (m/s): the most a child moves in a frame, whatever the game does. */
+const RUN = 3.4;
+
+/** The point of a children's ring game after `d` metres round (it wobbles in and out). */
+function ringAt(c: { x: number; z: number; r: number }, d: number, seed: number, out: XZ): void {
+  const a = d / c.r + Math.sin(d * 0.21 + seed) * 0.4;
+  const wob = 1 + Math.sin(d * 0.37 + seed) * 0.18;
+  out.x = c.x + Math.cos(a) * c.r * wob; out.z = c.z + Math.sin(a) * c.r * wob;
 }
 
 function rotateToward(a: number, b: number, k: number): number {

@@ -103,7 +103,14 @@ export const change: CharacterFactory = (THREE, opts) => {
     // gliding: the sleeves float out behind her, the body inclined into the air
     const g = Math.min(1, f.gait);
     p.shLx += 0.35 * g; p.shRx += 0.35 * g; p.shLz += 0.15 * g; p.shRz -= 0.15 * g;
-    if (f.emote === 'play' || f.emote === 'wave') {
+    if (f.emote === 'dance') {
+      // the sleeves thrown up and let fall, slow as clouds
+      const m = h.mx.set(p, f.env).m;
+      const a = Math.sin(f.since * 1.8);
+      m('shLx', -2.0 - a * 0.4); m('shLz', 0.7 + a * 0.3); m('elLx', -0.3);
+      m('shRx', -2.0 + a * 0.4); m('shRz', -0.7 + a * 0.3); m('elRx', -0.3);
+      m('headX', -0.2); m('headZ', a * 0.1); m('torsoY', a * 0.15);
+    } else if (f.emote === 'play' || f.emote === 'wave') {
       // a slow turn with the sleeves lifted
       const m = h.mx.set(p, f.env).m;
       const a = f.t * 1.6;

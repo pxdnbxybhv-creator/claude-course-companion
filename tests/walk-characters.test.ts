@@ -70,7 +70,7 @@ describe('the cast', () => {
   });
 
   for (const c of CHARACTERS) {
-    it(`${c.id}: every pose finite, within 40 draws, disposes`, () => {
+    it(`${c.id}: every pose finite, within 20 draws, disposes`, () => {
       const m = FACTORIES[c.id](THREE, { palette: {}, reduced: false });
       expect(m.height).toBeGreaterThan(0.4);
       let worst = 0, worstAt = '';
@@ -81,7 +81,7 @@ describe('the cast', () => {
         if (d > worst) { worst = d; worstAt = label; }
       });
       if (process.env.CAST_LOG) console.log(c.id, worst, worstAt);
-      expect(worst, `${c.id} peaks at ${worst} draws (${worstAt})`).toBeLessThanOrEqual(40);
+      expect(worst, `${c.id} peaks at ${worst} draws (${worstAt})`).toBeLessThanOrEqual(20);
       expect(() => m.dispose()).not.toThrow();
       expect(m.root.parent).toBeNull();
     });
@@ -110,5 +110,24 @@ describe('the cast', () => {
     const diff = q1.reduce((s, v, i) => Math.max(s, Math.abs(v - q2[i])), 0);
     expect(diff).toBeLessThan(0.5);
     m.dispose();
+  });
+
+  it('keeps the hands out of the head in every skill (the Go player reaching for his pot; a cup at the lips is fine)', () => {
+    type H = CharacterModel & { armL?: { hand: THREE.Object3D }; armR?: { hand: THREE.Object3D }; head?: THREE.Object3D; headC?: number; headR?: number; spec?: { scale: number } };
+    for (const c of CHARACTERS) {
+      const m = FACTORIES[c.id](THREE, { palette: {}, reduced: false }) as H;
+      if (!m.armR || !m.head || !m.spec) { m.dispose(); continue; }
+      const hand = new THREE.Vector3(), head = new THREE.Vector3();
+      let t = 0, worst = 9;
+      for (let i = 0; i <= 96; i++) {
+        t += 1 / 60;
+        m.update(1 / 60, state(t, { emote: 'skill', emoteT: i / 96 }));
+        m.root.updateMatrixWorld(true);
+        head.set(0, m.headC ?? 0.15, 0); m.head.localToWorld(head);
+        for (const a of [m.armR, m.armL]) if (a) { a.hand.getWorldPosition(hand); worst = Math.min(worst, hand.distanceTo(head) / ((m.headR ?? 0.17) * m.spec.scale)); }
+      }
+      expect(worst, `${c.id}: a hand comes within ${worst.toFixed(2)} head radii of the skull's centre`).toBeGreaterThan(1.0);
+      m.dispose();
+    }
   });
 });

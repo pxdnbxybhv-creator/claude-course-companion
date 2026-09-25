@@ -81,7 +81,7 @@ export const player: CharacterFactory = (THREE, opts) => {
   stone.position.set(0, -0.05, 0.02);
   // the placed stone and a board's lines glowing round it
   const placed = kit.group(h.scaler);
-  put(placed, new THREE.Mesh(kit.sphere(0.03, 1, 0.5, 1, 12, 8), stoneM), 0, 0, 0, Math.PI / 2, 0, 0);
+  put(placed, new THREE.Mesh(kit.sphere(0.04, 1, 0.5, 1, 12, 8), stoneM), 0, 0, 0, Math.PI / 2, 0, 0);
   const gridTex = kit.tex(128, 128, (g, w) => {
     g.clearRect(0, 0, w, w);
     const grd = g.createRadialGradient(w / 2, w / 2, 0, w / 2, w / 2, w / 2);
@@ -95,6 +95,7 @@ export const player: CharacterFactory = (THREE, opts) => {
   kit.keep(gridPlane);
   placed.visible = false;
   const handW = new THREE.Vector3();
+  const PLACE = new THREE.Vector3(0.02, 0.2, 0.38), placedAt = new THREE.Vector3();
 
   const behind = (m: (k: keyof Pose, v: number) => void) => {
     // hands clasped at the small of the back
@@ -138,41 +139,58 @@ export const player: CharacterFactory = (THREE, opts) => {
     }
     // a scholar's measured stride
     p.headX -= 0.04 * Math.min(1, f.gait);
+    if (f.emote === 'talk') {
+      // a point made with the fan: open, a sweep, a tap into the left palm
+      const m = h.mx.set(p, f.env).m;
+      const a = Math.sin(f.since * 2.6);
+      m('shRx', -1.0 + a * 0.2); m('shRz', 0.2 - a * 0.25); m('elRx', -1.25);
+      m('shLx', -0.7); m('shLz', -0.3); m('elLx', -1.2); m('elLz', 0);
+      m('headX', 0.04); m('headY', a * 0.12);
+    }
     if (f.emote === 'play') {
       // thinking over a move: fan tapping the chin
       const m = h.mx.set(p, f.env).m;
       m('shRx', -0.9); m('shRz', 0.4); m('elRx', -1.9 + Math.abs(Math.sin(f.t * 3)) * 0.15); m('headX', 0.1); m('headZ', 0.12);
     } else if (f.emote === 'skill') {
-      // 推演: a stone from the pot over the shoulder (0–.25), up before the eyes (.25–.5), a pause,
-      // then set firmly on the air (.55–.62); he holds the pose, looking at it
+      // 推演: a stone from the pot on his back, the elbow out over the right shoulder (0–.22),
+      // brought round before the eyes (.25–.45), a pause, then set firmly on the air out in front
+      // (.55–.62); he holds the pose, looking at it. (The arm always passes beside the head.)
       const m = h.mx.set(p, f.env).m;
       const take = smooth(f.u / 0.22), lift = smooth((f.u - 0.25) / 0.2), set = smooth((f.u - 0.55) / 0.07);
-      m('shRx', mix(mix(-0.3, -2.6, take), mix(-1.35, -1.5, set), lift)); m('shRz', mix(mix(0.1, 0.6, take), 0.12, lift));
-      m('elRx', mix(mix(-0.8, -1.8, take), mix(-1.1, -0.2, set), lift)); m('elRz', 0);
+      m('shRx', mix(mix(-0.3, -2.8, take), mix(-1.9, -1.75, set), lift));
+      m('shRz', mix(mix(-0.1, -0.9, take), mix(-0.35, -0.24, set), lift));
+      m('elRx', mix(mix(-0.8, -1.3, take), mix(-0.5, -0.2, set), lift)); m('elRz', 0);
       m('shLx', 0.45); m('shLz', 0.2); m('elLx', -1.15); m('elLz', -0.45);
-      m('headX', mix(-0.1 * take, 0.05, lift)); m('headY', mix(0.3 * take, 0, lift)); m('bodyX', 0.06 * set);
+      m('headX', mix(-0.05 * take, -0.08 + 0.1 * set, lift)); m('headY', mix(-0.35 * take, -0.12, lift)); m('bodyX', 0.06 * set);
+      m('torsoY', mix(-0.12 * take, 0, lift));
       m('hipLx', -0.25 * set); m('hipRx', 0.15 * set);
     }
   };
   h.onAfter = (f) => {
     const sk = f.emote === 'skill' && f.env > 0.05;
     // the fan: open in the hand for fanning and thinking, folded at the collar otherwise
-    const fanOut = (f.fidget === 'fan' && f.fk > 0.3) || (f.emote === 'play' && f.env > 0.3);
+    const fanOut = (f.fidget === 'fan' && f.fk > 0.3) || ((f.emote === 'play' || f.emote === 'talk') && f.env > 0.3);
     fan.visible = fanOut && !h.holding;
     folded.visible = !fan.visible;
     // the stone in the fingers
     stone.visible = !h.holding && !fanOut && ((f.gait > 0.1 && !f.emote) || (f.fidget === 'stone' && f.fk > 0.2) || (sk && f.u > 0.2 && f.u < 0.58));
     if (stone.visible) stone.rotation.set(f.t * 3, 0, f.t * 1.7);
     // the stone set on the air, the lines glowing out round it
-    placed.visible = sk && f.u >= 0.58;
+    const setNow = sk && f.u >= 0.58;
+    const fresh = setNow && !placed.visible;
+    placed.visible = setNow;
     if (placed.visible) {
-      if (f.u < 0.6) {
+      if (fresh) {
+        // (taken from the fingers on the first frame it shows, however long the frames are)
         h.armR.hand.updateWorldMatrix(true, false);
         handW.set(0, -0.05, 0.02).applyMatrix4(h.armR.hand.matrixWorld);
         h.scaler.updateWorldMatrix(true, false);
         h.scaler.worldToLocal(handW);
-        placed.position.copy(handW);
+        placedAt.copy(handW);
       }
+      // flicked from the fingers out in front and up: the glowing board reads above his shoulder
+      // from the camera behind
+      placed.position.copy(placedAt).addScaledVector(PLACE, smooth((f.u - 0.58) / 0.12));
       const g = clamp((f.u - 0.58) / 0.42);
       gridMat.opacity = Math.sin(Math.min(1, g * 1.3) * Math.PI) * 0.9;
       gridPlane.scale.setScalar(0.4 + smooth(g) * 1.2);

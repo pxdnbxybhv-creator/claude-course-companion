@@ -5,7 +5,7 @@
 // skill (撒网) puts the rod on his back, gathers a net at his hip, whirls and throws it — the net
 // opens wide in the air and sinks.
 import type { CharacterFactory } from './types';
-import { Human, Kit, OL, Spring, bothHands, clamp, conicalHat, mix, put, smooth, strawTex } from './rig';
+import { Human, Kit, OL, Spring, bothHands, clamp, conicalHat, mix, put, sitPose, smooth, strawTex } from './rig';
 
 export const fisher: CharacterFactory = (THREE, opts) => {
   const kit = new Kit(THREE, opts.reduced);
@@ -77,9 +77,11 @@ export const fisher: CharacterFactory = (THREE, opts) => {
     for (let j = 0; j <= 8; j++) { const y = (j / 8) * hh; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
   });
   const net = kit.group(h.scaler);
-  const netMat = kit.add(new THREE.MeshBasicMaterial({ map: netTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, alphaTest: 0.3 }));
+  // (no alpha test: the mesh and its weighted rim fade out together as the net sinks)
+  const netMat = kit.add(new THREE.MeshBasicMaterial({ map: netTex, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  const rimMat = kit.add(new THREE.MeshBasicMaterial({ color: '#4a3a2a', transparent: true, depthWrite: false }));
   put(net, new THREE.Mesh(kit.add(new THREE.ConeGeometry(0.5, 0.32, 20, 1, true).translate(0, -0.16, 0)), netMat), 0, 0, 0);
-  put(net, new THREE.Mesh(kit.torus(0.5, 0.012, 4, 28).rotateX(Math.PI / 2), kit.toon('#4a3a2a')), 0, -0.32, 0);
+  put(net, new THREE.Mesh(kit.torus(0.5, 0.012, 4, 28).rotateX(Math.PI / 2), rimMat), 0, -0.32, 0);
   net.visible = false;
   const handW = new THREE.Vector3(), from = new THREE.Vector3();
   let netFrom = false;
@@ -121,15 +123,25 @@ export const fisher: CharacterFactory = (THREE, opts) => {
     p.shRx = p.shRx + (-0.55 - p.shRx) * k; p.shRz = p.shRz + (0.18 - p.shRz) * k; p.elRx = p.elRx + (-1.85 - p.elRx) * k;
     // an old man's shuffle: head pushed a little forward, knees soft
     p.headX += 0.12 * Math.min(1, f.gait); p.knL += 0.08; p.knR += 0.08;
-    if (f.emote === 'skill') {
-      // 撒网: gather at the right hip, twist, whirl up and fling out wide
+    if (f.emote === 'sleep') {
+      // an old man's nap: down on the ground, arms on his knees, chin on his chest under the hat
       const m = h.mx.set(p, f.env).m;
-      const wind = smooth(f.u / 0.3), fling = smooth((f.u - 0.32) / 0.14), rest = smooth((f.u - 0.7) / 0.25);
-      const tw = mix(mix(0, 0.6, wind), -0.45, fling) * (1 - rest);
+      sitPose(m);
+      m('shLx', -0.75); m('shRx', -0.75); m('shLz', -0.12); m('shRz', 0.12); m('elLx', -0.9); m('elRx', -0.9);
+      m('torsoX', 0.22); m('headX', 0.45 + Math.sin(f.since * 1.1) * 0.04);
+    }
+    if (f.emote === 'skill') {
+      // 撒网: gather at the right hip, twist, whirl up and fling out wide — then follow through,
+      // arms forward and down after the net, a little bow as he watches it sink
+      const m = h.mx.set(p, f.env).m;
+      const wind = smooth(f.u / 0.3), fling = smooth((f.u - 0.32) / 0.14), after = smooth((f.u - 0.48) / 0.2), rest = smooth((f.u - 0.8) / 0.18);
+      const tw = mix(mix(0, 0.6, wind), -0.45, fling) * (1 - after * 0.7) * (1 - rest);
       m('torsoY', tw); m('bodyYaw', tw * 0.3);
-      m('shRx', mix(mix(-0.3, -0.9, wind), -1.7, fling) * (1 - rest) - 0.3 * rest); m('shRz', mix(0.2, -0.7, fling)); m('elRx', mix(-0.9, -0.2, fling));
-      m('shLx', mix(mix(-0.4, -1.0, wind), -1.6, fling) * (1 - rest) - 0.3 * rest); m('shLz', mix(-0.5, 0.7, fling)); m('elLx', mix(-1.2, -0.2, fling));
-      m('bodyX', mix(0.2, 0.05, fling)); m('headX', mix(0.1, -0.15, fling));
+      m('shRx', mix(mix(mix(-0.3, -0.9, wind), -1.7, fling), -1.0, after) * (1 - rest) - 0.3 * rest);
+      m('shRz', mix(mix(0.2, -0.7, fling), 0.12, after)); m('elRx', mix(mix(-0.9, -0.2, fling), -0.4, after));
+      m('shLx', mix(mix(mix(-0.4, -1.0, wind), -1.6, fling), -1.0, after) * (1 - rest) - 0.3 * rest);
+      m('shLz', mix(mix(-0.5, 0.7, fling), -0.12, after)); m('elLx', mix(mix(-1.2, -0.2, fling), -0.4, after));
+      m('bodyX', mix(mix(0.2, 0.05, fling), 0.14, after)); m('torsoX', 0.12 * after * (1 - rest)); m('headX', mix(mix(0.1, -0.15, fling), 0.18, after));
       m('hipLx', -0.35); m('hipRx', 0.25); m('knL', 0.35 * (1 - fling) + 0.1);
     }
   };
@@ -174,7 +186,7 @@ export const fisher: CharacterFactory = (THREE, opts) => {
         net.scale.set(open, mix(0.8, 0.35, e), open);
         net.rotation.set(0, f.t * 2.2, 0);
       }
-      netMat.opacity = 1 - smooth((f.u - 0.85) / 0.12);
+      netMat.opacity = rimMat.opacity = 1 - smooth((f.u - 0.8) / 0.16);
     }
   };
   return h;

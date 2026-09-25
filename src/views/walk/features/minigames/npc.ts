@@ -47,6 +47,20 @@ export interface Figure {
   walking?: number;
   /** A reaction under way ('listen' | 'bow' | 'sniff'), if any. */
   readonly reacting?: string | null;
+  /**
+   * Take this figure away before its bag goes (a resident dismissed, a pet's owner leaving): stops its
+   * animation, its skill listener, its speech mark and greeting, and removes and frees its meshes
+   * (and whatever was hung on it). Safe to call more than once; the bag's own dispose still works.
+   */
+  dispose(): void;
+  readonly disposed?: boolean;
+}
+
+/** Cleanups hung on a figure by speechMark() / greet(), run by its dispose(). */
+const extras = new WeakMap<Figure, (() => void)[]>();
+function onFigureGone(f: Figure, fn: () => void): void {
+  const l = extras.get(f);
+  if (l) l.push(fn); else extras.set(f, [fn]);
 }
 
 /** Build a figure and animate it (added to `parent` at (x, z) on the ground, facing `heading`). */
@@ -160,14 +174,26 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   // reactions to skills nearby: turn and sway to music, bow to a lord, lean in to sniff the flowers
   let react: 'listen' | 'bow' | 'sniff' | null = null, reactT = 0, reactDelay = 0;
   const src = { x: 0, z: 0 };
+  let dead = false;
+  const offs: (() => void)[] = [];
+  const stop = () => { for (const o of offs.splice(0)) o(); };
   const fig: Figure = {
     root, head, armL, armR, hand: new THREE.Vector3(0, -0.37, 0.01), height: (1.24 - sitDrop) * S, talking: false,
     wave() { if (waveT < 0) rest.copy(armR.rotation); waveT = 0; },
     faceTo: null,
     walking: 0,
     get reacting() { return react; },
+    get disposed() { return dead; },
+    dispose() {
+      if (dead) return;
+      dead = true;
+      stop();
+      for (const fn of extras.get(fig)?.splice(0) ?? []) { try { fn(); } catch (e) { console.warn('[npc] dispose', e); } }
+      if (!bag.disposed) bag.drop(root);
+    },
   };
-  bag.onDispose(onSkillEvent((e) => {
+  bag.onDispose(() => { dead = true; stop(); });
+  offs.push(onSkillEvent((e) => {
     const d = Math.hypot(e.x - root.position.x, e.z - root.position.z);
     const r = e.r ?? (e.kind === 'music' ? 16 : e.kind === 'bow' ? 11 : 9);
     if (d > r || !root.visible) return;
@@ -182,7 +208,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   // where they looked before a reaction turned them (to turn back to)
   const restAt = { x: at.x + Math.sin(heading) * 4, z: at.z + Math.cos(heading) * 4 };
   const seed = at.x * 1.7 + at.z * 0.3;
-  bag.frame((dt, t) => {
+  offs.push(ctx.onFrame((dt, t) => {
     const p = ctx.player.position;
     const dx = p.x - root.position.x, dz = p.z - root.position.z;
     const d = Math.hypot(dx, dz);
@@ -245,7 +271,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       armR.rotation.x = rest.x * (1 - up) + (still ? 0 : Math.sin(waveT * 12) * 0.25 * up);
       if (k >= 1) { waveT = -1; armR.rotation.copy(rest); }
     }
-  });
+  }));
   return fig;
 }
 
@@ -272,11 +298,13 @@ export function front(f: Figure, d = 0.9): T.Vector3 {
 /** Wave once when the walker first comes near. */
 export function greet(bag: Bag, ctx: WorldCtx, f: Figure, r = 5): void {
   let near = false;
-  bag.frame(() => {
+  const off = ctx.onFrame(() => {
     const d = Math.hypot(ctx.player.position.x - f.root.position.x, ctx.player.position.z - f.root.position.z);
     if (d < r && !near) { near = true; f.wave(); }
     else if (d > r + 4) near = false;
   });
+  bag.onDispose(off);
+  onFigureGone(f, off);
 }
 
 /** A floating ink mark over someone with something to say (a brushed glyph on a paper disc). */
@@ -302,12 +330,15 @@ export function speechMark(bag: Bag, fig: Figure, glyph: string): { set(on: bool
   let on = true;
   const still = reducedMotion();
   const w = new THREE.Vector3();
-  bag.frame((_dt, t) => {
+  const off = bag.ctx.onFrame((_dt, t) => {
     fig.root.getWorldPosition(w);
     const p = bag.ctx.player.position;
     s.visible = on && Math.hypot(p.x - w.x, p.z - w.z) < 32;
     if (on && !still) s.position.y = fig.height + 0.35 + Math.sin(t * 2.2) * 0.04;
   });
+  bag.onDispose(off);
+  // the figure going takes its mark along (its sprite, texture and animation)
+  onFigureGone(fig, () => { off(); if (!bag.disposed) bag.drop(s); });
   return { set(v) { on = v; } };
 }
 

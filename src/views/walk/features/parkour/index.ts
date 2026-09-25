@@ -5,6 +5,9 @@
 // 铜钱 — about forty coin spots a day, picked from all of them, some only a companion's gift reaches.
 import type { WorldCtx, WorldFeature } from '../../types';
 import { hashString } from '../../../../core/rng';
+import { toKey } from '../../../../core/date';
+import { play, record } from '../../../../app/play';
+import { today } from '../../../../app/store';
 import { feature, type Bag } from '../kit';
 import { Builder } from './build';
 import { CoinField, type CoinSpot } from './coins';
@@ -16,11 +19,41 @@ import { buildLookout } from './lookout';
 import { DAILY_SPOTS, pickDaily } from './logic';
 
 const STORE = 'banmu.parkour.v1';
+/** Today's taken coins in play state: a daily count per coin (it rolls over with the day, and goes in backups). */
+const TAKEN = 'pk:';
 
 /** The world's day (a preview of another day keeps its own coins). */
 function dayOf(ctx: WorldCtx): string {
   const d = ctx.env.date;
   return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+}
+
+/**
+ * Coins already picked up, by day, for as long as the page lives: the walk is torn down and rebuilt
+ * each time you come back to it, and where the browser keeps nothing (a sandboxed frame) this is what
+ * stops the same coins paying twice. Play state (daily counts) and localStorage are its mirrors.
+ */
+const takenByDay = new Map<string, Set<string>>();
+
+/** Coins already picked up on `day` (`key`: the same day as a DateKey), from every record of them. */
+function takenOn(day: string, key: string): Set<string> {
+  let got = takenByDay.get(day);
+  if (!got) {
+    takenByDay.clear(); // only one day is ever wanted
+    got = new Set();
+    takenByDay.set(day, got);
+  }
+  for (const id of loadTaken(day)) got.add(id);
+  const p = play.peek();
+  if (p.daily.day === key) for (const k in p.daily.counts) if (k.startsWith(TAKEN)) got.add(k.slice(TAKEN.length));
+  return got;
+}
+
+/** Remember a coin as taken today: here, in play state (while it is still that day) and in the browser. */
+function markTaken(day: string, key: string, got: Set<string>, id: string): void {
+  got.add(id);
+  if (today.peek() === key) record(TAKEN + id);
+  saveTaken(day, got);
 }
 
 /** Coins already picked up today (per viewer, in this browser). */
@@ -68,11 +101,11 @@ const parkour = feature('parkour', (bag, ctx) => {
     if (w === null || ctx.groundY(c.x, c.z) > w + 0.1) spots.push(c);
   }
 
-  const day = dayOf(ctx);
+  const day = dayOf(ctx), key = toKey(ctx.env.date);
   const todays = pickDaily(spots, hashString(`coinspots:${day}`), DAILY_SPOTS);
-  const taken = loadTaken(day);
+  const taken = takenOn(day, key);
   const field = new CoinField(bag, ctx, todays, taken);
-  field.onPick = (spot) => { taken.add(spot.id); saveTaken(day, taken); };
+  field.onPick = (spot) => markTaken(day, key, taken, spot.id);
   bag.onDispose(() => field.dispose());
   bag.frame((dt, t) => field.update(dt, t));
 

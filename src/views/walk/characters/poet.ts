@@ -87,7 +87,20 @@ export const poet: CharacterFactory = (THREE, opts) => {
       p.bodyZ += k * 0.12; p.headZ -= k * 0.15; p.shRz -= k * 0.8; p.hipRz -= k * 0.2;
     }
     if (f.emote === 'eat') drink(h.mx.set(p, f.env).m, 1);
-    else if (f.emote === 'skill') {
+    else if (f.emote === 'talk') {
+      // declaiming: the cup raised high in the left hand, the right flung out, a sway to the metre
+      const m = h.mx.set(p, f.env).m;
+      const a = Math.sin(f.since * 2.1);
+      m('shLx', -2.3); m('shLz', 0.25); m('elLx', -0.5);
+      m('shRx', -0.7); m('shRz', -0.9 - a * 0.25); m('elRx', -0.3);
+      m('headX', -0.22); m('headZ', a * 0.12); m('bodyZ', a * 0.07); m('bodyYaw', a * 0.12);
+    } else if (f.emote === 'dance') {
+      // a drunkard's dance: the cup kept up out of harm, a lurch to each side
+      const m = h.mx.set(p, f.env).m;
+      const a = Math.sin(f.since * 2.6);
+      m('shLx', -2.45); m('shLz', 0.2 + a * 0.2); m('elLx', -0.45);
+      m('bodyZ', a * 0.14); m('headZ', -a * 0.2); m('headX', -0.18); m('hipRz', -a * 0.12);
+    } else if (f.emote === 'skill') {
       // 斗酒: a deep pull (0–.45), then the cup flung up to the moon, head back, laughing
       const d = 1 - smooth((f.u - 0.4) / 0.12);
       if (d > 0) drink(h.mx.set(p, f.env * d).m, 1);

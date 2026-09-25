@@ -3,7 +3,8 @@
 import type { RegionId, XZ } from '../../map';
 import type { RouteStop } from './logic';
 
-/** The peddler's round: the market, over the bridge to the garden gate, the lotus dock, and back. */
+/** The peddler's round: the market, over the bridge to the garden gate, the lotus dock, and back (the gate leg
+ * passes a metre north of the stone by the gate; the DEV build samples the whole round against the ground). */
 const OUT: RouteStop[] = [
   { x: 2, z: 94.5 }, { x: 1.8, z: 91 }, { x: 0.5, z: 81 }, { x: 0, z: 71.5 }, { x: -1.1, z: 66 }, { x: -1.5, z: 61.5 }, { x: -2.5, z: 58.5 }, { x: -2.2, z: 54 }, { x: 0, z: 40 },
 ];
@@ -11,9 +12,9 @@ export const PEDDLER_ROUTE: RouteStop[] = [
   { x: 12, z: 96.5, dwell: 150, id: 'market' },
   ...OUT,
   { x: -2, z: 30, dwell: 100, id: 'gate' },
-  { x: 4, z: 26.5 }, { x: 30, z: 28 }, { x: 52, z: 30 },
+  { x: 4, z: 25.5 }, { x: 30, z: 28 }, { x: 52, z: 30 },
   { x: 58, z: 32.5, dwell: 100, id: 'dock' },
-  { x: 52, z: 30 }, { x: 30, z: 28 }, { x: 4, z: 26.5 }, { x: -2, z: 30 },
+  { x: 52, z: 30 }, { x: 30, z: 28 }, { x: 4, z: 25.5 }, { x: -2, z: 30 },
   ...[...OUT].reverse(),
 ];
 export const PEDDLER_SPEED = 1.0;

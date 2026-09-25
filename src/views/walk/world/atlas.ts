@@ -162,15 +162,37 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
     g.setLineDash([]);
   }
 
-  // places
+  // places: each name clear of the steles' icons (a stele often stands near its place's heart) and
+  // of the names already written: the nearest free spot above or below (or a little to one side)
+  const su = Math.max(u0, (o.ui ?? 1) * 1.15);
+  type Box = { x0: number; x1: number; z0: number; z1: number };
+  const taken: Box[] = (o.waypoints ?? []).map((w) => ({ x0: X(w.x) - 10 * su, x1: X(w.x) + 11 * su, z0: Z(w.z) - 17 * su, z1: Z(w.z) + 4 * su }));
+  /** How much of a box would lie over what is already drawn (0 = clear). */
+  const overlap = (x0: number, x1: number, z0: number, z1: number) => {
+    let a = 0;
+    for (const b of taken) a += Math.max(0, Math.min(x1, b.x1) - Math.max(x0, b.x0)) * Math.max(0, Math.min(z1, b.z1) - Math.max(z0, b.z0));
+    return a;
+  };
   for (const r of REGIONS) {
     const seen = o.visited.has(r.id);
-    const x = X(r.center.x), z = Z(r.center.z);
+    const cx = X(r.center.x), cz = Z(r.center.z);
     const name = o.lang === 'zh' ? r.zh : r.en;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const fs = (o.lang === 'zh' ? 30 : 20) * u;
     g.font = o.lang === 'zh' ? `${fs}px "Ma Shan Zheng", "LXGW WenKai", serif` : `italic ${fs}px "Cormorant Garamond", Georgia, serif`;
+    // the written name's box (with its ？ or seal): the nearest spot that covers nothing, or else
+    // the one that covers least
+    const hw = fs * (o.lang === 'zh' ? (r.zh.length + 1) * 0.5 : (name.length + 2) * 0.26), hh = fs * 0.55;
+    let x = cx, z = cz, best = Infinity;
+    for (let i = -10; i <= 10; i++) {
+      for (let j = -3; j <= 3; j++) {
+        const dz = i * hh * 0.5, dx = j * hw * 0.45;
+        const cost = overlap(cx + dx - hw, cx + dx + hw, cz + dz - hh, cz + dz + hh) * 1e3 + Math.abs(dx) + Math.abs(dz) * 1.3;
+        if (cost < best) { best = cost; x = cx + dx; z = cz + dz; }
+      }
+    }
+    taken.push({ x0: x - hw, x1: x + hw, z0: z - hh, z1: z + hh });
     // a soft paper halo so the name reads over the washes
     g.fillStyle = 'rgba(241,233,216,0.7)';
     g.beginPath(); g.ellipse(x, z, fs * (o.lang === 'zh' ? r.zh.length * 0.62 : name.length * 0.28) + 8 * u, fs * 0.72, 0, 0, Math.PI * 2); g.fill();

@@ -377,8 +377,11 @@ export function poet(env: SkillEnv): Running {
 
 // ───────────────────────────── 画师 · 神笔 ─────────────────────────────
 
-/** A folded paper crane (one instanced draw, wings beating in the vertex shader). */
-export function paperCrane(bag: Bag): { mesh: T.InstancedMesh; setTime(t: number): void; setBeat(a: number): void } {
+/**
+ * A folded paper crane (one instanced draw, wings beating in the vertex shader). One crane flies at a
+ * time: `flight` counts the flights, and a flight that is no longer the newest lets go of the mesh.
+ */
+export function paperCrane(bag: Bag): { mesh: T.InstancedMesh; flight: number; setTime(t: number): void; setBeat(a: number): void } {
   const { THREE } = bag.ctx;
   const { geo, mat, amp, uniforms } = birdWingParts(THREE);
   bag.own(mat);
@@ -389,6 +392,7 @@ export function paperCrane(bag: Bag): { mesh: T.InstancedMesh; setTime(t: number
   bag.add(reflects(mesh));
   return {
     mesh,
+    flight: 0,
     setTime(t) { uniforms.uTime.value = t; },
     setBeat(a) { amp.setX(0, a); amp.needsUpdate = true; },
   };
@@ -421,6 +425,8 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
   let pt = 0;
   let circleA = 0;
   const cx0 = circling ? p0.x : target.x, cz0 = circling ? p0.z : target.z;
+  // a new crane from the painter's hand: one still on its way unfolds into paper where it is
+  const mine = ++crane.flight;
   crane.mesh.visible = true;
   crane.setBeat(1);
   const metres = Math.round(dist / 5) * 5;
@@ -431,8 +437,19 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
   if (!circling) ctx.frameCamera(p0.x + (target.x - p0.x) / (dist || 1) * 14, p0.z + (target.z - p0.z) / (dist || 1) * 14, p0.y + 2.5, 1.8);
 
   // the flight outlives the skill: the painter walks on while the crane leads
+  const scatter = (n: number) => {
+    for (let i = 0; i < n; i++) {
+      fx.air.emit({ x, y, z, vx: rng.range(-0.8, 0.8), vy: rng.range(-0.2, 0.9), vz: rng.range(-0.8, 0.8), g: 0.6, drag: 1.2, flutter: 0.3, life: rng.range(1.6, 2.6), size: rng.range(0.05, 0.09), color: rng.chance(0.7) ? HUE.white : HUE.ink, mode: MODE.flake, cell: CELL.petal, spin: 4 });
+    }
+  };
   env.linger((dt, t) => {
     if (phase === 'gone') return false;
+    if (crane.flight !== mine) {
+      // a newer crane has the mesh now: this one comes apart in the air
+      phase = 'gone';
+      scatter(env.reduced ? 4 : 10);
+      return false;
+    }
     crane.setTime(t);
     pt += dt;
     const floor = env.floorAt(x, z);
@@ -474,9 +491,7 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
         phase = 'gone';
         crane.mesh.visible = false;
         snd.paper(4, 0.3);
-        for (let i = 0; i < (env.reduced ? 6 : 16); i++) {
-          fx.air.emit({ x, y, z, vx: rng.range(-0.8, 0.8), vy: rng.range(-0.2, 0.9), vz: rng.range(-0.8, 0.8), g: 0.6, drag: 1.2, flutter: 0.3, life: rng.range(1.6, 2.6), size: rng.range(0.05, 0.09), color: rng.chance(0.7) ? HUE.white : HUE.ink, mode: MODE.flake, cell: CELL.petal, spin: 4 });
-        }
+        scatter(env.reduced ? 6 : 16);
         return false;
       }
     }

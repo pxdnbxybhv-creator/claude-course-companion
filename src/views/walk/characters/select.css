@@ -91,7 +91,11 @@
 .cs-tile:focus-visible { outline: 2px solid var(--ink-2); outline-offset: 1px; }
 .cs-portrait { display: block; border-radius: 50%; }
 .cs-tile.is-locked .cs-tname { color: var(--ink-3); }
-.cs-tname { font-size: 13px; line-height: 1.2; white-space: nowrap; }
+.cs-tname { /* two short lines at most (English names wrap; never run into the next tile) */
+  display: block; max-width: 100%; padding: 0 2px; font-size: 13px; line-height: 1.15; text-align: center;
+  white-space: normal; overflow-wrap: break-word; hyphens: auto;
+}
+.cs-tname:lang(en) { font-size: 12px; }
 .cs-dot { position: absolute; top: 6px; right: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--cinnabar); box-shadow: 0 0 0 2px var(--paper); }
 
 @keyframes cs-in { from { opacity: 0; transform: scale(0.96); } }
