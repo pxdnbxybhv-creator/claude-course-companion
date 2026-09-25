@@ -49,7 +49,7 @@ import { createGrade } from './grade';
 import { bridgeSpecs, buildBridges, setBridgeReplaced } from './bridges';
 import { Dust } from './fx';
 import { buildSteles, type PlacedWaypoint, type Steles } from './waypoints';
-import { arrivalAt, findSpot, toLight } from './wayfind';
+import { arrivalAt, findSpot, lightReach, toLight } from './wayfind';
 import { drum } from '../features/sfx';
 import {
   GATE, LOOP, PAVILION, PAVILION_Y, POND, ROCKS, SPAWN, WALL, floorY, layoutPlants, polyAt, staticColliders, terrainY, walkableGround, wallPath, wallSegments, waterAt,
@@ -117,6 +117,7 @@ export { releasePlantBitmaps };
 
 /** A solid prop on the land: the player walks round it (and, given a height, the camera never hides behind it). */
 import type { Collider, Occluder } from '../types';
+import { WENKAI_WALK_SAMPLE } from './font-sample';
 export type { Collider, Occluder };
 
 /** Colliders and occluders are now part of WorldCtx itself; kept as an alias for older call sites. */
@@ -156,8 +157,10 @@ const WILD: { kind: PlantKind; seed: number }[] = [
 ];
 
 /** Where fast travel sets you down in each place (on its approach path, facing in). */
-const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ }> = {
-  garden: { x: SPAWN.x, z: SPAWN.z, face: { x: 0, z: 0 } },
+const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ; own?: true }> = {
+  // (own: set down on this very spot, not beside the stele — here, before the moon gate looking in
+  // through it, as on the first visit; beside the stele one faced the blank wall east of the gate)
+  garden: { x: SPAWN.x, z: SPAWN.z, face: { x: 0, z: 0 }, own: true },
   village: { x: -1.5, z: 49, face: ANCHORS.villageSquare },   // under the 小桥流水 archway: the bridge and the town ahead
   lake: { x: 58, z: 31, face: ANCHORS.lakeIsland },
   bamboo: { x: -66, z: 29.5, face: ANCHORS.bambooClearing },
@@ -318,13 +321,18 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   garden.add(pond.group);
   // the reflection camera sees layer 0 only (no particles, ripples or shadows in the mirror)
   (pond.water.getReflectionCamera(camera) as THREE.Camera).layers.set(0);
+  // from far off (another place's stele looking back at the garden) the pond is a sliver behind the
+  // wall: its mirror keeps the last reflection rather than drawing the scene a second time
+  const mirrorRender = pond.water.onBeforeRender;
+  let mirrorOn = true;
+  pond.water.onBeforeRender = function (...a: Parameters<typeof mirrorRender>) { if (mirrorOn) mirrorRender.apply(this, a); };
   hud.progress(0.36);
   await nextFrame();
 
-  // fonts for the tablets (never wait long)
+  // fonts for the tablets and the walk's own text, which has a WenKai file of its own (never wait long)
   try {
     await Promise.race([
-      Promise.all([document.fonts.load('40px "LXGW WenKai"', habits.map((h) => h.name).join('') + '此园尚空待种梅兰竹菊松荷'), document.fonts.load('60px "Ma Shan Zheng"', '问月')]),
+      Promise.all([document.fonts.load('40px "LXGW WenKai"', habits.map((h) => h.name).join('') + '此园尚空待种梅兰竹菊松荷' + WENKAI_WALK_SAMPLE), document.fonts.load('60px "Ma Shan Zheng"', '问月')]),
       new Promise((r) => setTimeout(r, 1500)),
     ]);
   } catch { /* fall back to system fonts */ }
@@ -877,8 +885,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     player.root.traverse((o) => o.layers.set(0));
     playerMirrored = true;
     player.emote('bow');
-    // off the water if the new walker cannot stand on it
-    if (!player.floats && !walkableGround(player.position.x, player.position.z)) {
+    // off the water if the new walker cannot stand on it: judged by the new walker's own gifts, since
+    // a skill's float (嫦娥's 奔月) is still set this tick and only ends on the skills' next frame
+    if (!player.gifts.float && !walkableGround(player.position.x, player.position.z)) {
       const a = ARRIVE[lastPlace];
       player.teleport(a.x, a.z, Math.atan2(a.face.x - a.x, a.face.z - a.z));
     }
@@ -966,9 +975,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   let steles: Steles | null = null;
   const placed: PlacedWaypoint[] = [];
   const placedById = new Map<RegionId, PlacedWaypoint>();
-  const steleSpots: { id: RegionId; x: number; z: number }[] = [];
+  const steleSpots: { id: RegionId; x: number; z: number; r: number }[] = [];
   const isLit = (id: string) => waypointOpen(play.peek(), id);
-  /** Light the stele the walker has reached (and any a code or another tab opened meanwhile). */
+  /** Light the stele the walker has reached (and any that another tab or a flag opened meanwhile). */
   const checkWaypoints = () => {
     if (!steles) return;
     for (const w of placed) if (isLit(w.id)) steles.light(w.id, false);
@@ -1061,6 +1070,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       checkWaypoints();
       dust.setTint(sky.tint, sky.night01);
       if (coreTop && frameNo % 96 === 1) unmirror();
+      mirrorOn = Math.hypot(camera.position.x - POND.x, camera.position.z - POND.z) < 50;
       // the walker shows in the pond only when near it (a character can be dozens of draws)
       const mirrored = Math.hypot(player.position.x - POND.x, player.position.z - POND.z) < 16;
       if (mirrored !== playerMirrored) {
@@ -1217,7 +1227,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // --- fast travel (驿站): the curtain falls, the player is set down at the stele, it lifts
   const travel = async (id: RegionId) => {
     if (traveling || !running) return;
-    if (player.isFrozen) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
+    // (on a skill's mount — 关公's 赤兔 — he simply swings down: the ride(null) below sets him on
+    // his feet, and the skill sees he is off and lets the horse go)
+    if (player.isFrozen && !player.heldBySkill) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
     if (!isLit(id)) { hud.toast('那处驿站尚未到访：循路走到驿碑前，点亮它的灯。', 'Not yet visited: walk to its waypoint stele and light the lantern first.'); return; }
     traveling = true;
     try {
@@ -1229,7 +1241,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       const a = ARRIVE[id];
       const w = placedById.get(id);
       let x = a.x, z = a.z, heading: number;
-      if (w) {
+      if (w && !a.own) {
         // a step in front of the stele, looking into the place
         const at = arrivalAt({ x: w.sx, z: w.sz }, a.face, isWalkable);
         x = at.x; z = at.z; heading = at.heading;
@@ -1302,7 +1314,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       const pw: PlacedWaypoint = { ...w, sx: spot.x, sz: spot.z, y: floorY(spot.x, spot.z), rot: Math.atan2(fx - spot.x, fz - spot.z) };
       placed.push(pw);
       placedById.set(w.id, pw);
-      steleSpots.push({ id: w.id, x: spot.x, z: spot.z });
+      // walking the road past it lights it (a roadside stele stands a few steps off the tread)
+      steleSpots.push({ id: w.id, x: spot.x, z: spot.z, r: lightReach(test.pathDist(spot.x, spot.z)) });
     }
     steles = buildSteles(bag, placed, (id) => regionGroup(id as RegionId), lang, reduced);
     for (const w of placed) {

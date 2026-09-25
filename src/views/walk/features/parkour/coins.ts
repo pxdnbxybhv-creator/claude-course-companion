@@ -37,8 +37,8 @@ interface Live {
 
 /** Who can reach what: named in the hint when you stand under a challenge coin. */
 const HINT: Record<Challenge, { zh: string; en: string }> = {
-  high: { zh: '铜钱悬得太高——道童、大橘跳得高；侠客的「技」可二段跳。', en: 'Too high to reach — the Taoist Child and Big Ginger jump higher; the Swordsman\'s skill gives a double jump.' },
-  double: { zh: '要跳两次才够得着——侠客的「技」可在空中再跃一次。', en: 'It takes two jumps — the Swordsman\'s skill lets you leap again in mid-air.' },
+  high: { zh: '铜钱悬得太高——道童、大橘跳得高；侠客的绝技「轻功」可二段跳。', en: 'Too high to reach — the Taoist Child and Big Ginger jump higher; the Swordsman\'s skill gives a double jump.' },
+  double: { zh: '要跳两次才够得着——侠客的绝技「轻功」可在空中再跃一次。', en: 'It takes two jumps — the Swordsman\'s skill lets you leap again in mid-air.' },
   glide: { zh: '铜钱悬在半空，要一路不落才够得着——玉兔助跑一跃，缓缓飘去；道童的「御风符」、嫦娥的「奔月」能凌空。', en: 'It hangs far out over the drop and you must keep your height all the way — the Jade Rabbit floats there from a running jump; the Taoist Child\'s Wind Talisman or Chang\'e\'s To the Moon carries you through the air.' },
 };
 

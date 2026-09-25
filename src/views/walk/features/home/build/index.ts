@@ -65,8 +65,9 @@ const homeBuild = feature('home-build', (bag, ctx) => {
   bag.onDispose(ctx.onRegion((id) => {
     if (id !== 'home' || play.value.flags['home:welcome']) return;
     flag('home:welcome');
-    bag.later(1800, () => ctx.hud.toast('此地归你了。起屋种树，都由你。', 'This ground is yours now. Build and plant as you please.', 4200));
-    bag.later(6400, () => ctx.hud.toast('进园后点「营」字，或在门楼前营造。', 'Inside, tap 营 to build — or build from the gate.', 3800));
+    // (not once you are already building: the how-to would sit over the build screen)
+    bag.later(1800, () => { if (!mode.active) ctx.hud.toast('此地归你了。起屋种树，都由你。', 'This ground is yours now. Build and plant as you please.', 4200); });
+    bag.later(6400, () => { if (!mode.active) ctx.hud.toast('进园后点「营」字，或在门楼前营造。', 'Inside, tap 营 to build — or build from the gate.', 3800); });
   }));
 
   if (import.meta.env.DEV) {

@@ -105,21 +105,28 @@ export function scorePoem(p: Poem, place: VersePlace): number {
   else s += Math.min(2, count(text, SEASON_WORDS[place.season]) * 0.8);
   s -= Math.min(3, count(text, OFF_SEASON[place.season]) * 1.5);
   // the place
+  let here = 0;
   if (place.region) {
-    s += Math.min(4.5, count(text, REGION_WORDS[place.region]) * 1.5);
+    here += Math.min(4.5, count(text, REGION_WORDS[place.region]) * 1.5);
     const plant = REGION_PLANT[place.region];
-    if (plant && p.plants?.includes(plant as never)) s += 3;
-    if (place.region === 'garden' && (p.themes?.includes('garden') || p.plants?.length)) s += 1.5;
-    if (place.region === 'lake' && p.themes?.includes('water')) s += 1.5;
-  } else s += Math.min(2, count(text, ROAD_WORDS) * 1);
+    if (plant && p.plants?.includes(plant as never)) here += 3;
+    if (place.region === 'garden' && (p.themes?.includes('garden') || p.plants?.length)) here += 1.5;
+    if (place.region === 'lake' && p.themes?.includes('water')) here += 1.5;
+  } else here += Math.min(2, count(text, ROAD_WORDS) * 1);
+  s += here;
   // the hour
   const hk = hourKind(place.hour, place.night);
-  s += Math.min(3, count(text, HOUR_WORDS[hk]) * 1.2);
+  const h = ((place.hour % 24) + 24) % 24;
+  // a dawn poem (鸡声茅店月, 春眠不觉晓) belongs to the early hours (4-9 h) only: outside them it drops out
+  if (p.themes?.includes('morning') && !(h >= 4 && h < 10 && hk !== 'night')) return -60;
+  // by night the place leads: a night poem with no tie to where you stand gets only part of the
+  // hour's pull, so each place opens with a night of its own rather than the same 夜雨 everywhere
   const nightPoem = !!(p.themes?.includes('night') || p.themes?.includes('moon'));
-  if (hk === 'night' && nightPoem) s += 2.5;
+  const generic = hk === 'night' && place.region !== null && here === 0;
+  s += Math.min(generic ? 1.2 : 3, count(text, HOUR_WORDS[hk]) * 1.2);
+  if (hk === 'night' && nightPoem) s += generic ? 0.8 : 2.5;
   if ((hk === 'day' || hk === 'dawn') && p.themes?.includes('night')) s -= 2;
   if (hk === 'dawn' && p.themes?.includes('morning')) s += 2.5;
-  if (hk === 'night' && p.themes?.includes('morning')) s -= 2;
   // precepts and prose (勤学 sayings) read less like a walk's verse
   if (p.themes?.length === 1 && p.themes[0] === 'diligence') s -= 1.5;
   if (clauses.length === 1) s -= 0.5;

@@ -59,7 +59,7 @@
   font-size: 12px; color: rgba(74, 68, 60, 0.62); letter-spacing: 0.08em; white-space: nowrap;
 }
 .cs-lockskill { margin: 0 0 8px; font-size: 13px; color: var(--ink-3); display: flex; align-items: center; gap: 8px; }
-@media (hover: none) { .cs-key { display: none; } }
+@media (hover: none), (pointer: coarse) { .cs-sname .cs-key { display: none; } }
 @media (min-width: 560px) {
   .cs-gifts { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); align-items: start; }
   .cs-ability { flex-direction: column; align-items: flex-start; gap: 4px; padding-top: 8px; }

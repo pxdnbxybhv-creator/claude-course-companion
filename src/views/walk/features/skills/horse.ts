@@ -92,7 +92,10 @@ export function makeGuan(bag: Bag): (env: SkillEnv) => Running {
     R.group.visible = R.shadow.visible = true;
     R.group.scale.setScalar(1);
     const dir = new THREE.Vector3();
-    ctx.hud.toast('赤兔来也！——摇杆驭马，疾跑飞驰，跳跃越涧；再按「技」（Q）或互动键下马', 'Red Hare! Steer with the stick, run to gallop, jump to leap; the skill key (Q) or the action button to get down', 3600);
+    // the skill button shows 马 on a phone; on a keyboard it is Q (and E the action key)
+    const touch = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } })();
+    if (touch) ctx.hud.toast('赤兔来也！——摇杆驭马，推到尽头飞驰，「跃」越涧；再点「马」或互动键下马', 'Red Hare! Steer with the stick, push to the edge to gallop, 跃 to leap; tap 马 again or the action button to get down', 3600);
+    else ctx.hud.toast('赤兔来也！——驭马前行，疾跑飞驰，跳跃越涧；再按 Q 或 E 下马', 'Red Hare! Ride on, run to gallop, jump to leap; Q again or E to get down', 3600);
     const mount = () => {
       if (P.isFrozen) {
         // something else took him meanwhile (a game, a boat, a card): Red Hare turns and goes

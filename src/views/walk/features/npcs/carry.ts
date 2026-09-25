@@ -8,7 +8,7 @@ import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { CharacterId } from '../../../../data/characters';
 import { CHARACTER } from '../../../../data/characters';
-import { play, flag } from '../../../../app/play';
+import { play, flag, playResets } from '../../../../app/play';
 import { Bag, feature, glowTexture, inked, loadBrush, propMat, reducedMotion, tr } from '../kit';
 import { merge, part } from '../geo';
 import { busy } from '../minigames/ui';
@@ -48,6 +48,8 @@ function loadCarry(): Carry {
 }
 
 let carry: Carry = loadCarry();
+/** The progress resets this copy has seen (an erase in Settings clears the browser's copy too). */
+let carryResets = playResets();
 const listeners = new Set<() => void>();
 
 function save() {
@@ -227,6 +229,7 @@ function kiteGeometry(ctx: WorldCtx): T.Mesh {
 
 export const carryFeature = feature('npc-carry', async (bag, ctx) => {
   const { THREE } = ctx;
+  if (carryResets !== playResets()) { carryResets = playResets(); carry = loadCarry(); }
   const still = reducedMotion();
   const props = buildProps(bag, ctx);
   const holder = new THREE.Group();
@@ -341,7 +344,7 @@ export const carryFeature = feature('npc-carry', async (bag, ctx) => {
   const onChange = () => { recolorFlower(); render(); };
   listeners.add(onChange);
   bag.onDispose(() => listeners.delete(onChange));
-  // a code or another tab may hand you wares: look at the flags now and then
+  // another tab (or anything else that sets flags) may hand you wares: look at the flags now and then
   let flagsSeen = play.value.flags;
   render();
 

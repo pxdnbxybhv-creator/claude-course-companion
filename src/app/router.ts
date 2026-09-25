@@ -30,11 +30,20 @@ function parse(): Route {
 
 export const route = signal<Route>(parse());
 
+/**
+ * The route last asked for. A page transition captures the old page before it swaps, so `route`
+ * changes a moment (a slow frame) after the ask; a second ask in that moment must win, and it is
+ * this, not `route`, that the next ask compares against.
+ */
+let wanted: Route = route.value;
+
 if (typeof window !== 'undefined') {
   // Back/forward buttons: animate from the centre.
   window.addEventListener('hashchange', () => {
     const next = parse();
-    if (next !== route.value) transition(() => void (route.value = next));
+    if (next === wanted) return;
+    wanted = next;
+    transition(() => void (route.value = wanted));
   });
 }
 
@@ -43,9 +52,12 @@ if (typeof window !== 'undefined') {
  * there; keyboard activation spreads from the centre.
  */
 export function go(r: Route, from?: Origin | MouseEvent | PointerEvent | Event): void {
-  if (route.value === r) return;
+  if (wanted === r) return;
+  wanted = r;
   transition(() => {
-    route.value = r;
+    route.value = wanted;
+    // a later ask (the back button) came in before this one landed: it has the address bar
+    if (wanted !== r) return;
     // Keep the address bar in step without triggering a second transition.
     try {
       history.pushState(null, '', `#${r}`);

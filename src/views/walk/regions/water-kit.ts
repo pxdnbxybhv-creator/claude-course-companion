@@ -12,12 +12,12 @@ import { registerClearing, registerDeck, type Clearing, type Deck } from './wate
 export type Three = WorldCtx['THREE'];
 export const INK = '#1b1916';
 /**
- * What the night does to a built place's lit surfaces (a multiplier on their day colour): moonlight,
- * a clear indigo-lavender rather than a grey-blue wash. The core's night light stays fairly strong,
+ * What the night does to a built place's lit surfaces (a multiplier on their day colour): moonlit
+ * ivory — warm, never a grey-blue wash. The core's night light stays fairly strong,
  * so without it the white walls and pale paving of the towns stay day-bright on a dark land and the
  * lit windows (amber, emissive) have nothing to glow against.
  */
-export const NIGHT_SHADE = '#b7bbd6';
+export const NIGHT_SHADE = '#c0b8b8';
 
 export function reducedMotion(): boolean {
   try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }

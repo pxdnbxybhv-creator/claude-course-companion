@@ -308,8 +308,8 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   const geo = bag.add(new THREE.CylinderGeometry(1, 1.06, 0.08, 11));
   geo.translate(0, 0.01, 0);
   const smat = toon(bag, '#ddd1bb');
-  // by night the stones are the palest things on the lawn: moonlit, silver, not lavender
-  const stoneDay = smat.color.clone(), stoneNight = stoneDay.clone().multiply(new THREE.Color('#a2aab8'));
+  // by night the stones are the palest things on the lawn: moonlit ivory, not lavender or slate
+  const stoneDay = smat.color.clone(), stoneNight = stoneDay.clone().multiply(new THREE.Color('#aca8a4'));
   const stones = new THREE.InstancedMesh(geo, smat, list.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
   const col = new THREE.Color();

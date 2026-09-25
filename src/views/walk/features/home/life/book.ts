@@ -93,6 +93,10 @@ const extra = {
     cache = sanitize(raw);
     try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch { /* keep it in memory */ }
   },
+  reset: () => {
+    cache = empty();
+    try { localStorage.removeItem(KEY); } catch { /* keep it in memory */ }
+  },
 };
 const at = backupExtras.findIndex((b) => b.key === extra.key);
 if (at >= 0) backupExtras[at] = extra; else backupExtras.push(extra);

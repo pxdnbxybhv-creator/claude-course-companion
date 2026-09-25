@@ -19,7 +19,7 @@ const WOOD = '#7a4e32';
  * places' own (regions/water-kit.ts NIGHT_SHADE): without it the whitewash stays day-bright on a
  * dark land, and the lanterns have nothing to glow against.
  */
-const NIGHT_SHADE = new THREE.Color('#b7bbd6');
+const NIGHT_SHADE = new THREE.Color('#c0b8b8');
 const WHITE = new THREE.Color('#ffffff');
 
 /** Dims materials toward NIGHT_SHADE as night falls (only when the night has moved). */

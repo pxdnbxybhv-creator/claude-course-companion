@@ -292,4 +292,4 @@ export function resetHome(): void {
   home.value = emptyHome();
 }
 
-backupExtras.push({ key: 'home', get: exportHome, set: importHome });
+backupExtras.push({ key: 'home', get: exportHome, set: importHome, reset: resetHome });

@@ -3,7 +3,7 @@
 // the walker lights.
 import { describe, expect, it } from 'vitest';
 import { BUFFER, COYOTE, JumpGate, squashAt } from '../src/views/walk/world/jump';
-import { arrivalAt, findSpot, goodSpot, LIGHT_RADIUS, toLight, type SpotTest } from '../src/views/walk/world/wayfind';
+import { arrivalAt, findSpot, goodSpot, LIGHT_RADIUS, lightReach, toLight, type SpotTest } from '../src/views/walk/world/wayfind';
 import { HOME_PLOT, WAYPOINTS, REGION } from '../src/views/walk/map';
 import { terrain } from '../src/views/walk/world/terrain';
 
@@ -127,6 +127,11 @@ describe('waypoint steles', () => {
     expect(toLight(1.6, 0, list, (id) => id === 'b')?.id).toBe('a');
     expect(toLight(20, 0, list, () => false)).toBeNull();
     expect(toLight(0, LIGHT_RADIUS + 0.1, list, () => false)).toBeNull();
+    // a stele 4 m off the road lights for a walker on the road; never from further than 6 m
+    const road = [{ id: 'v', x: 4, z: 0, r: lightReach(4) }];
+    expect(toLight(0, 1, road, () => false)?.id).toBe('v');
+    expect(lightReach(0.5)).toBe(LIGHT_RADIUS);
+    expect(lightReach(22)).toBe(6);
   });
 
   it('every place has one stele, and the map\'s spots are on dry, level, reachable land', () => {

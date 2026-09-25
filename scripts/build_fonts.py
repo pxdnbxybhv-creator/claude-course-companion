@@ -17,7 +17,12 @@ src/**/*.{ts,tsx,css}, index.html and scripts/brush_chars.txt, plus ASCII and a 
 Outputs (fonts live under src/ so that Vite fingerprints them in the normal build and inlines
 them as data: URLs in the single-file build):
 
-  src/assets/fonts/wenkai.woff2        LXGW WenKai — every character the app itself uses
+  src/assets/fonts/wenkai.woff2        LXGW WenKai — every character the app itself uses, but for
+                                       those only the walk (src/views/walk/**) shows
+  src/assets/fonts/wenkai-walk.woff2   LXGW WenKai — the characters only the walk shows; declared
+                                       with their exact unicode-range, so the garden's first paint
+                                       does not pay for them (the walk loads it as it starts, via
+                                       src/views/walk/world/font-sample.ts, which this writes)
   src/assets/fonts/wenkai-common.woff2 LXGW WenKai — the most frequent Chinese characters not in
                                        the file above (for habit names the user types). Declared
                                        with a unicode-range, so browsers fetch it only on demand.
@@ -57,6 +62,9 @@ ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / '.cache' / 'fonts'
 OUT = ROOT / 'src' / 'assets' / 'fonts'
 CSS_OUT = ROOT / 'src' / 'styles' / 'fonts.css'
+WALK_DIR = ROOT / 'src' / 'views' / 'walk'
+# One character of the walk's WenKai file, for the walk to load it by (generated, not scanned).
+WALK_SAMPLE_OUT = WALK_DIR / 'world' / 'font-sample.ts'
 LICENSE_OUT = ROOT / 'public' / 'fonts'
 BRUSH_CHARS = ROOT / 'scripts' / 'brush_chars.txt'
 
@@ -166,7 +174,7 @@ def source_files() -> list[Path]:
     files = [ROOT / 'index.html']
     for ext in ('ts', 'tsx', 'css'):
         files += (ROOT / 'src').rglob(f'*.{ext}')
-    return [f for f in files if f.is_file() and f != CSS_OUT]
+    return [f for f in files if f.is_file() and f not in (CSS_OUT, WALK_SAMPLE_OUT)]
 
 
 def read_brush_chars() -> set[str]:
@@ -180,12 +188,25 @@ def read_brush_chars() -> set[str]:
     return out
 
 
+def text_of(f: Path) -> set[str]:
+    text = f.read_text(encoding='utf-8', errors='replace')
+    return {c for c in text if is_cjkish(ord(c)) or is_latin_ext(ord(c)) or c in BASE_PUNCT}
+
+
 def collect_used() -> set[str]:
     used: set[str] = set()
     for f in source_files():
-        text = f.read_text(encoding='utf-8', errors='replace')
-        used |= {c for c in text if is_cjkish(ord(c)) or is_latin_ext(ord(c)) or c in BASE_PUNCT}
+        used |= text_of(f)
     return used
+
+
+def collect_walk_only() -> set[str]:
+    """Characters found only under src/views/walk (the lazily loaded open world)."""
+    walk: set[str] = set()
+    rest: set[str] = set()
+    for f in source_files():
+        (walk if WALK_DIR in f.parents else rest).update(text_of(f))
+    return walk - rest
 
 
 def ascii_chars() -> set[str]:
@@ -390,13 +411,16 @@ def main() -> int:
     text_chars = used | base | ascii_chars()
     brush_display = read_brush_chars() | set(BASE_CJK) | ascii_chars()
     used_han = {c for c in used if is_han(ord(c))}
+    # what only the walk shows goes in a file of its own, fetched when the walk starts
+    walk_only = collect_walk_only() - read_brush_chars() - base - ascii_chars()
 
     if args.check:
         absent_file = OUT / 'absent.txt'
         known_absent = set(absent_file.read_text(encoding='utf-8')) if absent_file.exists() else set()
         problems = []
         for files, want in (
-            (['wenkai.woff2'], text_chars),
+            (['wenkai.woff2', 'wenkai-walk.woff2'], text_chars),
+            (['wenkai.woff2'], text_chars - walk_only),
             (['mashanzheng.woff2'], read_brush_chars()),
             (['mashanzheng.woff2', 'mashanzheng-ext.woff2'], used_han),
         ):
@@ -424,17 +448,25 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
 
-        # --- LXGW WenKai: core (everything the app uses) ----------------------------------------
-        core_cps = {ord(c) for c in text_chars}
+        # --- LXGW WenKai: core (everything the app uses but the walk's own text) -----------------
+        core_cps = {ord(c) for c in text_chars - walk_only}
         wk, core_cov = build_wenkai(core_cps, tmp, 'core')
         absent |= {chr(c) for c in core_cps - core_cov if is_cjkish(c)}
         sizes['wenkai.woff2'] = save_woff2(wk, OUT / 'wenkai.woff2')
         copyright_wk = wk['name'].getDebugName(0) or 'Copyright 2021-2024 LXGW'
 
+        # --- LXGW WenKai: what only the walk shows (lazy) --------------------------------------
+        walk_cps = {ord(c) for c in walk_only} - core_cov
+        walk_cov: set[int] = set()
+        if walk_cps:
+            wkw, walk_cov = build_wenkai(walk_cps, tmp, 'walk')
+            absent |= {chr(c) for c in walk_cps - walk_cov if is_cjkish(c)}
+            sizes['wenkai-walk.woff2'] = save_woff2(wkw, OUT / 'wenkai-walk.woff2')
+
         # --- LXGW WenKai: common characters for user-typed text (lazy) -------------------------
         freq = load_frequency()
-        common = {ord(c) for c in freq[:COMMON_TOP_N]} - core_cov
-        common |= {ord(c) for c in '，。、；：？！“”（）《》…—·'} - core_cov
+        common = {ord(c) for c in freq[:COMMON_TOP_N]} - core_cov - walk_cov
+        common |= {ord(c) for c in '，。、；：？！“”（）《》…—·'} - core_cov - walk_cov
         wkc, common_cov = build_wenkai(common, tmp, 'common')
         sizes['wenkai-common.woff2'] = save_woff2(wkc, OUT / 'wenkai-common.woff2')
 
@@ -488,11 +520,16 @@ def main() -> int:
         ' * Self-hosted, subsetted fonts (SIL Open Font License 1.1; see public/fonts/*-OFL.txt).\n'
         ' * Relative URLs, so Vite fingerprints the files (and inlines them in the single-file build).\n'
         ' * The faces with a unicode-range are downloaded only when one of their characters is shown:\n'
-        ' * wenkai-common = frequent hanzi for text the user types; mashanzheng-ext = the poems. */',
+        ' * wenkai-common = frequent hanzi for text the user types; wenkai-walk = the walk\'s own text;\n'
+        ' * mashanzheng-ext = the poems. */',
         font_face('LXGW WenKai', 'wenkai.woff2'),
-        font_face('LXGW WenKai', 'wenkai-common.woff2', urange=to_unicode_range(han - core_cov)),
-        font_face('Ma Shan Zheng', 'mashanzheng.woff2'),
+        # disjoint from wenkai-walk's range: a font load (document.fonts.load, or a glyph drawn)
+        # fetches every face whose range holds the character
+        font_face('LXGW WenKai', 'wenkai-common.woff2', urange=to_unicode_range(han - core_cov - walk_cov)),
     ]
+    if walk_cov:
+        faces.append(font_face('LXGW WenKai', 'wenkai-walk.woff2', urange=to_unicode_range(walk_cov)))
+    faces.append(font_face('Ma Shan Zheng', 'mashanzheng.woff2'))
     if msz_ext_cov:
         faces.append(font_face('Ma Shan Zheng', 'mashanzheng-ext.woff2', urange=to_unicode_range(han - msz_cov)))
     latin_range = to_unicode_range(latin)
@@ -504,17 +541,26 @@ def main() -> int:
     stale = OUT / 'mashanzheng-ext.woff2'
     if not msz_ext_cov and stale.exists():
         stale.unlink()
+    if not walk_cov and (OUT / 'wenkai-walk.woff2').exists():
+        (OUT / 'wenkai-walk.woff2').unlink()
+    sample = (
+        '// Generated by scripts/build_fonts.py (`npm run fonts`) — do not edit by hand.\n'
+        '// A character from wenkai-walk.woff2: loading it fetches the walk\'s own WenKai file.\n'
+        f"export const WENKAI_WALK_SAMPLE = '{chr(min((c for c in walk_cov if is_han(c)), default=min(walk_cov))) if walk_cov else ''}';\n"
+    )
+    if not WALK_SAMPLE_OUT.exists() or WALK_SAMPLE_OUT.read_text(encoding='utf-8') != sample:
+        WALK_SAMPLE_OUT.write_text(sample, encoding='utf-8')
     if not CSS_OUT.exists() or CSS_OUT.read_text(encoding='utf-8') != css:
         CSS_OUT.write_text(css, encoding='utf-8')
 
     # --- report ------------------------------------------------------------------------------
-    lazy = {'wenkai-common.woff2', 'mashanzheng-ext.woff2'}
+    lazy = {'wenkai-common.woff2', 'wenkai-walk.woff2', 'mashanzheng-ext.woff2'}
     print()
     for name, n in sizes.items():
         print(f'  {name:<24} {n / 1024:8.1f} KB{"  (on demand)" if name in lazy else ""}')
     eager = sum(n for k, n in sizes.items() if k not in lazy)
     print(f'  {"total":<24} {sum(sizes.values()) / 1024:8.1f} KB  ({eager / 1024:.1f} KB eager)')
-    print(f'  WenKai {len(core_cov)} + {len(common_cov)} code points; Ma Shan Zheng {len(msz_cov)} + {len(msz_ext_cov)}')
+    print(f'  WenKai {len(core_cov)} + {len(walk_cov)} (walk) + {len(common_cov)} code points; Ma Shan Zheng {len(msz_cov)} + {len(msz_ext_cov)}')
     if absent:
         print(f'  not in the source fonts (system fallback): {"".join(sorted(absent))}')
     return 0

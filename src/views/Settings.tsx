@@ -22,6 +22,27 @@ function stamp(): string {
   return today.value.replace(/-/g, '');
 }
 
+/** Inside a host page (an iframe): scripted downloads are blocked there, or dropped without a word. */
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+/** May this page write to the clipboard? A host page's permissions policy can forbid it. */
+function clipboardAllowed(): boolean {
+  type Policy = { allowsFeature(feature: string): boolean };
+  const d = document as Document & { permissionsPolicy?: Policy; featurePolicy?: Policy };
+  try {
+    const policy = d.permissionsPolicy ?? d.featurePolicy;
+    return !policy || policy.allowsFeature('clipboard-write');
+  } catch {
+    return true;
+  }
+}
+
 /** Script-driven download; silently does nothing where downloads are blocked (the UI always offers another way). */
 function download(blob: Blob, name: string): void {
   try {
@@ -393,7 +414,7 @@ type Confirm =
   | { kind: 'import'; info: BackupInfo }
   | { kind: 'demo' }
   | { kind: 'reset'; step: 1 | 2 }
-  | { kind: 'copy'; json: string }
+  | { kind: 'copy'; json: string; why?: 'download' }
   | { kind: 'paste' };
 
 function DataSection() {
@@ -413,6 +434,8 @@ function DataSection() {
     const r = await hostSave(name, json);
     if (r === 'saved') return void toast(t(`已保存 ${name}`, `Saved ${name}`));
     if (r === 'declined') return;
+    // embedded, a scripted download is refused: hand over the text instead
+    if (isEmbedded()) return setConfirm({ kind: 'copy', json, why: 'download' });
     download(new Blob([json], { type: 'application/json' }), name);
     toast(t('备份已开始下载；若无反应，请改用「复制」', 'Backup download started — if nothing happens, use Copy'), 3600);
   };
@@ -420,7 +443,7 @@ function DataSection() {
     const json = exportJSON();
     const fail = () => setConfirm({ kind: 'copy', json });
     try {
-      if (!navigator.clipboard?.writeText) return fail();
+      if (!navigator.clipboard?.writeText || !clipboardAllowed()) return fail();
       navigator.clipboard.writeText(json).then(() => toast(t('备份已复制到剪贴板', 'Backup copied to the clipboard')), fail);
     } catch {
       fail();
@@ -485,7 +508,7 @@ function DataSection() {
         <button class="btn btn-small" onClick={() => setConfirm({ kind: 'demo' })}>{t('载入', 'Load')}</button>
       </Row>
       <CodeRow />
-      <Row title={<span class="set-danger-text">{t('清空一切', 'Erase everything')}</span>} sub={t('删除所有习惯与记录；设置保留', 'Deletes all habits and records; settings are kept')} wrap>
+      <Row title={<span class="set-danger-text">{t('清空一切', 'Erase everything')}</span>} sub={t('删除所有习惯与记录，连同入画中的同伴、任务、铜钱与家园；设置保留', 'Deletes all habits and records, and the walk’s companions, quests, coins and homestead; settings are kept')} wrap>
         <button class="btn btn-small set-danger" onClick={() => setConfirm({ kind: 'reset', step: 1 })}>{t('清空', 'Erase')}</button>
       </Row>
 
@@ -521,7 +544,11 @@ function DataSection() {
       <Sheet open={confirm?.kind === 'copy'} onClose={close} title={t('复制备份', 'Copy backup')} label={t('复制备份', 'Copy backup')}>
         {confirm?.kind === 'copy' && (
           <div class="set-sheet">
-            <p>{t('无法自动复制。文本已选中，请手动复制并妥善保存。', 'Couldn’t copy automatically. The text is selected — copy it by hand and keep it somewhere safe.')}</p>
+            <p>
+              {confirm.why === 'download'
+                ? t('此处无法下载文件。文本已选中，请手动复制并妥善保存。', 'Files can’t be downloaded here. The text is selected — copy it by hand and keep it somewhere safe.')
+                : t('无法自动复制。文本已选中，请手动复制并妥善保存。', 'Couldn’t copy automatically. The text is selected — copy it by hand and keep it somewhere safe.')}
+            </p>
             <textarea ref={copyRef} class="set-json" readOnly value={confirm.json} rows={8} onFocus={(e) => e.currentTarget.select()} />
             <div class="set-sheet-btns">
               <button class="btn btn-primary" onClick={close}>{t('好', 'Done')}</button>
@@ -544,7 +571,7 @@ function DataSection() {
       <Sheet open={confirm?.kind === 'reset'} onClose={close} title={t('清空一切', 'Erase everything')} label={t('确认清空', 'Confirm erase')}>
         {confirm?.kind === 'reset' && confirm.step === 1 && (
           <div class="set-sheet">
-            <p>{t(`园中 ${plants} 株、${checkins} 次打卡、所有日记与焚香记录都将删除。设置会保留。`, `All ${plants} plants, ${checkins} check-ins, notes and incense records will be deleted. Settings are kept.`)}</p>
+            <p>{t(`园中 ${plants} 株、${checkins} 次打卡、所有日记与焚香记录，以及入画中的同伴、任务、铜钱与家园，都将删除。设置会保留。`, `All ${plants} plants, ${checkins} check-ins, notes and incense records, and the walk’s companions, quests, coins and homestead, will be deleted. Settings are kept.`)}</p>
             <p class="muted">{t('建议先导出一份备份。', 'Consider exporting a backup first.')}</p>
             <div class="set-sheet-btns">
               <button class="btn" onClick={exportFile}>{t('先导出备份', 'Export backup first')}</button>

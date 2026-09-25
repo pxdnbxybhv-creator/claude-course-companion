@@ -127,6 +127,26 @@ describe('VerseDeck', () => {
     expect(nightShare(true)).toBeGreaterThan(nightShare(false));
   });
 
+  it('keeps dawn poems to the early hours, and gives each place a night of its own', () => {
+    const regions = ['garden', 'village', 'lake', 'bamboo', 'plum', 'mountain', 'home'] as const;
+    for (const p of POEMS.filter((q) => q.themes?.includes('morning'))) {
+      for (const region of regions) {
+        expect(scorePoem(p, { region, season: 'autumn', hour: 14, night: false })).toBeLessThanOrEqual(-50);
+        expect(scorePoem(p, { region, season: 'autumn', hour: 23, night: true })).toBeLessThanOrEqual(-50);
+      }
+    }
+    // the poem each place opens with most often by night: not one shared night poem everywhere
+    const favourite = (region: (typeof regions)[number]) => {
+      const c = new Map<string, number>();
+      for (let seed = 1; seed <= 120; seed++) {
+        const t = new VerseDeck(seed * 7919).pickPoem({ region, season: 'autumn', hour: 23, night: true }).title;
+        c.set(t, (c.get(t) ?? 0) + 1);
+      }
+      return [...c].sort((a, b) => b[1] - a[1])[0][0];
+    };
+    expect(new Set(regions.map(favourite)).size).toBeGreaterThanOrEqual(5);
+  });
+
   it('gives the poet whole couplets, then moves on to another poem', () => {
     const deck = new VerseDeck(9);
     const a = deck.couplet(places[1]);
@@ -191,6 +211,23 @@ describe('the painter’s crane', () => {
     expect(r.region).toBe('plum');
     const all: Discovery = { waypointOpen: () => true, encounterMet: () => true, visited: () => true };
     expect(craneTarget({ x: 3, z: 4 }, all).kind).toBe('none');
+  });
+
+  it('leads to a 奇遇 that can happen now, elsewhere; one whose hour has not come only as a last resort', () => {
+    // at night in the garden: the butterfly (a sunny afternoon, in this very garden) is never the target
+    const night: Discovery = { ...none, waypointOpen: () => true, visited: () => true, here: 'garden', canHappen: (id) => ENCOUNTERS.find((x) => x.id === id)!.hintZh.includes('夜') };
+    const t = craneTarget({ x: 0, z: 20 }, night);
+    expect(t.kind).toBe('encounter');
+    expect(t.region).not.toBe('garden');
+    expect(t.later).toBe(false);
+    expect(t.hintZh).toContain('夜');
+    // nothing can happen now: a place never visited comes first, then a 奇遇 for later
+    const never: Discovery = { ...none, waypointOpen: () => true, here: 'garden', canHappen: () => false, visited: (id: RegionId) => id !== 'plum' };
+    expect(craneTarget({ x: 0, z: 20 }, never).region).toBe('plum');
+    const later = craneTarget({ x: 0, z: 20 }, { ...never, visited: () => true });
+    expect(later.kind).toBe('encounter');
+    expect(later.later).toBe(true);
+    expect(later.region).not.toBe('garden');
   });
 
   it('only ever names a real place', () => {

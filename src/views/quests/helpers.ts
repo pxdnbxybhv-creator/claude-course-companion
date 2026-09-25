@@ -197,7 +197,7 @@ export function encounterDay(p: PlayState, id: string): DateKey | undefined {
 
 /**
  * Today's takings. The total is what app/play.ts counted as income today (daily count `earned`:
- * every rise in the purse, but never a refund or a code). The rows break it down where the play
+ * every rise in the purse, but never a refund). The rows break it down where the play
  * record can tell: the games (what each paid today), today's errands and quests, 奇遇 met today —
  * biggest first — and then one 「其他」 row for the rest (real-life check-ins and incense, finds on
  * roofs and poles, the neighbours' tips, the homestead, the companions' skills, 奇遇 bonuses).

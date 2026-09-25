@@ -130,7 +130,10 @@
   top: calc(env(safe-area-inset-top) + 66px);
   left: 50%;
   transform: translateX(-50%);
-  max-width: min(92vw, 440px);
+  /* its own width (left: 50% alone would cap it at half the screen), up to the screen less its gutters */
+  width: max-content;
+  max-width: min(calc(100vw - 32px), 440px);
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -141,10 +144,16 @@
   font-size: 14px;
   letter-spacing: 0.04em;
   animation: walk-rise 0.45s var(--ease);
-  pointer-events: auto;
+  /* over the features' chips (今日, 行囊 live in .walk-layer), but taps go through to them */
+  z-index: 4;
+  pointer-events: none;
 }
 .walk-banner ~ .walk-toast { top: calc(env(safe-area-inset-top) + 100px); }
-.walk-toast button { color: #f0c9a0; border-bottom: 1px solid currentColor; font-size: 14px; white-space: nowrap; }
+.walk-toast button { color: #f0c9a0; border-bottom: 1px solid currentColor; font-size: 14px; white-space: nowrap; pointer-events: auto; }
+/* narrow screens: the toast would reach the 今日 chip on the left; it drops below that row */
+@media (max-width: 700px) {
+  .walk-toast { top: calc(env(safe-area-inset-top) + 104px); }
+}
 @keyframes walk-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
 /* ---------- prompt */
@@ -595,7 +604,8 @@
 
 /* ---------- the purse: coins beside the way out; new coins float up from it */
 .walk-left { display: flex; gap: 8px; align-items: center; }
-.walk-purse { position: relative; padding: 0 12px; gap: 0; font-size: 15px; pointer-events: none; }
+.walk-purse { position: relative; padding: 0 12px; gap: 0; font-size: 15px; cursor: pointer; }
+.walk-purse:disabled { opacity: 1; color: var(--walk-ink); cursor: default; }
 .walk-purse .coin-badge { gap: 6px; }
 .walk-purse-gain {
   position: absolute;
@@ -779,6 +789,24 @@
   .walk-purse { padding: 0 10px; font-size: 14px; }
   .walk-leave { padding: 0 12px; }
 }
+/* narrow screens: the 今日 chip sits right under the purse, so new coins float up at its right-hand
+   end, clear of that chip */
+@media (max-width: 700px) {
+  .walk-purse-gain { left: auto; right: -0.9em; margin-left: 0; }
+}
+
+/* ---------- 钱囊 · the purse sheet (from the purse chip) */
+.walk-purse-sheet { display: flex; flex-direction: column; gap: 10px; padding-bottom: 6px; }
+.walk-purse-n { display: flex; align-items: baseline; gap: 6px; margin: 0; font-size: 26px; }
+.walk-purse-n > span:last-child { font-size: 14px; color: var(--ink-3, #6a5f50); }
+.walk-purse-today { margin: 0; font-size: 14px; color: var(--ink-3, #6a5f50); }
+.walk-purse-today.is-up { color: #9a6a12; }
+.walk-purse-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.walk-purse-rows li { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed var(--line, rgba(27, 25, 22, 0.16)); }
+.walk-purse-rows b { font-weight: 600; color: #9a6a12; }
+.walk-purse-how { margin: 0; font-size: 14px; line-height: 1.65; }
+.walk-purse-how b { font-weight: 600; margin-right: 8px; }
+.walk-purse-book { align-self: flex-start; margin-top: 4px; }
 @media (prefers-reduced-motion: reduce) {
   .walk-skill.is-active { animation: none; box-shadow: 0 0 0 4px rgba(255, 184, 107, 0.55); }
   .walk-purse-gain { animation-duration: 1.2s; }

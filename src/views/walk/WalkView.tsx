@@ -4,8 +4,9 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { go } from '../../app/router';
 import { useT } from '../../app/i18n';
-import { lang as langSig, setSettings, state as appState } from '../../app/store';
-import { play } from '../../app/play';
+import { lang as langSig, setSettings, state as appState, today } from '../../app/store';
+import { ERRAND_COINS, play } from '../../app/play';
+import { ledgerToday } from '../quests/helpers';
 import { CoinBadge, fmtCoins } from '../../ui/coins';
 import { Sheet, Segmented } from '../../ui/kit';
 import { toLunar, festivalsOn as coreFestivals } from '../../core/lunar';
@@ -67,6 +68,7 @@ export function WalkView() {
   const [festival, setFestival] = useState<FestivalKey | null>(queryFestival);
   const [time, setTime] = useState<TimeMode>('now');
   const [sheet, setSheet] = useState(false);
+  const [purseOpen, setPurseOpen] = useState(false);
   const [hint, setHint] = useState(() => !readHintSeen());
   const [touch] = useState(coarse);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -251,13 +253,16 @@ export function WalkView() {
 
   // pause walking while a card, a dialogue, the map or a picker is open
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || mapOpen || charOpen || !!dialog);
-  }, [card, sheet, phase, mapOpen, charOpen, dialog]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog]);
 
+  // held by a game, a boat or the homestead's building (not by a skill's own mount, 关公's 赤兔: the
+  // skill button stays up then, and travel simply sets him down)
+  const heldByOther = frozen && !skillUi;
   // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
   // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready' || card || dialog || sheet || charOpen || frozen || mapOpen) return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -266,7 +271,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog, sheet, charOpen, frozen, mapOpen]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -315,6 +320,9 @@ export function WalkView() {
   // the skills feature hides the button itself while a game or a boat holds the walker; on its own
   // mount (Red Hare) it stays, to get off again
   const showSkill = phase === 'ready' && !!skillUi && !card && !dialog && !mapOpen && !charOpen;
+  // the map and the companions wait, as the M key does, while someone is speaking, a card is up or a
+  // game or the homestead's building holds the walker (travelling would strand what is open)
+  const busy = phase !== 'ready' || !!dialog || !!card || heldByOther;
   const lunar = toLunar(new Date());
   const todayFest = coreFestivals(new Date())[0];
   const preview = festival ? FESTIVALS.find((f) => f.key === festival) : null;
@@ -331,10 +339,10 @@ export function WalkView() {
           <button type="button" class="walk-chip walk-leave" onClick={leave}>
             <span aria-hidden="true">‹</span> {t('出画', 'Leave')}
           </button>
-          <span class="walk-chip walk-purse" role="status" aria-live="polite">
-            <CoinBadge size={17} />
+          <button type="button" class="walk-chip walk-purse" disabled={busy} onClick={(e) => { blurAfter(e); setPurseOpen(true); }} aria-haspopup="dialog" title={t('钱囊', 'Purse')}>
+            <span role="status" aria-live="polite"><CoinBadge size={17} /></span>
             {gains.map((g) => <span key={g.id} class="walk-purse-gain num" style={{ '--lane': String(g.lane) }} aria-hidden="true">+{fmtCoins(g.n)}</span>)}
-          </span>
+          </button>
         </div>
         <div class="walk-title">
           <span class={lang === 'zh' ? 'brush' : 'latin'}>{t('入画', 'Into the Painting')}</span>
@@ -344,11 +352,11 @@ export function WalkView() {
           </small>
         </div>
         <div class="walk-tools">
-          <button type="button" class="walk-chip walk-tool" onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('角色', 'Characters')} title={t('角色', 'Characters')}>
+          <button type="button" class="walk-chip walk-tool" disabled={busy} onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('同伴', 'Companions')} title={t('同伴', 'Companions')}>
             <span class="brush" aria-hidden="true">{CHARACTER[play.value.character].zh.slice(0, 1)}</span>
-            <span class="walk-tool-label">{t('角色', 'Who')}</span>
+            <span class="walk-tool-label">{t('同伴', 'Companions')}</span>
           </button>
-          <button type="button" class="walk-chip walk-tool walk-travel" disabled={phase !== 'ready'} onClick={(e) => { blurAfter(e); setMapOpen(true); }} aria-haspopup="dialog" aria-label={t('舆图 · 传送', 'Map · travel')} title={t('舆图 · 传送 (M)', 'Map · travel (M)')}>
+          <button type="button" class="walk-chip walk-tool walk-travel" disabled={busy} onClick={(e) => { blurAfter(e); setMapOpen(true); }} aria-haspopup="dialog" aria-label={t('舆图 · 传送', 'Map · travel')} title={t('舆图 · 传送 (M)', 'Map · travel (M)')}>
             <span class="brush" aria-hidden="true">驿</span>
             <span class="walk-tool-label">{t('传送', 'Travel')}</span>
           </button>
@@ -454,7 +462,8 @@ export function WalkView() {
           {touch ? (
             <span>
               {t('摇杆行走，推到尽头或点「疾」奔跑', 'Joystick to walk; push to the edge or tap 疾 to run')}
-              <br />{t('「跃」跳上石栏屋檐 · 「技」角色绝技', '跃 jumps onto rails and eaves · 技 is your companion’s skill')}
+              {/* the skill button shows the companion's own glyph (题, 剑, 符…), never the word 技 */}
+              <br />{t(`「跃」跳上石栏屋檐 · 金圈「${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph}」是同伴绝技`, `跃 jumps onto rails and eaves · the gold-ringed ${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph} is your companion’s skill`)}
               <br />{t('点亮驿碑后，可从「驿」舆图传送', 'Light a waypoint stele, then travel from the 驿 map')}
             </span>
           ) : (
@@ -509,10 +518,16 @@ export function WalkView() {
           world={worldRef.current}
           mod={worldModule}
           onClose={() => setMapOpen(false)}
-          onTravel={(id) => { setMapOpen(false); void worldRef.current?.travel(id); }}
+          onTravel={(id) => {
+            setMapOpen(false);
+            // nobody is left talking to thin air: whatever was still being asked is answered first
+            setDialogs((ds) => { for (const d of ds) d.resolve(-1); return []; });
+            void worldRef.current?.travel(id);
+          }}
         />
       )}
       <CharacterSelect open={charOpen} onClose={() => setCharOpen(false)} />
+      <PurseSheet open={purseOpen} onClose={() => setPurseOpen(false)} />
 
       {/* --- a small hanging scroll */}
       {card && (
@@ -667,6 +682,43 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 钱囊 — the purse chip opens this: what is in it, what came in today and from where, where coins come
+ * from in one line, and the way to the quest book (its 钱囊 and 奇遇录 in full).
+ */
+function PurseSheet(props: { open: boolean; onClose(): void }) {
+  const t = useT();
+  if (!props.open) return null;
+  const { rows, total } = ledgerToday(play.value, today.value);
+  return (
+    <Sheet open onClose={props.onClose} title={t('钱囊', 'Purse')} label={t('钱囊', 'Purse')}>
+      <div class="walk-purse-sheet">
+        <p class="walk-purse-n"><CoinBadge size={22} /><span>{t('文', 'coins')}</span></p>
+        <p class={'walk-purse-today' + (total > 0 ? ' is-up' : '')}>
+          {total > 0 ? t(`今日进账 +${fmtCoins(total)} 文`, `Today +${fmtCoins(total)}`) : t('今日尚无进账', 'Nothing in yet today')}
+        </p>
+        {rows.length > 0 && (
+          <ul class="walk-purse-rows" aria-label={t('今日进账', "Today's takings")}>
+            {rows.map((r) => <li key={r.key}><span>{t(r.zh, r.en)}</span><b class="num">+{fmtCoins(r.coins)}</b></li>)}
+          </ul>
+        )}
+        <p class="walk-purse-how">
+          <b>{t('钱从何来', 'Where coins come from')}</b>
+          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，都能进账。`,
+            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips and the homestead's harvest.`)}
+        </p>
+        <p class="walk-purse-how">
+          <b>{t('钱往何处', 'What coins are for')}</b>
+          {t('家园起屋、种树、养宠，水乡摊上买些小玩意。', 'The homestead (houses, trees, pets) and the water-town stalls.')}
+        </p>
+        <button type="button" class="btn walk-purse-book" onClick={(e) => { props.onClose(); go('quests', e); }}>
+          {t('任务簿 · 钱囊与奇遇录', 'Quest book · purse and encounters')}<span aria-hidden="true"> ›</span>
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

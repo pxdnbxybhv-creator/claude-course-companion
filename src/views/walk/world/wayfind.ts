@@ -77,13 +77,24 @@ export function arrivalAt(stele: XZ, face: XZ, walkable: (x: number, z: number) 
   return { x, z, heading: Math.atan2(face.x - x, face.z - z) };
 }
 
-/** The waypoint the walker is close enough to light (the nearest unlit one within reach), or null. */
-export function toLight<T extends XZ & { id: string }>(x: number, z: number, list: readonly T[], lit: (id: string) => boolean, reach = LIGHT_RADIUS): T | null {
-  let best: T | null = null, bd = reach;
+/**
+ * How near one stele lights: at least LIGHT_RADIUS, and far enough that walking the road it stands
+ * beside (`pathDist` from that road's centre line) lights it without a detour; never beyond 6 m.
+ */
+export function lightReach(pathDist: number): number {
+  return Math.min(6, Math.max(LIGHT_RADIUS, pathDist + 1.8));
+}
+
+/**
+ * The waypoint the walker is close enough to light (the nearest unlit one within reach — its own `r`
+ * when it has one), or null.
+ */
+export function toLight<T extends XZ & { id: string; r?: number }>(x: number, z: number, list: readonly T[], lit: (id: string) => boolean, reach = LIGHT_RADIUS): T | null {
+  let best: T | null = null, bd = Infinity;
   for (const w of list) {
     if (lit(w.id)) continue;
     const d = Math.hypot(w.x - x, w.z - z);
-    if (d <= bd) { bd = d; best = w; }
+    if (d <= (w.r ?? reach) && d <= bd) { bd = d; best = w; }
   }
   return best;
 }

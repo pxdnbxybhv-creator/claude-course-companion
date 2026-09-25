@@ -16,15 +16,16 @@ interface Palette {
 
 // A warm living painting: golden paper light by day under a pale 花青 (indigo-teal) wash of sky,
 // rose-gold at dawn, amber at dusk (a bright bounce from below, so white walls glow apricot, not
-// tan); warm ink-brown from below (never blue-grey). Night is deep indigo with silver moonlight on
-// things — more moon and less flat sky fill, so the land has a lit side and a shaded one — and a
-// warm-brown bounce from below; dark enough near the ground that the lanterns and the lit windows
-// glow amber against it — cosy, never a flat grey-blue wash.
+// tan); warm ink-brown from below (never blue-grey). Night is a deep indigo sky over a warm dark:
+// an ivory moon on things — more moon and less flat sky fill, so the land has a lit side and a
+// shaded one — a lavender (not blue) sky fill and a warm-brown bounce from below, so lawns, walls and
+// paving read umber and ivory and the blue stays in the sky and the water; dark enough near the
+// ground that the lanterns and the lit windows glow amber against it — cosy, never a teal wash.
 const PALETTES: Record<TimeOfDay, Palette> = {
   dawn: { top: '#a0bccb', horizon: '#f4d9ba', fog: '#ecdcc8', hemiSky: '#fbeee2', hemiGround: '#8f7866', hemi: 2.0, sun: '#ffdcb4', sunI: 1.25, tint: '#faefe4', glow: '#f7a468' },
   day: { top: '#97bfcc', horizon: '#efebdf', fog: '#e7e6d8', hemiSky: '#fff8ee', hemiGround: '#a88a68', hemi: 2.05, sun: '#fff3de', sunI: 1.4, tint: '#fffaf2', glow: '#fff0c8' },
   dusk: { top: '#7b8db5', horizon: '#f2c59a', fog: '#e8cfb6', hemiSky: '#f6e9dc', hemiGround: '#957866', hemi: 2.15, sun: '#ffd3a6', sunI: 1.25, tint: '#f6e5d3', glow: '#f2844a' },
-  night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#a0b0d6', hemiGround: '#6a4f3c', hemi: 1.2, sun: '#e4eaff', sunI: 0.9, tint: '#a0a7c8', glow: '#efe2bc' },
+  night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#aaa8c4', hemiGround: '#74553e', hemi: 1.2, sun: '#ece6da', sunI: 0.9, tint: '#aaa6bc', glow: '#efe2bc' },
 };
 
 /** Fog distances by day and by night: a light warm haze, a closer indigo dark. */

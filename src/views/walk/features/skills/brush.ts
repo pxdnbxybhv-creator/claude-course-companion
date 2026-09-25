@@ -16,6 +16,8 @@ import { WAYPOINTS, type RegionId } from '../../map';
 import { COLUMNS, PAVILION_Y, WALL, wallSegments } from '../../world/site';
 import { CELL, MODE } from './fx';
 import { craneTarget } from './logic';
+import { RULES } from '../encounters/logic';
+import { ENCOUNTER } from '../../../../data/encounters';
 import { HUE, TAU, clamp01, damp, easeOut, forward, type Running, type SkillEnv } from './env';
 import type { VerseLine } from './verses';
 import * as snd from './sound';
@@ -238,7 +240,11 @@ export function scholar(env: SkillEnv, inscriptions: Inscriptions): Running {
   const p = P.position;
   const size = 0.44, step = 0.4;
   const n = [...line.text].length;
-  const col = column(env, line, 0, p.x + fx0 * 0.7 + rx * 0.95, p.y + 0.55 + step * (n - 1), p.z + fz0 * 0.7 + rz * 0.95, size);
+  // at his right shoulder, a little ahead — unless a pillar, a wall or a prop stands there (the
+  // 牌坊 at the water town's stele): then his left, or further ahead
+  const spots: [number, number][] = [[0.7, 0.95], [0.7, -0.95], [1.3, 0.6], [1.3, -0.6], [1.6, 0]];
+  const [ahead, side] = spots.find(([a, sd]) => ctx.isWalkable(p.x + fx0 * a + rx * sd, p.z + fz0 * a + rz * sd)) ?? spots[0];
+  const col = column(env, line, 0, p.x + fx0 * ahead + rx * side, p.y + 0.55 + step * (n - 1), p.z + fz0 * ahead + rz * side, size);
   const surface = surfaceNear(ctx, p.x, p.z);
   ctx.hud.toast(`「${line.text}」 —— ${attributionZh(line.poem)}`, `“${line.text}” — ${line.poem.authorEn}`, 3600);
   let t0 = -1;
@@ -408,17 +414,26 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
     waypointOpen: (id) => waypointOpen(pv, id),
     encounterMet: (id) => encounterMet(pv, id),
     visited: (id: RegionId) => id === here || !!pv.flags[`visit:${id}`],
+    here,
+    // the 奇遇's own place and hour (the butterfly only on a sunny afternoon, the moon on the lake by night)
+    canHappen: (id) => {
+      const rule = RULES[id], def = ENCOUNTER[id];
+      if (!rule || !def || def.region === 'any') return true;
+      return rule.when({ day: todayKey(), tod: ctx.env.tod, hour: ctx.env.hour, night: ctx.sky.isNight(), season: ctx.env.season, moon: ctx.env.moonPhase, region: def.region, who: P.character, festivals: ctx.env.festivals });
+    },
   });
   P.emote('skill');
   snd.paper(6, 0.6);
   snd.flap(0.5);
   const { THREE } = ctx;
   const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ'), v = new THREE.Vector3(), s = new THREE.Vector3(1.7, 1.7, 1.7);
-  const [f0x, f0z] = forward(P.heading);
-  let x = p0.x + f0x * 0.5, z = p0.z + f0z * 0.5, y = p0.y + 1.25;
-  let heading = P.heading;
-  const dist = Math.hypot(target.x - x, target.z - z);
   const circling = target.kind === 'none';
+  // it leaves his hand on the side it will fly to (never back toward the camera behind him)
+  const toward = circling ? P.heading : Math.atan2(target.x - p0.x, target.z - p0.z);
+  const [f0x, f0z] = forward(toward);
+  let x = p0.x + f0x * 0.5, z = p0.z + f0z * 0.5, y = p0.y + 1.25;
+  let heading = toward;
+  const dist = Math.hypot(target.x - x, target.z - z);
   const speed = Math.max(6.5, dist / 15);
   let travelled = 0, dotAt = 0.6;
   let phase: 'rise' | 'fly' | 'circle' | 'gone' = 'rise';
@@ -431,10 +446,13 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
   crane.setBeat(1);
   const metres = Math.round(dist / 5) * 5;
   if (target.kind === 'waypoint') ctx.hud.toast(`纸鹤飞向「${target.zh}」——那里的驿碑尚未点亮（约${metres}米）`, `The crane flies toward ${target.en} — a waypoint not yet lit (about ${metres} m)`, 4200);
+  else if (target.kind === 'encounter' && target.later) ctx.hud.toast(`纸鹤飞向${target.zh}，却说时候未到：${target.hintZh}`, `The crane flies toward the ${target.en}, but not yet: ${target.hintEn}`, 5200);
   else if (target.kind === 'encounter') ctx.hud.toast(`纸鹤飞向${target.zh}：${target.hintZh}`, `The crane flies toward the ${target.en}: ${target.hintEn}`, 4800);
   else if (target.kind === 'region') ctx.hud.toast(`纸鹤飞向「${target.zh}」——你还未曾去过（约${metres}米）`, `The crane flies toward ${target.en} — somewhere you have never been (about ${metres} m)`, 4200);
   else ctx.hud.toast('山水皆已入画——纸鹤绕你飞了一圈', 'Every place is already in your painting — the crane circles you once', 3600);
-  if (!circling) ctx.frameCamera(p0.x + (target.x - p0.x) / (dist || 1) * 14, p0.z + (target.z - p0.z) / (dist || 1) * 14, p0.y + 2.5, 1.8);
+  // turn the view the crane's way, a few metres ahead: the framing centres between the walker and
+  // this point, so a far one would swing the camera past him and leave him out of the picture
+  if (!circling) ctx.frameCamera(p0.x + f0x * 4.5, p0.z + f0z * 4.5, p0.y + 2.2, 1.8);
 
   // the flight outlives the skill: the painter walks on while the crane leads
   const scatter = (n: number) => {
@@ -497,7 +515,9 @@ export function painter(env: SkillEnv, crane: ReturnType<typeof paperCrane>): Ru
     }
     e.set(phase === 'fly' ? -0.08 : 0, heading, phase === 'circle' ? -0.35 : Math.sin(pt * 2.1) * 0.08);
     q.setFromEuler(e);
-    m.compose(v.set(x, y, z), q, s);
+    // never a great grey sheet across the lens: it folds away as it comes within 2.5 m of the camera
+    const near = clamp01((ctx.camera.position.distanceTo(v.set(x, y, z)) - 1.2) / 1.3);
+    m.compose(v, q, s.setScalar(1.7 * near));
     crane.mesh.setMatrixAt(0, m);
     crane.mesh.instanceMatrix.needsUpdate = true;
     crane.setBeat(phase === 'fly' && Math.sin(pt * 0.9) > 0.6 ? 0.25 : 1);

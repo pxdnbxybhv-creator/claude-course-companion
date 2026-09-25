@@ -52,11 +52,11 @@ export const LAWN: Record<Season, string> = { spring: '#a4cf9c', summer: '#9ac59
 
 /**
  * What the night does to the land (a multiplier on the lit ground): deep and dark, but keeping the
- * grass's own hue (a moonlit 黛 blue-green, not a flat slate), so the lanterns' amber pools and the
+ * grass's own hue (a moonlit olive-umber, never teal or slate), so the lanterns' amber pools and the
  * lit windows carry the warmth. The land and the lawn also darken their hollows by night (land.ts,
  * ground.ts), so the moonlit ground has a shape.
  */
-export const NIGHT_LAND = '#7790a0';
+export const NIGHT_LAND = '#83857c';
 
 /** Everything the world allocates goes in here so unmounting frees all GPU memory. */
 export class Bag {

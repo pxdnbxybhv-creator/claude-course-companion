@@ -65,6 +65,10 @@ export interface Discovery {
   waypointOpen(id: RegionId): boolean;
   encounterMet(id: string): boolean;
   visited(id: RegionId): boolean;
+  /** Could this 奇遇 happen now in its own place (its hour, day or night…)? Unknown: yes. */
+  canHappen?(id: string): boolean;
+  /** Where the walker stands: a 奇遇 of this place is not worth a crane (it is right here). */
+  here?: RegionId | null;
 }
 
 export interface CraneTarget {
@@ -77,15 +81,18 @@ export interface CraneTarget {
   /** For an encounter: its hint, to whisper where the crane leads. */
   hintZh?: string;
   hintEn?: string;
+  /** For an encounter: it cannot happen at this hour — come back when the hint says. */
+  later?: boolean;
 }
 
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /**
  * Where the painter's paper crane flies from `from`: the nearest waypoint stele not yet lit; else
- * the place of the nearest 奇遇 not yet met; else the nearest place never visited; else nowhere new
- * (it circles the painter). Places closer than `near` metres are passed over when anything farther
- * remains (the crane does not point at your feet).
+ * the place of the nearest 奇遇 not yet met that could happen there now; else the nearest place
+ * never visited; else the nearest 奇遇 not yet met whose hour has not come (`later`); else nowhere
+ * new (it circles the painter). A 奇遇 of the place you stand in is passed over, and places closer
+ * than `near` metres are passed over when anything farther remains (no pointing at your feet).
  */
 export function craneTarget(from: { x: number; z: number }, d: Discovery, near = 6): CraneTarget {
   const nearest = <T extends { x: number; z: number }>(list: T[]): T | null => {
@@ -101,16 +108,22 @@ export function craneTarget(from: { x: number; z: number }, d: Discovery, near =
   const wp = nearest(WAYPOINTS.filter((w) => !d.waypointOpen(w.id)));
   if (wp) return { kind: 'waypoint', x: wp.x, z: wp.z, region: wp.id, zh: wp.zh, en: wp.en };
 
-  const enc = nearest(ENCOUNTERS
-    .filter((e) => e.region !== 'any' && !d.encounterMet(e.id))
-    .map((e) => ({ e, x: REGION[e.region as RegionId].center.x, z: REGION[e.region as RegionId].center.z })));
-  if (enc) {
+  const unmet = ENCOUNTERS
+    .filter((e) => e.region !== 'any' && e.region !== d.here && !d.encounterMet(e.id))
+    .map((e) => ({ e, x: REGION[e.region as RegionId].center.x, z: REGION[e.region as RegionId].center.z }));
+  const toEncounter = (enc: (typeof unmet)[number], later: boolean): CraneTarget => {
     const r = REGION[enc.e.region as RegionId];
-    return { kind: 'encounter', x: enc.x, z: enc.z, region: r.id, zh: r.zh, en: r.en, hintZh: enc.e.hintZh, hintEn: enc.e.hintEn };
-  }
+    return { kind: 'encounter', x: enc.x, z: enc.z, region: r.id, zh: r.zh, en: r.en, hintZh: enc.e.hintZh, hintEn: enc.e.hintEn, later };
+  };
+  const now = (id: string) => (d.canHappen ? d.canHappen(id) : true);
+  const enc = nearest(unmet.filter((u) => now(u.e.id)));
+  if (enc) return toEncounter(enc, false);
 
   const reg = nearest(REGIONS.filter((r) => !d.visited(r.id)).map((r) => ({ r, x: r.center.x, z: r.center.z })));
   if (reg) return { kind: 'region', x: reg.x, z: reg.z, region: reg.r.id, zh: reg.r.zh, en: reg.r.en };
+
+  const wait = nearest(unmet);
+  if (wait) return toEncounter(wait, true);
 
   return { kind: 'none', x: from.x, z: from.z, region: null, zh: '', en: '' };
 }

@@ -298,6 +298,10 @@
    the pitch-pot score) and the touch jump / act buttons (the game has its own big button) */
 .walk:has(.walk-layer > .mg.is-game) .walk-arrive { visibility: hidden !important; }
 .walk:has(.walk-layer > .mg.is-game) .walk-buttons { visibility: hidden; pointer-events: none; }
+/* the joystick too, in the games that never read it (the boat rows with it; the pitch-pot aims with it) */
+.walk:has(.walk-layer > .mg.is-game:is(.mg-fishing, .mg-bell, .mg-lanterns)) .walk-stick { visibility: hidden; pointer-events: none; }
+/* while someone is speaking, the 今日 chip waits (its card would open over the dialogue) */
+.walk:has(.walk-say-wrap) .mg-errands { pointer-events: none; }
 
 /* ---------- 鱼谱, the fish album (from the ✕'s neighbour while fishing) */
 .mg-album-btn {

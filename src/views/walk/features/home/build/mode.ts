@@ -294,6 +294,13 @@ export class BuildMode {
     flag('home:built');
     const big = k.cat === 'house' || k.id === 'pavilion';
     if (big) ctx.hud.toast(`${k.zh}落成了。`, `The ${k.en.toLowerCase()} is up.`, 2600);
+    // a building (or anything dear) is bought once: back to the sheet, not a second one under the
+    // same button for a quick second tap
+    if (big || k.price >= 200) {
+      this.set({ mode: 'browse', kind: null, sel: null });
+      this.refresh();
+      return;
+    }
     // small things are laid in runs (a fence, a path): the ghost steps on
     if (k.w * k.d <= 2) {
       const f = footprint(k, this.rot);
