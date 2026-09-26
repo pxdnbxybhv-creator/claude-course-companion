@@ -46,6 +46,14 @@ const day = (m: Moment) => !m.night;
 const inR = (r: RegionId) => (m: Moment) => m.region === r;
 const who = (...ids: CharacterId[]) => (m: Moment) => (ids.includes(m.who) ? 1 : 0);
 
+/**
+ * Encounters no longer left to chance: they are met in a story of their own. 桃花源 (taohua) is the
+ * 桃源 story's (features/taoyuan/story.ts): the door opens with 拾得's letter, and B2 marks the
+ * encounter — so its 奇遇录 entry and first-time coins are still earned. They have no rule, rumour or
+ * scene here, and the director never sets them.
+ */
+export const STORY_ENCOUNTERS: readonly string[] = ['taohua'];
+
 export const RULES: Record<string, Rule> = {
   // 竹林 by day; the musician playing there brings him out for sure (see index.ts)
   zhiyin: { when: (m) => inR('bamboo')(m) && day(m), base: 0.35, step: 0.25, bonus: (m) => 0.3 * who('musician')(m) },
@@ -65,8 +73,6 @@ export const RULES: Record<string, Rule> = {
   hudie: { when: (m) => inR('garden')(m) && day(m) && m.tod === 'day' && m.hour >= 11, base: 0.35, step: 0.25, bonus: (m) => (m.season === 'spring' || m.season === 'summer' ? 0.15 : 0) },
   // 水乡 river by day
   kezhou: { when: (m) => inR('village')(m) && day(m), base: 0.3, step: 0.25, bonus: (m) => 0.15 * who('swordsman')(m) },
-  // behind the waterfall, by daylight; spring and those who know such places find it sooner
-  taohua: { when: (m) => inR('mountain')(m) && day(m), base: 0.25, step: 0.25, bonus: (m) => (m.season === 'spring' ? 0.2 : 0) + 0.15 * who('painter', 'poet', 'taoist')(m) },
   // the teahouse at night
   zuixian: { when: (m) => inR('village')(m) && m.night, base: 0.35, step: 0.25, bonus: (m) => 0.2 * who('poet')(m) },
   // on the road by day (not in the garden or at home); Qingming's drizzle is its season
@@ -209,7 +215,6 @@ export const RUMOURS: Record<string, { zh: string; en: string }> = {
   shijin: { zh: '听说有位客商在水乡丢了钱袋，急得团团转……', en: 'They say a merchant lost his purse in the water town and is beside himself…' },
   hudie: { zh: '园子里近来有只金蝶，午后总绕着花飞……', en: 'A golden butterfly has been circling the garden flowers in the afternoons…' },
   kezhou: { zh: '听说河上有人在船舷上刻记号，说是为了找剑……', en: 'They say a man on the river is cutting marks on his boat, to find a sword…' },
-  taohua: { zh: '山里的樵夫说，飞瀑后面，仿佛有光……', en: 'The woodcutters say that behind the waterfall there seems to be light…' },
   zuixian: { zh: '听说茶楼夜里来了位客人，喝的不是茶……', en: 'They say a guest came to the teahouse tonight, and it is not tea he drinks…' },
   mutong: { zh: '清明时节雨纷纷——路上或许会遇见骑牛吹笛的孩子。', en: 'In the drizzle of Qingming you may meet a child on an ox, playing the flute on the road.' },
   hanshan: { zh: '寺前有两位扫叶的僧人，一个拿扫帚，一个拿诗卷，总在笑……', en: 'Two monks sweep leaves before the temple — one with a broom, one with a scroll — always laughing…' },

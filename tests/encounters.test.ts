@@ -8,13 +8,16 @@ import { fileURLToPath } from 'node:url';
 import { ENCOUNTERS, ENCOUNTER } from '../src/data/encounters';
 import { CHARACTERS } from '../src/data/characters';
 import {
-  AGAIN, RULES, RUMOURS, chance, dayRoll, doneToday, emptyMemory, happensToday, misses, noteDone, noteMiss,
+  AGAIN, RULES, RUMOURS, STORY_ENCOUNTERS, chance, dayRoll, doneToday, emptyMemory, happensToday, misses, noteDone, noteMiss,
   noteRumour, rumourDue, rumourFor, sanitizeMemory, variantFor, type Moment,
 } from '../src/views/walk/features/encounters/logic';
 import { SCENES } from '../src/views/walk/features/encounters/scenes';
 
 const base: Moment = { day: '2026-09-25', tod: 'day', hour: 11, night: false, season: 'autumn', moon: 0.3, region: 'bamboo', who: 'scholar', festivals: [] };
 const at = (o: Partial<Moment>): Moment => ({ ...base, ...o });
+
+/** The encounters the chance director sets (桃花源 is met in the 桃源 story instead). */
+const CHANCE = ENCOUNTERS.filter((e) => !STORY_ENCOUNTERS.includes(e.id));
 
 /** A place and time where each encounter can happen. */
 const RIGHT: Record<string, Partial<Moment>> = {
@@ -27,7 +30,6 @@ const RIGHT: Record<string, Partial<Moment>> = {
   shijin: { region: 'village' },
   hudie: { region: 'garden', hour: 14 },
   kezhou: { region: 'village' },
-  taohua: { region: 'mountain' },
   zuixian: { region: 'village', tod: 'night', hour: 21.5, night: true },
   mutong: { region: null },
   hanshan: { region: 'mountain' },
@@ -41,8 +43,8 @@ function addDays(day: string, n: number): string {
 }
 
 describe('encounter rules', () => {
-  it('cover every encounter, with a scene, a rumour and a place and time', () => {
-    for (const e of ENCOUNTERS) {
+  it('cover every chance encounter, with a scene, a rumour and a place and time', () => {
+    for (const e of CHANCE) {
       expect(RULES[e.id], e.id).toBeTruthy();
       expect(SCENES[e.id], e.id).toBeTypeOf('function');
       expect(RUMOURS[e.id]?.zh, e.id).toBeTruthy();
@@ -96,7 +98,7 @@ describe('the daily chance', () => {
   });
 
   it('lets every encounter be found within a few days of trying', () => {
-    for (const e of ENCOUNTERS) {
+    for (const e of CHANCE) {
       // over many starting days: go to the right place at the right time daily, count the tries
       let worst = 0;
       for (let s = 0; s < 60; s++) {
@@ -140,7 +142,7 @@ describe('the daily chance', () => {
   it('is more likely with the right companion, season or festival', () => {
     const plain = at(RIGHT.zhiyin);
     expect(chance('zhiyin', { ...plain, who: 'musician' }, 0, false, false)).toBeGreaterThan(chance('zhiyin', plain, 0, false, false));
-    expect(chance('taohua', { ...at(RIGHT.taohua), season: 'spring' }, 0, false, false)).toBeGreaterThan(chance('taohua', at(RIGHT.taohua), 0, false, false));
+    expect(chance('hujie', { ...at(RIGHT.hujie), season: 'summer' }, 0, false, false)).toBeGreaterThan(chance('hujie', at(RIGHT.hujie), 0, false, false));
     expect(chance('yuelao', { ...at(RIGHT.yuelao), festivals: ['qixi'] }, 0, false, false)).toBe(1);
   });
 });
@@ -168,14 +170,33 @@ describe('each special companion has a version of their own in the scene', () =>
     return src.slice(at, next < 0 ? undefined : next);
   };
   it('branches on every companion the encounter names (and only real ones)', () => {
-    for (const e of ENCOUNTERS) {
+    for (const e of CHANCE) {
       const b = body(e.id);
       expect(b.length, e.id).toBeGreaterThan(200);
       for (const c of e.special) expect(b.includes(`'${c}'`), `${e.id} has no branch for ${c}`).toBe(true);
     }
   });
   it('closes with the card that remembers it, for everyone', () => {
-    for (const e of ENCOUNTERS) expect(body(e.id).includes('finish('), e.id).toBe(true);
+    for (const e of CHANCE) expect(body(e.id).includes('finish('), e.id).toBe(true);
+  });
+});
+
+describe('桃花源 is no longer left to chance', () => {
+  it('has no rule, rumour or scene: the 桃源 story meets it (and keeps its 奇遇录 entry)', () => {
+    expect(STORY_ENCOUNTERS).toContain('taohua');
+    expect(RULES.taohua).toBeUndefined();
+    expect(RUMOURS.taohua).toBeUndefined();
+    expect(SCENES.taohua).toBeUndefined();
+    // still in the 奇遇录, with its coins, and its hint points to 拾得's letter
+    expect(ENCOUNTER.taohua.coins).toBe(200);
+    expect(ENCOUNTER.taohua.hintZh).toContain('拾得');
+    expect(ENCOUNTER.taohua.hintEn).toContain('Shide');
+    // never rumoured, at any hour
+    for (const hour of [7, 11, 15, 21.5]) {
+      const m = at({ region: 'mountain', hour, night: hour > 19, tod: hour > 19 ? 'night' : 'day' });
+      expect(rumourFor(ENCOUNTERS, m, emptyMemory(), (id) => id !== 'taohua')?.id).not.toBe('taohua');
+      expect(happensToday('taohua', m, 10, false, false)).toBe(false);
+    }
   });
 });
 
