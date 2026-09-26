@@ -89,7 +89,7 @@ export const FOLK: Folk[] = [
   // the teahouse
   f('v.zheng', '郑老', 'Old Zheng', L('老茶客', 'Old tea drinker'), L('喝茶的老先生', 'The old gentleman at his tea'), 'tea', 'village', 'bookish'),
   f('v.mawu', '马五', 'Ma Wu', L('棋迷', 'Chess fiend'), L('端着茶碗的汉子', 'The man with the tea bowl'), 'tea', 'village', 'merry'),
-  f('v.pei', '裴公子', 'Young Master Pei', L('公子', 'Young gentleman'), L('摇扇的白衣公子', 'The young man in white with a fan'), 'tea', 'village', 'bookish'),
+  f('v.pei', '裴公子', 'Young Master Pei', L('茶客', 'Tea guest'), L('摇扇的白衣公子', 'The young man in white with a fan'), 'tea', 'village', 'bookish'),
   // the river steps and the well
   f('v.axiu', '阿秀', 'A Xiu', L('洗衣妇', 'Washerwoman'), L('捶衣裳的妇人', 'The woman beating the washing'), 'washer', 'village', 'gossip', { kin: ['v.chunyan'], keep: true }),
   f('v.chunyan', '春燕', 'Chunyan', L('洗衣妇', 'Washerwoman'), L('洗衣裳的小媳妇', 'The young wife at the washing'), 'washer', 'village', 'shy', { kin: ['v.axiu'], keep: true }),
@@ -104,7 +104,7 @@ export const FOLK: Folk[] = [
   f('v.guniang', '顾娘子', 'Mistress Gu', L('秀才娘子', 'The scholar’s wife'), L('提篮子的娘子', 'The young wife with a basket'), 'villager', 'village', 'plain', { kin: ['v.guxiucai'] }),
   f('v.yaosao', '姚大嫂', 'Sister Yao', L('街坊', 'Neighbour'), L('背竹篓的嫂子', 'The woman with a back-basket'), 'villager', 'village', 'gossip', { kin: ['v.yaoda'] }),
   f('v.yaoda', '姚大', 'Yao Da', L('卖炭的', 'Charcoal seller'), L('戴斗笠挑担的汉子', 'The man in a bamboo hat with a load'), 'villager', 'village', 'gruff', { kin: ['v.yaosao'] }),
-  f('v.guxiucai', '顾秀才', 'Scholar Gu', L('秀才', 'Licentiate'), L('摇扇的蓝衫书生', 'The scholar in blue with a fan'), 'villager', 'village', 'bookish', { kin: ['v.guniang'], keep: true }),
+  f('v.guxiucai', '顾廷之', 'Gu Tingzhi', L('秀才', 'Licentiate'), L('摇扇的蓝衫书生', 'The scholar in blue with a fan'), 'villager', 'village', 'bookish', { kin: ['v.guniang'], keep: true }),
   f('v.nie', '聂五', 'Nie Wu', L('行脚客', 'Traveller'), L('背包袱赶路的人', 'The traveller with a bundle'), 'villager', 'village', 'plain'),
   f('v.feng', '冯老爹', 'Grandpa Feng', L('老街坊', 'Old neighbour'), L('白胡子老爹', 'The white-bearded old man'), 'villager', 'village', 'gruff'),
   f('v.suyun', '素云', 'Suyun', L('绣娘', 'Embroiderer'), L('包绿头巾的姑娘', 'The girl in the green headscarf'), 'villager', 'village', 'shy'),
@@ -145,7 +145,7 @@ export const FOLK: Folk[] = [
   f('p.yinsheng', '殷生', 'Yin Sheng', L('读书郎', 'Student'), L('树下读书的后生', 'The young man reading under the tree'), 'scholar', 'plum', 'shy', { kin: ['m.yinlao', 'm.yindaniang'] }),
   f('p.yezhou', '叶舟', 'Ye Zhou', L('士子', 'Young scholar'), L('踏雪寻梅的书生', 'The scholar walking the plum path'), 'scholar', 'plum', 'bookish', { kin: ['p.yeniang'] }),
   f('p.zhuo', '卓先生', 'Master Zhuo', L('寻梅人', 'Plum-seeker'), L('提灯看梅的人', 'The man looking at plum by lantern'), 'scholar', 'plum', 'gruff'),
-  f('p.yeniang', '叶娘子', 'Mistress Ye', L('叶家娘子', 'Ye’s wife'), L('提灯的娘子', 'The woman with a lantern'), 'lantern', 'plum', 'plain', { kin: ['p.yezhou'] }),
+  f('p.yeniang', '沈若兰', 'Shen Ruolan', L('叶家娘子', 'Ye’s wife'), L('提灯的娘子', 'The woman with a lantern'), 'lantern', 'plum', 'plain', { kin: ['p.yezhou'] }),
 
   // ── 竹林 the bamboo grove
   f('b.xiang', '向先生', 'Master Xiang', L('竹林客', 'Man of the grove'), L('林中漫步的先生', 'The gentleman walking in the grove'), 'villager', 'bamboo', 'bookish'),
@@ -170,6 +170,8 @@ export const FOLK: Folk[] = [
   f('n.monk', '了缘', 'Liaoyuan', L('知客僧', 'Guest-master monk'), L('知客僧', 'Gate monk'), 'npc', 'mountain', 'pious', { kin: ['m.jueming'] }),
   f('n.poet', '梅溪居士', 'the Plum Creek Recluse', L('亭中诗人', 'Poet in the pavilion'), L('亭中诗人', 'Poet in the pavilion'), 'npc', 'plum', 'bookish'),
   f('n.kite', '阿蛮', 'A’man', L('放风筝的孩子', 'Kite child'), L('放风筝的孩子', 'Child with a kite'), 'npc', 'bamboo', 'child'),
+  // the pet seller who sets down his cages by the homestead on market days (../home/life/people.ts)
+  f('n.pets', '甘九', 'Gan Jiu', L('宠物贩', 'Pet seller'), L('挑笼子的货郎', 'The man with the animal cages'), 'npc', 'home', 'merry'),
 ];
 
 export const FOLK_BY_ID: Record<string, Folk> = Object.fromEntries(FOLK.map((x) => [x.id, x]));
@@ -193,10 +195,11 @@ export const arcFlag = (id: string, arc: string, n: number) => `arc:${id}:${arc}
 /** Talks before someone greets you as an old acquaintance (熟客). */
 export const REGULAR_AFTER = 3;
 
-/** The prompt's label: the epithet until you have met, then 「title·name」. */
+/** The prompt's label: the epithet until you have met, then 「title·name」 (just the name when it says the title already: 糖人张, not 糖人摊·糖人张). */
 export function folkLabel(x: Folk, met: boolean): Line {
   if (!met) return x.epithet;
-  if (x.title.zh === x.zh) return L(x.zh, x.en);
+  const core = x.title.zh.replace(/摊$/, '');
+  if (x.zh.includes(core) || core.includes(x.zh)) return L(x.zh, x.en);
   return L(`${x.title.zh}·${x.zh}`, `${x.title.en} · ${x.en}`);
 }
 

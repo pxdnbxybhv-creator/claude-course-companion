@@ -166,10 +166,16 @@ export const ARCS: Record<string, Arc[]> = {
 
   // ── 觉明 the old monk at the wooden fish
   'm.jueming': [
-    { id: 'fish', who: ['cat', '@shou'], beats: [
+    { id: 'fish', who: ['cat'], beats: [
       b({ any: [L('（老僧看你盯着木鱼的眼神，笑了）这不是鱼，木头的。你咬一口，牙疼。', '(The old monk sees how you eye the wooden fish, and smiles.) It isn’t a fish. It’s wood. Bite it and your teeth will ache.'), M('（绕着木鱼转了三圈，不死心。）', '(Circles the wooden fish three times, not convinced.)')] }),
       b({ any: [L('今日斋堂有豆腐，没有鱼。……贫僧给你留了一碟，在后厨门口。', 'Today the refectory has tofu, no fish. …I left you a dish by the kitchen door.')] }),
       b({ any: [L('你天天来，倒像是来听经的。——善哉，与佛有缘。', 'You come every day, as though to hear the sutras. — Excellent. You have a bond with the Buddha.')] }, { reward: { coins: 10, card: card('木鱼', 'The Wooden Fish', '木鱼不闭眼，\n猫也不闭眼。\n一个在修行，\n一个在等鱼。', 'The wooden fish never shuts its eyes;\nneither does the cat.\nOne is practising.\nOne is waiting for a fish.', '禅') } }),
+    ] },
+    // 玉兔 hears the Jataka of the hare who leapt into the fire, and why there is a hare on the moon
+    { id: 'hare', who: ['rabbit'], beats: [
+      b({ any: [L('（老僧放下木槌，看了你良久。）经里有个故事：从前有只兔子，遇见一个饿坏了的老人，没有东西供养，便自己跳进了火里。', '(The old monk lays down his mallet and looks at you a long while.) There is a story in the sutras: once a hare met an old man faint with hunger. It had nothing to give him — so it leapt into the fire itself.'), M('（玉兔的耳朵慢慢垂了下来。）', '(The Jade Rabbit’s ears slowly droop.)')] }),
+      b({ any: [L('那火，没有烧着它。那老人原是帝释天，他把兔子的样子画在了月亮上，叫世上的人抬头都看得见。', 'The fire did not burn it. The old man was Śakra, lord of the gods, and he drew the hare upon the moon, so that anyone in the world who looked up would see it.'), M('（玉兔抬起头，望了望天。）', '(The Jade Rabbit lifts her head and looks at the sky.)')] }),
+      b({ any: [L('老僧念了五十年经，舍不下的东西还多着。你呢，早就舍过了。——这碟素饼，带回月亮上去吧。', 'Fifty years at my prayers, and there is still so much I cannot let go. You let go of everything long ago. — Take this dish of plain cakes back to the moon.')] }, { reward: { coins: 10, card: card('月中兔', 'The Hare in the Moon', '无物可供养，\n便把自己给了。\n月亮上那只兔子，\n是这么来的。', 'With nothing else to give,\nit gave itself.\nThat is how the hare\ncame to be in the moon.', '月') } }),
     ] },
     { id: 'blade', who: ['guan', 'swordsman'], beats: [
       b({ any: [L('施主的剑，叫老僧想起一个人——五十年前的自己。老僧年轻时，也握过刀。在边关，十年。', 'Your sword reminds me of someone — myself, fifty years ago. I too held a blade when I was young. Ten years, on the frontier.')], guan: [L('……将军，老僧年轻时也握过刀。在边关，十年。', '…General, I too held a blade when I was young. Ten years on the frontier.')] }),
@@ -211,7 +217,7 @@ export const ARCS: Record<string, Arc[]> = {
   // ── 殷老汉 the pilgrim, praying for his son (殷生, reading under the plum)
   'm.yinlao': [
     { id: 'son', who: ['scholar', 'painter', 'player', '@wen'], beats: [
-      b({ any: [L('先生是读书人……我儿殷生在梅岭上读书，今秋赴考。您若见着他，替我捎句话：爹娘不求他中，只求他别熬坏了身子。', 'You’re a reader, sir… my son Yin Sheng studies on the plum ridge and sits the exams this autumn. If you see him, give him a word from me: his mother and I don’t ask him to pass — only not to ruin his health.')] }),
+      b({ any: [L('您是识字的人……我儿殷生在梅岭上读书，今秋赴考。您若见着他，替我捎句话：爹娘不求他中，只求他别熬坏了身子。', 'You’re lettered, I can see… my son Yin Sheng studies on the plum ridge and sits the exams this autumn. If you see him, give him a word from me: his mother and I don’t ask him to pass — only not to ruin his health.')] }),
       b({ any: [L('您见着他了？他瘦了没有？……他说「儿子知道了」？好，好。', 'You saw him? Has he grown thin? …He said, “Your son understands”? Good, good.')] }, { need: ['met:p.yinsheng'] }),
       b({ any: [L('中不中，都好，回家种地也是好日子。（他笑了，眼角全是褶子。）这是我们自家晒的柿饼，您尝尝。', 'Pass or not, it’s all well — farming is a good life too. (He smiles, his eyes all creases.) These are persimmons we dried ourselves. Try one.')] }, { reward: { coins: 20 } }),
     ] },
@@ -244,10 +250,12 @@ export const ARCS: Record<string, Arc[]> = {
   // ── 顾秀才, three times failed at the exams
   'v.guxiucai': [
     { id: 'exam', who: ['scholar', 'poet', '@wen'], beats: [
-      b({ any: [L('兄台也是读书人。实不相瞒，我考了三回，三回落第。娘子不怪我，我却怪自己。', 'You’re a reader too. To be frank: three times I sat the exams, three times I failed. My wife doesn’t blame me; I blame myself.'), M('落第三回，文章便磨了三回。', 'Failed three times — then your essays have been honed three times.')],
+      b({ any: [L('您也是读书人。实不相瞒，我考了三回，三回落第。娘子不怪我，我却怪自己。', 'You’re a reader too. To be frank: three times I sat the exams, three times I failed. My wife doesn’t blame me; I blame myself.'), M('落第三回，文章便磨了三回。', 'Failed three times — then your essays have been honed three times.')],
         musician: [L('姑娘弹琴，也有弹不下去的时候吧？实不相瞒，我考了三回，三回落第。娘子不怪我，我却怪自己。', 'Even at the qin there must be times you cannot play on? To be frank: three times I sat the exams, three times I failed. My wife doesn’t blame me; I blame myself.'), M('弦断了，换一根，再弹。', 'When a string breaks, you change it and play on.')],
         player: [L('先生下棋，输过么？……我考了三回，三回落第。娘子不怪我，我却怪自己。', 'Do you ever lose at go, sir? …Three times I sat the exams, three times I failed. My wife doesn’t blame me; I blame myself.'), M('输一局，才知道下一局怎么下。', 'Only by losing a game do you learn how to play the next.')], poet: [L('太白先生……您当年，也没考过科举吧？', 'Master Li… you never sat the exams yourself, did you?'), M('没考。天子呼来不上船，自称臣是酒中仙。', 'Never. When the emperor called I didn’t board his boat — I said I was an immortal of the wine.')] }),
-      b({ any: [L('兄台那句话，我想了一夜：文章磨了三回……好，今秋再考一回。', 'I thought about your words all night: honed three times… All right — I’ll sit once more this autumn.')], poet: [L('先生那句话，我想了一夜……考得上考不上，诗照样写。今秋再考一回。', 'I thought about what you said all night… pass or fail, I’ll keep writing. I’ll sit once more this autumn.')] }),
+      b({ any: [L('您那句话，我想了一夜：文章磨了三回……好，今秋再考一回。', 'I thought about your words all night: honed three times… All right — I’ll sit once more this autumn.')],
+        musician: [L('姑娘那句话，我想了一夜：弦断了，换一根，再弹……好，今秋再考一回。', 'I thought about what you said all night: when a string breaks, change it and play on… All right — I’ll sit once more this autumn.')],
+        player: [L('先生那句话，我想了一夜：输一局，才知道下一局怎么下……好，今秋再考一回。', 'I thought about what you said all night: only a lost game teaches you the next… All right — I’ll sit once more this autumn.')], poet: [L('先生那句话，我想了一夜……考得上考不上，诗照样写。今秋再考一回。', 'I thought about what you said all night… pass or fail, I’ll keep writing. I’ll sit once more this autumn.')] }),
       b({ any: [L('娘子给我缝了新衫。这方旧砚送你，它陪我考了三回，该歇歇了。', 'My wife has sewn me a new robe. Take this old inkstone — it has sat the exams with me three times, and deserves a rest.')] }, { reward: { coins: 20, card: card('旧砚', 'An Old Inkstone', '磨了三回的墨，\n写了三回的文章。\n砚台说：\n再来一回，也行。', 'Ink ground three times,\nessays written three times.\nThe inkstone says:\none more time is fine.', '砚') } }),
     ] },
   ],

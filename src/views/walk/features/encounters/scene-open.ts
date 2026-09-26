@@ -200,7 +200,13 @@ export function mutong(s: Stage): Scene {
     tune -= dt;
     if (tune < 0 && d < 24 && !s.finished) { tune = 7; s.qin(TUNE, 300, 0.35); }
   });
-  const name = C('牧童', 'Herd-Boy');
+  // 牧童 until he tells you his name (杏生, born when the apricots bloomed — but to the Poet he stays
+  // the herd-boy of the poem)
+  let name = C('牧童', 'Herd-Boy');
+  const myName = async () => {
+    await s.say(boy, name, [L('我叫杏生——生在杏花开的那天。到了杏花村，替我跟酒家的阿婆问声好！', 'I’m Xingsheng — born the day the apricots bloomed. When you get to the village, say hello to the old lady at the tavern for me!')]);
+    name = C('杏生', 'Xingsheng');
+  };
   talkPrompt(s, { root: beast.root } as never, {
     labelZh: '骑牛吹笛的孩子', labelEn: 'A child on an ox, playing the flute', actionZh: '借问', actionEn: 'Ask', d: 1.4,
     async act() {
@@ -234,6 +240,7 @@ export function mutong(s: Stage): Scene {
           await s.say(null, C('渔翁', 'Old Fisherman'), [L('青箬笠，绿蓑衣，斜风细雨不须归。——雨天鱼儿浮上来，最好钓。', 'Green bamboo hat, green straw cape — in slanting wind and fine rain, no need to go home. The fish rise in the rain; it’s the best time.')]);
           await s.say(boy, name, [L('那我也不回家了！爷爷要是想喝酒，杏花村就在那边——', 'Then I won’t go home either! And if you want a drink, Grandpa, Apricot Blossom Village is that way—')]);
           await point();
+          await myName();
           s.finish({ zh: '渔翁念了一首《渔歌子》，牧童说他也不回家了。', en: 'The fisherman recited “Song of the Fisherman,” and the herd-boy declared he wasn’t going home either.', bonus: 40, seal: '渔' });
           return;
         }
@@ -244,6 +251,7 @@ export function mutong(s: Stage): Scene {
           await s.wait(900);
           await s.say(boy, name, [L('它平时可不让生人碰呢！这枝杏花送你——插在园子里，明年就活了。', 'He never lets strangers touch him! Take this sprig of apricot blossom — plant it in your garden, and it’ll root by next year.')]);
           await point();
+          await myName();
           s.finish({ zh: '园丁喂了老牛一把嫩草，牧童回赠一枝杏花。', en: 'The gardener fed the old ox a handful of grass; the herd-boy gave him a sprig of apricot blossom.', bonus: 40, seal: '杏' });
           return;
         }
@@ -252,6 +260,7 @@ export function mutong(s: Stage): Scene {
         if (k === 1) await s.say(boy, name, [L('放牛去呀！下雨天，牛儿爱吃带水的草。', 'Taking the ox to graze! In the rain he likes the wet grass.')]);
         await point();
         await s.say(boy, name, [L('喏——往那边走，过了桥，杏花开得最好的那家就是。', 'Look — go that way, over the bridge; the house with the finest apricot blossom, that’s the one.')]);
+        await myName();
         s.finish();
       } finally {
         s.unclaim();

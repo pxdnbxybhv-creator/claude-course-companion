@@ -11,7 +11,7 @@ import {
   type Folk, type TalkState,
 } from '../src/views/walk/features/npcs/folk';
 import { ARCS, NPC_ARCS } from '../src/views/walk/features/npcs/folk-arcs';
-import { INTROS, REGULAR, ROLE_TALK } from '../src/views/walk/features/npcs/folk-lines';
+import { HAIL, INTROS, REGULAR, ROLE_TALK } from '../src/views/walk/features/npcs/folk-lines';
 import { GROUPS_OF, voiced } from '../src/views/walk/features/npcs/logic';
 import {
   FARMER_HELLO, FISHER_HELLO, FLOWER_HELLO, FORTUNE_HELLO, KITE_HELLO, MONK_HELLO, PEDDLER_HELLO, POET_NPC_HELLO, SHUTONG_ASK, SUGAR_HELLO, SUGAR_MAKE,
@@ -19,6 +19,8 @@ import {
 } from '../src/views/walk/features/npcs/lines';
 import { NPC_LETTERS, WANG_LETTER_DAY, WANGDA_READ } from '../src/views/walk/features/npcs/letters';
 import { ROLES, SPECIES } from '../src/views/walk/features/home/life/logic';
+import { splitLetter } from '../src/views/mail/letter';
+import { fillName } from '../src/app/name';
 
 const WHO: CharacterId[] = CHARACTERS.map((c) => c.id);
 const GROUPS = ['@wen', '@nong', '@wu', '@xian', '@shou'] as const;
@@ -105,6 +107,75 @@ describe('names', () => {
     expect(folkName(wu, false).zh).toBe('打更的汉子');
     expect(folkName(wu, true).zh).toBe('老吴');
     expect(folkLabel(FOLK_BY_ID['n.peddler'], true).zh).toBe('货郎·孙七');
+  });
+  it('never says the title twice (糖人张, not 糖人摊·糖人张), and the name is the one they give', () => {
+    expect(folkLabel(FOLK_BY_ID['n.sugar'], true)).toEqual({ zh: '糖人张', en: 'Sugar-Figure Zhang' });
+    expect(folkLabel(FOLK_BY_ID['v.guxiucai'], true).zh).toBe('秀才·顾廷之');
+    for (const x of FOLK) {
+      const l = folkLabel(x, true);
+      const [title, name] = l.zh.includes('·') ? l.zh.split('·') : ['', l.zh];
+      if (title) expect(name.includes(title.replace(/摊$/, '')) || title.includes(name), `${l.zh}`).toBe(false);
+    }
+    // the name on the tag is the one they give (顾廷之 says 顾廷之)
+    for (const id of ['v.guxiucai', 'p.yeniang', 'l.wen', 'l.lin']) expect(INTROS[id].zh, id).toContain(FOLK_BY_ID[id].zh);
+  });
+});
+
+/** Words a companion must never hear said to them (a line for the cat said to the rabbit, a man’s address to the qin player…). */
+const MUST_NOT: Partial<Record<CharacterId, RegExp>> = {
+  rabbit: /猫|\bcats?\b|鱼|\bfish|骨|\bbones?\b|claw|pounc|lick/i,
+  cat: /玉兔|小兔|bunny|Jade Rabbit/i,
+  musician: /先生|兄台|Mister|\bsir\b|man of letters|功名/i,
+  change: /兄台|先生|Mister|\bsir\b|man of letters/i,
+  fisher: /种地|土|秧|\bsoil\b|seedling|fellow farmer/i,
+  gardener: /同行|fellow of the trade|鱼篓|creel/i,
+};
+
+describe('each companion is spoken to as who they are', () => {
+  const said = (l: { zh: string; en: string }) => `${l.zh} / ${l.en}`;
+  it('in the words every role keeps for them and their kind (day and night)', () => {
+    for (const who of WHO) {
+      const bad = MUST_NOT[who];
+      if (!bad) continue;
+      for (const role of ROLE_IDS) {
+        for (const night of [false, true]) {
+          const pool = chatPool({ ...FOLK[0], role }, who, night);
+          for (const l of pool.lines.slice(0, pool.personal)) expect(bad.test(said(l)), `${who} ${role}${night ? ' night' : ''}: ${said(l)}`).toBe(false);
+        }
+      }
+    }
+  });
+  it('in the stories meant for them (what is said to them, not what they say)', () => {
+    for (const who of WHO) {
+      const bad = MUST_NOT[who];
+      if (!bad) continue;
+      for (const [id, arcs] of Object.entries(ARCS)) {
+        for (const arc of arcs) {
+          if (!arc.who || !arcFor(arc.who, who)) continue;
+          for (const beat of arc.beats) for (const l of voiced(beat.lines, who)) if (l.by !== 'me') expect(bad.test(said(l)), `${who} ${id}/${arc.id}: ${said(l)}`).toBe(false);
+        }
+      }
+    }
+  });
+  it('the Jade Rabbit has a story of her own with the old monk; the wooden fish is the cat’s', () => {
+    const jm = ARCS['m.jueming'];
+    expect(jm.find((a) => a.id === 'fish')!.who).toEqual(['cat']);
+    expect(jm.some((a) => a.who?.includes('rabbit'))).toBe(true);
+  });
+});
+
+describe('an old acquaintance greets you in words that read with any name', () => {
+  const lines = [...Object.values(REGULAR).flat(), ...HAIL];
+  it('with the default name (园主 / friend): no doubled honorific, never “It’s friend”', () => {
+    for (const l of lines) {
+      const zh = fillName(l.zh, 'zh', 'world', ''), en = fillName(l.en, 'en', 'world', '');
+      expect(zh, zh).not.toMatch(/园主(施主|兄)/);
+      expect(en, en).not.toMatch(/It’s friend|Friend has|Friend’s here|[Ff]riend, my friend|— Friend!|^\(.*it’s friend/);
+      expect(en.startsWith('Friend'), en).toBe(false);
+    }
+  });
+  it('with a chosen name', () => {
+    for (const l of lines) expect(fillName(l.en, 'en', 'world', 'Mei')).toContain('Mei');
   });
 });
 
@@ -231,6 +302,12 @@ describe('stories, a beat a day', () => {
     expect(letter.beats[1].reward?.mark).toBe(WANG_LETTER_DAY);
     const def = LETTER['npc-wangda'];
     expect(def).toBe(NPC_LETTERS[0]);
+    // signed at the foot, as a letter is (the signature never runs on into the body)
+    for (const l of NPC_LETTERS) {
+      expect(splitLetter(l.body.zh, 'zh').sign, l.id).not.toBe('');
+      expect(splitLetter(l.body.en, 'en').sign, l.id).not.toBe('');
+    }
+    expect(splitLetter(NPC_LETTERS[0].body.zh, 'zh').sign).toBe('王大（托人代书）');
     const p = emptyPlay();
     expect(def.due!(p, '2026-09-26')).toBe(false);
     p.done[WANG_LETTER_DAY] = '2026-09-26';

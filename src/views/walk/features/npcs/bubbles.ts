@@ -216,6 +216,7 @@ export class Nameplate {
     const k = 0.1 * d * 0.36;
     this.sprite.scale.set(k * (PW / PH), k, 1);
     (this.sprite.material as T.SpriteMaterial).opacity = this.fade;
-    this.sprite.visible = this.on;
+    // never printed into a photograph
+    this.sprite.visible = this.on && this.bag.ctx.cameraMode() !== 'photo';
   }
 }

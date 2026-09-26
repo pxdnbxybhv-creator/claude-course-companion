@@ -7,7 +7,8 @@ import { earnFrom, flag, markDay, play, record } from '../../../../app/play';
 import { deliver } from '../../../../app/mail';
 import { today } from '../../../../app/store';
 import type { Line } from './logic';
-import { arcDayKey, folkLabel, folkName, folkOf, metFlag, planTalk, talkKey, type DLine, type Folk, type TalkPlan, type TalkState } from './folk';
+import { arcDayKey, folkLabel, folkName, folkOf, metFlag, planTalk, talkKey, type Card, type DLine, type Folk, type TalkPlan, type TalkState } from './folk';
+import { busy } from '../minigames/ui';
 import * as snd from './sound';
 
 /** Coins from the folk count as their own income row (src:npcs). */
@@ -36,6 +37,29 @@ export async function sayLines(ctx: WorldCtx, name: Line, lines: readonly DLine[
   }
 }
 
+const COIN_TOAST_MS = 1800;
+
+/**
+ * A keepsake card, shown once the talk it came from is over — a stall-keeper goes on to their usual
+ * business after a story, and their dialogue must not cover it — and once the coins' toast has gone
+ * (it sits where the card's title is). Given up if the walk is left meanwhile.
+ */
+function cardWhenFree(ctx: WorldCtx, card: Card, notBefore: number): void {
+  const giveUp = performance.now() + 20 * 60_000;
+  const tick = () => {
+    const now = performance.now();
+    if (now > giveUp) return;
+    const open = typeof document !== 'undefined' && !!document.querySelector('.walk-say-wrap, .walk-card-wrap, .walk-toast');
+    if (import.meta.env.DEV) (globalThis as { __npcCard?: unknown }).__npcCard = { now, notBefore, busy: busy(ctx), open };
+    if (now >= notBefore && !busy(ctx) && !open) {
+      try { ctx.hud.showCard(card); } catch { /* the walk has closed */ }
+      return;
+    }
+    setTimeout(tick, 200);
+  };
+  setTimeout(tick, 250);
+}
+
 /** A beat told: its flag, one beat a day with this person, and what it brings. */
 function settle(ctx: WorldCtx, x: Folk, beat: NonNullable<TalkPlan['beat']>): void {
   flag(beat.flag);
@@ -46,10 +70,10 @@ function settle(ctx: WorldCtx, x: Folk, beat: NonNullable<TalkPlan['beat']>): vo
   if (r.coins) {
     earnFrom(NPC_SOURCE, r.coins);
     snd.coins();
-    ctx.hud.toast(`+${r.coins} 文`, `+${r.coins} coins`, 1800);
+    ctx.hud.toast(`+${r.coins} 文`, `+${r.coins} coins`, COIN_TOAST_MS);
   }
   if (r.mail) deliver(r.mail);
-  if (r.card) ctx.hud.showCard(r.card);
+  if (r.card) cardWhenFree(ctx, r.card, performance.now() + (r.coins ? COIN_TOAST_MS + 150 : 0));
 }
 
 export interface ConverseOpts {

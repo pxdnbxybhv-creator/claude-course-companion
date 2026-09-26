@@ -269,6 +269,8 @@ interface Person extends Speaker {
   folk: Folk;
   /** Stopped to talk with you (turned to you, going nowhere, saying nothing overhead). */
   held: boolean;
+  /** How near you must be to talk (m): a boat's is measured from the shore (boatReach). */
+  reach: number;
 }
 
 const TAU = Math.PI * 2;
@@ -333,7 +335,7 @@ interface CrowdRuntime {
   event(e: SkillEvent): void;
   info(): { region: RegionId; people: number; active: number };
   /** DEV: who is who, and where. */
-  people(): { region: RegionId; i: number; id: string; name: string; role: CrowdRole; shift: Shift; active: boolean; held: boolean; x: number; z: number; away: boolean }[];
+  people(): { region: RegionId; i: number; id: string; name: string; role: CrowdRole; shift: Shift; active: boolean; held: boolean; x: number; y: number; z: number; away: boolean; reach: number }[];
   /** DEV: whom the prompt is on (id, label), if anyone. */
   target(): { region: RegionId; id: string; label: string; held: boolean } | null;
 }
@@ -381,13 +383,20 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       d: spec.offset ?? rng() * 20, dir: 1, speed: spec.speed ?? 0.9, pause: 0, nextDwell: 8 + rng() * 25,
       amp: 0, ph: rng() * TAU, yaw: 0, seed: rng() * 100, react: 'none', reactT: 0, reactDelay: 0, src: { x: 0, z: 0 }, goal: null,
       greeted: false, bowedHere: false, nextBark: 4 + rng() * 20, moved: true, child: sc < 0.9, scale: sc, boatI: -1,
-      away: false, placed: false, stuck: 0, lead, folk, held: false,
+      away: false, placed: false, stuck: 0, lead, folk, held: false, reach: TALK_REACH,
     };
     people.push(p0);
     prev = p0;
   }
   if (!people.length) return null;
   const N = people.length;
+  // someone in a boat is talked to from the bank: their reach is measured from the nearest open ground
+  for (const p of people) {
+    if (!p.spec.boat) continue;
+    const r = boatReach(p.spec, (x, z) => ctx.isWalkable(x, z));
+    p.reach = r.reach;
+    if (import.meta.env.DEV && !(r.near < r.reach - 0.5)) console.warn(`[npcs] ${region}: ${p.folk.id}'s boat never comes within talking reach of the bank (${r.near.toFixed(1)} m, reach ${r.reach.toFixed(1)} m)`);
+  }
 
   // ── the figure: one instanced mesh and its outline
   const geo = crowdGeometry(THREE);
@@ -597,9 +606,12 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     const pp = ctx.player.position;
     const cd = Math.hypot(pp.x - (people[0].x), pp.z - (people[0].z));
     if (cd > 160) { drop(); return; }
-    // whom you would talk to: the nearest in front of you (a little stickier for whoever it is now)
+    // whom you would talk to: the nearest in front of you (a little stickier for whoever it is now);
+    // no one while you frame a photograph (the name tag must not be printed into it)
+    const photo = ctx.cameraMode() === 'photo';
+    if (photo) drop();
     const myH = ctx.player.heading;
-    const choose = !talking && !ctx.player.isFrozen;
+    const choose = !talking && !ctx.player.isFrozen && !photo;
     let best: Person | null = null, bestD = Infinity;
     const who: CharacterId = ctx.player.character;
     const isGuan = who === 'guan', isChange = who === 'change', chaseMe = who === 'cat' || who === 'rabbit';
@@ -614,11 +626,17 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       const held = p.held;
       if (choose) {
         const mine = p === cur;
-        const reach = (S.boat ? 4 : 2.6) + (mine ? 0.4 : 0);
-        if (dist < reach) {
-          // facing: my heading against the bearing from me to them (boats: any side will do)
-          const facing = S.boat ? 1 : Math.cos(wrap(myH - toMe - Math.PI));
-          const score = dist - (mine ? 0.4 : 0);
+        const reach = p.reach + (mine ? 0.4 : 0);
+        // a boat going round the lotus is hailed across the water wherever she is on her round: how
+        // near you stand to her round, facing it
+        const ring = S.boat === 'circle' ? S.ring : undefined;
+        const near = ring ? Math.max(0, Math.hypot(pp.x - ring.x, pp.z - ring.z) - ring.r) : dist;
+        const bearing = ring ? Math.atan2(pp.x - ring.x, pp.z - ring.z) : toMe;
+        // (a boat may be hailed from a bridge above it; on land, not through a floor)
+        if (near < reach && Math.abs(pp.y - p.y) < (S.boat ? 4.8 : 2.8)) {
+          // facing: my heading against the bearing from me to them (a boat alongside: any side will do)
+          const facing = S.boat && dist < 3.5 ? 1 : Math.cos(wrap(myH - bearing - Math.PI));
+          const score = near - (mine ? 0.4 : 0);
           if (facing > (mine ? 0.2 : 0.45) && score < bestD) { best = p; bestD = score; }
         }
       }
@@ -875,8 +893,9 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     if (choose) {
       if (best !== cur) { cur = best; if (cur) relabel(); else { proxy.radius = 0; plate.hide(region); } }
       if (cur) {
-        proxy.position.set(cur.x, cur.y, cur.z);
-        proxy.radius = cur.spec.boat ? 4.6 : 3.2;
+        // a boat below a bridge: the prompt is held level with you (the world drops one 3 m off)
+        proxy.position.set(cur.x, cur.spec.boat ? Math.max(cur.y, Math.min(pp.y, cur.y + 2)) : cur.y, cur.z);
+        proxy.radius = Math.max(cur.reach, Math.hypot(pp.x - cur.x, pp.z - cur.z)) + 0.6;
         plate.hold(region, !bubbles.talking(cur));
       }
     }
@@ -926,7 +945,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   return {
     roster, step, event,
     info: () => ({ region, people: N, active: people.filter((p) => p.active).length }),
-    people: () => people.map((p) => ({ region, i: p.i, id: p.folk.id, name: p.folk.zh, role: p.spec.role, shift: p.spec.shift, active: p.active, held: p.held, x: +p.x.toFixed(2), z: +p.z.toFixed(2), away: p.away })),
+    people: () => people.map((p) => ({ region, i: p.i, id: p.folk.id, name: p.folk.zh, role: p.spec.role, shift: p.spec.shift, active: p.active, held: p.held, x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2), away: p.away, reach: +p.reach.toFixed(2) })),
     target: () => { const p = talking ?? cur; return p ? { region, id: p.folk.id, label: proxy.labelZh, held: p.held } : null; },
   };
 }
@@ -941,6 +960,48 @@ function loopAt(pts: XZ[], d: number, out: { x: number; z: number; heading: numb
     if (r <= L) { const k = L ? r / L : 0; out.x = a.x + (b.x - a.x) * k; out.z = a.z + (b.z - a.z) * k; out.heading = Math.atan2(b.x - a.x, b.z - a.z); return; }
     r -= L;
   }
+}
+
+/** How near you stand to talk with someone on foot (m). */
+const TALK_REACH = 2.6;
+
+/** How far open ground is from (x, z), up to `max` m (Infinity: none so near). */
+export function shoreDistance(isWalkable: (x: number, z: number) => boolean, x: number, z: number, max = 11, step = 0.45): number {
+  if (isWalkable(x, z)) return 0;
+  for (let r = step; r <= max; r += step) {
+    const n = Math.max(8, Math.ceil((TAU * r) / step));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * TAU;
+      if (isWalkable(x + Math.sin(a) * r, z + Math.cos(a) * r)) return r;
+    }
+  }
+  return Infinity;
+}
+
+/**
+ * How near you must stand to talk with someone in a boat, measured from the bank: an anchored boat
+ * (it swings 0.6 m) from the nearest ground; a boat going round a ring from the nearest ground to the
+ * ring (and she is hailed by how near you stand to her round); the river boat from the bank along most of its way (the
+ * quays stand back 4–5 m from the channel). `near` is the nearest the boat's way comes to open ground.
+ */
+export function boatReach(spec: Pick<Spec, 'boat' | 'at' | 'ring' | 'path'>, isWalkable: (x: number, z: number) => boolean): { reach: number; near: number } {
+  const pts: XZ[] = [];
+  if (spec.boat === 'circle' && spec.ring) {
+    for (let k = 0; k < 16; k++) { const a = (k / 16) * TAU; pts.push({ x: spec.ring.x + Math.cos(a) * spec.ring.r, z: spec.ring.z + Math.sin(a) * spec.ring.r }); }
+  } else if (spec.boat === 'river' && spec.path) {
+    for (let i = 0; i < spec.path.length - 1; i++) {
+      const a = spec.path[i], b = spec.path[i + 1], L = Math.hypot(b.x - a.x, b.z - a.z);
+      for (let s = 0; s < L; s += 3) pts.push({ x: a.x + ((b.x - a.x) * s) / L, z: a.z + ((b.z - a.z) * s) / L });
+    }
+  } else if (spec.at) pts.push({ x: spec.at.x, z: spec.at.z });
+  const d = pts.map((q) => shoreDistance(isWalkable, q.x, q.z)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (!d.length) return { reach: 4, near: Infinity };
+  const near = d[0];
+  let reach: number;
+  if (spec.boat === 'river') reach = Math.min(6.5, d[Math.floor(d.length * 0.8)] + 1);
+  else if (spec.boat === 'circle') reach = near + 1.6;
+  else reach = near + 1.8;
+  return { reach: Math.min(10.5, Math.max(4, reach)), near };
 }
 
 /** How fast a child runs (m/s): the most a child moves in a frame, whatever the game does. */
