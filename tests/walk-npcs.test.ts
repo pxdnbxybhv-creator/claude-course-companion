@@ -148,11 +148,15 @@ describe('the peddler’s shop', () => {
 describe('lines for each companion', () => {
   it('falls back to what everyone hears', () => {
     expect(forCompanion(PEDDLER_HELLO, 'guan')).toBe(PEDDLER_HELLO.guan);
-    expect(forCompanion(PEDDLER_HELLO, 'painter')).toBe(PEDDLER_HELLO.any);
+    // every stall-keeper now greets all thirteen in their own words (tests/walk-folk.test.ts)
+    expect(forCompanion(PEDDLER_HELLO, 'painter')).toBe(PEDDLER_HELLO.painter);
     expect(special(PEDDLER_HELLO, 'cat')).toBe(true);
-    expect(special(PEDDLER_HELLO, 'player')).toBe(false);
+    const some = { any: 'everyone', cat: 'cat', guan: null } as const;
+    expect(forCompanion(some, 'painter')).toBe('everyone');
+    expect(special(some, 'player')).toBe(false);
     // "nothing special" (null) is kept, not replaced by a fallback
-    expect(forCompanion(TEA_HELLO, 'painter')).toBeNull();
+    expect(forCompanion(some, 'guan')).toBeNull();
+    expect(forCompanion(TEA_HELLO, 'painter')).not.toBeNull();
   });
   it('gives every new and upgraded person their own words for at least four companions', () => {
     const tables = { SUGAR_HELLO, PEDDLER_HELLO, FORTUNE_HELLO, FLOWER_HELLO, FARMER_HELLO, SUGAR_MAKE, SHUTONG_ASK, MASTER_FOUND, TALE_SPOTTED, TEA_HELLO, FISHER_HELLO, MONK_HELLO, POET_NPC_HELLO, KITE_HELLO, HELLO };

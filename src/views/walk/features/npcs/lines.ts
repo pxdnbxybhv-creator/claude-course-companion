@@ -83,6 +83,10 @@ export const PEDDLER_HELLO: PerCompanion<Line> = {
   taoist: L('小道长，纸鸢放得高，离天就近了。', 'Little Taoist, fly a kite high and you’re that much nearer heaven.'),
   scholar: L('公子，赶考的路上提盏灯笼，夜里也好赶路。', 'Young sir, a lantern for the road to the exams — you can travel by night.'),
   fisher: L('老哥，买顶……哦，你有斗笠了。来串糖葫芦？', 'Old man, a hat… oh, you’ve got one. Candied haws, then?'),
+  gardener: L('园丁师傅！风车插在花圃里，风一吹，花也跟着点头。', 'Gardener! Stick a pinwheel in your flower bed — when the wind blows, the flowers nod along.'),
+  musician: L('琴师姑娘，我这拨浪鼓也算个乐器吧？……比不上您的琴，买盏灯笼照着弹？', 'Qin player — my rattle-drum counts as an instrument, doesn’t it? …Not like your qin. A lantern to play by?'),
+  painter: L('画师！我这担子上的颜色，红的红，绿的绿，够您画一张的。', 'Painter! The colours on my pole — reds so red, greens so green — enough for a whole picture.'),
+  player: L('先生是下棋的？我这担子上没棋子，糖葫芦倒是一颗一颗的，像不像？', 'You play go, sir? No stones on my pole — but candied haws, one by one on the stick. Look alike, don’t they?'),
 };
 
 /** The kept ware each companion's hello pitches (owned already, and he pitches something else). */
@@ -220,6 +224,11 @@ export const TALE_SPOTTED: PerCompanion<Line | null> = {
   musician: L('琴师来了。今儿说一段知音的故事。', 'The qin player is here. Today, a tale of the friend who knew the tune.'),
   taoist: L('小道长来了？今儿说「崂山道士」——学穿墙的那位，可不是您的同门。', 'A little Taoist? Then “The Taoist of Mount Lao” — the wall-walker was no brother of your school, mind.'),
   gardener: L('园丁师傅来了？今儿说一段「种梨」，说完了您也试试。', 'The gardener? Then today it’s “Planting a Pear” — try it yourself afterwards.'),
+  scholar: L('哟，台下坐着位读书人——今儿这段，您可得替我记着，说错了您指出来。', 'Oh, a scholar in the audience — keep track for me today, and tell me if I slip.'),
+  poet: L('诗仙到！今儿这段书，定场诗还请您老人家指教——咳，我先念。', 'The Poet Immortal is here! Today’s opening verse — pray correct me. Ahem, I’ll start.'),
+  swordsman: L('台下这位大侠，剑可别出鞘——我这书说到打斗，您可别跟着比划。', 'The hero in the audience — keep that sword sheathed. When my tale comes to the fighting, no joining in.'),
+  fisher: L('老哥又来了！听书可以，打呼噜不行啊。', 'You again, old man! Listen all you like — only no snoring.'),
+  cat: L('（说书人瞥见台下一团橘色）……咳，今儿的听众，毛色倒是鲜亮。', '(The storyteller spots a ginger blur in the audience.) …Ahem. A bright-coated crowd today.'),
 };
 
 /** The poet hears the opening verse misquoted (as it stood in the Song-dynasty books) and puts it right. */
@@ -278,6 +287,12 @@ export const FORTUNE_HELLO: PerCompanion<Line> = {
   player: L('先生算棋，老朽算命，都是推演。您先请。', 'You calculate games, I calculate fates — all the same art. After you.'),
   rabbit: L('月宫来的兔儿爷？您的签，老朽不看也知道：月圆人团圆。', 'The rabbit from the moon? Yours I know without looking: full moon, full family.'),
   swordsman: L('大侠剑气冲天，这签筒都在抖。求一支？', 'Your sword’s spirit makes my tube tremble, hero. Draw one?'),
+  scholar: L('读书人问前程？老朽不看文章，只看面相——嗯，额头亮，是个中举的相。十文一签。', 'A scholar asking about his future? I don’t read essays, only faces — hm, a bright brow, the look of a successful candidate. Ten coins a slip.'),
+  poet: L('太白先生的命，老朽不敢算——您的诗，比签文灵。要摇就摇一支，图个乐。', 'I dare not reckon Master Li’s fate — your poems are truer than any slip. Shake one if you like, for fun.'),
+  painter: L('画师，您笔下的山水，比老朽签上的准。……求一支？', 'Painter, the landscapes from your brush are truer than my slips. …Draw one?'),
+  musician: L('琴师姑娘，您的琴声里有天机，老朽听得出来。求一支？', 'Qin player, there are heaven’s secrets in your music — I can hear them. Draw a slip?'),
+  gardener: L('园丁师傅，您种下去的，自己就会长——命也一样。求一支看看？', 'Gardener, what you plant grows by itself — so does fate. Draw one and see?'),
+  fisher: L('老哥，钓鱼靠等，算命也靠等。等一支好签？', 'Old man, fishing is waiting, and so is fortune. Wait for a good slip?'),
 };
 export const GUAN_GIFT = L('……倒是送将军一句，不收钱：『大意失荆州』。切记，切记。', '…But one line for the general, free: “Careless, and Jingzhou is lost.” Remember it.');
 export const CAT_PAW = L('嗯……爪纹清晰，肉垫饱满。今日宜晒太阳，忌洗澡。不收钱，去吧。', 'Hmm… clear lines, plump pads. Today: good for sunbathing, bad for baths. No charge — off you go.');
@@ -293,6 +308,12 @@ export const SUGAR_HELLO: PerCompanion<Line> = {
   poet: L('诗仙！吹一个举杯的，杯里给您添一滴桂花蜜。五文钱，诗就不用付了。', 'The Poet! One raising his cup, with a drop of osmanthus honey in it. Five coins — keep your poems.'),
   swordsman: L('大侠要吹个什么？舞剑的！剑要长，要亮——五文钱，保证比真剑还威风。', 'What shall it be, hero? Mid-sword-dance! Long blade, bright blade — five coins, grander than the real thing.'),
   taoist: L('小道长，吹个踏云的？糖稀拉成云，您踩在上头。五文钱。', 'Little Taoist, one riding a cloud? I’ll pull the syrup into a cloud under your feet. Five coins.'),
+  scholar: L('公子，吹个捧书的？书页得拉得薄薄的，透光。五文钱。', 'Young sir, one holding a book? I’ll pull the pages paper-thin, so the light shines through. Five coins.'),
+  painter: L('画师，您画画，我画糖——咱俩是同行！五文，给您画一个拿笔的。', 'Painter, you paint in ink, I paint in sugar — we’re in the same trade! Five coins, and I’ll draw you holding a brush.'),
+  player: L('先生，吹个下棋的？棋子我用黑糖白糖各点一颗。五文钱。', 'Sir, one playing go? I’ll dot a black-sugar stone and a white. Five coins.'),
+  musician: L('琴师姑娘，糖做的琴，弦是拉丝的——五文，保准好看。', 'Qin player, a qin of sugar, strings of spun syrup — five coins, lovely guaranteed.'),
+  gardener: L('园丁师傅，吹个扛锄头的？锄头上再给您添朵糖花。五文钱。', 'Gardener, one with a hoe on his shoulder? I’ll add a sugar flower on the blade. Five coins.'),
+  fisher: L('老哥，吹个钓鱼的！鱼竿细，鱼线更细，这可是真功夫。五文钱。', 'Old man, one fishing! A thin rod and a thinner line — that takes real skill. Five coins.'),
 };
 export const SUGAR_MAKE: PerCompanion<Line> = {
   any: L('来——照着客官的样子，一勺糖稀，走！', 'Here — in your likeness: a ladle of hot syrup, and… go!'),
@@ -303,6 +324,12 @@ export const SUGAR_MAKE: PerCompanion<Line> = {
   poet: L('诗仙举杯邀明月——这杯子得吹得薄薄的。', 'The Poet raising a cup to the moon — the cup must be blown paper-thin.'),
   swordsman: L('一个人，一把剑……嗯，剑比人大，这才像大侠。', 'A man and a sword… the sword bigger than the man. Now that’s a hero.'),
   taoist: L('小道长，拂尘的毛可难画了，您瞧好——', 'Little Taoist, the whisk’s hairs are the hard part — watch closely.'),
+  scholar: L('公子捧书，书上还得写个字——就写个「中」吧，讨个彩头。', 'The young sir with his book — and a word on the page: “Pass”, for luck.'),
+  painter: L('画师拿笔，笔尖要蘸一点红——就是您的印泥色。', 'The painter with his brush — the tip dipped in red, the colour of your seal paste.'),
+  player: L('下棋的先生，手里捏一颗子，举棋不定——对，就这神气！', 'The go master with a stone between his fingers, not quite deciding — yes, just that look!'),
+  musician: L('琴师抚琴，手指得拉得细细的，像在拨弦。', 'The qin player at her strings — fingers pulled fine, as if plucking.'),
+  gardener: L('园丁扛锄，草帽得吹得圆圆的，帽檐再翘一点。', 'The gardener with his hoe — a round straw hat, brim tilted up a little.'),
+  fisher: L('渔翁垂钓，线上挂一条小糖鱼，一口就能咬着。', 'The old fisherman at his line — with a little sugar fish on the hook, just one bite away.'),
 };
 
 // ───────────────────────────── 卖花姑娘, the flower girl ─────────────────────────────
@@ -323,6 +350,13 @@ export const FLOWER_HELLO: PerCompanion<Line> = {
   poet: L('先生买枝花簪在帽檐上吧，「人老簪花不自羞」嘛。', 'Buy one for your hat, sir — “Old, but not ashamed to wear a flower,” as the poem says.'),
   gardener: L('园丁伯伯种的花比我的还好！这枝送您，您给我讲讲怎么养。', 'Your flowers beat mine, gardener! Take this one free — and tell me how you grow them.'),
   scholar: L('公子买花，是要送心上人吗？', 'Buying a flower, young sir? For someone special?'),
+  painter: L('画师大哥，买一枝回去照着画吧！画好了，花也不会谢了。', 'Painter, buy one to paint from! Once it’s painted, it’ll never wilt.'),
+  player: L('先生买花么？插在棋盘边上，下棋也香。', 'A flower, sir? Set it by your board — even your games will smell sweet.'),
+  musician: L('姐姐弹琴的时候，簪一枝在头上，一定好看！', 'When you play, sister, wear one in your hair — it’ll look lovely!'),
+  swordsman: L('大侠买花？……送给心上人的吧？我不告诉别人。', 'A hero buying flowers? …For your sweetheart, I bet. I won’t tell.'),
+  taoist: L('小道长也喜欢花？道观里种不种花呀？', 'Do Taoists like flowers too? Do you grow them at your temple?'),
+  fisher: L('老爷爷，买一枝插在斗笠上吧，鱼看见了也高兴。', 'Grandpa, buy one for your hat — the fish will be glad to see it.'),
+  rabbit: L('小兔子，花闻闻就好，不能啃哦！……好吧，啃一片叶子。', 'Little rabbit, just sniff the flowers, no nibbling! …All right, one leaf.'),
 };
 
 /** Given a flower: what each person says, and what they give back. */
@@ -374,6 +408,12 @@ export const FARMER_HELLO: PerCompanion<Line> = {
   rabbit: L('兔子！我的白菜！……唉，看你这么白净，拿一棵去吧。', 'A rabbit! My cabbages! …Ah, so clean and white — take one.'),
   scholar: L('读书人，也该知道「谁知盘中餐，粒粒皆辛苦」。', 'A scholar ought to know: “Who knows each grain on the plate came of toil?”'),
   change: L('老汉种了一辈子地，今儿见着月亮上的人了……回去跟老伴说，她准不信。', 'A lifetime farming and today I meet someone from the moon… the wife won’t believe me.'),
+  poet: L('太白先生也来看地？「锄禾日当午」可不是您写的，是李绅——您别抢。', 'Master Li come to see the land? “Hoeing at noon” wasn’t yours, mind — that was Li Shen. No stealing.'),
+  painter: L('画师，这块地你先画下来，等它长满了庄稼，你再画一张比比。', 'Painter, sketch this ground now — and when it’s full of crops, draw it again to compare.'),
+  player: L('下棋的？种地也像下棋：先占角，再守边，中间留着慢慢来。', 'A go player? Farming’s like your game: take the corners first, hold the sides, and fill the middle slowly.'),
+  musician: L('琴师姑娘，你弹一曲，地里的苗都长得快些——我是这么信的。', 'Qin player, play a tune and the shoots grow faster — that’s what I believe.'),
+  swordsman: L('大侠，剑再快，也快不过节气。种地急不得。', 'Hero, your sword may be quick, but it can’t outrun the seasons. Farming won’t be hurried.'),
+  fisher: L('老哥，你钓鱼，我种地，都是靠天吃饭的。', 'Old man, you fish and I farm — both of us live by the sky.'),
 };
 
 export const FARMER_TIPS: Line[] = [
@@ -402,6 +442,14 @@ export const SHUTONG_ASK: PerCompanion<Line> = {
   rabbit: L('小兔子，你耳朵长，能听见我家先生在哪儿吗？', 'Little rabbit, your ears are long — can you hear where Master is?'),
   taoist: L('松下问童子——哎，今天是童子问道士！你见过我家先生吗？', '“I asked the boy beneath the pine” — today the boy asks the Taoist! Have you seen my master?'),
   change: L('神仙姐姐，你在天上看得远，能看见我家先生吗？', 'Fairy sister, you can see far from the sky — can you see my master?'),
+  scholar: L('公子也是读书人！我家先生也是……可他走丢了！你帮我找找好不好？', 'You read books too! So does my master… but he’s got lost! Will you help me find him?'),
+  poet: L('您是诗仙！我家先生最喜欢您的诗，天天念——可他念着念着就走丢了！', 'You’re the Poet Immortal! My master loves your poems, recites them every day — and he recited himself right off somewhere!'),
+  painter: L('画师画画的时候，眼睛最尖了！能帮我找找我家先生吗？', 'Painters have the sharpest eyes! Can you help me look for my master?'),
+  player: L('先生会算棋，能不能算算我家先生走到哪儿去了？', 'You can read a go board, sir — can you work out where my master went?'),
+  musician: L('姐姐，要是你弹琴，我家先生听见了，会不会自己回来？', 'Sister, if you played your qin and my master heard it, would he come back by himself?'),
+  gardener: L('园丁爷爷，我家先生最爱看花，你知道哪里的花开得最好吗？他准在那儿！', 'Gardener, my master loves flowers — do you know where they bloom best? He’ll be there!'),
+  fisher: L('老爷爷，我家先生说要去看水……您在水边，看见他没有？', 'Grandpa, my master said he was going to look at the water… you’re by the water — have you seen him?'),
+  swordsman: L('大侠！你跑得快，帮我把先生找回来吧！', 'Hero! You’re fast — please bring my master back!'),
 };
 
 export const MASTER_FOUND: PerCompanion<Line> = {
@@ -430,6 +478,13 @@ export const TEA_HELLO: PerCompanion<Line | null> = {
   change: L('仙子请上坐——小的这就去泡一壶桂花茶。', 'Please, fair lady, the best seat — I’ll brew some osmanthus tea at once.'),
   musician: L('琴师来了！今儿能在小店弹一曲吗？茶钱全免！', 'The qin player! Would you play in my shop today? Tea’s on the house!'),
   fisher: L('老哥，今天的鱼送我店里来！做鱼汤！', 'Old friend, bring me today’s catch — fish soup!'),
+  scholar: L('公子里边请！靠窗的位子给您留着，看书喝茶两不误。', 'Come in, young sir! The window seat’s kept for you — read and drink both.'),
+  painter: L('画师来了！窗外那座桥，您画过没有？一壶茶的工夫就够。', 'The painter! Have you drawn the bridge outside the window? A pot of tea’s time would do it.'),
+  player: L('棋士到！马五在那边等着呢，茶我先给您沏上。', 'The go master! Ma Wu is waiting over there — I’ll pour your tea first.'),
+  gardener: L('园丁师傅，小店的茶，都是山上自己长的，您尝尝。', 'Gardener, our tea grows wild on the hill — have a taste.'),
+  swordsman: L('大侠请坐！喝茶解渴，喝酒误事——小店只有茶。', 'Sit, hero! Tea quenches thirst, wine clouds judgement — we only serve tea.'),
+  taoist: L('小道长！茶里有道，您比我懂。', 'Little Taoist! There is a Way in tea — you know it better than I.'),
+  rabbit: L('哟，小兔子也来喝茶？给你泡一碗菊花的，不苦。', 'Well, a little rabbit for tea? I’ll brew you chrysanthemum — not bitter.'),
 };
 export const FISHER_HELLO: PerCompanion<Line | null> = {
   any: null,
@@ -439,6 +494,13 @@ export const FISHER_HELLO: PerCompanion<Line | null> = {
   poet: L('太白兄，「闲来垂钓碧溪上」——坐下，一起钓。', '“At leisure I fish by the blue stream,” eh, Li Bai? Sit and fish with me.'),
   change: L('嫦娥仙子……老汉活了七十年，头一回见。', 'Lady Chang’e… seventy years I’ve lived, and I’ve never seen the like.'),
   rabbit: L('月亮上也有鱼吗？……没有？那你多钓几条带回去。', 'Are there fish on the moon? …No? Then catch a few to take home.'),
+  scholar: L('读书人也来钓鱼？坐下吧，钓鱼比读书省眼睛。', 'A scholar come fishing? Sit — fishing’s easier on the eyes than reading.'),
+  painter: L('画师，你画渔翁画了多少回？今儿看看真的。', 'Painter, how many fishermen have you painted? Today, have a look at a real one.'),
+  player: L('下棋的？钓鱼跟下棋一样，都讲究个「等」字。', 'A go player? Fishing is like your game — it’s all in the waiting.'),
+  musician: L('琴师姑娘，你一弹琴，水里的鱼都往这边游，我这竿子可就忙了。', 'Qin player, when you play, the fish all swim this way — then my rod gets busy.'),
+  gardener: L('园丁，你种花，我钓鱼，都是跟老天爷讨饭吃。', 'Gardener, you grow flowers and I catch fish — both of us begging our bread from heaven.'),
+  swordsman: L('大侠，你那剑要是能钓鱼就好了——一剑一条。', 'Hero, if only that sword could fish — one stroke, one fish.'),
+  taoist: L('小道长，你们道家讲「钓而不纲」，我懂，不贪。', 'Little Taoist, your sages say “fish with a line, not a net” — I know, never greedy.'),
 };
 export const MONK_HELLO: PerCompanion<Line | null> = {
   any: null,
@@ -448,6 +510,13 @@ export const MONK_HELLO: PerCompanion<Line | null> = {
   poet: L('李施主，寺里禁酒——葫芦请挂在山门外。', 'Master Li, no wine in the temple — hang your gourd outside the gate.'),
   change: L('……阿弥陀佛，罪过罪过，贫僧不该多看。', '…Amituofo. Forgive me, I should not stare.'),
   swordsman: L('施主剑气太重。放下，放下。', 'Your sword’s spirit is heavy, friend. Set it down, set it down.'),
+  scholar: L('阿弥陀佛。书生施主，读书是修，扫地也是修。', 'Amituofo. Scholar, reading is practice; so is sweeping.'),
+  painter: L('画师施主，寺里的山门，请您画一张？佛不嫌笔拙。', 'Painter, would you draw our temple gate? The Buddha does not mind a clumsy brush.'),
+  player: L('棋士施主，觉明师叔在后院摆了一局残棋，等了三年了。', 'Go master, Elder Jueming set out an unfinished game in the back court three years ago. It still waits.'),
+  musician: L('琴师施主，晨钟暮鼓之外，寺里缺的就是琴声。', 'Qin player, beyond the morning bell and evening drum, what the temple lacks is music.'),
+  gardener: L('园丁施主，寺后菜园的萝卜，今年长得歪，您给瞧瞧？', 'Gardener, the radishes behind the temple grew crooked this year — would you look?'),
+  fisher: L('渔翁施主，钓竿请放在山门外——放生池的鱼，胆子小。', 'Fisherman, leave your rod outside the gate — the fish in the release pond are timid.'),
+  rabbit: L('月宫的玉兔……贫僧给您留了一碟青菜。', 'The Moon Rabbit… I’ve saved you a dish of greens.'),
 };
 export const POET_NPC_HELLO: PerCompanion<Line | null> = {
   any: null,
@@ -457,6 +526,13 @@ export const POET_NPC_HELLO: PerCompanion<Line | null> = {
   change: L('「嫦娥应悔偷灵药」……哎呀，失言失言！', '“Chang’e must regret stealing the elixir”… oh! Forgive me, a slip of the tongue!'),
   scholar: L('兄台，良辰美景，来一局？', 'My friend — fine hour, fine view: a round?'),
   musician: L('有琴有诗，此亭今日不虚。', 'A qin and verses — the pavilion is well used today.'),
+  painter: L('画师也来了！诗中有画，画中有诗——今日可以一试。', 'The painter too! Poetry within painting, painting within poetry — today we can try it.'),
+  player: L('棋士，行令如下棋，一句一子，落下无悔。', 'Go master, a verse game is like go: one line, one stone, and no taking it back.'),
+  gardener: L('园丁先生，这梅是您照料的么？开得真好。行一令？', 'Gardener, do you tend this plum? It blooms so well. A round of verses?'),
+  fisher: L('渔翁也来行令？「孤舟蓑笠翁」——您就是诗里走出来的。', 'The fisherman plays too? “A straw-caped old man in a lone boat” — you stepped right out of the poem.'),
+  swordsman: L('侠客，「十步杀一人」——今日只行令，不杀人。', 'Swordsman, “one man slain every ten steps” — today we only trade verses, no slaying.'),
+  taoist: L('小道长，道家诗也多：「松下问童子」——你就是那童子吧？', 'Little Taoist, there are Taoist poems too: “I asked the boy beneath the pine” — you’re that boy, aren’t you?'),
+  rabbit: L('兔儿也来行令？「白兔捣药秋复春」——你先来。', 'A rabbit for verses? “The white rabbit pounds herbs autumn after spring” — you first.'),
 };
 export const KITE_HELLO: PerCompanion<Line | null> = {
   any: null,
@@ -466,4 +542,11 @@ export const KITE_HELLO: PerCompanion<Line | null> = {
   change: L('你是仙女吗？你会飞吗？帮我拿风筝好不好！', 'Are you a fairy? Can you fly? Please get my kite!'),
   taoist: L('小道士哥哥，你跳得高，帮帮我！', 'Taoist brother, you jump so high — help me!'),
   swordsman: L('大侠！你会轻功，一定能把风筝拿下来！', 'A hero! You know lightness skill — you can get it down!'),
+  scholar: L('哥哥是读书的吧？你会不会写「风」字？风把我的风筝吹跑了！', 'You read books, don’t you? Can you write “wind”? The wind blew my kite away!'),
+  poet: L('你就是写「儿童散学归来早」的那个人吗？', 'Are you the one who wrote about children coming home early from school?'),
+  painter: L('你会画风筝吗？画一只不会飞走的给我！', 'Can you paint kites? Paint me one that won’t fly away!'),
+  player: L('叔叔，风筝线缠成一团了，像你们下的棋！', 'Mister, the kite string’s all in a tangle — like your go games!'),
+  musician: L('姐姐，你的琴能把风筝叫回来吗？', 'Sister, can your qin call my kite back?'),
+  gardener: L('爷爷，竹子是你种的吗？它把我的风筝抓住了！', 'Grandpa, did you plant the bamboo? It grabbed my kite!'),
+  fisher: L('老爷爷，你能用鱼竿把风筝钓下来吗？', 'Grandpa, can you fish my kite down with your rod?'),
 };

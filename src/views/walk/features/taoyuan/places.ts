@@ -19,8 +19,16 @@ export const RING = { inner: 52, crest: 58, outer: SPEC.pocket!.ring };
 /** The lowest crest above the floor (the photo camera stays 3 m below it). */
 export const CREST_MIN = 34;
 
-/** The narrow way (光隧): a cleft through the south ring, from its start (outer end) to the inner mouth (local z). */
-export const CAVE = { start: 61.6, end: 65.2, words: 55, mouth: 40, trigger: 43, outer: 66 } as const;
+/**
+ * The narrow way (光隧): a cleft through the south ring, from its start (outer end, where the walker is
+ * set down, a few steps in front of the water-curtain) to the inner mouth (local z).
+ */
+export const CAVE = { start: 59.8, end: 65.2, words: 55, mouth: 40, trigger: 43, outer: 66 } as const;
+/**
+ * The last step of the plank walk (local z): short of the curtain and well inside the pocket's ring
+ * (beyond the ring the world core no longer counts the walker as inside, and the floor is taken away).
+ */
+export const CLEFT_END = Math.min(CAVE.end - 0.7, RING.outer - 0.8);
 
 export interface XZ { x: number; z: number }
 export interface XYZ { x: number; y: number; z: number }
@@ -161,7 +169,7 @@ export function streamAt(x: number, z: number): { d: number; s: number; hw: numb
 export function cleftHalf(z: number): number {
   if (z < CAVE.mouth - 4) return 6;
   if (z < 44) return 0.9 + (44 - z) * 0.62;
-  return 0.66 + 0.2 * (0.5 + 0.5 * Math.sin(z * 0.9 + 1.3)) + 0.06 * Math.sin(z * 2.7);
+  return 0.7 + 0.16 * (0.5 + 0.5 * Math.sin(z * 0.9 + 1.3)) + 0.03 * Math.sin(z * 2.7);
 }
 
 /** The cleft's floor (the plank walk), local height: level with the mouth, rising a little in the middle. */
@@ -267,7 +275,7 @@ export function inCleft(x: number, z: number): boolean {
 /** Where the walker may stand (local): the floor within its edge, dry, off the steep outcrop; the planks of the cleft. */
 export function walkAt(x: number, z: number): boolean {
   if (z > CAVE.mouth + 1.5) {
-    if (z > CAVE.end - 0.7) return false;
+    if (z > CLEFT_END) return false;
     return Math.abs(x + 0.05) < cleftHalf(z) - 0.42;
   }
   const r = Math.hypot(x, z);
@@ -328,7 +336,10 @@ export function standAt(x: number, z: number): number {
   if (x > H.x0 + 0.05 && x < H.x1 - 0.05 && z < H.z0 + 0.05 && z > H.z1 + 0.05) return floorAt(0, -24) + H.floor;
   // the hall's front step
   if (Math.abs(x) < 1.6 && z < H.z0 + 0.75 && z >= H.z0 + 0.05) return floorAt(0, -24) + H.floor * 0.5;
-  if (z > CAVE.mouth - 1 && z <= CAVE.mouth + 1.5 && Math.abs(x) < cleftHalf(z)) return Math.max(floorAt(x, z), cleftFloor(CAVE.mouth + 1.5) * smooth(CAVE.mouth - 1, CAVE.mouth + 1.5, z));
+  if (z > CAVE.mouth - 1 && z <= CAVE.mouth + 1.5 && Math.abs(x) < cleftHalf(z)) {
+    const f = floorAt(x, z);
+    return f + (cleftFloor(CAVE.mouth + 1.5) - f) * smooth(CAVE.mouth - 1, CAVE.mouth + 1.5, z);
+  }
   return floorAt(x, z);
 }
 
@@ -435,7 +446,7 @@ export function fenceValley(p: XYZ, walker: XYZ): void {
   const l = L(walker.x, walker.z);
   const c = L(p.x, p.z);
   if (l.z > CAVE.mouth + 1) {
-    const zz = clamp(c.z, CAVE.mouth - 3, CAVE.start + 0.8);
+    const zz = clamp(c.z, CAVE.mouth - 3, CLEFT_END - 0.4);
     const hw = Math.max(0.2, cleftHalf(zz) - 0.3);
     p.x = G.x + clamp(c.x, -hw, hw);
     p.z = G.z + zz;
@@ -445,6 +456,17 @@ export function fenceValley(p: XYZ, walker: XYZ): void {
   const d = Math.hypot(c.x, c.z);
   if (d > 44) { p.x = G.x + (c.x / d) * 44; p.z = G.z + (c.z / d) * 44; }
   p.y = Math.min(p.y, Y_T + CREST_MIN - 3);
+}
+
+/** hidden: only the petals · open: the light, 「入光」 · closed: 「寻向所志，遂迷」 · reopened: the light for good, 「持花入光」. */
+export type DoorState = 'hidden' | 'open' | 'closed' | 'reopened';
+
+/** The door's state from the record alone (bible §2), when the story has not pinned it. */
+export function doorStateFor(flags: Readonly<Record<string, true>>, hasShideLetter: boolean): DoorState {
+  if (flags['ty:way']) return 'reopened';
+  if (flags['ty:b8']) return 'closed';
+  if (hasShideLetter || flags['qy:taohua']) return 'open';
+  return 'hidden';
 }
 
 /** The glyphs brushed into the air in the valley (fetched as the valley is built). */

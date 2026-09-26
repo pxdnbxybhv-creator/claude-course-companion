@@ -541,7 +541,7 @@ export class ValleyFx {
       tex.wrapS = tex.wrapT = TH.RepeatWrapping;
       tex.repeat.set(6, 6);
       const layers = [0.25, 0.5, 0.85].map((hgt, li) => {
-        const N = this.low ? 28 : 44, R = FLOOR_R + 1;
+        const N = this.low ? 20 : 30, R = FLOOR_R + 1;
         const geo = new TH.PlaneGeometry(R * 2, R * 2, N, N).rotateX(-Math.PI / 2);
         const p = geo.attributes.position as T.BufferAttribute;
         for (let i = 0; i < p.count; i++) {
@@ -898,6 +898,8 @@ export class ValleyFx {
   // ───────────────────────────── FX1 / FX14: the cleft's light, its seasons, its closing
 
   private caveGlow: { sprite: T.Sprite; mat: T.SpriteMaterial; k: number } | null = null;
+  /** FX14 shows the light guttering out, wherever the walker stands. */
+  private glowHeld = false;
   /** The light at the cleft's inner mouth, growing as the walker comes nearer (FX1). Built by the door. */
   mouthGlow(): T.Sprite {
     const TH = this.THREE;
@@ -911,14 +913,24 @@ export class ValleyFx {
     this.own(mat);
     const g = { sprite, mat, k: 1 };
     this.caveGlow = g;
-    this.onFrame(() => {
-      const p = L(this.ctx.player.position.x, this.ctx.player.position.z);
+    // it is the light seen from inside the narrow way: it grows as the walker comes up the cleft, and
+    // goes as they reach the mouth (the flash takes over there) or turn back into the valley; and it
+    // never fills the lens (it fades as the camera comes near it, or passes it on the way out)
+    let seen = 0;
+    const cam = new this.THREE.Vector3();
+    this.onFrame((dt) => {
+      const pw = this.ctx.player.position;
+      const p = L(pw.x, pw.z);
       const d = Math.max(0, p.z - CAVE.mouth);
-      const near = p.z > CAVE.mouth - 2 && Math.abs(p.x) < 6;
-      sprite.visible = near && g.k > 0.01;
+      const want = (this.glowHeld || (p.z > CAVE.mouth + 3 && p.z < CAVE.end + 1 && Math.abs(p.x) < 6)) && pw.y > Y_T - 5 ? 1 : 0;
+      seen += (want - seen) * Math.min(1, dt * (want ? 1.2 : 2.2));
+      cam.copy(this.ctx.camera.position).sub(this.group.position).sub(sprite.position);
+      const lens = clamp01((cam.length() - 2) / 6);
+      const k = g.k * seen * lens * lens * (3 - 2 * lens);
       const s = 3.2 + 9 * clamp01(1 - d / 24);
       sprite.scale.set(s * 0.8, s * 1.4, 1);
-      mat.opacity = g.k * (0.55 + 0.35 * clamp01(1 - d / 24));
+      mat.opacity = k * (0.55 + 0.35 * clamp01(1 - d / 24));
+      sprite.visible = mat.opacity > 0.01;
     });
     return sprite;
   }
@@ -932,6 +944,7 @@ export class ValleyFx {
     const c = new Cloud(this, n, 'petal');
     const rng = makeRng(141);
     const P = Array.from({ length: n }, () => new TH.Vector3((rng() - 0.5) * 1.2, standAt(0, CAVE.mouth + 2) + 0.4 + rng() * 1.8, CAVE.mouth - 2 - rng() * 12));
+    this.glowHeld = true;
     const col = new TH.Color('#f3b3c3');
     let t = 0;
     const off = this.onFrame((dt) => {
@@ -967,6 +980,7 @@ export class ValleyFx {
     });
     off();
     c.dispose();
+    this.glowHeld = false;
   }
   private caveMist: (() => void) | null = null;
   /** The cleft's light and mist back as they were (after FX14, the next way in). */

@@ -223,6 +223,12 @@ export class SkySystem implements Sky {
   private moodMoon = new THREE.Vector3();
   /** A fog set by an effect over the mood (near, far, colour). */
   private fogOver: { near: number; far: number; color: THREE.Color | null } | null = null;
+  /**
+   * Whether a mood may be set now (the world core: only while the walker is inside a pocket valley).
+   * A mood or a fog asked for outside — an effect still running as the walker left — is refused, so the
+   * valley's sky never follows them out.
+   */
+  moodGate: (() => boolean) | null = null;
   private fogNow: { near: number; far: number } | null = null;
 
   constructor(
@@ -296,10 +302,12 @@ export class SkySystem implements Sky {
   /**
    * The valley clock (桃源): a sky of its own — palette, sun, moon, fog and water — that wins over the
    * hour while it is set. `secs`: how long the sky takes to turn (0 = at once; a time-lapse passes a
-   * few moods in a row with short ones). 'chang' follows the world's hour (see changTod). null gives
-   * the sky back to the hour, at once (it is cleared as the walker leaves the valley).
+   * few moods in a row with short ones). 'chang' follows the world's own hour — the hour it was entered
+   * at, or the one the walk was set to (时辰), a feature's night, a picture's hour — unless `hour` names
+   * one. null gives the sky back to the hour, at once (it is cleared as the walker leaves the valley).
    */
   setMood(mood: SkyMood | null, o: { secs?: number; hour?: number } = {}): void {
+    if (mood !== null && this.moodGate && !this.moodGate()) return;
     if (mood === null) {
       if (!this.mood) return;
       this.mood = null;
@@ -311,7 +319,7 @@ export class SkySystem implements Sky {
       this.applyPalette(1);
       return;
     }
-    const spec = mood === 'chang' ? MOODS[`chang:${changTod(o.hour ?? new Date().getHours() + new Date().getMinutes() / 60)}`] : MOODS[mood];
+    const spec = mood === 'chang' ? MOODS[`chang:${o.hour !== undefined && Number.isFinite(o.hour) ? changTod(o.hour) : this.hourTod()}`] : MOODS[mood];
     if (!spec) return;
     if (!this.preMood) this.preMood = { sun: this.sunDir.clone(), moon: this.moonDir.clone() };
     const first = !this.mood;
@@ -332,9 +340,22 @@ export class SkySystem implements Sky {
   get moodNow(): SkyMood | null {
     return this.moodId;
   }
+  /** The hour the mood paints (常 resolved to dawn, day, dusk or night), or null without a mood. */
+  get moodTod(): TimeOfDay | null {
+    return this.mood ? this.mood.tod : null;
+  }
+  /** The world's own hour as a night would show it (what 常 maps): a picture's, a feature's night, the clock's. */
+  private hourTod(): TimeOfDay {
+    return this.pictureNight ?? (this.forced || this.tod === 'night') ? 'night' : this.tod;
+  }
+  /** 常 turns with the world's hour (a picture's, a feature's night). */
+  private rechang(): void {
+    if (this.moodId === 'chang') this.setMood('chang', { secs: 1.2 });
+  }
 
   /** An effect's fog over the mood (a close mist, a clearing), or null to let the mood's fog be. */
   setFog(o: { near: number; far: number; color?: string } | null): void {
+    if (o && this.moodGate && !this.moodGate()) return;
     this.fogOver = o ? { near: o.near, far: o.far, color: o.color ? new THREE.Color(o.color) : null } : null;
   }
 
@@ -361,7 +382,9 @@ export class SkySystem implements Sky {
 
   /** A feature's night (features share this one flag); a picture's hour lies over it without touching it. */
   forceNight(on: boolean): void {
+    if (this.forced === on) return;
     this.forced = on;
+    this.rechang();
   }
 
   /** The hour the world was entered at, kept while a picture turns it (photo mode). */
@@ -381,11 +404,13 @@ export class SkySystem implements Sky {
         this.sunDir.copy(this.realHour.sun);
         this.realHour = null;
       }
-      return;
+    } else {
+      if (!this.realHour) this.realHour = { tod: this.tod, sun: this.sunDir.clone() };
+      this.tod = tod;
+      aimSun(this.sunDir, tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : 11, tod);
     }
-    if (!this.realHour) this.realHour = { tod: this.tod, sun: this.sunDir.clone() };
-    this.tod = tod;
-    aimSun(this.sunDir, tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : 11, tod);
+    // (inside the valley at 常, a picture's hour turns the valley's own sky)
+    this.rechang();
   }
 
   setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE.Vector3 }): void {

@@ -6,15 +6,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../app/i18n';
 import { lang as langSig, setSettings, state, today } from '../../app/store';
-import { play, isUnlockedIn } from '../../app/play';
+import { celebrations, play, isUnlockedIn } from '../../app/play';
 import { arrivals, claimLetter, closeMail, deliverDue, hasGift, mail, mailUi, openMail, type MailEntry } from '../../app/mail';
-import { fillName, playerName, type NameScope } from '../../app/name';
+import { displayName, fillName, playerName, type NameScope } from '../../app/name';
 import { nameAsk, registerNameHost } from '../../app/nameAsk';
 import { cleanName } from '../../core/names';
 import type { Lang } from '../../core/types';
 import { LETTER, type LetterDef } from '../../data/letters';
 import { CHARACTER } from '../../data/characters';
-import { Sheet, toast } from '../../ui/kit';
+import { Sheet, dismissToast, openSheets, toast } from '../../ui/kit';
 import { CoinIcon, coinToast, fmtCoins } from '../../ui/coins';
 import { Portrait, Seal } from '../quests/bits';
 import { dprOf, paintPaper } from '../quests/paint';
@@ -29,7 +29,7 @@ export function MailHost() {
   // a new day while the app stays open: the letters that come "the next day" come now
   const day = today.value;
   useEffect(() => { deliverDue(); }, [day]);
-  useAnnouncer(ui !== null || ask !== null);
+  useAnnouncer(ui !== null, ask !== null);
   return (
     <>
       <MailSheet ui={ui} />
@@ -40,29 +40,63 @@ export function MailHost() {
 
 // ------------------------------------------------------------------------------------ the courier
 
-/** 「驿使送来一封信」 with 拆信, for letters that came while the app was open (held while the welcome shows). */
-function useAnnouncer(busy: boolean) {
+/** The courier's toast while it shows: its id and the letters it brought. */
+let courier: { toast: number; ids: string[] } | null = null;
+
+/** Something the courier should not talk over: the walk still grinding its ink or changing scene. */
+function screenBusy(): boolean {
+  try {
+    return !!document.querySelector('.walk-loading:not(.walk-fail), .walk-curtain.is-on, .cel');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 「驿使送来一封信」 with 拆信, for letters that came while the app was open. He waits while the
+ * welcome shows, while any sheet is open (the first habit's editor, the letters themselves), while a
+ * quest is being celebrated and while the walk is still loading; he leaves as soon as the letters
+ * are opened, and if another sheet opens over him he steps aside and comes back when it closes.
+ */
+function useAnnouncer(mailOpen: boolean, asking: boolean) {
   const t = useT();
   const a = arrivals.value;
   const s = state.value;
+  const box = mail.value.box;
+  const sheets = openSheets.value;
+  const cheering = celebrations.value.length > 0;
   const welcomed = s.onboarded || s.habits.length > 0;
+  const held = mailOpen || asking || sheets > 0 || cheering;
+  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (!a.length || !welcomed || busy) return;
+    if (!a.length || !welcomed || held) return;
     const tm = setTimeout(() => {
+      if (screenBusy()) { setRetry((n) => n + 1); return; }
       const ids = arrivals.peek().filter((id) => mail.peek().box.some((e) => e.id === id && !e.read));
       arrivals.value = [];
       if (!ids.length) return;
       const one = ids.length === 1 ? ids[0] : undefined;
       const from = one ? LETTER[one]?.from : undefined;
-      toast(
+      const id = toast(
         ids.length > 1
           ? t(`驿使送来 ${ids.length} 封信`, `A courier brings you ${ids.length} letters`)
           : t(`驿使送来一封信${from ? ` · ${from.zh}` : ''}`, `A courier brings you a letter${from ? ` · ${from.en}` : ''}`),
         { ms: 7000, action: { label: t('拆信', 'Open'), run: () => openMail(one) } },
       );
+      courier = { toast: id, ids };
     }, 1400);
     return () => clearTimeout(tm);
-  }, [a, welcomed, busy]);
+  }, [a, welcomed, held, retry]);
+  // his letters opened (from the 信 button, or elsewhere), or a sheet over him: he goes
+  useEffect(() => {
+    const c = courier;
+    if (!c) return;
+    const waiting = c.ids.filter((id) => box.some((e) => e.id === id && !e.read));
+    if (!mailOpen && !asking && !sheets && waiting.length) return;
+    courier = null;
+    // stepped aside for some other sheet: he comes back with what is still unopened
+    if (dismissToast(c.toast) && !mailOpen && waiting.length) arrivals.value = [...new Set([...arrivals.peek(), ...waiting])];
+  }, [mailOpen, asking, sheets, box]);
 }
 
 // ------------------------------------------------------------------------------------ the sheet
@@ -111,7 +145,7 @@ function BoxView() {
                   <span class="mail-item-tag">{t('已收', 'Taken')}</span>
                 ) : null}
               </span>
-              {!e.read && <i class="mail-dot" aria-label={t('未拆', 'Unread')} />}
+              {!e.read && <i class="mail-dot" role="img" aria-label={t('未拆', 'Unread')} />}
             </button>
           </li>
         );
@@ -197,7 +231,10 @@ function LetterView(props: { l: LetterDef; entry: MailEntry }) {
           id="mail-name"
           value={draft}
           label={t('足下如何称呼？', 'What shall I call you?')}
-          hint={t('可留空，便称「园主」；日后在设置 · 名号里可改。', 'You may leave it blank (“friend”) and change it later in Settings.')}
+          placeholder={displayName(lang, scope, '')}
+          hint={scope === 'valley'
+            ? t('可留空，便称「客」；日后在设置 · 名号里可改。', 'You may leave it blank (“guest”) and change it later in Settings.')
+            : t('可留空，便称「园主」；日后在设置 · 名号里可改。', 'You may leave it blank (“friend”) and change it later in Settings.')}
           onDraft={setDraft}
           onEnter={take}
         />
@@ -343,7 +380,7 @@ function NameSheet() {
     <Sheet open onClose={none} title={t('名号', 'Your name')} label={t('名号', 'Your name')}>
       <div class="mail-ask">
         <p class="mail-ask-prompt">{t(ask.promptZh, ask.promptEn)}</p>
-        <NameField id="ask-name" value={draft} label={t('如何称呼', 'Your name')} onDraft={setDraft} onEnter={save} autoFocus />
+        <NameField id="ask-name" value={draft} label={t('如何称呼', 'Your name')} placeholder={displayName(langSig.value, ask.scope, '')} onDraft={setDraft} onEnter={save} autoFocus />
         <div class="mail-ask-actions">
           <button type="button" class="btn btn-primary" onClick={save} disabled={!cleanName(draft)}>{t('就这样称呼', 'Call me that')}</button>
           <button type="button" class="btn btn-ghost" onClick={none}>{t('山野之人，无名无号', 'Just a traveller — no name')}</button>

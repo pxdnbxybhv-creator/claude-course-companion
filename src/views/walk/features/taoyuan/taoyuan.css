@@ -102,11 +102,21 @@
   width: 260px;
   height: 180px;
 }
+.ty-stamp::before {
+  /* a sheet of paper under the ink: the name reads on the darkest night of the case */
+  content: '';
+  position: absolute;
+  inset: -6px -18px;
+  border-radius: 48% 52% 46% 54% / 52% 44% 56% 48%;
+  background: radial-gradient(closest-side, rgba(241, 233, 216, 0.9), rgba(241, 233, 216, 0.82) 62%, rgba(241, 233, 216, 0) 100%);
+  opacity: 0;
+  animation: ty-in 0.5s ease forwards;
+}
 .ty-stamp .blot {
   position: absolute;
   inset: 20px 30px;
   border-radius: 46% 54% 50% 50% / 55% 45% 55% 45%;
-  background: radial-gradient(closest-side, rgba(30, 26, 22, 0.28), rgba(30, 26, 22, 0.12) 60%, rgba(30, 26, 22, 0) 100%);
+  background: radial-gradient(closest-side, rgba(30, 26, 22, 0.2), rgba(30, 26, 22, 0.08) 60%, rgba(30, 26, 22, 0) 100%);
   transform: scale(0.2);
   opacity: 0;
   animation: ty-blot 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
@@ -128,7 +138,8 @@
   font-family: var(--font-latin);
   font-style: italic;
   font-size: 15px;
-  color: #3a332b;
+  color: #2a241e;
+  text-shadow: 0 0 6px rgba(241, 233, 216, 0.95), 0 0 2px rgba(241, 233, 216, 0.95);
   opacity: 0;
   animation: ty-in 0.6s ease 0.8s forwards;
 }

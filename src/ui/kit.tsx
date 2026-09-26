@@ -7,19 +7,33 @@ import { PLANT_INFO } from '../ink/plants';
 import { useT } from '../app/i18n';
 import './ui.css';
 
+/** The sheets open right now, oldest first: Esc closes only the topmost (a letter over an editor). */
+const sheetStack: object[] = [];
+/** How many sheets are open (the courier's toast waits until there are none). */
+export const openSheets = signal(0);
+
 export function Sheet(props: { open: boolean; onClose: () => void; title?: ComponentChildren; children: ComponentChildren; label?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const t = useT();
   useEffect(() => {
     if (!props.open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && props.onClose();
+    const me = {};
+    sheetStack.push(me);
+    openSheets.value = sheetStack.length;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && sheetStack[sheetStack.length - 1] === me) props.onClose();
+    };
     window.addEventListener('keydown', onKey);
     const prev = document.activeElement as HTMLElement | null;
     ref.current?.focus();
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+      const at = sheetStack.indexOf(me);
+      if (at >= 0) sheetStack.splice(at, 1);
+      openSheets.value = sheetStack.length;
+      // the page scrolls again only once the last sheet is gone
+      if (!sheetStack.length) document.body.style.overflow = '';
       prev?.focus?.();
     };
   }, [props.open]);
@@ -58,12 +72,25 @@ interface ToastAction { label: string; run: () => void }
 const toastMsg = signal<{ text: string; id: number; action?: ToastAction } | null>(null);
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let toastSeq = 0;
-/** Show a short message at the top of the screen, optionally with one action (e.g. 撤销 · Undo). */
-export function toast(text: string, opts: number | { ms?: number; action?: ToastAction } = 2600): void {
+/**
+ * Show a short message at the top of the screen, optionally with one action (e.g. 撤销 · Undo).
+ * Returns its id, for dismissToast.
+ */
+export function toast(text: string, opts: number | { ms?: number; action?: ToastAction } = 2600): number {
   const o = typeof opts === 'number' ? { ms: opts } : opts;
-  toastMsg.value = { text, id: ++toastSeq, action: o.action };
+  const id = ++toastSeq;
+  toastMsg.value = { text, id, action: o.action };
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (toastMsg.value = null), o.ms ?? (o.action ? 5000 : 2600));
+  return id;
+}
+/** Take a toast down early: that one (by id) if it is still showing, or with no id whatever shows. True if one went. */
+export function dismissToast(id?: number): boolean {
+  const m = toastMsg.peek();
+  if (!m || (id !== undefined && m.id !== id)) return false;
+  clearTimeout(toastTimer);
+  toastMsg.value = null;
+  return true;
 }
 export function ToastHost() {
   const m = toastMsg.value;

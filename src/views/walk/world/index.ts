@@ -9,7 +9,7 @@ import { effect } from '@preact/signals';
 import type { FestivalKey, Hud, Interactable, InputState as CtxInput, QualityLevel, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
 import { REGION_MODULES } from '../regions';
-import { allDecks, clearedAt, rectClearing, registerClearing } from '../regions/water-decks';
+import { allDecks, clearedAt, deckWalk, deckWater, rectClearing, registerClearing } from '../regions/water-decks';
 import { FACTORIES } from '../characters';
 import type { CharacterModel } from '../characters/types';
 import { ANCHORS, HOME_PLOT, REGION, REGIONS, WAYPOINTS, pocketAt, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
@@ -556,15 +556,36 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   setPx();
 
   // --- collisions (regions and features add their props through addCollider)
-  /** A prop's footprint, and (given a height) its top in world y: above that the walker steps over it. */
-  type Solid = Circle & { top?: number };
+  /**
+   * A prop's footprint, and (given a height) its top in world y: above that the walker steps over it.
+   * `base`: the surface it was set on (world y), for props added through addCollider. A prop far below
+   * the walker's feet (the open country under a pocket valley's floor) or far above them (the valley's
+   * own, seen from the ground) is on another level and does not stop them.
+   */
+  type Solid = Circle & { top?: number; base?: number };
+  /** How far (m) below and above a prop's base the walker may be and still be stopped by it. */
+  const LEVEL = { below: 10, above: 20 };
+  const otherLevel = (c: Solid, y: number) => c.base !== undefined && Number.isFinite(y) && (y < c.base - LEVEL.below || y > c.base + LEVEL.above);
   const colliders: Solid[] = [...staticColliders()];
   for (const e of plants) {
     const c = plantCollider(e);
     if (c) colliders.push(c);
   }
   for (const t of tabletSpecs) colliders.push({ x: t.x, z: t.z, r: 0.3 });
-  const walkHere = (x: number, z: number) => walkableGround(x, z) || (player.floats && x * x + z * z < 172 * 172);
+  /**
+   * Where a floating walker (凌波, 嫦娥's 奔月) may go beyond the dry ground: any water in the world, but on
+   * a deck with a walk rule of its own (a pocket valley's floor) only that deck's water, and never out
+   * past the pocket's ring (the rock of its cleft is not water).
+   */
+  const floatHere = (x: number, z: number) => {
+    if (!player.floats) return false;
+    if (deckWalk(x, z) === null) return !pocket && x * x + z * z < 172 * 172;
+    if (deckWater(x, z) == null) return false;
+    if (!pocket) return true;
+    const r = REGION[pocket];
+    return Math.hypot(x - r.center.x, z - r.center.z) < r.pocket!.ring - 0.8;
+  };
+  const walkHere = (x: number, z: number) => walkableGround(x, z) || floatHere(x, z);
   /** resolve()'s answer: one array, reused (read it at once). */
   const resolved: [number, number] = [0, 0];
   const out = (x: number, z: number): readonly [number, number] => { resolved[0] = x; resolved[1] = z; return resolved; };
@@ -577,6 +598,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         if (dx > m || dx < -m || dz > m || dz < -m) continue;
         // on top of it (or clearing it in a jump): walk along the wall top, over the crate
         if (c.top !== undefined && c.top <= feetY + 0.03) continue;
+        if (otherLevel(c, feetY)) continue;
         const d = Math.sqrt(dx * dx + dz * dz);
         if (d < m && d > 1e-6) { x = c.x + (dx / d) * m; z = c.z + (dz / d) * m; }
       }
@@ -609,7 +631,17 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     return false;
   };
   // a little clearance round every trunk, stone, tablet and wall, so nothing is set down inside another
-  const isWalkable = (x: number, z: number) => walkableGround(x, z, 0.1) && !nearWall(x, z, 0.7) && !colliders.some((c) => Math.abs(x - c.x) < c.r + 0.5 && Math.hypot(x - c.x, z - c.z) < c.r + 0.45);
+  const isWalkable = (x: number, z: number) => {
+    if (!walkableGround(x, z, 0.1) || nearWall(x, z, 0.7)) return false;
+    // (a prop counts only on the level of the surface here: a pocket valley's floor floats over open country)
+    let y = NaN;
+    for (const c of colliders) {
+      if (Math.abs(x - c.x) >= c.r + 0.5 || Math.hypot(x - c.x, z - c.z) >= c.r + 0.45) continue;
+      if (c.base !== undefined && Number.isNaN(y)) y = floorY(x, z);
+      if (!otherLevel(c, y)) return false;
+    }
+    return true;
+  };
 
   // --- the companions' gifts that live in the world: the qin player's listeners, the poet's verses
   const songBirds = new SongBirds(bag, floorY, isWalkable);
@@ -644,8 +676,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const addCollider = (c0: Collider) => {
     const c: Solid = { x: c0.x, z: c0.z, r: Math.max(0.05, c0.r) };
     const h = c0.h !== undefined && Number.isFinite(c0.h) && c0.h > 0 ? c0.h : 0;
-    // its top, from the surface it stands on now (the ground, or a quay it was set on)
-    if (h > 0) c.top = floorY(c.x, c.z) + h;
+    // its top, from the surface it stands on now (the ground, a quay it was set on, a pocket valley's floor)
+    c.base = floorY(c.x, c.z);
+    if (h > 0) c.top = c.base + h;
     colliders.push(c);
     let offOcc: (() => void) | null = null;
     if (h >= 0.9) {
@@ -886,7 +919,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const trackRegion = () => {
     const p = player.position;
     // a pocket valley first (keyed on the walker in 3-D: its floor floats high over open country)
-    const at = pocketAt(p.x, p.y, p.z) ?? regionAt(p.x, p.z);
+    const at = pocketHere() ?? regionAt(p.x, p.z);
     if (at === region) return;
     if (at === null && region && !REGION[region].pocket) {
       const r = REGION[region];
@@ -1049,6 +1082,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
    * straight into the scene far from the pocket. All of it comes back, exactly, on the way out.
    */
   let pocket: RegionId | null = null;
+  // the valley clock's sky belongs to the valley: a mood asked for outside it is refused
+  sky.moodGate = () => pocket !== null;
   const pocketHidden = new Set<THREE.Object3D>();
   let pocketAmbient = false;
   const coreLayers = (): THREE.Object3D[] => [land.group, openWater.group, bridges, scatter.group, ground.mesh, wall.group, flora.mist, mountains, ...(air ? [air.points] : [])];
@@ -1086,9 +1121,21 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       if (pocketAmbient) { pocketAmbient = false; try { audio.setAmbient('none'); } catch { /* muted */ } }
     }
   };
+  /**
+   * The pocket region the walker is in, with a little hysteresis like the ground regions': once inside,
+   * leaving takes a few metres past its ring on its level (a fall, or a way out through its door, leaves
+   * at once: both drop far below its floor).
+   */
+  const pocketHere = (): RegionId | null => {
+    const p = player.position;
+    const at = pocketAt(p.x, p.y, p.z);
+    if (at || !pocket) return at;
+    const r = REGION[pocket], P = r.pocket!;
+    return p.y > P.y - 10 && Math.hypot(p.x - r.center.x, p.z - r.center.z) < P.ring + 6 ? pocket : null;
+  };
   const stream = () => {
     const p = player.position;
-    setPocket(pocketAt(p.x, p.y, p.z));
+    setPocket(pocketHere());
     if (pocket) {
       for (const r of REGIONS) {
         const g = regionGroups.get(r.id)!;

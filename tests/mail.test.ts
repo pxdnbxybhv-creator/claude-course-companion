@@ -15,7 +15,9 @@ import { CHARACTERS, CHARACTER } from '../src/data/characters';
 import { QUEST } from '../src/data/quests';
 import { cleanName, NAME_MAX } from '../src/core/names';
 import { fillName, displayName } from '../src/app/name';
-import { askName, nameAsk, registerNameHost } from '../src/app/nameAsk';
+import { askName, nameAsk, provideNameScope, registerNameHost } from '../src/app/nameAsk';
+import { HAO } from '../src/views/mail/hao';
+import { dismissToast, toast } from '../src/ui/kit';
 import { splitLetter, pickPs, claimSets, letterDate } from '../src/views/mail/letter';
 
 const settle = () => new Promise<void>((r) => setTimeout(r, 0));
@@ -238,6 +240,24 @@ describe('玉兔 from the old 八月十五', () => {
     expect(pickPs(l, play.value.flags)?.zh).toContain('萝卜');
   });
 
+  it('only a save from before this build migrates: mooncakes eaten now still leave her to the letter', () => {
+    // a new player eats the eight mooncakes before opening the 初见礼, then reloads (or another tab syncs)
+    ensureFirstGift();
+    const now = sanitizePlay(JSON.parse(JSON.stringify({ ...emptyPlay(), done: { 'q-mooncake': DAY } })));
+    expect(now.v).toBe(2);
+    expect(now.flags['char:rabbit']).toBeUndefined();
+    expect(sanitizePlay({ v: 2, done: { 'q-mooncake': DAY }, flags: {} }).flags['char:rabbit']).toBeUndefined();
+    play.value = now;
+    expect(isUnlockedIn(play.value, 'rabbit')).toBe(false);
+    expect(pickPs(LETTER[FIRST_GIFT], play.value.flags)).toBeUndefined();
+    expect(claimLetter(FIRST_GIFT)).toBe('ok');
+    expect(celebrations.value).toEqual([`gift:${FIRST_GIFT}`]);
+    expect(play.value.flags[`mail:${FIRST_GIFT}:had`]).toBeUndefined();
+    // and an old save, with no version or v1, still keeps the rabbit it earned
+    expect(sanitizePlay({ v: 1, done: { 'q-mooncake': '2025-10-06' } }).flags['char:rabbit']).toBe(true);
+    expect(emptyPlay().v).toBe(2);
+  });
+
   it('someone who gets her from the letter never sees that postscript', () => {
     ensureFirstGift();
     const l = LETTER[FIRST_GIFT];
@@ -364,6 +384,43 @@ describe('名号', () => {
     expect(await a).toBe('');
     off();
     expect(await b).toBe('');
+  });
+
+  it('askName knows where it is asked: 客 in the valley, 园主 elsewhere, or as the caller says', async () => {
+    const off = registerNameHost();
+    void askName();
+    expect(nameAsk.value?.scope).toBe('world');
+    const undo = provideNameScope(() => 'valley');
+    void askName('老丈问道', 'The elder asks');
+    expect(nameAsk.value?.scope).toBe('valley');
+    void askName(undefined, undefined, 'world');
+    expect(nameAsk.value?.scope).toBe('world');
+    // a world that is gone (where() throws) falls back to the garden's default
+    const undo2 = provideNameScope(() => { throw new Error('disposed'); });
+    void askName();
+    expect(nameAsk.value?.scope).toBe('world');
+    undo2();
+    undo();
+    nameAsk.value?.resolve('');
+    off();
+  });
+
+  it('every 拟号 fits a name whole, in both languages', () => {
+    expect(HAO.length).toBeGreaterThanOrEqual(6);
+    for (const [zh, en] of HAO) {
+      expect(cleanName(zh), zh).toBe(zh);
+      expect(cleanName(en), en).toBe(en);
+      expect(Array.from(en).length, en).toBeLessThanOrEqual(NAME_MAX);
+    }
+  });
+
+  it('a toast can be taken down early, but only the one asked for', () => {
+    const a = toast('驿使送来一封信', { ms: 7000 });
+    const b = toast('另一句');
+    expect(dismissToast(a)).toBe(false);
+    expect(dismissToast(b)).toBe(true);
+    expect(dismissToast(b)).toBe(false);
+    expect(dismissToast()).toBe(false);
   });
 });
 

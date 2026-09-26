@@ -6,6 +6,8 @@
 //   卖花姑娘  a flower girl: buy a flower, give it to someone for a surprise
 //   老农      an old farmer by the homestead: tips on building, pets, waypoints
 //   书童      a lost page boy looking for his master across the places (a little errand)
+// Each has a name (folk.ts: 货郎孙七, 说书钱先生, 袁半仙, 糖人张, 杏儿, 田老伯, 小篆 and 柳先生), given the
+// first time you talk (the prompt then reads 「title·name」), and a small story told a beat a day.
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { CharacterId } from '../../../../data/characters';
@@ -33,6 +35,7 @@ import { PEDDLER_ROUTE, PEDDLER_SPEED, SHUTONG_SPOTS } from './places';
 import { offerFlower } from './gift';
 import { blockedAlong } from './crowd';
 import * as snd from './sound';
+import { stallFolk } from './talk';
 
 const who = (ctx: WorldCtx): CharacterId => ctx.player.character;
 const night = (ctx: WorldCtx): boolean => { try { return ctx.sky.isNight(); } catch { return false; } };
@@ -119,10 +122,11 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
   const pr = { ...pos };
   let clock = clockSeconds(ctx.env.date), talking = false, rattleT = 2, callT = 6, metToday = false, callN = 0;
   const voice = { x: pr.x, y: 0, z: pr.z, top: f.height + 0.25 };
-  const name = { zh: '货郎', en: 'Peddler' };
-  bag.interact({
+  const folk = stallFolk('n.peddler');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-peddler', position: at, radius: 2.2,
-    labelZh: '货郎', labelEn: 'Peddler', actionZh: '看货', actionEn: 'Browse',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '看货', actionEn: 'Browse',
     async act() {
       if (!begin(ctx, 'talk')) return;
       talking = true;
@@ -134,6 +138,7 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
           if (gift === 'first') { receive('haws'); ctx.hud.toast('得了一串糖葫芦', 'A stick of candied haws for you', 1800); }
           return;
         }
+        await folk.story(ctx, night(ctx));
         let first = true;
         for (;;) {
           const choices = WARES.map((w) => {
@@ -166,7 +171,7 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
         }
       } finally { talking = false; end(ctx, 'talk'); }
     },
-  });
+  }));
   bag.frame((dt, t) => {
     const pp = ctx.player.position;
     const d = Math.hypot(pp.x - pr.x, pp.z - pr.z);
@@ -221,17 +226,19 @@ export const storyteller = feature('npc-storyteller', (bag, ctx) => {
   greet(bag, ctx, f, 5);
   const day = toKey(ctx.env.date);
   let n = 0;
-  const name = { zh: '说书人', en: 'Storyteller' };
+  const folk = stallFolk('n.storyteller');
+  const name = folk.nameRef;
   const knock = () => { snd.gavel(); f.armR.rotation.x = -1.2; bag.later(180, () => { f.armR.rotation.x = -0.2; }); };
-  bag.interact({
+  bag.interact(folk.prompt({
     id: 'npc-storyteller', position: front(f, 1.2), radius: 2.2,
-    labelZh: '说书人', labelEn: 'Storyteller', actionZh: '听书', actionEn: 'Listen',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '听书', actionEn: 'Listen',
     async act() {
       if (!begin(ctx, 'talk')) return;
       mark.set(false);
       try {
         record('npc:storyteller');
         if (await offerFlower(ctx, f, name, 'storyteller')) return;
+        await folk.story(ctx, night(ctx));
         const me = who(ctx);
         const tale = taleFor(TALES, day, me, n++);
         const spotted = forCompanion(TALE_SPOTTED, me);
@@ -264,7 +271,7 @@ export const storyteller = feature('npc-storyteller', (bag, ctx) => {
         const after = tale.hero === me ? tale.heroNote : me === 'cat' ? CAT_AFTER : forCompanion(TALE_AFTER, me);
         if (after) {
           if (tale.hero === me) ctx.player.emote(me === 'guan' ? 'bow' : 'talk');
-          await ctx.hud.say({ nameZh: me === 'cat' ? '说书人' : '　', nameEn: me === 'cat' ? 'Storyteller' : ' ', zh: after.zh, en: after.en });
+          await ctx.hud.say({ nameZh: me === 'cat' ? name.zh : '　', nameEn: me === 'cat' ? name.en : ' ', zh: after.zh, en: after.en });
         }
         const heard = Object.keys(play.value.flags).filter((k) => k.startsWith('tale:')).length;
         const tip = await talk(ctx, f, name, [{
@@ -276,7 +283,7 @@ export const storyteller = feature('npc-storyteller', (bag, ctx) => {
         else ctx.hud.toast('啪啪啪——满堂喝彩', 'Clap clap clap — the whole teahouse cheers', 1600);
       } finally { mark.set(true); end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 算命先生, the fortune teller ─────────────────────────────
@@ -315,7 +322,8 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
   greet(bag, ctx, f, 5);
   const day = toKey(ctx.env.date);
   let draws = 0;
-  const name = { zh: '算命先生', en: 'Fortune Teller' };
+  const folk = stallFolk('n.fortune');
+  const name = folk.nameRef;
   const drawSlip = async () => {
     snd.sticks();
     f.armR.rotation.x = -1.1;
@@ -330,9 +338,9 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
       seal: '签',
     });
   };
-  bag.interact({
+  bag.interact(folk.prompt({
     id: 'npc-fortune', position: front(f, 1.3), radius: 2.2,
-    labelZh: '算命先生', labelEn: 'Fortune teller', actionZh: '求签', actionEn: 'Draw a slip',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '求签', actionEn: 'Draw a slip',
     async act() {
       if (!begin(ctx, 'talk')) return;
       mark.set(false);
@@ -340,6 +348,7 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
         record('npc:fortune');
         const gift = await offerFlower(ctx, f, name, 'fortune');
         if (gift) { if (gift === 'first') await drawSlip(); return; }
+        await folk.story(ctx, night(ctx));
         const me = who(ctx);
         const hello = forCompanion(FORTUNE_HELLO, me);
         if (me === 'guan') {
@@ -362,7 +371,7 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
         await drawSlip();
       } finally { mark.set(true); end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 糖人, the sugar-figure stall ─────────────────────────────
@@ -374,11 +383,12 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
   f.armR.rotation.x = -0.6;
   const mark = speechMark(bag, f, '糖');
   greet(bag, ctx, f, 4);
-  const name = { zh: '糖人张', en: 'Sugar-Figure Zhang' };
+  const folk = stallFolk('n.sugar');
+  const name = folk.nameRef;
   const spot = new ctx.THREE.Vector3(5, ctx.groundY(5, nz + 1.5), nz + 1.5);
-  bag.interact({
+  bag.interact(folk.prompt({
     id: 'npc-sugar', position: spot, radius: 1.9,
-    labelZh: '糖人摊', labelEn: 'Sugar figures', actionZh: '吹糖人', actionEn: 'Make one',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '吹糖人', actionEn: 'Make one',
     async act() {
       if (!begin(ctx, 'talk')) return;
       mark.set(false);
@@ -387,6 +397,7 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
         const me = who(ctx);
         // a sugar figure free for the first flower of the day; after that, flowers are only thanked
         const free = (await offerFlower(ctx, f, name, 'sugar')) === 'first';
+        if (!free) await folk.story(ctx, night(ctx));
         if (!free) {
           const hi = forCompanion(SUGAR_HELLO, me);
           const c = await talk(ctx, f, name, [{ zh: `${hi.zh}（囊中 ${coinsNow()} 文）`, en: `${hi.en} (Purse: ${coinsNow()})`, choices: [{ zh: `来一个 · ${SUGAR_PRICE}文`, en: `One, please · ${SUGAR_PRICE}` }, { zh: '看看就好', en: 'Just looking' }] }]);
@@ -414,7 +425,7 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
         }
       } finally { mark.set(true); end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 卖花姑娘, the flower girl ─────────────────────────────
@@ -445,15 +456,17 @@ export const flowerGirl = feature('npc-flower', (bag, ctx) => {
     const d = Math.hypot(pp.x - voice.x, pp.z - voice.z);
     if (callT <= 0 && d < 16 && d > 2.5) { callT = 12; bubbles.say(voice, tr(ctx, fl.call.zh, fl.call.en), 2.8); }
   });
-  const name = { zh: '卖花姑娘', en: 'Flower Girl' };
-  bag.interact({
+  const folk = stallFolk('n.flower');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-flower', position: front(f, 0.9), radius: 2,
-    labelZh: '卖花姑娘', labelEn: 'Flower girl', actionZh: '买花', actionEn: 'Buy a flower',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '买花', actionEn: 'Buy a flower',
     async act() {
       if (!begin(ctx, 'talk')) return;
       mark.set(false);
       try {
         record('npc:flower');
+        await folk.story(ctx, night(ctx));
         const me = who(ctx);
         // 嫦娥 and the gardener get one flower a day for nothing
         const fond = me === 'change' || me === 'gardener';
@@ -474,7 +487,7 @@ export const flowerGirl = feature('npc-flower', (bag, ctx) => {
         await talk(ctx, f, name, [{ zh: `拿好！拿着花去找人说话，就能送给他——说不定有惊喜哦。`, en: `There you go! Walk up to someone with it in hand and you can give it to them — there may be a surprise.` }]);
       } finally { mark.set(true); end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 老农, the old farmer ─────────────────────────────
@@ -495,16 +508,18 @@ export const oldFarmer = feature('npc-farmer', (bag, ctx) => {
   const mark = speechMark(bag, f, '农');
   greet(bag, ctx, f, 6);
   let n = Math.floor(ctx.rng() * FARMER_TIPS.length);
-  const name = { zh: '老农', en: 'Old Farmer' };
-  bag.interact({
+  const folk = stallFolk('n.farmer');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-farmer', position: front(f, 0.9), radius: 2.1,
-    labelZh: '老农', labelEn: 'Old farmer', actionZh: '讨教', actionEn: 'Ask',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '讨教', actionEn: 'Ask',
     async act() {
       if (!begin(ctx, 'talk')) return;
       mark.set(false);
       try {
         record('npc:farmer');
         if (await offerFlower(ctx, f, name, 'farmer')) return;
+        await folk.story(ctx, night(ctx));
         const me = who(ctx);
         for (;;) {
           const c = await talk(ctx, f, name, [{ zh: forCompanion(FARMER_HELLO, me).zh, en: forCompanion(FARMER_HELLO, me).en, choices: [{ zh: '请老伯指点', en: 'Any advice?' }, { zh: '告辞', en: 'Goodbye' }] }]);
@@ -518,7 +533,7 @@ export const oldFarmer = feature('npc-farmer', (bag, ctx) => {
         }
       } finally { mark.set(true); end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 书童, the lost page boy ─────────────────────────────
@@ -548,16 +563,18 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
   const marks = () => { kidMark.set(stage === 'idle' || stage === 'note'); masterMark.set(stage === 'seeking'); };
   marks();
   greet(bag, ctx, kid, 6);
-  const kname = { zh: '书童', en: 'Page Boy' }, mname = { zh: '柳先生', en: 'Master Liu' };
+  const kfolk = stallFolk('n.shutong'), mfolk = stallFolk('n.master');
+  const kname = kfolk.nameRef, mname = mfolk.nameRef;
   const note = () => bag.counter('npc-shutong', { zh: '字条', en: 'Note' }, tr(ctx, '带给书童', 'for the page boy'));
   if (stage === 'note') note();
-  bag.interact({
+  bag.interact(kfolk.prompt({
     id: 'npc-shutong', position: front(kid, 0.8), radius: 2,
-    labelZh: '书童', labelEn: 'Page boy', actionZh: '说话', actionEn: 'Talk',
+    labelZh: kfolk.label().zh, labelEn: kfolk.label().en, actionZh: '说话', actionEn: 'Talk',
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:shutong');
+        await kfolk.story(ctx, night(ctx));
         const me = who(ctx);
         if (stage === 'done') { await talk(ctx, kid, kname, [{ zh: '先生说，下回出门一定牵着我的手。', en: 'Master says next time he’ll hold my hand when we go out.' }]); return; }
         if (stage === 'note') {
@@ -581,15 +598,16 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
         if (stage === 'idle') { stage = 'seeking'; record(SHUTONG_SEEK); marks(); }
       } finally { end(ctx, 'talk'); }
     },
-  });
-  bag.interact({
+  }));
+  bag.interact(mfolk.prompt({
     id: 'npc-shutong-master', position: front(master, 0.9), radius: 2,
-    labelZh: '柳先生', labelEn: 'Master Liu', actionZh: '说话', actionEn: 'Talk',
+    labelZh: mfolk.label().zh, labelEn: mfolk.label().en, actionZh: '说话', actionEn: 'Talk',
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:master');
         if (await offerFlower(ctx, master, mname, 'master')) return;
+        await mfolk.story(ctx, night(ctx));
         const me = who(ctx);
         if (stage === 'seeking') {
           await talk(ctx, master, mname, [L2(forCompanion(MASTER_FOUND, me))]);
@@ -607,7 +625,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
         }
       } finally { end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 export const PEOPLE = [peddler, storyteller, fortuneTeller, sugarStall, flowerGirl, oldFarmer, shutong];

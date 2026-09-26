@@ -20,14 +20,14 @@ export type Gift = false | 'first' | 'again';
  * 'first' when it was this person's first flower today (the thanks said and paid — the caller adds
  * its own surprise), 'again' when they already had one today (thanked, nothing more), false if kept.
  */
-export async function offerFlower(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string }, who: string): Promise<Gift> {
+export async function offerFlower(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string; proper?: boolean }, who: string): Promise<Gift> {
   if (!holdingFlower()) return false;
   const f = FLOWERS[carrying().flowerKind] ?? FLOWERS[0];
   const before = countToday(play.value.daily, today.value, giftKey(who));
   const c = await ctx.hud.say({
     nameZh: '行囊', nameEn: 'Your bag',
     zh: `你手里拿着一枝${f.zh}。送给${name.zh}吗？${before ? '（今天已经送过一枝了）' : ''}`,
-    en: `You are holding a sprig of ${f.en}. Give it to the ${name.en.toLowerCase()}?${before ? ' (You already gave one today.)' : ''}`,
+    en: `You are holding a sprig of ${f.en}. Give it to ${name.proper ? name.en : `the ${name.en.toLowerCase()}`}?${before ? ' (You already gave one today.)' : ''}`,
     choices: [{ zh: '送花', en: 'Give the flower' }, { zh: '留着', en: 'Keep it' }],
   });
   if (c !== 0 || !takeFlower()) return false;

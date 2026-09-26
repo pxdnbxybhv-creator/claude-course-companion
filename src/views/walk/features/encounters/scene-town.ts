@@ -35,7 +35,7 @@ export function shijin(s: Stage): Scene {
     }
   };
   void pace();
-  const oname = C('客商', 'Merchant');
+  const oname = C('客商贾四', 'Jia Si, the Merchant');
   let got = false;
   let returned = false;
   let offPurse: () => void = () => {};
@@ -128,7 +128,7 @@ export function shijin(s: Stage): Scene {
       if (!s.claim()) return;
       try {
         faceMe(s, th);
-        await s.say(th, C('小贼', 'Thief'), [fair
+        await s.say(th, C('小贼「一阵风」', 'Gust, the Thief'), [fair
           ? L('好快的身手！大侠饶命，钱袋还你！', 'Such speed! Spare me, hero — here’s the purse!')
           : L('哎哟！（小贼脚下一绊，摔了个嘴啃泥，钱袋滚到你脚边。）', 'Ouch! (The thief trips and falls flat; the purse rolls to your feet.)')]);
         hold('walker');

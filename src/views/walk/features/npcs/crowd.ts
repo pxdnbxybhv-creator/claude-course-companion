@@ -13,8 +13,13 @@
 // halos — a handful of draws. They glance at you, some greet you, bow to 关公, stare at 嫦娥, and the
 // children run after the cat; they gather to listen when someone plays ('banmu:music'), bow when a
 // lord rides by ('banmu:bow') and sniff the air when flowers burst open ('banmu:bloom').
+//
+// Everyone has a name (folk.ts: the same id on two shifts is one person with a day and a night), and
+// anyone can be talked to: one prompt per place follows whoever stands nearest in front of you
+// (「搭话」, the epithet until you have met, then 「title·name」); they stop and turn to you while you
+// talk, then go on their way. No meshes or listeners per person — one shared name tag at most.
 import type * as T from 'three';
-import type { WorldCtx } from '../../types';
+import type { Interactable, WorldCtx } from '../../types';
 import { REGION, type RegionId, type XZ } from '../../map';
 import type { CharacterId } from '../../../../data/characters';
 import { Bag, dayRng, feature, glowTexture, outlineMat, propMat, reducedMotion, tr } from '../kit';
@@ -22,11 +27,16 @@ import { merge, part } from '../geo';
 import { riverZ } from '../../regions/water-kit';
 import { walkableNear } from '../minigames/cat';
 import { BACK, CAPE, HAND, HAT, LANTERN_AT, crowdGeometry, crowdMaterials, packColor } from './crowd-geo';
-import { Bubbles, type Speaker } from './bubbles';
+import { Bubbles, Nameplate, type Speaker } from './bubbles';
 import { CALLS, CHASE, FEST_CALLS, HELLO, HELLO_NIGHT, REACT, type CrowdRole } from './lines';
 import { LANTERN_NIGHTS, forCompanion, onDuty, pingPong, type Line, type Shift } from './logic';
 import { onSkillEvent, type SkillEvent } from './events';
 import { crowdKeeps } from '../../world/quality';
+import { FOLK_BY_ID, REGULAR_AFTER, folkLabel, talkKey, type Folk } from './folk';
+import { HAIL } from './folk-lines';
+import { play } from '../../../../app/play';
+import { converse, isMet } from './talk';
+import { begin, end } from '../minigames/ui';
 
 // ───────────────────────────── who is where ─────────────────────────────
 
@@ -38,6 +48,8 @@ interface Look {
 }
 
 interface Spec {
+  /** Who this is (folk.ts): the same id on two shifts is one person with a day and a night. */
+  id: string;
   role: CrowdRole;
   shift: Shift;
   look: Look;
@@ -86,111 +98,133 @@ function riverLine(x0: number, x1: number, step = 5): XZ[] {
   return out;
 }
 
-function crowdOf(region: RegionId): Spec[] {
+/**
+ * Out at this picture quality (`share` of the everyday crowd, see crowdKeeps)? Someone with a story
+ * to tell (folk.keep) is never culled at 低: a witness must not vanish.
+ */
+export function outAt(share: number, index: number, spec: Pick<Spec, 'id' | 'role'>, region: RegionId): boolean {
+  return !!FOLK_BY_ID[spec.id]?.keep || crowdKeeps(share, index, spec.role, region);
+}
+
+/** Who of a place's crowd is out at this quality: a couple stays out (or home) together. */
+export function keptSpecs(specs: readonly Pick<Spec, 'id' | 'role' | 'beside'>[], region: RegionId, share: number): boolean[] {
+  const out: boolean[] = [];
+  for (let i = 0; i < specs.length; i++) {
+    const sp = specs[i], next = specs[i + 1];
+    if (sp.beside) { out.push(i > 0 && out[i - 1]); continue; }
+    const partnerKept = !!(next?.beside && FOLK_BY_ID[next.id]?.keep);
+    out.push(partnerKept || outAt(share, i, sp, region));
+  }
+  return out;
+}
+
+/** Everyone of a place's crowd, in order (a fresh copy each call). Exported for the tests. */
+export function crowdOf(region: RegionId): Spec[] {
   switch (region) {
     case 'village': {
       const S: Spec[] = [
         // vendors behind the market stalls, calling across the street
-        ...[-1, 5.5, 14.5, 21, 27.5].map((x, i): Spec => ({ role: 'vendor', shift: 'day', act: 'vend', at: { x: x + 0.3, z: 100.4, h: Math.PI }, look: [man(C.ochre, C.dark, { cape: CAPE.apron }), woman(C.apricot), man(C.indigo, C.dark, { hatKind: HAT.none }), woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.indigo }), man(C.brown, C.dark, { hatKind: HAT.bamboo, hat: C.straw })][i] })),
-        { role: 'vendor', shift: 'day', act: 'vend', at: { x: -1.2, z: 92.1, h: 0 }, look: woman(C.rouge, C.dark, { hatKind: HAT.scarf, hat: C.teal }) },
+        ...[-1, 5.5, 14.5, 21, 27.5].map((x, i): Spec => ({ id: ['v.qingtuan', 'v.lingjiao', 'v.basket', 'v.needle', 'v.ou'][i], role: 'vendor', shift: 'day', act: 'vend', at: { x: x + 0.3, z: 100.4, h: Math.PI }, look: [man(C.ochre, C.dark, { cape: CAPE.apron }), woman(C.apricot), man(C.indigo, C.dark, { hatKind: HAT.none }), woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.indigo }), man(C.brown, C.dark, { hatKind: HAT.bamboo, hat: C.straw })][i] })),
+        { id: 'v.teaegg', role: 'vendor', shift: 'day', act: 'vend', at: { x: -1.2, z: 92.1, h: 0 }, look: woman(C.rouge, C.dark, { hatKind: HAT.scarf, hat: C.teal }) },
         // tea drinkers at the teahouse tables (they stay into the night)
-        { role: 'tea', shift: 'always', act: 'drink', sit: true, lift: 0.14, at: { x: 13.35, z: 84.3, h: 0 }, look: man(C.grey, C.dark, { hair: GREY, beard: true, hand: HAND.cup }) },
-        { role: 'tea', shift: 'always', act: 'drink', sit: true, lift: 0.14, at: { x: 14.05, z: 85.95, h: Math.PI }, look: man(C.teal, C.maroon, { hand: HAND.cup }) },
-        { role: 'tea', shift: 'day', act: 'drink', sit: true, lift: 0.14, at: { x: 13.6, z: 91.75, h: Math.PI }, look: scholarLook(C.white, { hand: HAND.fan }) },
+        { id: 'v.zheng', role: 'tea', shift: 'always', act: 'drink', sit: true, lift: 0.14, at: { x: 13.35, z: 84.3, h: 0 }, look: man(C.grey, C.dark, { hair: GREY, beard: true, hand: HAND.cup }) },
+        { id: 'v.mawu', role: 'tea', shift: 'always', act: 'drink', sit: true, lift: 0.14, at: { x: 14.05, z: 85.95, h: Math.PI }, look: man(C.teal, C.maroon, { hand: HAND.cup }) },
+        { id: 'v.pei', role: 'tea', shift: 'day', act: 'drink', sit: true, lift: 0.14, at: { x: 13.6, z: 91.75, h: Math.PI }, look: scholarLook(C.white, { hand: HAND.fan }) },
         // washerwomen on the river steps in the morning; neighbours chatting by the well later on
-        { role: 'washer', shift: 'morning', act: 'wash', sit: true, at: { x: -22.2, z: 72.3, h: Math.PI }, look: woman(C.indigo, C.maroon, { hatKind: HAT.scarf, hat: C.undyed, hand: HAND.paddle }) },
-        { role: 'washer', shift: 'morning', act: 'wash', sit: true, at: { x: -20.6, z: 71.8, h: Math.PI + 0.3 }, look: woman(C.rouge, C.dark, { hatKind: HAT.scarf, hat: C.indigo, hand: HAND.paddle }) },
-        { role: 'villager', shift: 'afternoon', act: 'chat', at: { x: -9, z: 88.2, h: 0 }, face: { x: -7.4, z: 87.3 }, look: woman(C.gamboge, C.maroon, { back: BACK.basket }) },
-        { role: 'villager', shift: 'afternoon', act: 'chat', at: { x: -7.4, z: 87.3, h: 0 }, face: { x: -9, z: 88.2 }, look: woman(C.plum, C.dark, { hatKind: HAT.scarf, hat: C.rouge }) },
+        { id: 'v.axiu', role: 'washer', shift: 'morning', act: 'wash', sit: true, at: { x: -22.2, z: 72.3, h: Math.PI }, look: woman(C.indigo, C.maroon, { hatKind: HAT.scarf, hat: C.undyed, hand: HAND.paddle }) },
+        { id: 'v.chunyan', role: 'washer', shift: 'morning', act: 'wash', sit: true, at: { x: -20.6, z: 71.8, h: Math.PI + 0.3 }, look: woman(C.rouge, C.dark, { hatKind: HAT.scarf, hat: C.indigo, hand: HAND.paddle }) },
+        { id: 'v.he', role: 'villager', shift: 'afternoon', act: 'chat', at: { x: -9, z: 88.2, h: 0 }, face: { x: -7.4, z: 87.3 }, look: woman(C.gamboge, C.maroon, { back: BACK.basket }) },
+        { id: 'v.meng', role: 'villager', shift: 'afternoon', act: 'chat', at: { x: -7.4, z: 87.3, h: 0 }, face: { x: -9, z: 88.2 }, look: woman(C.plum, C.dark, { hatKind: HAT.scarf, hat: C.rouge }) },
         // children playing tag in the square
-        ...[0, 1, 2].map((i): Spec => ({ role: 'child', shift: 'day', ring: { x: -2.5, z: 87, r: 2.4 + i * 0.35 }, offset: i * 2.1, speed: 2.4 + i * 0.25, look: child([C.vermilion, C.gamboge, C.sky][i], i === 2 ? { hatKind: HAT.bun } : {}) })),
+        ...[0, 1, 2].map((i): Spec => ({ id: ['v.hutou', 'v.erya', 'v.shuanzi'][i], role: 'child', shift: 'day', ring: { x: -2.5, z: 87, r: 2.4 + i * 0.35 }, offset: i * 2.1, speed: 2.4 + i * 0.25, look: child([C.vermilion, C.gamboge, C.sky][i], i === 2 ? { hatKind: HAT.bun } : {}) })),
         // strollers: round the square, along the market street, the south quay, over the bridge, the back lane, the east quay
-        { role: 'villager', shift: 'day', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], speed: 1.0, look: man(C.indigo, C.dark, { back: BACK.carry }) },
-        { role: 'villager', shift: 'day', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], offset: 30, speed: 0.85, look: woman(C.rouge, C.maroon, { back: BACK.basket }) },
-        { role: 'villager', shift: 'day', path: [{ x: -6, z: 96.8 }, { x: 34, z: 96.2 }], speed: 1.05, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.basket }) },
-        { role: 'villager', shift: 'day', path: [{ x: -6, z: 96.4 }, { x: 34, z: 95.8 }], offset: 28, speed: 0.9, look: man(C.ochre, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.carry }) },
-        { role: 'villager', shift: 'day', path: [{ x: -34, z: 76.8 }, { x: -24, z: 76.4 }, { x: -14, z: 75 }, { x: -5, z: 73.4 }], speed: 0.95, look: scholarLook(C.sky, { hand: HAND.fan }) },
-        { role: 'villager', shift: 'day', path: [{ x: 0, z: 81 }, { x: 0, z: 71.5 }, { x: -1.1, z: 66 }, { x: -1.5, z: 61.5 }, { x: -2.5, z: 58.5 }, { x: -2.2, z: 54 }], speed: 0.9, look: man(C.olive, C.dark, { back: BACK.bundle, hatKind: HAT.bamboo, hat: C.straw }) },
-        { role: 'villager', shift: 'day', path: [{ x: -38, z: 88 }, { x: -38, z: 98 }, { x: -27, z: 98.5 }], speed: 0.8, look: man(C.grey, C.dark, { hair: GREY, beard: true, hatKind: HAT.none }) },
-        { role: 'villager', shift: 'day', path: [{ x: 7, z: 70.4 }, { x: 20, z: 70 }, { x: 33, z: 69.3 }], speed: 1.0, look: woman(C.apricot, C.dark, { hatKind: HAT.scarf, hat: C.jade }) },
+        { id: 'v.fan', role: 'villager', shift: 'day', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], speed: 1.0, look: man(C.indigo, C.dark, { back: BACK.carry }) },
+        { id: 'v.guniang', role: 'villager', shift: 'day', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], offset: 30, speed: 0.85, look: woman(C.rouge, C.maroon, { back: BACK.basket }) },
+        { id: 'v.yaosao', role: 'villager', shift: 'day', path: [{ x: -6, z: 96.8 }, { x: 34, z: 96.2 }], speed: 1.05, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.basket }) },
+        { id: 'v.yaoda', role: 'villager', shift: 'day', path: [{ x: -6, z: 96.4 }, { x: 34, z: 95.8 }], offset: 28, speed: 0.9, look: man(C.ochre, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.carry }) },
+        { id: 'v.guxiucai', role: 'villager', shift: 'day', path: [{ x: -34, z: 76.8 }, { x: -24, z: 76.4 }, { x: -14, z: 75 }, { x: -5, z: 73.4 }], speed: 0.95, look: scholarLook(C.sky, { hand: HAND.fan }) },
+        { id: 'v.nie', role: 'villager', shift: 'day', path: [{ x: 0, z: 81 }, { x: 0, z: 71.5 }, { x: -1.1, z: 66 }, { x: -1.5, z: 61.5 }, { x: -2.5, z: 58.5 }, { x: -2.2, z: 54 }], speed: 0.9, look: man(C.olive, C.dark, { back: BACK.bundle, hatKind: HAT.bamboo, hat: C.straw }) },
+        { id: 'v.feng', role: 'villager', shift: 'day', path: [{ x: -38, z: 88 }, { x: -38, z: 98 }, { x: -27, z: 98.5 }], speed: 0.8, look: man(C.grey, C.dark, { hair: GREY, beard: true, hatKind: HAT.none }) },
+        { id: 'v.suyun', role: 'villager', shift: 'day', path: [{ x: 7, z: 70.4 }, { x: 20, z: 70 }, { x: 33, z: 69.3 }], speed: 1.0, look: woman(C.apricot, C.dark, { hatKind: HAT.scarf, hat: C.jade }) },
         // the night: the watchman's round, and two lanterns out walking
-        { role: 'watchman', shift: 'night', loop: true, path: [{ x: -14, z: 84.5 }, { x: 8, z: 85 }, { x: 8.5, z: 95.5 }, { x: -8, z: 96.5 }, { x: -16, z: 93 }], speed: 0.75, look: man(C.dark, C.maroon, { hand: HAND.clapper, back: BACK.gong, hatKind: HAT.cap, hat: C.ink }) },
-        { role: 'lantern', shift: 'night', path: [{ x: -34, z: 76.8 }, { x: -24, z: 76.4 }, { x: -14, z: 75 }, { x: -5, z: 73.4 }], offset: 10, speed: 0.7, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
-        { role: 'lantern', shift: 'night', path: [{ x: -6, z: 96.8 }, { x: 34, z: 96.2 }], offset: 20, speed: 0.7, lantern: true, look: man(C.indigo, C.dark, { hand: HAND.lantern }) },
+        { id: 'v.wu', role: 'watchman', shift: 'night', loop: true, path: [{ x: -14, z: 84.5 }, { x: 8, z: 85 }, { x: 8.5, z: 95.5 }, { x: -8, z: 96.5 }, { x: -16, z: 93 }], speed: 0.75, look: man(C.dark, C.maroon, { hand: HAND.clapper, back: BACK.gong, hatKind: HAT.cap, hat: C.ink }) },
+        { id: 'v.qiao', role: 'lantern', shift: 'night', path: [{ x: -34, z: 76.8 }, { x: -24, z: 76.4 }, { x: -14, z: 75 }, { x: -5, z: 73.4 }], offset: 10, speed: 0.7, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
+        { id: 'v.weijiu', role: 'lantern', shift: 'night', path: [{ x: -6, z: 96.8 }, { x: 34, z: 96.2 }], offset: 20, speed: 0.7, lantern: true, look: man(C.indigo, C.dark, { hand: HAND.lantern }) },
         // a couple strolling round the square with a lantern, all night
-        { role: 'lantern', shift: 'night', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], offset: 12, speed: 0.55, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
-        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.sky, { hand: HAND.fan }) },
+        { id: 'v.guniang', role: 'lantern', shift: 'night', loop: true, path: [{ x: -15, z: 84 }, { x: -3, z: 83.5 }, { x: 9, z: 86.5 }, { x: 9.5, z: 93.8 }, { x: -4, z: 95.5 }, { x: -15, z: 92 }], offset: 12, speed: 0.55, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
+        { id: 'v.guxiucai', role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.sky, { hand: HAND.fan }) },
         // the night market (夜市): snack stalls, and people come out to see the lanterns
-        ...[-1, 14.5, 27.5].map((x, i): Spec => ({ role: 'snack', shift: 'evening', act: 'vend', at: { x: x + 0.3, z: 100.4, h: Math.PI }, look: [man(C.white, C.dark, { cape: CAPE.apron, hat: C.ink }), woman(C.rouge, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, cape: CAPE.apron }), man(C.brown, C.dark, { hair: GREY, beard: true, hatKind: HAT.bamboo, hat: C.straw })][i] })),
-        { role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3, z: 97.4, h: 0.35 }, look: woman(C.gamboge, C.maroon, { hand: HAND.lantern }) },
-        { role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3.8, z: 97.1, h: 0.1 }, look: child(C.vermilion, { hand: HAND.lantern }) },
-        { role: 'lantern', shift: 'evening', act: 'admire', at: { x: 10.5, z: 97.6, h: -0.25 }, look: scholarLook(C.white, { hand: HAND.fan, beard: true }) },
-        { role: 'lantern', shift: 'evening', act: 'chat', at: { x: 19.5, z: 97.2, h: 0 }, face: { x: 20.9, z: 97.6 }, look: man(C.teal, C.dark, { hatKind: HAT.cap, hat: C.ink }) },
-        { role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: 20.9, z: 97.6, h: 0 }, face: { x: 19.5, z: 97.2 }, look: woman(C.plum, C.dark, { hand: HAND.lantern, hatKind: HAT.scarf, hat: C.rouge }) },
-        { role: 'lantern', shift: 'evening', act: 'chat', at: { x: -4.2, z: 89.8, h: 0 }, face: { x: -2.8, z: 90.6 }, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge }) },
-        { role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: -2.8, z: 90.6, h: 0 }, face: { x: -4.2, z: 89.8 }, look: man(C.ochre, C.dark, { hand: HAND.lantern, hatKind: HAT.bamboo, hat: C.straw }) },
+        ...[-1, 14.5, 27.5].map((x, i): Spec => ({ id: ['v.baolao', 'v.luo', 'v.qiulao'][i], role: 'snack', shift: 'evening', act: 'vend', at: { x: x + 0.3, z: 100.4, h: Math.PI }, look: [man(C.white, C.dark, { cape: CAPE.apron, hat: C.ink }), woman(C.rouge, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, cape: CAPE.apron }), man(C.brown, C.dark, { hair: GREY, beard: true, hatKind: HAT.bamboo, hat: C.straw })][i] })),
+        { id: 'v.he', role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3, z: 97.4, h: 0.35 }, look: woman(C.gamboge, C.maroon, { hand: HAND.lantern }) },
+        { id: 'v.niuniu', role: 'lantern', shift: 'evening', act: 'admire', lantern: true, at: { x: 3.8, z: 97.1, h: 0.1 }, look: child(C.vermilion, { hand: HAND.lantern }) },
+        { id: 'v.song', role: 'lantern', shift: 'evening', act: 'admire', at: { x: 10.5, z: 97.6, h: -0.25 }, look: scholarLook(C.white, { hand: HAND.fan, beard: true }) },
+        { id: 'v.mengda', role: 'lantern', shift: 'evening', act: 'chat', at: { x: 19.5, z: 97.2, h: 0 }, face: { x: 20.9, z: 97.6 }, look: man(C.teal, C.dark, { hatKind: HAT.cap, hat: C.ink }) },
+        { id: 'v.meng', role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: 20.9, z: 97.6, h: 0 }, face: { x: 19.5, z: 97.2 }, look: woman(C.plum, C.dark, { hand: HAND.lantern, hatKind: HAT.scarf, hat: C.rouge }) },
+        { id: 'v.yaosao', role: 'lantern', shift: 'evening', act: 'chat', at: { x: -4.2, z: 89.8, h: 0 }, face: { x: -2.8, z: 90.6 }, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge }) },
+        { id: 'v.yaoda', role: 'lantern', shift: 'evening', act: 'chat', lantern: true, at: { x: -2.8, z: 90.6, h: 0 }, face: { x: -4.2, z: 89.8 }, look: man(C.ochre, C.dark, { hand: HAND.lantern, hatKind: HAT.bamboo, hat: C.straw }) },
         // on a festival night the children run round the square with rabbit lanterns
-        ...[0, 1].map((i): Spec => ({ role: 'child', shift: 'fest', ring: { x: -2.5, z: 86.6, r: 2.5 + i * 0.5 }, offset: i * 3.3, speed: 1.3 + i * 0.2, lantern: true, look: child([C.rouge, C.gamboge][i], { hand: HAND.lantern }) })),
+        ...[0, 1].map((i): Spec => ({ id: ['v.hutou', 'v.erya'][i], role: 'child', shift: 'fest', ring: { x: -2.5, z: 86.6, r: 2.5 + i * 0.5 }, offset: i * 3.3, speed: 1.3 + i * 0.2, lantern: true, look: child([C.rouge, C.gamboge][i], { hand: HAND.lantern }) })),
         // the boatman poling down the river (a lantern on his boat at night)
-        { role: 'boatman', shift: 'always', boat: 'river', act: 'pole', path: riverLine(-44, 34), speed: 0.9, look: man(C.dark, C.ink, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.pole, cape: CAPE.straw }) },
+        { id: 'v.shao', role: 'boatman', shift: 'always', boat: 'river', act: 'pole', path: riverLine(-44, 34), speed: 0.9, look: man(C.dark, C.ink, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.pole, cape: CAPE.straw }) },
       ];
       return S;
     }
     case 'lake':
       return [
-        { role: 'fisher', shift: 'day', boat: 'anchored', act: 'fish', sit: true, at: { x: 76, z: 8, h: 2.2 }, look: man(C.grey, C.dark, { hair: GREY, beard: true, hatKind: HAT.bamboo, hat: C.straw, hand: HAND.rod, cape: CAPE.straw }) },
-        { role: 'fisher', shift: 'always', boat: 'anchored', act: 'fish', sit: true, lantern: true, at: { x: 106, z: 25, h: -0.8 }, look: man(C.olive, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.rod }) },
-        { role: 'fisher', shift: 'day', boat: 'circle', act: 'pick', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.35, look: woman(C.rouge, C.maroon, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.basket }) },
-        { role: 'villager', shift: 'day', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], speed: 0.8, look: scholarLook(C.white, { hand: HAND.fan }) },
-        { role: 'villager', shift: 'day', beside: true, look: woman(C.plum, C.dark, {}) },
+        { id: 'l.hu', role: 'fisher', shift: 'day', boat: 'anchored', act: 'fish', sit: true, at: { x: 76, z: 8, h: 2.2 }, look: man(C.grey, C.dark, { hair: GREY, beard: true, hatKind: HAT.bamboo, hat: C.straw, hand: HAND.rod, cape: CAPE.straw }) },
+        { id: 'l.agen', role: 'fisher', shift: 'always', boat: 'anchored', act: 'fish', sit: true, lantern: true, at: { x: 106, z: 25, h: -0.8 }, look: man(C.olive, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.rod }) },
+        { id: 'l.linger', role: 'fisher', shift: 'day', boat: 'circle', act: 'pick', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.35, look: woman(C.rouge, C.maroon, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.basket }) },
+        { id: 'l.wen', role: 'villager', shift: 'day', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], speed: 0.8, look: scholarLook(C.white, { hand: HAND.fan }) },
+        { id: 'l.wenwan', role: 'villager', shift: 'day', beside: true, look: woman(C.plum, C.dark, {}) },
         // by night: a couple with a lantern on the causeway, a lantern boat among the lotus
-        { role: 'lantern', shift: 'night', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], offset: 6, speed: 0.5, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
-        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.white, { hand: HAND.fan }) },
-        { role: 'lantern', shift: 'evening', boat: 'circle', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.25, lantern: true, look: woman(C.gamboge, C.maroon, { hatKind: HAT.bun }) },
+        { id: 'l.lin', role: 'lantern', shift: 'night', path: [{ x: 73, z: 40.5 }, { x: 90, z: 40.5 }, { x: 108, z: 40 }], offset: 6, speed: 0.5, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern }) },
+        { id: 'l.wen', role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.white, { hand: HAND.fan }) },
+        // 王四娘 of the market, rowing out each evening to light a lamp for her husband's boat
+        { id: 'v.lingjiao', role: 'lantern', shift: 'evening', boat: 'circle', sit: true, ring: { x: 84, z: 25, r: 4 }, speed: 0.25, lantern: true, look: woman(C.apricot) },
       ];
     case 'mountain':
       return [
-        { role: 'monk', shift: 'dawn', act: 'sweep', at: { x: 46, z: -104, h: 1.9 }, look: monkLook({ hand: HAND.broom }) },
-        { role: 'monk', shift: 'day', act: 'sweep', at: { x: 33, z: -106, h: -1.2 }, look: monkLook({ hand: HAND.broom, robe: '#a8663a' }) },
-        { role: 'woodfish', shift: 'always', act: 'woodfish', at: { x: 40, z: -109.5, h: 0 }, look: monkLook({ hand: HAND.mallet, back: BACK.woodfish, robe: '#b0703a', cape: CAPE.none }) },
-        { role: 'pilgrim', shift: 'day', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], speed: 0.6, look: woman(C.indigo, C.maroon, { hatKind: HAT.scarf, hat: C.rouge, back: BACK.basket }) },
-        { role: 'pilgrim', shift: 'day', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 9, speed: 0.55, look: man(C.grey, C.dark, { hair: GREY, beard: true, back: BACK.bundle, hatKind: HAT.none }) },
-        { role: 'pilgrim', shift: 'day', act: 'pray', at: { x: 40, z: -101.5, h: Math.PI }, look: woman(C.apricot, C.maroon, {}) },
-        { role: 'monk', shift: 'night', path: [{ x: 36.2, z: -104 }, { x: 43.4, z: -104 }], speed: 0.5, lantern: true, look: monkLook({ hand: HAND.lantern }) },
-        { role: 'pilgrim', shift: 'evening', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 4, speed: 0.45, lantern: true, look: woman(C.plum, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, hand: HAND.lantern }) },
+        { id: 'm.liaochen', role: 'monk', shift: 'dawn', act: 'sweep', at: { x: 46, z: -104, h: 1.9 }, look: monkLook({ hand: HAND.broom }) },
+        { id: 'm.liaofan', role: 'monk', shift: 'day', act: 'sweep', at: { x: 33, z: -106, h: -1.2 }, look: monkLook({ hand: HAND.broom, robe: '#a8663a' }) },
+        { id: 'm.jueming', role: 'woodfish', shift: 'always', act: 'woodfish', at: { x: 40, z: -109.5, h: 0 }, look: monkLook({ hand: HAND.mallet, back: BACK.woodfish, robe: '#b0703a', cape: CAPE.none }) },
+        { id: 'm.yindaniang', role: 'pilgrim', shift: 'day', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], speed: 0.6, look: woman(C.indigo, C.maroon, { hatKind: HAT.scarf, hat: C.rouge, back: BACK.basket }) },
+        { id: 'm.yinlao', role: 'pilgrim', shift: 'day', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 9, speed: 0.55, look: man(C.grey, C.dark, { hair: GREY, beard: true, back: BACK.bundle, hatKind: HAT.none }) },
+        { id: 'm.lv', role: 'pilgrim', shift: 'day', act: 'pray', at: { x: 40, z: -101.5, h: Math.PI }, look: woman(C.apricot, C.maroon, {}) },
+        { id: 'm.liaochen', role: 'monk', shift: 'night', path: [{ x: 36.2, z: -104 }, { x: 43.4, z: -104 }], speed: 0.5, lantern: true, look: monkLook({ hand: HAND.lantern }) },
+        { id: 'm.liang', role: 'pilgrim', shift: 'evening', path: [{ x: 29, z: -88 }, { x: 30, z: -95 }, { x: 33, z: -101 }, { x: 39, z: -106 }], offset: 4, speed: 0.45, lantern: true, look: woman(C.plum, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, hand: HAND.lantern }) },
       ];
     case 'plum':
       return [
-        { role: 'scholar', shift: 'day', act: 'admire', at: { x: -64, z: -63, h: -1.4 }, look: scholarLook(C.white, { hand: HAND.fan, beard: true }) },
-        { role: 'scholar', shift: 'day', act: 'read', at: { x: -60, z: -57.5, h: 2.6 }, look: scholarLook(C.sky, { back: BACK.book }) },
-        { role: 'scholar', shift: 'day', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], speed: 0.7, look: scholarLook(C.jade, { hand: HAND.fan }) },
-        { role: 'scholar', shift: 'night', act: 'admire', lantern: true, at: { x: -68, z: -70, h: 0.6 }, look: scholarLook(C.white, { hand: HAND.lantern }) },
+        { id: 'p.ouyang', role: 'scholar', shift: 'day', act: 'admire', at: { x: -64, z: -63, h: -1.4 }, look: scholarLook(C.white, { hand: HAND.fan, beard: true }) },
+        { id: 'p.yinsheng', role: 'scholar', shift: 'day', act: 'read', at: { x: -60, z: -57.5, h: 2.6 }, look: scholarLook(C.sky, { back: BACK.book }) },
+        { id: 'p.yezhou', role: 'scholar', shift: 'day', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], speed: 0.7, look: scholarLook(C.jade, { hand: HAND.fan }) },
+        { id: 'p.zhuo', role: 'scholar', shift: 'night', act: 'admire', lantern: true, at: { x: -68, z: -70, h: 0.6 }, look: scholarLook(C.white, { hand: HAND.lantern }) },
         // a couple come up the path with a lantern to see the plum by moonlight
-        { role: 'lantern', shift: 'night', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], offset: 3, speed: 0.45, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
-        { role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.jade, { hand: HAND.fan }) },
+        { id: 'p.yeniang', role: 'lantern', shift: 'night', path: [{ x: -80, z: -50 }, { x: -77, z: -58 }, { x: -70, z: -62 }, { x: -64, z: -66 }], offset: 3, speed: 0.45, lantern: true, look: woman(C.rouge, C.maroon, { hand: HAND.lantern, hatKind: HAT.bun, hat: C.gamboge }) },
+        { id: 'p.yezhou', role: 'lantern', shift: 'night', beside: true, look: scholarLook(C.jade, { hand: HAND.fan }) },
       ];
     case 'bamboo':
       return [
-        { role: 'villager', shift: 'day', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], speed: 0.75, look: scholarLook(C.teal, { hand: HAND.fan }) },
-        { role: 'farmer', shift: 'day', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 8, speed: 0.8, look: man(C.ochre, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.carry }) },
+        { id: 'b.xiang', role: 'villager', shift: 'day', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], speed: 0.75, look: scholarLook(C.teal, { hand: HAND.fan }) },
+        { id: 'b.tan', role: 'farmer', shift: 'day', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 8, speed: 0.8, look: man(C.ochre, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.carry }) },
         // after dark: a lantern going slowly through the grove, and a woodcutter late home
-        { role: 'lantern', shift: 'night', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], offset: 5, speed: 0.5, lantern: true, look: scholarLook(C.teal, { hand: HAND.lantern }) },
-        { role: 'farmer', shift: 'evening', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 14, speed: 0.6, lantern: true, look: man(C.brown, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.bundle, hand: HAND.lantern }) },
+        { id: 'b.xiang', role: 'lantern', shift: 'night', path: [{ x: -57, z: 30 }, { x: -66, z: 29 }, { x: -78, z: 27.5 }], offset: 5, speed: 0.5, lantern: true, look: scholarLook(C.teal, { hand: HAND.lantern }) },
+        { id: 'b.cai', role: 'farmer', shift: 'evening', path: [{ x: -56, z: 29.4 }, { x: -64, z: 28.6 }, { x: -73, z: 28.2 }], offset: 14, speed: 0.6, lantern: true, look: man(C.brown, C.dark, { hatKind: HAT.bamboo, hat: C.straw, back: BACK.bundle, hand: HAND.lantern }) },
       ];
     case 'home':
       return [
-        { role: 'farmer', shift: 'dawn', act: 'hoe', at: { x: -29, z: -34, h: -1.3 }, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.hoe }) },
-        { role: 'farmer', shift: 'day', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], speed: 0.8, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.carry }) },
+        { id: 'h.geng', role: 'farmer', shift: 'dawn', act: 'hoe', at: { x: -29, z: -34, h: -1.3 }, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.hoe }) },
+        { id: 'h.gengsao', role: 'farmer', shift: 'day', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], speed: 0.8, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.carry }) },
         // the farmer and his wife walking home with a lantern
-        { role: 'farmer', shift: 'evening', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], offset: 3, speed: 0.55, lantern: true, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.lantern }) },
-        { role: 'farmer', shift: 'evening', beside: true, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.basket }) },
+        { id: 'h.geng', role: 'farmer', shift: 'evening', path: [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -36.5, z: -21 }], offset: 3, speed: 0.55, lantern: true, look: man(C.indigo, C.dark, { hatKind: HAT.bamboo, hat: C.straw, hand: HAND.lantern }) },
+        { id: 'h.gengsao', role: 'farmer', shift: 'evening', beside: true, look: woman(C.jade, C.maroon, { hatKind: HAT.scarf, hat: C.gamboge, back: BACK.basket }) },
       ];
     default:
       return [];
   }
 }
 
-const REGIONS_WITH_CROWDS: RegionId[] = ['village', 'lake', 'mountain', 'plum', 'bamboo', 'home'];
+export const REGIONS_WITH_CROWDS: RegionId[] = ['village', 'lake', 'mountain', 'plum', 'bamboo', 'home'];
 
 // ───────────────────────────── the living ─────────────────────────────
 
@@ -231,6 +265,10 @@ interface Person extends Speaker {
   stuck: number;
   /** Whom they walk beside (spec.beside). */
   lead: Person | null;
+  /** Who they are. */
+  folk: Folk;
+  /** Stopped to talk with you (turned to you, going nowhere, saying nothing overhead). */
+  held: boolean;
 }
 
 const TAU = Math.PI * 2;
@@ -240,10 +278,12 @@ const lineText = (ctx: WorldCtx, l: Line) => tr(ctx, l.zh, l.en);
 export const crowd = feature('npc-crowd', (bag, ctx) => {
   const still = reducedMotion();
   const bubbles = new Bubbles(bag, 3);
+  // one name tag for whoever you are about to talk to, shared by every place (one draw while shown)
+  const plate = new Nameplate(bag);
   // a lantern festival tonight: more stalls, children with lanterns, festival calls
   const festKey = ctx.env.festivals.find((f) => LANTERN_NIGHTS.includes(f)) ?? null;
   const festLines = festKey ? FEST_CALLS[festKey] ?? null : null;
-  const crowds = REGIONS_WITH_CROWDS.map((r) => buildCrowd(bag, ctx, r, bubbles, still, festLines)).filter((c): c is CrowdRuntime => !!c);
+  const crowds = REGIONS_WITH_CROWDS.map((r) => buildCrowd(bag, ctx, r, bubbles, plate, still, festLines)).filter((c): c is CrowdRuntime => !!c);
   bag.onDispose(onSkillEvent((e) => { for (const c of crowds) c.event(e); }));
   // who is about depends on the night (the visitor may switch it) — look again now and then
   let check = 0;
@@ -259,7 +299,7 @@ export const crowd = feature('npc-crowd', (bag, ctx) => {
   });
   if (import.meta.env.DEV) {
     const w = window as unknown as { __crowd?: unknown };
-    const dev = { info: () => crowds.map((c) => c.info()), people: () => crowds.flatMap((c) => c.people()), bubbles };
+    const dev = { info: () => crowds.map((c) => c.info()), people: () => crowds.flatMap((c) => c.people()), targets: () => crowds.map((c) => c.target()).filter(Boolean), bubbles, plate };
     w.__crowd = dev;
     // don't keep a disposed crowd reachable after the walk ends
     bag.onDispose(() => { if (w.__crowd === dev) delete w.__crowd; });
@@ -293,10 +333,12 @@ interface CrowdRuntime {
   event(e: SkillEvent): void;
   info(): { region: RegionId; people: number; active: number };
   /** DEV: who is who, and where. */
-  people(): { region: RegionId; i: number; role: CrowdRole; shift: Shift; active: boolean; x: number; z: number; away: boolean }[];
+  people(): { region: RegionId; i: number; id: string; name: string; role: CrowdRole; shift: Shift; active: boolean; held: boolean; x: number; z: number; away: boolean }[];
+  /** DEV: whom the prompt is on (id, label), if anyone. */
+  target(): { region: RegionId; id: string; label: string; held: boolean } | null;
 }
 
-function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles, still: boolean, festLines: Line[] | null): CrowdRuntime | null {
+function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles, plate: Nameplate, still: boolean, festLines: Line[] | null): CrowdRuntime | null {
   const { THREE } = ctx;
   const specs = crowdOf(region);
   if (!specs.length) return null;
@@ -308,6 +350,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const share = Math.min(1, ctx.quality?.density ?? 1);
   // ── validate the ways: every walked line on open ground (nudged, or the walker stays home)
   const people: Person[] = [];
+  const kept = keptSpecs(specs, region, share);
   let prev: Person | null = null;
   for (let si = 0; si < specs.length; si++) {
     const spec = specs[si];
@@ -315,7 +358,9 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     const lead = spec.beside ? prev : null;
     prev = null;
     if (spec.beside && (!lead || !lead.spec.path)) continue;
-    if (!spec.beside && !crowdKeeps(share, si, spec.role, region)) continue;
+    const folk = FOLK_BY_ID[spec.id];
+    if (!folk) { if (import.meta.env.DEV) console.warn(`[npcs] no folk for ${spec.id}`); continue; }
+    if (!kept[si]) continue;
     if (spec.path && !spec.boat) {
       const pts = spec.path.map((p) => walkableNear(ctx, p.x, p.z, 2.5));
       const { bad, n, where } = blockedAlong(ctx, pts, 0.8, !!spec.loop);
@@ -336,7 +381,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       d: spec.offset ?? rng() * 20, dir: 1, speed: spec.speed ?? 0.9, pause: 0, nextDwell: 8 + rng() * 25,
       amp: 0, ph: rng() * TAU, yaw: 0, seed: rng() * 100, react: 'none', reactT: 0, reactDelay: 0, src: { x: 0, z: 0 }, goal: null,
       greeted: false, bowedHere: false, nextBark: 4 + rng() * 20, moved: true, child: sc < 0.9, scale: sc, boatI: -1,
-      away: false, placed: false, stuck: 0, lead,
+      away: false, placed: false, stuck: 0, lead, folk, held: false,
     };
     people.push(p0);
     prev = p0;
@@ -437,6 +482,45 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
 
   bag.add(root, group);
 
+  // ── talking: one prompt for the whole place, on whoever stands nearest in front of you. "No one"
+  //    is radius 0; it starts on the first person, inside the place (the world keeps the place the
+  //    prompt was first seen in, to hide it with the place)
+  let cur: Person | null = null;
+  let talking: Person | null = null;
+  const proxy: Interactable = {
+    id: `npc-crowd:${region}`,
+    position: new THREE.Vector3(people[0].x, 0, people[0].z),
+    radius: 0,
+    labelZh: '', labelEn: '', actionZh: '搭话', actionEn: 'Talk',
+    act: () => talkTo(cur),
+  };
+  bag.interact(proxy);
+  const relabel = () => {
+    if (!cur) return;
+    const l = folkLabel(cur.folk, isMet(cur.folk.id));
+    proxy.labelZh = l.zh; proxy.labelEn = l.en;
+    plate.show(region, cur, tr(ctx, l.zh, l.en), isMet(cur.folk.id));
+  };
+  const drop = () => { if (talking) return; cur = null; proxy.radius = 0; plate.hide(region); };
+  async function talkTo(p: Person | null): Promise<void> {
+    if (!p || talking || !p.active || !begin(ctx, 'talk')) return;
+    // a couple stops together
+    const pair = p.lead ?? people.find((q) => q.lead === p && q.active) ?? null;
+    talking = p;
+    p.held = true; p.react = 'none'; p.goal = null;
+    if (pair) { pair.held = true; pair.react = 'none'; pair.goal = null; }
+    proxy.radius = 0;
+    plate.hide(region);
+    try {
+      await converse(ctx, p.folk, { night, onMet: relabel });
+    } finally {
+      for (const q of pair ? [p, pair] : [p]) { q.held = false; q.pause = Math.max(q.pause, 1.5); q.greeted = true; }
+      talking = null;
+      relabel();
+      end(ctx, 'talk');
+    }
+  }
+
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v3 = new THREE.Vector3(), s3 = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0), eul = new THREE.Euler();
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const tmp = { x: 0, z: 0, heading: 0 };
@@ -450,7 +534,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     night = isNight;
     let changed = false;
     for (const p of people) {
-      const on = onDuty(p.spec.shift, hour, isNight, fest);
+      // someone talking with you finishes the talk before going home
+      const on = p.held || onDuty(p.spec.shift, hour, isNight, fest);
       if (on !== p.active) {
         p.active = on; changed = true; p.moved = true;
         // out of sight in between: they may start straight on their way
@@ -458,6 +543,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
         if (on && p.lead) { p.x = p.lead.x; p.z = p.lead.z; }
       }
     }
+    if (cur && !cur.active) drop();
     if (changed || rosterDirty) {
       rosterDirty = false;
       for (const p of people) if (!p.active) { body.setMatrixAt(p.i, zero); shadows.setMatrixAt(p.i, zero); if (boats && p.boatI >= 0) boats.setMatrixAt(p.boatI, zero); }
@@ -474,7 +560,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     if (!group.visible || !root.visible) return;
     const r = e.r ?? (e.kind === 'music' ? 16 : e.kind === 'bow' ? 11 : 9);
     for (const p of people) {
-      if (!p.active) continue;
+      if (!p.active || p.held) continue;
       const d = Math.hypot(p.x - e.x, p.z - e.z);
       if (d > r) continue;
       const kind: React = e.kind === 'music' ? 'listen' : e.kind === 'bow' ? 'bow' : 'sniff';
@@ -493,7 +579,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     }
     // one of them says something
     const list = e.kind === 'music' ? REACT.music : e.kind === 'bow' ? REACT.bow : REACT.bloom;
-    const near = people.filter((p) => p.active && Math.hypot(p.x - e.x, p.z - e.z) < r).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z))[0];
+    const near = people.filter((p) => p.active && !p.held && Math.hypot(p.x - e.x, p.z - e.z) < r).sort((a, b) => Math.hypot(a.x - e.x, a.z - e.z) - Math.hypot(b.x - e.x, b.z - e.z))[0];
     if (near) bag.later(600, () => bubbles.say(near, lineText(ctx, list[Math.floor((near.seed * 7) % list.length)]), 2.6, true));
   }
 
@@ -507,10 +593,14 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       const far = Math.hypot(cam.x - home.center.x, cam.z - home.center.z) > home.radius + 55;
       if (root.visible === far) root.visible = !far;
     }
-    if (!anyOn || !group.visible || !root.visible) return;
+    if (!anyOn || !group.visible || !root.visible) { drop(); return; }
     const pp = ctx.player.position;
     const cd = Math.hypot(pp.x - (people[0].x), pp.z - (people[0].z));
-    if (cd > 160) return;
+    if (cd > 160) { drop(); return; }
+    // whom you would talk to: the nearest in front of you (a little stickier for whoever it is now)
+    const myH = ctx.player.heading;
+    const choose = !talking && !ctx.player.isFrozen;
+    let best: Person | null = null, bestD = Infinity;
     const who: CharacterId = ctx.player.character;
     const isGuan = who === 'guan', isChange = who === 'change', chaseMe = who === 'cat' || who === 'rabbit';
     let staredSaid = false;
@@ -521,6 +611,17 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       const dx = pp.x - p.x, dz = pp.z - p.z;
       const dist = Math.hypot(dx, dz);
       const toMe = Math.atan2(dx, dz);
+      const held = p.held;
+      if (choose) {
+        const mine = p === cur;
+        const reach = (S.boat ? 4 : 2.6) + (mine ? 0.4 : 0);
+        if (dist < reach) {
+          // facing: my heading against the bearing from me to them (boats: any side will do)
+          const facing = S.boat ? 1 : Math.cos(wrap(myH - toMe - Math.PI));
+          const score = dist - (mine ? 0.4 : 0);
+          if (facing > (mine ? 0.2 : 0.45) && score < bestD) { best = p; bestD = score; }
+        }
+      }
       let speed = 0;
       let react = p.react;
       if (react !== 'none') {
@@ -528,15 +629,19 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
         else { p.reactT -= dt; if (p.reactT <= 0) { p.react = 'none'; react = 'none'; p.goal = null; } }
       }
       // companions: a bow for 关公, a long stare at 嫦娥, the children after the cat
-      if (react === 'none' && !p.child && !S.boat) {
+      if (react === 'none' && !p.child && !S.boat && !held) {
         if (isGuan && dist < 6 && !p.bowedHere) { p.bowedHere = true; p.react = react = 'bow'; p.reactT = 2.2; p.src = { x: pp.x, z: pp.z }; if (!bubbles.talking(p) && bubbles.quiet > 1.5) bubbles.say(p, lineText(ctx, pickOf(forCompanion(HELLO, who), p.seed)), 2.4); }
         else if (isChange && dist < 13) { react = 'stare'; if (!staredSaid && !p.greeted && dist < 8 && bubbles.quiet > 3) { staredSaid = true; p.greeted = true; bubbles.say(p, lineText(ctx, pickOf(forCompanion(HELLO, who), p.seed)), 2.6); } }
       }
       if (dist > 9) { p.bowedHere = false; if (!isChange) p.greeted = false; }
       if (dist > 16 && isChange) p.greeted = false;
 
-      // ── move
-      if (S.boat === 'river' && S.path) {
+      // ── move (not while talking with you: they turn to you and wait)
+      if (held) {
+        speed = 0;
+        if (S.boat === 'anchored' && S.at) { p.x = S.at.x + Math.sin(t * 0.05 + p.seed) * 0.6; p.z = S.at.z + Math.cos(t * 0.04 + p.seed) * 0.6; }
+        else if (!S.boat && !S.sit) p.h = rotateToward(p.h, toMe, dt * 6);
+      } else if (S.boat === 'river' && S.path) {
         p.d += S.speed! * dt * (still ? 0.6 : 1);
         pingPong(S.path, p.d, tmp);
         p.x = tmp.x; p.z = tmp.z; p.h = tmp.heading;
@@ -648,7 +753,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       // turn to face: whoever calls them, you when near and interested, the partner in a chat
       if (speed < 0.05 && !S.boat) {
         let want: number | null = null;
-        if (react === 'bow' || react === 'listen' || react === 'sniff') want = Math.atan2(p.src.x - p.x, p.src.z - p.z);
+        if (held) want = toMe;
+        else if (react === 'bow' || react === 'listen' || react === 'sniff') want = Math.atan2(p.src.x - p.x, p.src.z - p.z);
         else if (react === 'stare' || (p.pause > 0 && dist < 3)) want = toMe;
         else if (S.face) want = Math.atan2(S.face.x - p.x, S.face.z - p.z);
         else if (S.at && !S.sit) want = S.at.h;
@@ -656,17 +762,19 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
       }
 
       // ── hello when you pass (not everyone; one bubble at a time)
-      if (dist < 3.4 && !p.greeted && react === 'none' && !S.boat && !p.child && hi === 0 && bubbles.quiet > 2.5 && (p.seed % 2) < 1.2) {
+      // (an old acquaintance always does, by name: {名} is filled as the bubble is drawn)
+      const known = dist < 3.4 && !p.greeted && (play.value.counters[talkKey(p.folk.id)] ?? 0) >= REGULAR_AFTER;
+      if (dist < 3.4 && !p.greeted && !held && react === 'none' && !S.boat && !p.child && hi === 0 && bubbles.quiet > 2.5 && (known || (p.seed % 2) < 1.2)) {
         p.greeted = true;
         hi++;
-        bubbles.say(p, lineText(ctx, pickOf(night ? HELLO[who] ?? HELLO_NIGHT : forCompanion(HELLO, who), p.seed)), 2.4);
+        bubbles.say(p, lineText(ctx, pickOf(known ? HAIL : night ? HELLO[who] ?? HELLO_NIGHT : forCompanion(HELLO, who), p.seed)), 2.4);
         if (!S.sit && S.act !== 'wash') { p.react = 'wave'; p.reactT = 1.4; p.reactDelay = 0; }
       }
       // calls: vendors, the watchman, the boatman, the wooden fish
-      p.nextBark -= dt;
-      if (p.nextBark <= 0 && dist < 18) {
+      if (!held) p.nextBark -= dt;
+      if (p.nextBark <= 0 && dist < 18 && !held) {
         const fest = festLines && night && (S.role === 'snack' || S.role === 'lantern') && Math.floor(p.seed + t * 0.37) % 2 === 0;
-        const calls = fest ? festLines : CALLS[S.role];
+        const calls = fest ? festLines : p.folk.calls ?? CALLS[S.role];
         if (calls && S.role !== 'child' && bubbles.quiet > 3.5) {
           p.nextBark = (S.role === 'watchman' ? 9 : 13) + (p.seed % 8);
           if (bubbles.say(p, lineText(ctx, pickOf(calls, p.seed + t * 0.37)), S.role === 'watchman' ? 3.4 : 2.6)) {
@@ -720,6 +828,7 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
           else if (S.look.hand === HAND.clapper) { const c = (t * 0.45 + p.seed) % 1; armR = 0.7 + (c < 0.1 ? Math.sin(c * 31) * 0.5 : 0); armL = 0.7; }
           else if (S.look.back === BACK.basket) armL = 0.3;
       }
+      if (held && (!S.act || S.act === 'admire' || S.act === 'chat')) { armR = 0.35 + Math.max(0, Math.sin(t * 2.1 + p.seed)) * 0.45 * k; headP = Math.sin(t * 2.6 + p.seed) * 0.05 * k; }
       switch (react) {
         case 'bow': { const e = envelope(2.2 - p.reactT, 2.2); bow = 0.7 * e; armL = armR = 1.2 * e + armL * (1 - e); roll = 0.55 * e; break; }
         case 'listen': sway = Math.sin(t * 1.9 + p.seed) * 0.11 * k; headP = 0.05; if (!S.act) { armL = armR = 0.15; } break;
@@ -762,6 +871,15 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
     shadows.instanceMatrix.needsUpdate = true;
     if (boats) boats.instanceMatrix.needsUpdate = true;
     aPose.needsUpdate = aPose2.needsUpdate = aMisc.needsUpdate = true;
+    // the prompt follows whoever you would talk to (labels are rewritten only when that changes)
+    if (choose) {
+      if (best !== cur) { cur = best; if (cur) relabel(); else { proxy.radius = 0; plate.hide(region); } }
+      if (cur) {
+        proxy.position.set(cur.x, cur.y, cur.z);
+        proxy.radius = cur.spec.boat ? 4.6 : 3.2;
+        plate.hold(region, !bubbles.talking(cur));
+      }
+    }
     // lantern halos
     if (halos.visible) {
       let n = 0;
@@ -808,7 +926,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   return {
     roster, step, event,
     info: () => ({ region, people: N, active: people.filter((p) => p.active).length }),
-    people: () => people.map((p) => ({ region, i: p.i, role: p.spec.role, shift: p.spec.shift, active: p.active, x: +p.x.toFixed(2), z: +p.z.toFixed(2), away: p.away })),
+    people: () => people.map((p) => ({ region, i: p.i, id: p.folk.id, name: p.folk.zh, role: p.spec.role, shift: p.spec.shift, active: p.active, held: p.held, x: +p.x.toFixed(2), z: +p.z.toFixed(2), away: p.away })),
+    target: () => { const p = talking ?? cur; return p ? { region, id: p.folk.id, label: proxy.labelZh, held: p.held } : null; },
   };
 }
 

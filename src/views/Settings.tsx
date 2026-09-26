@@ -12,7 +12,8 @@ import { music } from '../audio/music';
 import { redeemCode } from '../app/play';
 import { makeSeal } from '../ink/seal';
 import { cleanName } from '../core/names';
-import { NameField } from './mail/NameField';
+import { NameField, inComposition, useComposing } from './mail/NameField';
+import { HAO } from './mail/hao';
 import { QUALITY_LEVELS, QUALITY_TEXT } from './walk/world/quality';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
@@ -133,18 +134,6 @@ function SealStamp(props: { text: string; style: 'bai' | 'zhu'; size?: number; l
   return <div class="seal-stamp" ref={ref} role="img" aria-label={props.label} style={{ width: size, height: size }} />;
 }
 
-/** 拟号 · a few classical 号 to try on (the button cycles them). */
-const HAO: [string, string][] = [
-  ['听雨客', 'Rain-Listener'],
-  ['半亩散人', 'Idler of the Half-Acre'],
-  ['松下客', 'Guest beneath the Pines'],
-  ['抱琴人', 'Keeper of the Qin'],
-  ['种竹翁', 'Old Bamboo-Planter'],
-  ['看云人', 'Cloud-Watcher'],
-  ['南山居士', 'Recluse of the South Hill'],
-  ['一蓑烟雨', 'Rain-Cape'],
-];
-
 /** 名号 — what the painting's people call you (never brushed: it is drawn in the text face). */
 function NameRow() {
   const t = useT();
@@ -188,13 +177,15 @@ function SealSection() {
   const t = useT();
   const saved = state.value.settings.sealName;
   const [draft, setDraft] = useState(saved);
-  const composing = useRef(false);
-  useEffect(() => { if (!composing.current) setDraft(saved); }, [saved]);
+  const input = useRef<HTMLInputElement>(null);
   const commit = (v: string) => {
     const clean = cleanSeal(v);
     setDraft(clean);
     if (clean !== state.value.settings.sealName) setSettings({ sealName: clean });
   };
+  // pinyin is kept whole until the composition ends (then it is cleaned and saved)
+  const composing = useComposing(input, commit);
+  useEffect(() => { if (!composing.current) setDraft(saved); }, [saved]);
   const preview = cleanSeal(draft) || '半亩';
   return (
     <Section id="seal" zh="名号 · 印章" en="Name · Seal">
@@ -203,6 +194,7 @@ function SealSection() {
         <label class="field set-seal-field">
           <span>{t('印文（一至四字）', 'Seal characters (1–4)')}</span>
           <input
+            ref={input}
             type="text"
             value={draft}
             placeholder="半亩"
@@ -213,14 +205,9 @@ function SealSection() {
             onInput={(e) => {
               const v = e.currentTarget.value;
               setDraft(v);
-              if (!composing.current) commit(v);
+              if (!inComposition(e, composing)) commit(v);
             }}
-            onCompositionStart={() => (composing.current = true)}
-            onCompositionEnd={(e) => {
-              composing.current = false;
-              commit(e.currentTarget.value);
-            }}
-            onBlur={(e) => commit(e.currentTarget.value)}
+            onBlur={(e) => { if (!composing.current) commit(e.currentTarget.value); }}
           />
           <small id="set-seal-hint" class="set-hint">
             {t('钤于长卷落款之下。留空则用「半亩」。', 'Pressed under the signature on your scrolls. Leave empty for 半亩.')}
@@ -779,7 +766,7 @@ export function SettingsView() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
           <h1 class="brush">{t('设置', 'Settings')}</h1>
-          <span class="topbar-sub">{t('名号 · 印章 · 语言 · 画面 · 声乐 · 数据', 'Name · seal · language · picture · sound · data')}</span>
+          <span class="topbar-sub">{t('名号 · 印章 · 语言 · 画面 · 声乐 · 数据', 'Name · seal · look · sound · data')}</span>
         </div>
       </header>
       <div class="page set-page">

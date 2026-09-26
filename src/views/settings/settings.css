@@ -1,6 +1,10 @@
 /* 设置 · Settings */
 .settings-view .topbar { max-width: 680px; }
 .settings-view .topbar-title { align-items: center; gap: 6px; }
+/* on a phone the list of what is here may take two short lines rather than lose its end */
+@media (max-width: 480px) {
+  .settings-view .topbar-sub { white-space: normal; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-left: 4px; }
+}
 .set-back { margin-left: -10px; }
 .set-page { padding-bottom: 28px; }
 .set-section .section-title { margin-top: 26px; }

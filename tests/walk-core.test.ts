@@ -174,3 +174,143 @@ describe('the homestead plot', () => {
     }
   });
 });
+
+// ───────────────────────────── 桃源: the pocket valley's plan (features/taoyuan/places.ts)
+import { GROUND_REGIONS, pocketAt, regionAt } from '../src/views/walk/map';
+import {
+  ANCHORS as TY_ANCHORS, CAVE, CLEFT_END, CREST_MIN, CROSSINGS, FLOOR_R, G, PLACES, RING, SHRINE, Y_T, cleftHalf, crestH, doorStateFor, fenceValley, floorAt, standAt, streamAt, surfaceAt, walkAt, waterAt,
+} from '../src/views/walk/features/taoyuan/places';
+import { fenceDisc } from '../src/views/walk/world/photoMath';
+import { changTod, SKY_MOODS } from '../src/views/walk/world/sky';
+
+describe('桃源 · the pocket valley', () => {
+  it('is a pocket: never on the ground plane, found in 3-D only on its floor', () => {
+    expect(GROUND_REGIONS.some((r) => r.id === 'taoyuan')).toBe(false);
+    expect(regionAt(G.x, G.z)).not.toBe('taoyuan');
+    expect(pocketAt(G.x, Y_T + 1, G.z)).toBe('taoyuan');
+    expect(pocketAt(G.x, 20, G.z)).toBe(null);
+    expect(pocketAt(G.x, Y_T, G.z + CAVE.start)).toBe('taoyuan'); // the narrow way is inside the ring
+    expect(REGION.taoyuan.pocket?.y).toBe(Y_T);
+  });
+
+  it('every place and anchor stands on the floor, inside the ring (the cleft in the south ring)', () => {
+    const all = [...Object.values(TY_ANCHORS)];
+    const walk = (o: unknown) => { if (o && typeof o === 'object' && 'x' in o && 'y' in o) all.push(o as { x: number; y: number; z: number }); else if (o && typeof o === 'object') Object.values(o).forEach(walk); };
+    walk(PLACES);
+    for (const p of all) {
+      expect(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)).toBe(true);
+      const r = Math.hypot(p.x - G.x, p.z - G.z);
+      const inCave = p.z - G.z > CAVE.mouth - 1;
+      expect(r).toBeLessThan(inCave ? CAVE.end : FLOOR_R);
+      expect(p.y).toBeGreaterThan(Y_T - 1.5);
+      expect(p.y).toBeLessThan(Y_T + 12);
+    }
+  });
+
+  it('the places one walks to are walkable, dry and reachable; the stream only at its crossings', () => {
+    const spots: [number, number][] = [[0, 0], [0, -20], [0, -24.5], [-1.4, 35.2], [-22, 3.4], [-24, 10.2], [23.2, 6.6], [18, -8.9], [8, -11.4], [26, -18.8], [-12.3, -13.2], [-17, -26.5], [14, -36], [24, 24], [-3, 28]];
+    for (const [x, z] of spots) {
+      expect(walkAt(x, z), `(${x}, ${z})`).toBe(true);
+      expect(waterAt(x, z)).toBe(null);
+    }
+    // the stream: water, and not walked, except on the bridge, the slab and the stepping stones
+    expect(waterAt(7.2, 6)).not.toBe(null);
+    expect(walkAt(7.2, 6)).toBe(false);
+    for (const c of CROSSINGS) {
+      const mx = (c.a[0] + c.b[0]) / 2, mz = (c.a[1] + c.b[1]) / 2;
+      expect(walkAt(mx, mz), c.id).toBe(true);
+      expect(standAt(mx, mz)).toBeGreaterThanOrEqual(floorAt(mx, mz));
+    }
+    // beyond the floor's edge: the slopes are not walked
+    expect(walkAt(0, -44)).toBe(false);
+    expect(walkAt(44, 0)).toBe(false);
+  });
+
+  it('the narrow way: 1.3–1.8 m wide, its walls at least 0.6 m from the centre, the walker kept off them', () => {
+    for (let z = 44; z <= CAVE.end; z += 0.25) {
+      const hw = cleftHalf(z);
+      expect(hw * 2).toBeGreaterThanOrEqual(1.3 - 1e-6);
+      expect(hw * 2).toBeLessThanOrEqual(1.8 + 1e-6);
+      expect(hw).toBeGreaterThanOrEqual(0.6);
+      // the rock rises right beyond the half-width
+      expect(surfaceAt(hw + 1.2, z)).toBeGreaterThan(standAt(0, z) + 2);
+      if (z < CLEFT_END - 0.05) expect(walkAt(0, z)).toBe(true);
+      expect(walkAt(hw - 0.2, z)).toBe(false);
+    }
+    // a walker can go from the start of the way to the valley floor without a step higher than a stair
+    let prev = standAt(0, CAVE.start);
+    for (let z = CAVE.start; z > CAVE.mouth - 6; z -= 0.1) {
+      const y = standAt(z > CAVE.mouth + 1.5 ? 0 : -0.3, z);
+      expect(Math.abs(y - prev)).toBeLessThan(0.1);
+      prev = y;
+    }
+  });
+
+  it('every walkable step lies inside the pocket\'s ring (past it the floor is taken away: a fall)', () => {
+    let n = 0;
+    for (let x = -45; x <= 45; x += 0.25) {
+      for (let z = -45; z <= 70; z += 0.25) {
+        if (!walkAt(x, z)) continue;
+        n++;
+        expect(Math.hypot(x, z), `(${x}, ${z})`).toBeLessThan(RING.outer - 0.5);
+        expect(pocketAt(G.x + x, Y_T + standAt(x, z), G.z + z)).toBe('taoyuan');
+      }
+    }
+    expect(n).toBeGreaterThan(10000);
+    // the walker is set down in the cleft, a few steps in front of the curtain, and can walk it
+    expect(walkAt(0, CAVE.start)).toBe(true);
+    expect(CAVE.start).toBeLessThan(CLEFT_END - 2);
+  });
+
+  it('the ring: crests 34–48 m above the floor, never lower than the photo camera may rise', () => {
+    for (let a = 0; a < Math.PI * 2; a += 0.05) {
+      const h = crestH(a);
+      expect(h).toBeGreaterThanOrEqual(CREST_MIN);
+      expect(h).toBeLessThanOrEqual(48);
+      const x = Math.cos(a) * 58, z = Math.sin(a) * 58;
+      if (Math.abs(x) > 9 || z < 0) expect(surfaceAt(x, z)).toBeGreaterThan(CREST_MIN - 4); // (the cleft cuts the south)
+    }
+    // the stream runs from the spring to the cleft
+    expect(streamAt(0, -33).d).toBeLessThan(0.5);
+    expect(streamAt(0.36, 55).inCleft).toBe(true);
+  });
+
+  it('the photo camera keeps inside the ring and under its crest (and inside the cleft from there)', () => {
+    const p = { x: G.x + 80, y: Y_T + 90, z: G.z };
+    fenceValley(p, { x: G.x, y: Y_T, z: G.z });
+    expect(Math.hypot(p.x - G.x, p.z - G.z)).toBeLessThanOrEqual(44 + 1e-6);
+    expect(p.y).toBeLessThanOrEqual(Y_T + CREST_MIN - 3);
+    const q = { x: G.x + 5, y: Y_T + 40, z: G.z + 55 };
+    fenceValley(q, { x: G.x, y: Y_T, z: G.z + 55 });
+    expect(Math.abs(q.x - G.x)).toBeLessThan(cleftHalf(55));
+    expect(q.y).toBeLessThan(Y_T + 10);
+    const d = fenceDisc({ x: 100, y: 50, z: 0 }, { x: 0, z: 0 }, 10, 5);
+    expect(Math.hypot(d.x, d.z)).toBeCloseTo(10);
+    expect(d.y).toBe(5);
+  });
+
+  it('the shrine: an 8 × 5 m courtyard before the hall, the altar inside it', () => {
+    expect(SHRINE.wallX * 2).toBeCloseTo(8.4, 1);
+    expect(SHRINE.south - SHRINE.courtN).toBeCloseTo(5, 1);
+    expect(SHRINE.altar.z).toBeLessThan(SHRINE.hall.z0);
+    expect(SHRINE.altar.z).toBeGreaterThan(SHRINE.hall.z1);
+    expect(standAt(0, -24.5)).toBeGreaterThan(floorAt(0, -20)); // the hall's raised floor
+  });
+
+  it('the door follows the record (bible §2)', () => {
+    expect(doorStateFor({}, false)).toBe('hidden');
+    expect(doorStateFor({}, true)).toBe('open');
+    expect(doorStateFor({ 'qy:taohua': true }, false)).toBe('open');
+    expect(doorStateFor({ 'qy:taohua': true, 'ty:b8': true }, true)).toBe('closed');
+    expect(doorStateFor({ 'ty:b8': true, 'ty:way': true }, false)).toBe('reopened');
+  });
+
+  it('the valley clock has every state of the bible, and 常 maps the world hour', () => {
+    expect([...SKY_MOODS].sort()).toEqual(['case', 'chang', 'hai', 'mao', 'shen', 'xu', 'you', 'zi']);
+    expect(changTod(6)).toBe('dawn');
+    expect(changTod(12)).toBe('day');
+    expect(changTod(18)).toBe('dusk');
+    expect(changTod(23)).toBe('night');
+    expect(changTod(3)).toBe('night');
+  });
+});

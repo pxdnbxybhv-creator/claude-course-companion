@@ -10,7 +10,7 @@
 // merged per material; the peaches are instanced. The floor is a deck (regions/water-decks.ts) that is
 // registered only while the walker is inside: the open country far below keeps its own ground.
 import type * as T from 'three';
-import type { WorldCtx } from '../../types';
+import type { Collider, WorldCtx } from '../../types';
 import { Batch, COL, Hill, TAU, hipRoof, place, plaqueCanvas, rockGeometry, roof, stairs, steleCanvas, taperTube } from '../../regions/hill-kit';
 import { registerDeck, type Deck } from '../../regions/water-decks';
 import { makeNoise2, makeRng, type Rng } from '../../../../core/rng';
@@ -58,12 +58,13 @@ export function buildValley(ctx: WorldCtx): Valley {
 
   // ── the floor (a deck: registered only while inside)
   const deck: Deck = {
-    id: 'taoyuan:floor', cx: G.x, cz: G.z, ax: 1, az: 0, hl: RING.outer + 18, hw: RING.outer + 18,
+    id: 'taoyuan:floor', cx: G.x, cz: G.z, ax: 1, az: 0, hl: RING.outer + 5, hw: RING.outer + 5,
     y: () => Y_T,
     yAt(x, z) {
       const u = x - G.x, v = z - G.z;
       const r = Math.hypot(u, v);
-      if (r > RING.outer + 17) return null;
+      // (the ring's crest and no further: the pool below the falls, 66 m off, keeps its own ground)
+      if (r > RING.outer + 1 && !(v > CAVE.mouth && Math.abs(u) < 9)) return null;
       // in the cleft the camera keeps to the planks (the walls keep it in, not the rock's height)
       if (v > CAVE.mouth + 1 && Math.abs(u) < cleftHalf(v) + 7) return Y_T + standAt(u, v);
       const s = standAt(u, v);
@@ -80,13 +81,16 @@ export function buildValley(ctx: WorldCtx): Valley {
 
   // ── the floor mesh: a grid over the floor disc, painted: grass, packed earth, paths, fallen petals
   {
-    const S = 0.6, R = FLOOR_R + 1.2, n = Math.ceil((R * 2) / S) + 1;
+    const S = low ? 0.8 : 0.65, R = FLOOR_R + 1.2, n = Math.ceil((R * 2) / S) + 1;
     const pos: number[] = [], col: number[] = [];
     const cGrass = new TH.Color('#9db566'), cWarm = new TH.Color('#c6c77a'), cDeep = new TH.Color('#7b9a57');
     const cPath = new TH.Color('#c9a877'), cEarth = new TH.Color('#d1b98f'), cPetal = new TH.Color('#eab4bf'), cBed = new TH.Color('#7c8d74');
     const cStone = new TH.Color('#c4bba8'), cField = new TH.Color('#b4d06c'), cRow = new TH.Color('#8fb35a');
     const tmp = new TH.Color();
-    const vert = (x: number, z: number) => {
+    // (the grid's edge is pulled onto the circle r = R: a clean rim where the ring's slopes rise from under it)
+    const vert = (gx: number, gz: number) => {
+      const gr = Math.hypot(gx, gz), k = gr > R ? R / gr : 1;
+      const x = gx * k, z = gz * k;
       const y = ph(x, z);
       pos.push(x, y, z);
       const n1 = noise(x * 0.09, z * 0.09), n2 = noise(x * 0.5 + 9, z * 0.5 - 3);
@@ -110,7 +114,7 @@ export function buildValley(ctx: WorldCtx): Valley {
       for (let j = 0; j < n - 1; j++) {
         const x0 = -R + i * S, z0 = -R + j * S, x1 = x0 + S, z1 = z0 + S;
         const cx = x0 + S / 2, cz = z0 + S / 2;
-        if (Math.hypot(cx, cz) > R) continue;
+        if (Math.hypot(cx, cz) > R + S * 0.71) continue;
         if (cz > CAVE.mouth + 1.8) continue;
         const quad: [number, number][] = [[x0, z0], [x0, z1], [x1, z1], [x0, z0], [x1, z1], [x1, z0]];
         for (const [x, z] of quad) vert(x, z);
@@ -130,7 +134,10 @@ export function buildValley(ctx: WorldCtx): Valley {
   const caveMat = h.toon('#ffffff', { vc: true, side: TH.DoubleSide });
   {
     const segA = low ? 120 : 180;
-    const radii = [36, 38.5, 40.5, 42, 43.5, 45.5, 47.5, 50, 52.5, 55, 57, 58.5, 60, 62, 64.5, 67, 70, 74, 80, 86];
+    // (from under the floor's rim outward: one surface at every place, the painted floor always on top —
+    // inside the rim the ring keeps below it, at the rim it starts a hair under it, then rises)
+    const RIM = FLOOR_R + 1.2;
+    const radii = [38.5, RIM, RIM + 0.6, 43.5, 45.5, 47.5, 50, 52.5, 55, 57, 58.5, 60, 62, 64.5, 67, 70, 74, 80, 86];
     const pos: number[] = [], col: number[] = [];
     const cLow = new TH.Color('#86a35c'), cMid = new TH.Color('#5c957e'), cBlue = new TH.Color('#4b8396'), cHigh = new TH.Color('#9bb9ae');
     const cMist = new TH.Color('#e9e4d6'), cRock = new TH.Color('#9c8566'), cInk = new TH.Color('#3a3f3a');
@@ -139,7 +146,13 @@ export function buildValley(ctx: WorldCtx): Valley {
       const a = (i / segA) * TAU;
       const r = radii[j];
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      return { x, z, y: surfaceAt(x, z), a, r };
+      let y = surfaceAt(x, z);
+      if (j <= 2) {
+        const f = floorAt(x, z);
+        if (j < 2) { if (y - f < 0.35) y = Math.min(y, f - (j === 0 ? 0.5 : 0.06)); }
+        else y = Math.max(y, f + 0.05);
+      }
+      return { x, z, y, a, r };
     };
     const colour = (p: { x: number; z: number; y: number; a: number; r: number }) => {
       const n1 = noise(p.x * 0.07 + 3, p.z * 0.07), n2 = noise(p.x * 0.3, p.z * 0.3 + 7);
@@ -185,7 +198,13 @@ export function buildValley(ctx: WorldCtx): Valley {
     for (let z = CAVE.mouth - 6; z <= 80; z += z < CAVE.end + 1 ? 0.5 : 1.5) zs.push(z);
     const cWall = new TH.Color('#5d574e'), cMoss = new TH.Color('#6e8c5f'), cDamp = new TH.Color('#3e4a44');
     const cv = (x: number, z: number) => {
-      const y = surfaceAt(x, z);
+      let y = surfaceAt(x, z);
+      // at the mouth, where the painted floor lies over it, the rock keeps a hand under it (no speckled
+      // patches where two surfaces cross), easing back up to its own floor beyond the floor's end
+      if (z < CAVE.mouth + 2.8 && Math.hypot(x, z) < FLOOR_R + 1.25) {
+        const f = floorAt(x, z);
+        if (y - f < 0.35) y = Math.min(y, f - 0.12 * smooth(CAVE.mouth + 2.8, CAVE.mouth + 2.1, z));
+      }
       cpos.push(x, y, z);
       const hw = cleftHalf(z);
       const inWall = Math.abs(x) > hw - 0.05;
@@ -298,8 +317,11 @@ export function buildValley(ctx: WorldCtx): Valley {
     h.frame((_dt, t) => { glowMat.opacity = (0.4 + 0.12 * Math.sin(t * 0.9)) * (1 - 0.3 * h.night); });
   }
 
-  // ── colliders: circles along walls and round footprints
-  const solid = (x: number, z: number, r: number, hgt = 2) => h.collide({ x: G.x + x, z: G.z + z, r, h: hgt });
+  // ── colliders: circles along walls and round footprints. Registered only while the floor is (see
+  // setFloor): the open country 120 m below walks through where the valley's walls would stand.
+  const solids: Collider[] = [];
+  let offSolids: (() => void)[] | null = null;
+  const solid = (x: number, z: number, r: number, hgt = 2) => { solids.push({ x: G.x + x, z: G.z + z, r, h: hgt }); };
   const wallLine = (ax: number, az: number, bx: number, bz: number, hgt: number, gap?: { x: number; z: number; w: number }) => {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.45));
     for (let i = 0; i <= n; i++) {
@@ -583,7 +605,8 @@ export function buildValley(ctx: WorldCtx): Valley {
   const setDoorSolid = (shut: boolean) => {
     for (const f of doorSolid) f();
     doorSolid = [];
-    if (shut) for (let i = 0; i < 4; i++) doorSolid.push(ctx.addCollider({ x: G.x - S.door.w / 2 + 0.16 + i * (S.door.w - 0.32) / 3, z: G.z + S.door.z, r: 0.24, h: 2.2 }));
+    // (only while the floor is there: see setFloor)
+    if (shut && offDeck) for (let i = 0; i < 4; i++) doorSolid.push(ctx.addCollider({ x: G.x - S.door.w / 2 + 0.16 + i * (S.door.w - 0.32) / 3, z: G.z + S.door.z, r: 0.24, h: 2.2 }));
   };
   h.frame((dt) => {
     if (doorK === doorWant) return;
@@ -706,7 +729,7 @@ export function buildValley(ctx: WorldCtx): Valley {
     // the hollow: a dark oval on the trunk's south-east face, knee high
     const p = t[1];
     b.add(place(new TH.SphereGeometry(0.22, 10, 8), p.x + 0.28, p.y - 0.1, p.z + 0.36, 0.7, 1, 1.5, 0.5), '#1f1712', {});
-    bigTree(-2.6, 35.8, 1.1, false, 5151);
+    bigTree(-4.6, 36.4, 1.05, false, 5151);
     // the kite string's peg on the terrace
     b.add(place(new TH.CylinderGeometry(0.03, 0.03, 0.4, 5), -0.4, Y(-0.4, 34.6) + 0.2, 34.6), COL.wood, {});
     const tr = rockGeometry(333, 3.4, 0.7, { detail: 1, base: '#c1b79f', dark: '#7a705f', flat: 0.6 });
@@ -816,11 +839,17 @@ export function buildValley(ctx: WorldCtx): Valley {
   }
   // on the lower slopes (no walking there): pink among the jade
   const slopeTrees = Math.round((low ? 14 : 28) * Math.min(1.5, density));
-  for (let i = 0; i < slopeTrees; i++) {
-    const a = rng() * TAU, r = 41.5 + rng() * 8;
+  for (let i = 0, n = 0; i < slopeTrees * 4 && n < slopeTrees; i++) {
+    const a = rng() * TAU, r = 41.2 + rng() * 4.5;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const s = 0.8 + rng() * 0.5, ry = rng() * TAU, t = rng();
     if (z > CAVE.mouth - 6 && Math.abs(x) < 9) continue;
-    trees.push({ x, z, s: 0.8 + rng() * 0.5, ry: rng() * TAU, t: rng() });
+    // only the gentle lower slopes: nothing hung on the sheer north cliff (it would look glued on)
+    const y = surfaceAt(x, z), e = 0.5;
+    const steep = Math.max(Math.abs(surfaceAt(x + e, z) - surfaceAt(x - e, z)), Math.abs(surfaceAt(x, z + e) - surfaceAt(x, z - e))) / (2 * e);
+    if (y - floorAt((x / r) * FLOOR_R, (z / r) * FLOOR_R) > 6 || steep > 0.9) continue;
+    trees.push({ x, z, s, ry, t });
+    n++;
   }
   {
     const floorTrees = trees.filter((t) => Math.hypot(t.x, t.z) < FLOOR_R);
@@ -883,8 +912,17 @@ export function buildValley(ctx: WorldCtx): Valley {
     hill: h,
     get floorOn() { return offDeck !== null; },
     setFloor(on: boolean) {
+      // the floor first, then what stands on it (a collider's top is measured from the floor under it)
       if (on && !offDeck) offDeck = registerDeck(deck);
-      else if (!on && offDeck) { offDeck(); offDeck = null; }
+      if (on && !offSolids) {
+        offSolids = solids.map((c) => ctx.addCollider(c));
+        setDoorSolid(!doorOpen);
+      }
+      if (!on) {
+        if (offSolids) { for (const f of offSolids) f(); offSolids = null; }
+        setDoorSolid(false);
+        if (offDeck) { offDeck(); offDeck = null; }
+      }
     },
     get doorOpen() { return doorOpen; },
     shrineDoor(open: boolean, instant = false) {
@@ -900,17 +938,18 @@ export function buildValley(ctx: WorldCtx): Valley {
     dispose() {
       disposed = true;
       valley.setFloor(false);
-      setDoorSolid(false);
       h.dispose();
     },
   };
+  // (the floor is registered while building: what stands on it with it)
+  valley.setFloor(true);
   return valley;
 }
 
 /** Footprints the trees keep clear of (local x, z, radius). */
 const BUILT: [number, number, number][] = [
   [-23.2, 5.7, 3], [-20.3, 6.6, 1.8], [-24, 8.7, 2.4], [22.4, 4, 3], [23.2, 9.2, 2.6], [18, -10.8, 2.8], [8, -14, 3.4], [-14.2, -15.3, 2.2], [-12.2, -14.2, 1.2],
-  [4.6, 0, 2.4], [-3, 2, 1.2], [26, -20, 4.5], [-20.5, 19.5, 1.8], [-2.6, 35.8, 2.5], [-1.4, 35.2, 2], [-27.5, 1.5, 1.5], [-28.2, 6.5, 1.5], [-19, 11, 1.5], [-31, 0, 4],
+  [4.6, 0, 2.4], [-3, 2, 1.2], [26, -20, 4.5], [-20.5, 19.5, 1.8], [-4.6, 36.4, 2.5], [-1.4, 35.2, 2], [-27.5, 1.5, 1.5], [-28.2, 6.5, 1.5], [-19, 11, 1.5], [-31, 0, 4],
 ];
 
 /** hill-kit's stairs() places in world coordinates (it reads the ground there); the batch here is local. */

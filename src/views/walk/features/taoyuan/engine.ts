@@ -4,6 +4,7 @@ import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { RegionId } from '../../map';
 import type { SkyMood } from '../../world/sky';
+import type { TimeOfDay } from '../../../../ink/scene-types';
 
 export type { SkyMood };
 
@@ -35,14 +36,16 @@ export interface Engine {
   /** The valley clock's sky (null: the hour's own), turning over `secs`. */
   setMood(mood: SkyMood | null, o?: { secs?: number; hour?: number }): void;
   moodNow(): SkyMood | null;
+  /** The hour the mood paints (常 resolved from the world's own hour), or null without a mood. */
+  moodTod(): TimeOfDay | null;
   /** An effect's fog over the mood, or null. */
   setFog(o: { near: number; far: number; color?: string } | null): void;
   /** The light falling on painted things now (the sky's tint), if the core says. */
   skyTint(): T.Color | null;
 }
 
-type Extras = Partial<Omit<Engine, 'setMood' | 'moodNow' | 'setFog' | 'skyTint'>>;
-type SkyX = { setMood?: (m: SkyMood | null, o?: { secs?: number; hour?: number }) => void; moodNow?: SkyMood | null; setFog?: (o: { near: number; far: number; color?: string } | null) => void; tint?: T.Color };
+type Extras = Partial<Omit<Engine, 'setMood' | 'moodNow' | 'moodTod' | 'setFog' | 'skyTint'>>;
+type SkyX = { setMood?: (m: SkyMood | null, o?: { secs?: number; hour?: number }) => void; moodNow?: SkyMood | null; moodTod?: TimeOfDay | null; setFog?: (o: { near: number; far: number; color?: string } | null) => void; tint?: T.Color };
 
 const cache = new WeakMap<WorldCtx, Engine>();
 
@@ -65,8 +68,10 @@ export function engine(ctx: WorldCtx): Engine {
     restream: () => x.restream?.(),
     photoFence: (fn) => x.photoFence?.(fn),
     pocket: () => (x.pocket ? x.pocket() : null),
-    setMood: (m, o) => sky.setMood?.(m, o),
+    // (a mood only inside the pocket: an effect still running as the walker leaves must not paint the world outside)
+    setMood: (m, o) => { if (m !== null && x.pocket && !x.pocket()) return; sky.setMood?.(m, o); },
     moodNow: () => sky.moodNow ?? null,
+    moodTod: () => sky.moodTod ?? null,
     setFog: (o) => sky.setFog?.(o),
     skyTint: () => sky.tint ?? null,
   };

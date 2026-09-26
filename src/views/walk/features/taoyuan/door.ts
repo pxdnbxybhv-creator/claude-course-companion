@@ -16,20 +16,12 @@ import { glowTexture, tr } from '../kit';
 import { begin, end } from '../minigames/ui';
 import { play } from '../../../../app/play';
 import { inBox } from '../../../../app/mail';
-import { ANCHORS, CAVE, G, L, W, Y_T, standAt } from './places';
+import { ANCHORS, CAVE, CLEFT_END, G, L, W, Y_T, standAt } from './places';
 import { engine } from './engine';
 import type { TaoyuanWorld } from './world';
 
-/** hidden: only the petals · open: the light, 「入光」 · closed: 「寻向所志，遂迷」 · reopened: the light for good, 「持花入光」. */
-export type DoorState = 'hidden' | 'open' | 'closed' | 'reopened';
-
-/** The door's state from the record alone (bible §2), when the story has not said otherwise. */
-export function doorStateFor(flags: Readonly<Record<string, true>>, hasShideLetter: boolean): DoorState {
-  if (flags['ty:way']) return 'reopened';
-  if (flags['ty:b8']) return 'closed';
-  if (hasShideLetter || flags['qy:taohua']) return 'open';
-  return 'hidden';
-}
+import { doorStateFor, type DoorState } from './places';
+export { doorStateFor, type DoorState };
 
 export interface Door {
   readonly state: DoorState;
@@ -199,7 +191,7 @@ export async function enterValley(tv: TaoyuanWorld, o: EnterOpts = {}): Promise<
     ctx.player.freeze(true);
     const fall = MAP_ANCHORS.waterfall;
     try { ctx.frameCamera(fall.x, fall.z, ctx.player.position.y + 3.2, 2.2); } catch { /* a nicety */ }
-    try { ctx.music.setTheme('quiet'); } catch { /* optional */ }
+    tv.hush(true);
     await tv.wait(1500);
     await veil(ctx, 'veil', o.line === undefined ? LINE_IN : o.line, async () => {
       const v = await tv.build();
@@ -210,14 +202,15 @@ export async function enterValley(tv: TaoyuanWorld, o: EnterOpts = {}): Promise<
       eng.faceView(Math.PI);
       eng.restream();
       tv.arrived();
-      if (!o.atMouth) try { ctx.music.setTheme('quiet'); } catch { /* optional */ }
-      else try { ctx.music.release(); } catch { /* optional */ }
+      tv.hush(!o.atMouth);
       tv.cave?.wipe();
     }, 700, (ms) => tv.wait(ms));
   } finally {
     ctx.player.freeze(false);
     end(ctx, 'taoyuan');
     tv.moving = false;
+    // (the way in failed: the music is the pool's again)
+    if (!tv.isInside()) tv.hush(false);
   }
   if (o.atMouth) return;
   // the cleft: the words at +56, the mouth at +43
@@ -243,18 +236,19 @@ export async function mouthReveal(tv: TaoyuanWorld): Promise<void> {
   const claimed = begin(ctx, 'taoyuan');
   ctx.player.freeze(true);
   try {
-    try { ctx.music.release(); } catch { /* optional */ }
+    tv.hush(false);
     const reveal = fx.reveal();
     const p = ctx.player.position;
     const look = W(0, 6);
     const lookY = Y_T + 2.5;
     // over the shoulder: back along the way one came, and up
-    const to = { x: p.x + 0.9, y: p.y + 8, z: p.z + 5.5 };
+    // (straight up the cleft's open top: between its walls, the sky above)
+    const to = { x: G.x + L(p.x, p.z).x * 0.5, y: p.y + 8, z: p.z + 3.2 };
     const crane = eng.cinematic({ to, look: { x: look.x, y: lookY, z: look.z }, secs: 3.6, hold: 1.4 });
     await tv.wait(700);
     void fx.petalBurst({ x: p.x - 1.5, y: p.y + 0.8, z: p.z - 3 }, { n: 160, up: 2.5, spread: 1.2, lit: false, wind: { x: 3.2, z: 1.2 } });
     await tv.wait(900);
-    fx.words('豁然开朗', { x: look.x, y: Y_T + 5.2, z: G.z + 18 }, { size: 1.1, life: 5.5, rise: 0.8 });
+    fx.words('豁然开朗', { x: look.x - 0.5, y: Y_T + 5.6, z: G.z + 26 }, { size: 1.3, life: 6, rise: 0.7 });
     await Promise.all([reveal, crane]);
   } finally {
     ctx.player.freeze(false);
@@ -271,7 +265,10 @@ export interface LeaveOpts {
   card?: { titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; seal?: string };
 }
 
-/** Out again: into the cleft (FX14 if asked), a curtain with a line, set down at the pool facing away from the falls. */
+/**
+ * Out again: into the cleft (FX14 if asked), a curtain with a line, set down a few steps back from the
+ * pool, out of the door's reach, turned to look back at the falls (the camera behind in open air).
+ */
 export async function leaveValley(tv: TaoyuanWorld, o: LeaveOpts = {}): Promise<void> {
   const ctx = tv.ctx;
   if (tv.moving || !begin(ctx, 'taoyuan')) return;
@@ -289,12 +286,13 @@ export async function leaveValley(tv: TaoyuanWorld, o: LeaveOpts = {}): Promise<
     else await tv.wait(900);
     await veil(ctx, 'card', o.line === undefined ? LINE_OUT : o.line, () => {
       eng.endCinematic();
-      const d = tv.door?.spot;
-      const s = d ?? { x: MAP_ANCHORS.waterfallPool.x - 2.4, z: MAP_ANCHORS.waterfallPool.z - 3.2, heading: 0, y: 0 };
-      ctx.player.teleport(s.x, s.z, (d?.heading ?? 0) + Math.PI);
-      eng.faceView((d?.heading ?? 0) + Math.PI);
+      // (the valley's floor first: set down on the mountain's own ground)
       tv.valley?.setFloor(false);
+      const s = landing(ctx, tv.door?.spot ?? null);
+      ctx.player.teleport(s.x, s.z, s.heading);
+      eng.faceView(s.heading);
       eng.restream();
+      tv.hush(false);
       try { ctx.music.release(); } catch { /* optional */ }
       tv.fx?.reopenCave();
       tv.left();
@@ -307,6 +305,35 @@ export async function leaveValley(tv: TaoyuanWorld, o: LeaveOpts = {}): Promise<
   if (o.card) ctx.hud.showCard(o.card);
 }
 
+/**
+ * Where the way out sets the walker down: a few steps from the door's spot, beyond its reach (the prompt
+ * is not live at once), turned to look back at the falls they came out of — at the place round the pool
+ * where the camera behind them has the most open air (the ground behind rises least: never wedged into
+ * the cliff, never looking down on the walker's head).
+ */
+function landing(ctx: WorldCtx, spot: Door['spot'] | null): { x: number; z: number; heading: number } {
+  const fall = MAP_ANCHORS.waterfall;
+  const s = spot ?? { x: MAP_ANCHORS.waterfallPool.x - 2.4, z: MAP_ANCHORS.waterfallPool.z - 3.2, y: 0, heading: 0 };
+  const face = (x: number, z: number) => Math.atan2(fall.x - x, fall.z - z);
+  let best = { x: s.x, z: s.z, heading: face(s.x, s.z) }, bestScore = Infinity;
+  for (const r of [3.6, 4.4, 5.2]) {
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const x = s.x + Math.sin(a) * r, z = s.z + Math.cos(a) * r;
+      if (!ctx.isWalkable(x, z)) continue;
+      const h = face(x, z), y = ctx.groundY(x, z);
+      // (on the pool's own bank, not up on a ledge above it)
+      if (Math.abs(y - s.y) > 1.3) continue;
+      // the camera's line: behind the walker, 2–5 m back
+      let rise = -Infinity;
+      for (const b of [2, 3.5, 5]) rise = Math.max(rise, ctx.groundY(x - Math.sin(h) * b, z - Math.cos(h) * b) - y);
+      const score = Math.max(0, rise) + r * 0.05;
+      if (score < bestScore) { bestScore = score; best = { x, z, heading: h }; }
+    }
+  }
+  return best;
+}
+
 /** The inner mouth's prompt (always there: 「出谷 · Leave」), and one at the cleft's start. */
 export function exitPrompts(tv: TaoyuanWorld, leave: () => void | Promise<void>): (() => void)[] {
   const ctx = tv.ctx;
@@ -315,5 +342,7 @@ export function exitPrompts(tv: TaoyuanWorld, leave: () => void | Promise<void>)
     labelZh: '来时的小口', labelEn: 'The narrow way you came', actionZh: '出谷', actionEn: 'Leave',
     act: () => leave(),
   });
-  return [ctx.addInteractable(mk('taoyuan:out', ANCHORS.mouth, 2.2)), ctx.addInteractable(mk('taoyuan:out2', ANCHORS.caveStart, 1.6))];
+  // (the second a little short of the plank walk's last step, so it never draws the walker to the ring's edge)
+  const out2 = W(0, CLEFT_END - 1.1);
+  return [ctx.addInteractable(mk('taoyuan:out', ANCHORS.mouth, 2.2)), ctx.addInteractable(mk('taoyuan:out2', { x: out2.x, y: Y_T + standAt(0, CLEFT_END - 1.1), z: out2.z }, 1.4))];
 }

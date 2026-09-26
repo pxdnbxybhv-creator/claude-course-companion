@@ -26,7 +26,8 @@ export class TaoyuanWorld {
   private offs: (() => void)[] = [];
   private exitOffs: (() => void)[] = [];
   private clockNow: ValleyClock = 'chang';
-  private clockTimer: ReturnType<typeof setInterval> | null = null;
+  /** The valley's hush (the music held at 'quiet' through the narrow way) is on. */
+  private quietHeld = false;
   private builtFns = new Set<(v: Valley) => void>();
   private enterFns = new Set<Listener>();
   private leaveFns = new Set<Listener>();
@@ -113,15 +114,24 @@ export class TaoyuanWorld {
     this.applyClock(0);
     for (const fn of this.enterFns) { try { fn(); } catch (e) { console.error('[walk] taoyuan enter listener', e); } }
   }
+  /**
+   * (door.ts) Hush the music for the narrow way (true), or give it back to the place (false). Whatever
+   * way the walker leaves — the door, the map, a fall — the hush is given back (see left()).
+   */
+  hush(on: boolean): void {
+    if (on === this.quietHeld) return;
+    this.quietHeld = on;
+    try { if (on) this.ctx.music.setTheme('quiet'); else this.ctx.music.release(); } catch { /* optional */ }
+  }
   /** (door.ts, or the region listener) the walker has left. */
   left(): void {
     if (!this.inside) return;
     this.inside = false;
     this.cleft = null;
+    this.hush(false);
     this.fx?.fireflies(false);
     this.fx?.holdPetals(false);
     this.fx?.heldMist(false);
-    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
     for (const fn of this.leaveFns) { try { fn(); } catch (e) { console.error('[walk] taoyuan leave listener', e); } }
   }
 
@@ -162,10 +172,9 @@ export class TaoyuanWorld {
     const eng = engine(this.ctx);
     const s = this.clockNow;
     eng.setMood(s, { secs });
-    if (this.clockTimer) { clearInterval(this.clockTimer); this.clockTimer = null; }
-    if (s === 'chang') this.clockTimer = setInterval(() => { if (this.inside && this.clockNow === 'chang') eng.setMood('chang', { secs: 8 }); }, 60000);
     if (!fx) return;
-    const tod = s === 'chang' ? changNow() : null;
+    // (常 is the world's own hour, as the sky resolved it: the walk's 时辰, a feature's night)
+    const tod = s === 'chang' ? eng.moodTod() ?? 'day' : null;
     const night = s === 'xu' || s === 'hai' || s === 'zi' || s === 'case' || tod === 'night';
     fx.godRays(s === 'shen' || s === 'mao' || tod === 'day', s === 'mao' || tod === 'dawn' ? 'east' : 'west');
     fx.fireflies(s === 'you' || s === 'xu' || s === 'hai' || s === 'zi' || tod === 'dusk' || tod === 'night');
@@ -173,6 +182,17 @@ export class TaoyuanWorld {
     void fx.petalGlow(s === 'hai' || s === 'zi' ? 0.8 : s === 'xu' || tod === 'night' ? 0.35 : s === 'case' ? 0.25 : 0, Math.max(0.01, secs));
     fx.holdPetals(s === 'case');
     fx.heldMist(s === 'case');
+  }
+
+  /**
+   * FX12 · 嗒 and the dawn after it: fx.da() (the drop, the warm ring, every petal falling, the sky to
+   * 卯, the mist lifting), then the valley clock stands at 卯.
+   */
+  async da(o: { at?: { x: number; y: number; z: number } } = {}): Promise<void> {
+    if (!this.fx || !this.inside) return;
+    await this.fx.da({ at: o.at });
+    this.clockNow = 'mao';
+    if (this.inside) this.applyClock(0);
   }
 
   // ───────────── the shrine's door, places
@@ -192,7 +212,6 @@ export class TaoyuanWorld {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    if (this.clockTimer) clearInterval(this.clockTimer);
     for (const f of this.offs.splice(0)) f();
     for (const f of this.exitOffs.splice(0)) f();
     engine(this.ctx).photoFence(null);
@@ -205,11 +224,6 @@ export class TaoyuanWorld {
   }
 }
 
-function changNow(): 'dawn' | 'day' | 'dusk' | 'night' {
-  const d = new Date();
-  const h = d.getHours() + d.getMinutes() / 60;
-  return h >= 5 && h < 9 ? 'dawn' : h >= 9 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'dusk' : 'night';
-}
 
 const worlds = new WeakMap<WorldCtx, TaoyuanWorld>();
 

@@ -28,7 +28,8 @@ import { backupExtras, state as appState, today } from './store';
 const KEY = 'banmu.play.v1';
 
 export interface PlayState {
-  v: 1;
+  /** 2 since wave 6 (玉兔 moved to the 初见礼); a save without it, or with 1, is older. */
+  v: 2;
   character: CharacterId;
   /** Lifetime counters. */
   counters: Record<string, number>;
@@ -47,7 +48,7 @@ export interface PlayState {
 }
 
 export function emptyPlay(): PlayState {
-  return { v: 1, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [], paid: [] }, coins: 0, life: null };
+  return { v: 2, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [], paid: [] }, coins: 0, life: null };
 }
 
 const CHAR_IDS = new Set(CHARACTERS.map((c) => c.id));
@@ -67,12 +68,15 @@ export function sanitizePlay(raw: unknown): PlayState {
   if (r.flags && typeof r.flags === 'object') for (const [k, v] of Object.entries(r.flags)) if (v) flags[k.slice(0, 64)] = true;
   const done: Record<string, DateKey> = {};
   if (r.done && typeof r.done === 'object') for (const [k, v] of Object.entries(r.done)) if (typeof v === 'string') done[k] = v;
-  // 玉兔 used to come with 八月十五; she now comes in the 初见礼 letter. Whoever earned her keeps her
-  // (and a saved character:'rabbit' stays valid); their letter still pays, with a postscript.
-  if (done['q-mooncake']) flags['char:rabbit'] = true;
+  // 玉兔 used to come with 八月十五; she now comes in the 初见礼 letter. Whoever earned her before
+  // this build keeps her (and a saved character:'rabbit' stays valid); their letter still pays, with a
+  // postscript. Only a save written before v2 migrates: someone who eats the mooncakes now still
+  // meets her in the letter, with its own celebration.
+  const legacy = !(typeof r.v === 'number' && r.v >= 2);
+  if (legacy && done['q-mooncake']) flags['char:rabbit'] = true;
   const d = (r.daily ?? {}) as Partial<PlayState['daily']>;
   return {
-    v: 1,
+    v: 2,
     character: CHAR_IDS.has(r.character as CharacterId) ? (r.character as CharacterId) : 'scholar',
     counters: rec(r.counters),
     best: rec(r.best),

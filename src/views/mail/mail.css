@@ -143,6 +143,11 @@
     background-image: repeating-linear-gradient(to left, rgba(185, 58, 43, 0.3) 0 1px, transparent 1px 32px); }
   .mail-att { flex-basis: 120px; padding-right: 10px; }
 }
+/* the narrowest phones: a finer hand, so the whole letter still fits the page without a scroll */
+@media (max-width: 360px) {
+  .mail-paper.is-vertical .mail-paper-text { font-size: 15.5px; line-height: 29px; letter-spacing: 0.08em; padding: 18px 12px 16px 14px;
+    background-image: repeating-linear-gradient(to left, rgba(185, 58, 43, 0.3) 0 1px, transparent 1px 29px); }
+}
 @media (prefers-reduced-motion: reduce) {
   .mail-paper, .mail-att, .mail-unread-dot { animation: none; }
 }

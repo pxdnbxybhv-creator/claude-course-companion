@@ -10,7 +10,7 @@ import { ledgerToday } from '../quests/helpers';
 import { CoinBadge, fmtCoins } from '../../ui/coins';
 import { Sheet, Segmented, Toggle } from '../../ui/kit';
 import { deliverDue, mailUi, openMail } from '../../app/mail';
-import { nameAsk } from '../../app/nameAsk';
+import { nameAsk, provideNameScope } from '../../app/nameAsk';
 import { fillName, type NameScope } from '../../app/name';
 import { MailGlyph, mailLabel } from '../mail/MailHost';
 import { toLunar, festivalsOn as coreFestivals } from '../../core/lunar';
@@ -119,6 +119,13 @@ export function WalkView() {
   const dialog = dialogs[0] ?? null;
   // the letters (信) and the name sheet (askName) are app-wide sheets over the walk
   const mailOpen = mailUi.value !== null || nameAsk.value !== null;
+  /** A sheet over the walk (a letter, the name sheet) or a text field has the keyboard: the walk's keys wait. */
+  const keysElsewhere = (e: KeyboardEvent) => {
+    // read at the key press itself: a sheet opened a moment ago counts before the walk re-renders
+    if (mailUi.peek() !== null || nameAsk.peek() !== null) return true;
+    const tg = e.target as HTMLElement | null;
+    return !!tg?.closest?.('.sheet, input, textarea, select, [contenteditable]');
+  };
   const answer = (i: number) => {
     setDialogs((ds) => {
       const [head, ...rest] = ds;
@@ -228,6 +235,7 @@ export function WalkView() {
   useEffect(() => {
     if (!dialog) return;
     const onKey = (e: KeyboardEvent) => {
+      if (keysElsewhere(e)) return;
       const n = dialog.choices?.length ?? 0;
       if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); answer(-1); return; }
       if (!n && ['Enter', 'Space', 'KeyE', 'NumpadEnter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); answer(0); return; }
@@ -236,7 +244,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [dialog]);
+  }, [dialog, mailOpen]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
@@ -351,6 +359,7 @@ export function WalkView() {
   useEffect(() => {
     if (!card) return;
     const onKey = (e: KeyboardEvent) => {
+      if (keysElsewhere(e)) return;
       if (['Escape', 'Enter', 'KeyE', 'Space', 'NumpadEnter'].includes(e.code) || e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -359,7 +368,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [card]);
+  }, [card, mailOpen]);
 
   // the first-visit hint fades after a while, or once you start moving: a walking key, the joystick,
   // or dragging the view round
@@ -404,6 +413,8 @@ export function WalkView() {
   // 名号 at render: `{名}` in any line becomes what the player is called (in 桃源 the unnamed are 客)
   const nameScope: NameScope = phase === 'ready' && worldRef.current?.where().region === 'taoyuan' ? 'valley' : 'world';
   const f = (zh: string, en: string) => fillName(t(zh, en), lang, nameScope);
+  // and the name sheet (askName) asked in the valley offers 客 as the name left blank
+  useEffect(() => provideNameScope(() => (worldRef.current?.where().region === 'taoyuan' ? 'valley' : 'world')), []);
   const blurAfter = (e: Event) => (e.currentTarget as HTMLElement | null)?.blur?.();
 
   return (
@@ -848,8 +859,8 @@ function PurseSheet(props: { open: boolean; onClose(): void }) {
         )}
         <p class="walk-purse-how">
           <b>{t('钱从何来', 'Where coins come from')}</b>
-          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，都能进账。`,
-            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips and the homestead's harvest.`)}
+          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，随信附来，都能进账。`,
+            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips, the homestead's harvest and coins sent with letters.`)}
         </p>
         <p class="walk-purse-how">
           <b>{t('钱往何处', 'What coins are for')}</b>

@@ -237,3 +237,22 @@ describe('themes share the key of the sound effects', () => {
     }
   });
 });
+
+describe('桃源 · the valley theme', () => {
+  it('is its own: 徵 mode, 60–68 bpm, 笛 over 古筝 and a 笙 pad, sent into the echo', () => {
+    const s = THEMES.taoyuan;
+    expect(s).not.toBe(THEMES.garden);
+    expect(s.style.bpm[0]).toBeGreaterThanOrEqual(60);
+    expect(s.style.bpm[1]).toBeLessThanOrEqual(68);
+    for (const m of s.style.modes) expect(m.final).toBe(3);
+    const c = new Composer(s.style, 7);
+    const r = makeRng(3);
+    const inst = new Set<string>();
+    let echo = 0;
+    for (let i = 0; i < 8; i++) for (const e of arrange('taoyuan', c.next(), r, i)) { inst.add(e.inst); echo = Math.max(echo, e.echo); }
+    expect(inst.has('dizi')).toBe(true);
+    expect(inst.has('zheng')).toBe(true);
+    expect(inst.has('sheng')).toBe(true);
+    expect(echo).toBeGreaterThan(0.1);
+  });
+});

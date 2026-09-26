@@ -1,7 +1,8 @@
 // The people of the painting, each with something to say: the teahouse keeper (tea, and gossip about
 // the cat), the old fisherman at the dock (how to fish, a joke), the monk at the temple gate (a koan,
 // and the bell), the poet in the plum-ridge pavilion (a game of 飞花令), and a child at the edge of the
-// bamboo whose kite got away (a little errand).
+// bamboo whose kite got away (a little errand). Each has a name (../npcs/folk.ts: 陆掌柜, 江老汉, 了缘,
+// 梅溪居士, 阿蛮), given the first time you talk, and a small story told a beat a day.
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { RegionId, XZ } from '../../map';
@@ -20,6 +21,9 @@ import { offerFlower } from '../npcs/gift';
 import { begin, end, withTheme } from './ui';
 import { todaysCat, walkableNear } from './cat';
 import * as snd from './sound';
+import { stallFolk } from '../npcs/talk';
+
+const isNight = (ctx: WorldCtx): boolean => { try { return ctx.sky.isNight(); } catch { return false; } };
 
 /** A standing NPC in a place, by an anchor, facing a point (see npc.ts person). */
 function placed(bag: Bag, ctx: WorldCtx, region: RegionId, spec: FigureSpec, a: XZ, dx: number, dz: number, look: XZ): Figure {
@@ -52,15 +56,17 @@ export const teahouse = feature('npc-teahouse', (bag, ctx) => {
   f.armR.add(kettle);
   greet(bag, ctx, f);
   let served = 0;
-  const name = { zh: '茶博士', en: 'Tea Master' };
-  bag.interact({
+  const folk = stallFolk('n.tea');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-teahouse', position: front(f), radius: 2,
-    labelZh: '茶博士', labelEn: 'Tea master', actionZh: '说话', actionEn: 'Talk',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '说话', actionEn: 'Talk',
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:tea');
         if (await offerFlower(ctx, f, name, 'tea')) { served++; ctx.player.emote('eat'); return; }
+        await folk.story(ctx, isNight(ctx));
         const cat = todaysCat(ctx);
         const hi = served ? { zh: '客官又来啦！再来一壶？', en: 'Welcome back! Another pot?' } : hello(ctx, TEA_HELLO, { zh: '客官里边请！走了一路，喝口茶歇歇脚？', en: 'Come in, come in! A long walk — sit and have some tea?' });
         if (!served && ctx.player.character === 'guan') f.wave();
@@ -89,7 +95,7 @@ export const teahouse = feature('npc-teahouse', (bag, ctx) => {
         }
       } finally { end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 老渔翁, the old fisherman ─────────────────────────────
@@ -116,15 +122,17 @@ export const oldFisherman = feature('npc-fisherman', (bag, ctx) => {
   bag.frame((_dt, t) => { if (!still) rod.rotation.x = 1.85 + Math.sin(t * 0.9) * 0.03; });
   greet(bag, ctx, f, 4);
   let joke = Math.floor(dayRng(ctx, 'joke')() * JOKES.length);
-  const name = { zh: '老渔翁', en: 'Old Fisherman' };
-  bag.interact({
+  const folk = stallFolk('n.fisher');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-fisherman', position: front(f, 1), radius: 2,
-    labelZh: '老渔翁', labelEn: 'Old fisherman', actionZh: '说话', actionEn: 'Talk',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '说话', actionEn: 'Talk',
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:fisher');
         if (await offerFlower(ctx, f, name, 'fisher')) return;
+        await folk.story(ctx, isNight(ctx));
         const n = play.value.counters.fish ?? 0;
         const hi = hello(ctx, FISHER_HELLO, n >= 5 ? { zh: '哟，你如今也是个老把式了。', en: 'Well now, you’re an old hand yourself these days.' } : { zh: '年轻人，也想试试这一竿风月？', en: 'Young one — fancy a try at the rod?' });
         const c = await talk(ctx, f, name, [{
@@ -149,7 +157,7 @@ export const oldFisherman = feature('npc-fisherman', (bag, ctx) => {
         }
       } finally { end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 知客僧, the monk at the gate ─────────────────────────────
@@ -171,16 +179,18 @@ export const monk = feature('npc-monk', (bag, ctx) => {
   f.armR.rotation.x = -0.7;
   greet(bag, ctx, f);
   let k = Math.floor(dayRng(ctx, 'koan')() * KOANS.length);
-  const name = { zh: '知客僧', en: 'Gate Monk' };
-  bag.interact({
+  const folk = stallFolk('n.monk');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-monk', position: front(f), radius: 2,
-    labelZh: '知客僧', labelEn: 'Gate monk', actionZh: '问禅', actionEn: 'Ask',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '问禅', actionEn: 'Ask',
     async act() {
       if (!begin(ctx, 'talk')) return;
       ctx.player.emote('bow');
       try {
         record('npc:monk');
         if (await offerFlower(ctx, f, name, 'monk')) return;
+        await folk.story(ctx, isNight(ctx));
         const koan = KOANS[k++ % KOANS.length];
         const rang = !!play.value.flags.bell;
         const cat = todaysCat(ctx);
@@ -198,7 +208,7 @@ export const monk = feature('npc-monk', (bag, ctx) => {
         ]);
       } finally { end(ctx, 'talk'); }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 诗人, the poet on the ridge: 飞花令 ─────────────────────────────
@@ -235,10 +245,11 @@ export const poet = feature('npc-poet', (bag, ctx) => {
     }
   });
 
-  const name = { zh: '诗人', en: 'The Poet' };
-  bag.interact({
+  const folk = stallFolk('n.poet');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-poet', position: front(f), radius: 2.2,
-    labelZh: '亭中诗人', labelEn: 'Poet in the pavilion', actionZh: '飞花令', actionEn: 'Flying Flowers',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '飞花令', actionEn: 'Flying Flowers',
     async act() {
       if (!begin(ctx, 'feihua')) return;
       const restore = withTheme(ctx, 'quiet');
@@ -246,6 +257,7 @@ export const poet = feature('npc-poet', (bag, ctx) => {
       try {
         record('npc:poet');
         if (await offerFlower(ctx, f, name, 'poet')) return;
+        await folk.story(ctx, isNight(ctx));
         const own = forCompanion(POET_NPC_HELLO, ctx.player.character);
         if (own) await talk(ctx, f, name, [own]);
         const go = await talk(ctx, f, name, [{
@@ -301,7 +313,7 @@ export const poet = feature('npc-poet', (bag, ctx) => {
         end(ctx, 'feihua');
       }
     },
-  });
+  }));
 });
 
 // ───────────────────────────── 放风筝的孩子, the child and the lost kite ─────────────────────────────
@@ -372,15 +384,17 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
   f.armR.rotation.z = -1.9; // holding the string up
   const lookUp = () => { f.head.rotation.x = -0.35; };
 
-  const name = { zh: '小童', en: 'Little One' };
-  bag.interact({
+  const folk = stallFolk('n.kite');
+  const name = folk.nameRef;
+  bag.interact(folk.prompt({
     id: 'npc-kite', position: front(f, 0.8), radius: 2,
-    labelZh: '放风筝的孩子', labelEn: 'Child with a kite', actionZh: '说话', actionEn: 'Talk',
+    labelZh: folk.label().zh, labelEn: folk.label().en, actionZh: '说话', actionEn: 'Talk',
     async act() {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:kite');
         if (await offerFlower(ctx, f, name, 'kite')) return;
+        await folk.story(ctx, isNight(ctx));
         if (returned) {
           await talk(ctx, f, name, [{ zh: '你看！两只都飞起来啦！', en: 'Look! Both of them are flying!' }]);
         } else if (carrying) {
@@ -408,7 +422,7 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
         }
       } finally { end(ctx, 'talk'); }
     },
-  });
+  }));
   bag.interact({
     id: 'npc-kite-lost', position: lostAt, radius: 2.4,
     labelZh: '挂住的风筝', labelEn: 'A kite in the bamboo', actionZh: '取下', actionEn: 'Take it down',

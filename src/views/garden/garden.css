@@ -236,3 +236,19 @@
 .garden-mail .mail-unread-dot { top: 8px; right: 7px; }
 .garden-walk .brush { font-size: 18px; letter-spacing: 0.08em; }
 .garden-walk-en:empty { display: none; }
+/* a phone: 半亩 and its three buttons share the first row, and the date (the festival, the solar
+   term and its pentad) takes the whole row under them instead of being squeezed to a few characters */
+@media (max-width: 420px) {
+  .garden-top { flex-wrap: wrap; row-gap: 2px; column-gap: 8px; padding-bottom: 6px; }
+  .garden-title { display: contents; }
+  .garden-date { order: 9; flex: 1 0 100%; -webkit-line-clamp: 2; }
+  .garden-walk { padding: 0 10px; }
+  .garden-walk-en { display: none; }
+  .garden-mail { width: 40px; margin-right: -4px; }
+}
+/* the English date is longer: it takes its own row a little further up */
+@media (min-width: 421px) and (max-width: 580px) {
+  :lang(en) .garden-top { flex-wrap: wrap; row-gap: 2px; padding-bottom: 6px; }
+  :lang(en) .garden-title { display: contents; }
+  :lang(en) .garden-date { order: 9; flex: 1 0 100%; }
+}

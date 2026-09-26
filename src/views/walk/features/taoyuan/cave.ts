@@ -2,6 +2,7 @@
 // water-curtain of light at its start (the back of the waterfall), drips from the rock, the camera kept
 // between its walls, and 「初极狭，才通人」 brushed onto the rock at (0, +56). The rock itself is the
 // valley's (valley.ts, a fine patch of the ring cut through by the slot).
+import type * as T from 'three';
 import type { Valley } from './valley';
 import type { ValleyFx } from './fx';
 import { Cloud } from './fx';
@@ -54,13 +55,13 @@ export function buildCave(valley: Valley, fx: ValleyFx): Cave {
     const hw = cleftHalf(z), y = Y_T + cleftFloor(z);
     for (const s of [-1, 1]) h.occlude({ x: G.x + s * (hw + 0.55), z: G.z + z, r: 0.55, y0: y - 1, y1: y + 40 });
   }
-  // and the dead end behind the start (the curtain of falling water)
-  for (let x = -1.2; x <= 1.2; x += 0.6) h.occlude({ x: G.x + x, z: G.z + CAVE.end + 3.4, r: 0.55, y0: Y_T - 1, y1: Y_T + 40 });
+  // and the dead end behind the start: the camera stays on this side of the curtain of falling water
+  for (let x = -1.2; x <= 1.2; x += 0.6) h.occlude({ x: G.x + x, z: G.z + CAVE.end + 1.2, r: 0.55, y0: Y_T - 1, y1: Y_T + 40 });
 
   // the back of the waterfall at the cleft's start: a sheet of falling light
   const sheetTex = h.tex(fallCanvas(64, 256), { repeat: true });
   sheetTex.repeat.set(2, 1);
-  const sheetMat = h.own(new TH.MeshBasicMaterial({ map: sheetTex, color: '#e9f4f2', transparent: true, opacity: 0.85, depthWrite: false, blending: TH.AdditiveBlending, fog: false, side: TH.DoubleSide }));
+  const sheetMat = h.own(new TH.MeshBasicMaterial({ map: sheetTex, color: '#e9f4f2', transparent: true, opacity: 0.5, depthWrite: false, blending: TH.AdditiveBlending, fog: false, side: TH.DoubleSide }));
   const sheet = new TH.Mesh(new TH.PlaneGeometry(2.6, 6), sheetMat);
   sheet.position.set(0, cleftFloor(CAVE.end) + 2.8, CAVE.end + 0.35);
   sheet.name = 'taoyuan:curtain';
@@ -69,7 +70,17 @@ export function buildCave(valley: Valley, fx: ValleyFx): Cave {
   back.position.set(0, cleftFloor(CAVE.end) + 1.6, CAVE.end + 0.6);
   back.scale.set(3.4, 5.5, 1);
   h.add(back);
-  h.frame((dt) => { sheetTex.offset.y += dt * 0.9; });
+  // (seen from the cleft, never from behind or through: it fades as the camera comes up to it)
+  const backMat = back.material as T.SpriteMaterial;
+  h.frame((dt) => {
+    sheetTex.offset.y += dt * 0.9;
+    const gap = sheet.position.z - (ctx.camera.position.z - G.z);
+    const k = Math.max(0, Math.min(1, (gap - 0.6) / 2));
+    const f = k * k * (3 - 2 * k);
+    sheetMat.opacity = 0.5 * f;
+    backMat.opacity = 0.7 * f;
+    sheet.visible = back.visible = f > 0.01;
+  });
 
   // the light at the far end (the inner mouth), growing as one comes nearer (FX1)
   fx.mouthGlow();
@@ -102,6 +113,15 @@ export function buildCave(valley: Valley, fx: ValleyFx): Cave {
   let shown = 0;
   const paint = (g: CanvasRenderingContext2D) => {
     g.clearRect(0, 0, W, H);
+    // a pale wash on the damp rock first (the ink reads against it)
+    if (shown > 0) {
+      const wash = g.createLinearGradient(0, 0, W, 0);
+      wash.addColorStop(0, 'rgba(236,228,210,0)');
+      wash.addColorStop(0.5, 'rgba(236,228,210,0.26)');
+      wash.addColorStop(1, 'rgba(236,228,210,0)');
+      g.fillStyle = wash;
+      g.fillRect(0, 4, W, 12 + cell * Math.min(shown, chars.length));
+    }
     g.font = `${cell * 0.86}px ${BRUSH_FONT}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
@@ -116,7 +136,7 @@ export function buildCave(valley: Valley, fx: ValleyFx): Cave {
   const wordsMat = h.own(new TH.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.95 }));
   h.nightShade(wordsMat);
   const zW = CAVE.words;
-  const words = new TH.Mesh(new TH.PlaneGeometry(0.48, (0.48 * H) / W), wordsMat);
+  const words = new TH.Mesh(new TH.PlaneGeometry(0.52, (0.52 * H) / W), wordsMat);
   words.position.set(cleftHalf(zW) - 0.03, cleftFloor(zW) + 1.75, zW);
   words.rotation.y = -Math.PI / 2;
   words.renderOrder = 2;
@@ -131,6 +151,8 @@ export function buildCave(valley: Valley, fx: ValleyFx): Cave {
       brushing = true;
       void loadBrush(TEXT);
       words.visible = true;
+      // and brushed in the air a few steps ahead, facing the walker (the rock's words are seen edge-on)
+      fx.words('初极狭　才通人', { x: G.x - 0.05, y: Y_T + cleftFloor(zW - 3.5) + 1.95, z: G.z + zW - 3.5 }, { vertical: true, size: 0.3, life: 5.5, rise: 0.35 });
       for (shown = 1; shown <= chars.length; shown++) {
         const g = (tex.image as HTMLCanvasElement).getContext('2d');
         if (g) { paint(g); tex.needsUpdate = true; }
