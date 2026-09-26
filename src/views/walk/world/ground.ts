@@ -5,14 +5,17 @@ import * as THREE from 'three';
 import type { PlantKind } from '../../../core/types';
 import type { Season } from '../../../ink/scene-types';
 import { makeNoise2, makeRng } from '../../../core/rng';
-import { Bag, canvas, canvasTexture, toon } from './kit';
+import { Bag, LAWN, NIGHT_LAND, canvas, canvasTexture, glowTexture, toon } from './kit';
+import { skyNow } from './sky';
+import { NO_REFLECT } from './pond';
 import { GATE, LANTERNS, LOOP, PAVILION, POND, ROCKS, SPURS, polyDist, pondQ, steppingStones, terrainY, type PlantSlot } from './site';
 
 /** The overlay covers [-OV, OV]² metres. */
 const OV = 32;
 const OS = 1024;
 
-const GROUND_COLOR: Record<Season, string> = { spring: '#dcd8c8', summer: '#d9d6c5', autumn: '#ddd5c4', winter: '#e6e3dc' };
+/** The lawn is the same meadow as the country beyond the wall (kit.ts LAWN), so the two meet cleanly. */
+const GROUND_COLOR = LAWN;
 
 const SHADOW_R: Record<PlantKind, number> = { pine: 1.6, bamboo: 1.15, plum: 1.35, chrysanthemum: 0.6, orchid: 0.5, lotus: 0 };
 
@@ -23,7 +26,7 @@ function warp(u: number): number {
 }
 
 function terrainGeometry(bag: Bag): THREE.BufferGeometry {
-  const n = 168;
+  const n = 112;
   const verts = (n + 1) * (n + 1);
   const pos = new Float32Array(verts * 3);
   let k = 0;
@@ -108,11 +111,23 @@ function overlayCanvas(slots: PlantSlot[], season: Season): HTMLCanvasElement {
     g.restore();
   };
 
-  // 1. mottled ink texture in the lawn
+  // 1. mottled texture in the lawn: ink, and soft colour washes — jade in the hollows, sunny
+  //    yellow-green, a little ochre (the overlay multiplies, so a wash both tints and deepens)
+  const washes = season === 'winter' ? [] : season === 'autumn' ? ['96,140,92', '186,170,74', '176,120,64'] : ['86,146,96', '170,190,80', '150,120,70'];
   for (let i = 0; i < 90; i++) {
     const x = rng.range(-OV, OV), z = rng.range(-OV, OV);
     if (pondQ(x, z) < 1.1) continue;
     blob(x, z, rng.range(0.8, 3.6), rng.range(0.025, 0.06), '52,46,36', rng.range(0.7, 1.4), rng.range(0.6, 1.2));
+  }
+  for (let i = 0; washes.length && i < 90; i++) {
+    const x = rng.range(-OV, OV), z = rng.range(-OV, OV);
+    if (pondQ(x, z) < 1.15) continue;
+    blob(x, z, rng.range(1.5, 5.5), rng.range(0.09, 0.2), washes[i % washes.length], rng.range(0.7, 1.5), rng.range(0.6, 1.2));
+  }
+  // the grass is deeper and greener where the bank is damp
+  if (washes.length) for (let i = 0; i < 40; i++) {
+    const a = (i / 40) * Math.PI * 2 + rng.range(-0.05, 0.05), q = rng.range(1.18, 1.4);
+    blob(POND.x + Math.cos(a) * POND.rx * q, POND.z + Math.sin(a) * POND.rz * q, rng.range(1, 2), rng.range(0.1, 0.18), washes[0], 1.3, 0.8);
   }
 
   // 2. the pond's bank: a soft wash outside, a broken ink line on the shore
@@ -157,7 +172,7 @@ function overlayCanvas(slots: PlantSlot[], season: Season): HTMLCanvasElement {
     if (rng() > dens * (season === 'winter' ? 0.4 : 0.8)) continue;
     if (polyDist(LOOP, x, z) < 0.55) continue;
     const bx = P(x), bz = P(z);
-    const ink = season === 'spring' || season === 'summer' ? '46,54,42' : '46,42,36';
+    const ink = season === 'winter' ? '46,42,36' : '40,62,40';
     if (rng() < 0.6) {
       g.fillStyle = `rgba(${ink},${rng.range(0.12, 0.34)})`;
       g.beginPath();
@@ -261,7 +276,9 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   const overlay = canvasTexture(bag, overlayCanvas(slots, season), { flipY: false });
   const grain = canvasTexture(bag, grainCanvas(), { repeat: true });
   const mat = bag.add(new THREE.MeshLambertMaterial({ color: GROUND_COLOR[season] }));
+  const nightU = { value: 0 };
   mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = nightU;
     sh.uniforms.uOverlay = { value: overlay };
     sh.uniforms.uGrain = { value: grain };
     sh.uniforms.uOv = { value: new THREE.Vector4(-OV, -OV, 2 * OV, 2 * OV) };
@@ -269,14 +286,18 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
       .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGxz = (modelMatrix * vec4(position, 1.0)).xz;\nvSlope = 1.0 - normal.y;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;')
+      .replace('#include <common>', '#include <common>\nvarying vec2 vGxz;\nvarying float vSlope;\nuniform sampler2D uOverlay;\nuniform sampler2D uGrain;\nuniform vec4 uOv;\nuniform float uNight;')
       .replace('#include <map_fragment>', `#include <map_fragment>
         vec2 ouv = (vGxz - uOv.xy) / uOv.zw;
         vec3 ov = texture2D(uOverlay, ouv).rgb;
+        // by night the lawn's washes and moss read deeper, and broad hollows of shade lie between
+        // the moonlit swells (the grain's soft blotches, large), so the dark has a shape
+        ov = mix(ov, ov * ov, uNight * 0.4);
+        float nb = clamp((texture2D(uGrain, vGxz / 23.0 + 0.61).r - 0.87) / 0.13, 0.0, 1.0);
         float g1 = texture2D(uGrain, vGxz / 7.0).r;
         float g2 = texture2D(uGrain, vGxz / 29.0 + 0.37).r;
         float ink = smoothstep(0.06, 0.4, vSlope) * 0.3;
-        diffuseColor.rgb *= ov * (0.82 + 0.18 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink);`);
+        diffuseColor.rgb *= ov * (0.82 + 0.18 * g1) * (0.9 + 0.1 * g2) * (1.0 - ink) * (1.0 + uNight * (0.45 * nb - 0.3));`);
   };
   mat.customProgramCacheKey = () => 'ground';
   const mesh = new THREE.Mesh(terrainGeometry(bag), mat);
@@ -286,7 +307,9 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   const list = steppingStones();
   const geo = bag.add(new THREE.CylinderGeometry(1, 1.06, 0.08, 11));
   geo.translate(0, 0.01, 0);
-  const smat = toon(bag, '#d9d2c3');
+  const smat = toon(bag, '#ddd1bb');
+  // by night the stones are the palest things on the lawn: moonlit ivory, not lavender or slate
+  const stoneDay = smat.color.clone(), stoneNight = stoneDay.clone().multiply(new THREE.Color('#aca8a4'));
   const stones = new THREE.InstancedMesh(geo, smat, list.length);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), sc = new THREE.Vector3();
   const col = new THREE.Color();
@@ -304,5 +327,46 @@ export function buildGround(bag: Bag, slots: PlantSlot[], season: Season): Groun
   stones.instanceMatrix.needsUpdate = true;
   if (stones.instanceColor) stones.instanceColor.needsUpdate = true;
   stones.name = 'stones';
+
+  // by night, warm pools of light on the lawn round the stone lanterns — and the lit garden's glow
+  // spilling out through the moon gate onto the lawn where one arrives (the first thing one sees)
+  const spill = [
+    { x: 0, z: GATE.z + 1.5, sx: 2.3, sz: 1.7, k: 0.62 },
+    { x: 0, z: GATE.z - 1.2, sx: 1.8, sz: 1.5, k: 0.5 },
+  ];
+  const pgeo = bag.add(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2));
+  const pmat = bag.add(new THREE.MeshBasicMaterial({
+    map: glowTexture(bag, 64, 0.8), color: '#ffb86b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  }));
+  const pools = new THREE.InstancedMesh(pgeo, pmat, LANTERNS.length + spill.length);
+  LANTERNS.forEach((l, i) => {
+    v.set(l.x, terrainY(l.x, l.z) + 0.03, l.z);
+    pools.setMatrixAt(i, m4.compose(v, q.identity(), sc.set(2.1, 1, 2.1)));
+    pools.setColorAt(i, col.setRGB(1, 1, 1));
+  });
+  spill.forEach((p, k) => {
+    v.set(p.x, terrainY(p.x, p.z) + 0.03, p.z);
+    pools.setMatrixAt(LANTERNS.length + k, m4.compose(v, q.identity(), sc.set(p.sx, 1, p.sz)));
+    pools.setColorAt(LANTERNS.length + k, col.setRGB(p.k, p.k, p.k));
+  });
+  pools.instanceMatrix.needsUpdate = true;
+  if (pools.instanceColor) pools.instanceColor.needsUpdate = true;
+  pools.computeBoundingSphere();
+  pools.name = 'lamp-pools';
+  pools.visible = false;
+  pools.renderOrder = 1;
+  pools.layers.set(NO_REFLECT);
+  mesh.add(pools);
+  // the lawn is always drawn: it turns the pools on and off (they follow one frame behind)
+  const day = new THREE.Color(GROUND_COLOR[season]), moonlit = day.clone().multiply(new THREE.Color(NIGHT_LAND));
+  let lastN = -1;
+  mesh.onBeforeRender = () => {
+    const n = skyNow.night;
+    pools.visible = n > 0.02;
+    pmat.opacity = 0.62 * n;
+    // the lawn goes down to a moonlit blue-green dark by night (the pools and lanterns keep their warmth)
+    if (Math.abs(n - lastN) > 1e-3) { lastN = n; nightU.value = n; mat.color.copy(day).lerp(moonlit, n); smat.color.copy(stoneDay).lerp(stoneNight, n); }
+  };
   return { mesh, stones };
 }

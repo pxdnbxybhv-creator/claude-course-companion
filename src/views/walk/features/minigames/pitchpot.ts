@@ -10,6 +10,8 @@ import { record, recordMax, play } from '../../../../app/play';
 import { POT, classifyThrow, flightAt, scoreRound, HIT_POINTS, type PotHit } from './logic';
 import { ability, begin, button, closeButton, end, frameOn, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import * as snd from './sound';
+import { pitchpotPay } from '../../../games/economy';
+import { pay, payLine } from '../../../games/purse';
 
 const ARROWS = 8;
 
@@ -226,12 +228,16 @@ export const pitchPot = feature('mg-pitchpot', (bag, ctx) => {
       updateTop();
       const feats = sc.feats.map((f) => (ctx.lang === 'zh' ? f.zh : f.en)).join(' · ');
       const isBest = sc.total > prev && sc.total > 0;
+      // coins: 3 an arrow in, 20 more for all eight
+      const pp = pitchpotPay(sc.hits, ARROWS);
+      const out = pay(pp);
+      const coinZh = payLine(pp, out, 'zh'), coinEn = payLine(pp, out, 'en');
       if (sc.hits >= 6) ctx.audio.chime(5); else snd.ding(sc.hits >= 3 ? 3 : 1);
       bag.later(700, () => {
         ctx.hud.showCard({
           titleZh: `投壶 · ${sc.total} 分`, titleEn: `Pitch-pot · ${sc.total}`,
-          bodyZh: `八矢中${sc.hits}${feats ? `\n${feats}` : ''}${isBest ? '\n—— 新的最好成绩！' : ''}\n\n「投壶者，主人与客燕饮讲艺之礼也。」\n—— 《礼记》`,
-          bodyEn: `${sc.hits} of 8 arrows in${feats ? `\n${feats}` : ''}${isBest ? '\n— A new personal best!' : ''}\n\n“Pitch-pot is the rite of host and guest feasting and practising an art.”\n— The Book of Rites`,
+          bodyZh: `八矢中${sc.hits}${feats ? `\n${feats}` : ''}${isBest ? '\n—— 新的最好成绩！' : ''}${coinZh ? `\n${coinZh}` : ''}\n\n「投壶者，主人与客燕饮讲艺之礼也。」\n—— 《礼记》`,
+          bodyEn: `${sc.hits} of 8 arrows in${feats ? `\n${feats}` : ''}${isBest ? '\n— A new personal best!' : ''}${coinEn ? `\n${coinEn}` : ''}\n\n“Pitch-pot is the rite of host and guest feasting and practising an art.”\n— The Book of Rites`,
           seal: sc.hits === ARROWS ? '全' : '壶',
         });
         if (ui) {

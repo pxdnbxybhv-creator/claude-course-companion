@@ -5,19 +5,63 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeNoise2, makeRng } from '../../../core/rng';
 import { Bag, canvas, canvasTexture, glowTexture, outlineMaterial, tint, toon } from './kit';
+import { NO_REFLECT } from './pond';
 import { BRIDGE, BRIDGE_HW, BRIDGE_Y, COLUMNS, GATE, LANTERNS, PAVILION, PAVILION_Y, POND, ROCKS, terrainY } from './site';
 
 const INK = '#1b1916';
-const STONE = '#cfc8b8';
-const WHITEWASH = '#f1ede4';
-const TILE = '#5d5c5a';
-const LACQUER = '#7b3f31';
-const WOOD = '#5b3d2e';
+const STONE = '#d6c8ab';
+const WHITEWASH = '#f3ecdc';
+const TILE = '#3d5a64';
+const LACQUER = '#b8402e';
+const WOOD = '#7a4e32';
+/**
+ * What the night does to lit plaster and stone (a multiplier on the day colour), the same as the
+ * places' own (regions/water-kit.ts NIGHT_SHADE): without it the whitewash stays day-bright on a
+ * dark land, and the lanterns have nothing to glow against.
+ */
+const NIGHT_SHADE = new THREE.Color('#c0b8b8');
+const WHITE = new THREE.Color('#ffffff');
+
+/** Dims materials toward NIGHT_SHADE as night falls (only when the night has moved). */
+function nightShader(mats: { color: THREE.Color }[]): (n: number) => void {
+  let last = -1;
+  return (n) => {
+    if (Math.abs(n - last) < 1e-3) return;
+    last = n;
+    for (const m of mats) m.color.copy(WHITE).lerp(NIGHT_SHADE, n);
+  };
+}
+
+export interface GardenWall {
+  group: THREE.Group;
+  /** Dusk on the whitewash: call every frame with night 0..1 (cheap when nothing changed). */
+  setNight(n: number): void;
+}
 
 export interface Architecture {
   group: THREE.Group;
   /** Night glows (lanterns): call every frame with night 0..1. */
   setNight(n: number, t: number): void;
+}
+
+/** The same triangles facing the other way (a double-sided surface inside a single-sided merge). */
+function backFaces(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  const b = g.clone();
+  const pos = b.attributes.position as THREE.BufferAttribute, nor = b.attributes.normal as THREE.BufferAttribute;
+  for (const a of [pos, nor, b.attributes.color as THREE.BufferAttribute]) {
+    if (!a) continue;
+    // swap the 2nd and 3rd vertex of every triangle
+    for (let i = 0; i + 2 < a.count; i += 3) {
+      for (let c = 0; c < a.itemSize; c++) {
+        const k1 = (i + 1) * a.itemSize + c, k2 = (i + 2) * a.itemSize + c;
+        const arr = a.array as Float32Array;
+        const tmp = arr[k1]; arr[k1] = arr[k2]; arr[k2] = tmp;
+      }
+    }
+  }
+  const na = nor.array as Float32Array;
+  for (let i = 0; i < na.length; i++) na[i] = -na[i];
+  return b;
 }
 
 function place(g: THREE.BufferGeometry, x: number, y: number, z: number, ry = 0, sx = 1, sy = 1, sz = 1): THREE.BufferGeometry {
@@ -57,19 +101,19 @@ function wallCanvas(): HTMLCanvasElement {
     g.translate(x, 6);
     g.scale(1, len / w);
     const grd = g.createRadialGradient(0, 0, 0, 0, 0, w);
-    grd.addColorStop(0, `rgba(105,98,86,${r.range(0.05, 0.11)})`);
-    grd.addColorStop(1, 'rgba(105,98,86,0)');
+    grd.addColorStop(0, `rgba(120,96,70,${r.range(0.05, 0.11)})`);
+    grd.addColorStop(1, 'rgba(120,96,70,0)');
     g.fillStyle = grd;
     g.fillRect(-w, 0, w * 2, w);
     g.restore();
   }
   const damp = g.createLinearGradient(0, H * 0.62, 0, H);
-  damp.addColorStop(0, 'rgba(90,84,70,0)');
-  damp.addColorStop(1, 'rgba(90,84,70,0.28)');
+  damp.addColorStop(0, 'rgba(110,88,60,0)');
+  damp.addColorStop(1, 'rgba(110,88,60,0.3)');
   g.fillStyle = damp;
   g.fillRect(0, H * 0.62, W, H * 0.38);
   for (let i = 0; i < 180; i++) {
-    g.fillStyle = `rgba(40,46,36,${r.range(0.15, 0.5)})`;
+    g.fillStyle = `rgba(66,98,52,${r.range(0.2, 0.55)})`;
     g.beginPath();
     g.arc(r() * W, H * r.range(0.8, 0.97), r.range(0.6, 2), 0, Math.PI * 2);
     g.fill();
@@ -84,16 +128,16 @@ function gateGeometry(): THREE.BufferGeometry[] {
   const out: THREE.BufferGeometry[] = [];
   // tiled coping and ridge
   out.push(tint(place(new THREE.BoxGeometry(halfW * 2 + 0.36, 0.14, thick + 0.4), 0, top + 0.05, z), TILE));
-  out.push(tint(place(new THREE.BoxGeometry(halfW * 2 + 0.2, 0.08, 0.14), 0, top + 0.16, z), '#4a4947'));
+  out.push(tint(place(new THREE.BoxGeometry(halfW * 2 + 0.2, 0.08, 0.14), 0, top + 0.16, z), '#2f4650'));
   // plinth
-  out.push(tint(place(new THREE.BoxGeometry(halfW * 2 + 0.04, 0.5, thick + 0.06), -0, -0.1, z), '#9d9990'));
+  out.push(tint(place(new THREE.BoxGeometry(halfW * 2 + 0.04, 0.5, thick + 0.06), -0, -0.1, z), '#a8977a'));
   // gate surround: a thin grey ring of brick around the opening (both faces)
   for (const side of [-1, 1]) {
     const ring = new THREE.RingGeometry(holeR, holeR + 0.12, 48, 1, a0, Math.PI - 2 * a0);
     ring.translate(0, holeY, 0);
     if (side < 0) ring.rotateY(Math.PI);
     ring.translate(0, 0, z + side * (thick / 2 + 0.005));
-    out.push(tint(ring, '#a39f96'));
+    out.push(tint(ring, '#b09f82'));
   }
   return out;
 }
@@ -161,10 +205,10 @@ function plaqueCanvas(): HTMLCanvasElement {
   const g = c.getContext('2d')!;
   g.fillStyle = '#3b2a20';
   g.fillRect(0, 0, 256, 96);
-  g.strokeStyle = '#8c6a3e';
+  g.strokeStyle = '#c99a4a';
   g.lineWidth = 5;
   g.strokeRect(6, 6, 244, 84);
-  g.fillStyle = '#e8d9b0';
+  g.fillStyle = '#f0d58e';
   g.font = '60px "Ma Shan Zheng", "LXGW WenKai", "KaiTi", serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
@@ -183,8 +227,8 @@ export function rockGeometry(seed: number, w: number, h: number): THREE.BufferGe
   const rng = makeRng(seed);
   const p = g.attributes.position as THREE.BufferAttribute;
   const colors = new Float32Array(p.count * 3);
-  const base = new THREE.Color('#b9b3a6');
-  const dark = new THREE.Color('#57544e');
+  const base = new THREE.Color('#c2b397');
+  const dark = new THREE.Color('#5c4a3a');
   const twist = rng.range(-0.5, 0.5);
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
@@ -213,12 +257,12 @@ export function rockGeometry(seed: number, w: number, h: number): THREE.BufferGe
 function lanternParts(x: number, z: number): THREE.BufferGeometry[] {
   const y = terrainY(x, z);
   return [
-    tint(place(new THREE.CylinderGeometry(0.24, 0.28, 0.16, 6), x, y + 0.08, z), '#a6a092'),
-    tint(place(new THREE.CylinderGeometry(0.07, 0.09, 0.62, 8), x, y + 0.46, z), '#b1ab9e'),
-    tint(place(new THREE.CylinderGeometry(0.22, 0.2, 0.08, 6), x, y + 0.8, z), '#a6a092'),
-    tint(place(new THREE.BoxGeometry(0.3, 0.28, 0.3), x, y + 0.98, z), '#b8b2a5'),
-    tint(place(new THREE.ConeGeometry(0.34, 0.24, 6), x, y + 1.24, z), '#8f8a80'),
-    tint(place(new THREE.SphereGeometry(0.06, 8, 6), x, y + 1.4, z), '#8f8a80'),
+    tint(place(new THREE.CylinderGeometry(0.24, 0.28, 0.16, 6), x, y + 0.08, z), '#ab9d83'),
+    tint(place(new THREE.CylinderGeometry(0.07, 0.09, 0.62, 8), x, y + 0.46, z), '#b8aa8f'),
+    tint(place(new THREE.CylinderGeometry(0.22, 0.2, 0.08, 6), x, y + 0.8, z), '#ab9d83'),
+    tint(place(new THREE.BoxGeometry(0.3, 0.28, 0.3), x, y + 0.98, z), '#c1b398'),
+    tint(place(new THREE.ConeGeometry(0.34, 0.24, 6), x, y + 1.24, z), '#8d7d64'),
+    tint(place(new THREE.SphereGeometry(0.06, 8, 6), x, y + 1.4, z), '#8d7d64'),
   ];
 }
 
@@ -255,22 +299,22 @@ export function buildArchitecture(bag: Bag): Architecture {
   const colH = 2.3;
   for (const c of COLUMNS) {
     parts.push(tint(place(new THREE.CylinderGeometry(0.1, 0.11, colH, 8), c.x, PAVILION_Y + colH / 2, c.z), LACQUER));
-    parts.push(tint(place(new THREE.CylinderGeometry(0.16, 0.18, 0.14, 8), c.x, PAVILION_Y + 0.07, c.z), '#a49e91'));
+    parts.push(tint(place(new THREE.CylinderGeometry(0.16, 0.18, 0.14, 8), c.x, PAVILION_Y + 0.07, c.z), '#ae9f84'));
   }
   const beamY = PAVILION_Y + colH;
   const beam = tint(place(new THREE.CylinderGeometry(P.r - 0.2, P.r - 0.2, 0.22, 6, 1, true, Math.PI / 6), P.x, beamY - 0.06, P.z), WOOD);
   addLined(beam);
   // hanging fretwork (挂落) under the beam
-  parts.push(tint(place(new THREE.CylinderGeometry(P.r - 0.24, P.r - 0.24, 0.2, 6, 1, true, Math.PI / 6), P.x, beamY - 0.26, P.z), '#6d4a36'));
+  parts.push(tint(place(new THREE.CylinderGeometry(P.r - 0.24, P.r - 0.24, 0.2, 6, 1, true, Math.PI / 6), P.x, beamY - 0.26, P.z), '#2f6a6a'));
   // stone table & stools
-  parts.push(tint(place(new THREE.CylinderGeometry(0.42, 0.3, 0.72, 10), P.x, PAVILION_Y + 0.36, P.z), '#b3ad9f'));
+  parts.push(tint(place(new THREE.CylinderGeometry(0.42, 0.3, 0.72, 10), P.x, PAVILION_Y + 0.36, P.z), '#bcae93'));
   for (let i = 0; i < 3; i++) {
     const a = (i / 3) * Math.PI * 2 + 0.4;
-    parts.push(tint(place(new THREE.CylinderGeometry(0.17, 0.15, 0.42, 8), P.x + Math.cos(a) * 0.85, PAVILION_Y + 0.21, P.z + Math.sin(a) * 0.85), '#aaa496'));
+    parts.push(tint(place(new THREE.CylinderGeometry(0.17, 0.15, 0.42, 8), P.x + Math.cos(a) * 0.85, PAVILION_Y + 0.21, P.z + Math.sin(a) * 0.85), '#b3a58a'));
   }
   // finial
-  parts.push(tint(place(new THREE.SphereGeometry(0.16, 10, 8), P.x, beamY + 1.75, P.z), '#3c3c3e'));
-  parts.push(tint(place(new THREE.ConeGeometry(0.07, 0.35, 8), P.x, beamY + 2.0, P.z), '#3c3c3e'));
+  parts.push(tint(place(new THREE.SphereGeometry(0.16, 10, 8), P.x, beamY + 1.75, P.z), '#b08a3e'));
+  parts.push(tint(place(new THREE.ConeGeometry(0.07, 0.35, 8), P.x, beamY + 2.0, P.z), '#b08a3e'));
 
   // bridge
   for (let i = 1; i < BRIDGE.length; i++) {
@@ -281,36 +325,52 @@ export function buildArchitecture(bag: Bag): Architecture {
     addLined(tint(place(new THREE.BoxGeometry(BRIDGE_HW * 2, 0.14, len + BRIDGE_HW * 0.9), mx, BRIDGE_Y - 0.07, mz, ry), STONE, 0.05, i));
     for (const side of [-1, 1]) {
       const ox = Math.cos(ry) * side * (BRIDGE_HW - 0.05), oz = -Math.sin(ry) * side * (BRIDGE_HW - 0.05);
-      addLined(tint(place(new THREE.BoxGeometry(0.07, 0.26, Math.max(0.3, len - 0.7)), mx + ox, BRIDGE_Y + 0.13, mz + oz, ry), '#c4bdae'));
+      addLined(tint(place(new THREE.BoxGeometry(0.07, 0.26, Math.max(0.3, len - 0.7)), mx + ox, BRIDGE_Y + 0.13, mz + oz, ry), '#cdbfa4'));
     }
   }
   for (const [x, z] of BRIDGE) {
     if (Math.hypot((x - POND.x) / POND.rx, (z - POND.z) / POND.rz) > 1) continue;
-    parts.push(tint(place(new THREE.BoxGeometry(0.4, 0.9, 0.4), x, BRIDGE_Y - 0.55, z), '#8f8a7f'));
+    parts.push(tint(place(new THREE.BoxGeometry(0.4, 0.9, 0.4), x, BRIDGE_Y - 0.55, z), '#8e7f66'));
   }
 
   // stone lanterns
   for (const l of LANTERNS) for (const g of lanternParts(l.x, l.z)) addLined(g, 40);
 
+  // roof: tiles seen from above and below (both faces in the one merged mesh), ink ridges and tile rows
+  const { roof, lines } = roofGeometry(beamY + 0.05, P.r + 0.55, 1.75);
+  roof.translate(P.x, 0, P.z);
+  const roofTop = tint(roof, TILE);
+  parts.push(roofTop, backFaces(roofTop));
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+  lg.translate(P.x, 0, P.z);
+  lineParts.push(lg);
+
+  // the paper lanterns' caps and cords (their red bodies glow at night: a mesh of their own)
+  const hanging: [number, number, number][] = [Math.PI / 2 - Math.PI / 6, Math.PI / 2 + Math.PI / 6].map((ang) => [P.x + Math.cos(ang) * (P.r - 0.5), beamY - 0.65, P.z + Math.sin(ang) * (P.r - 0.5)]);
+  const bodies: THREE.BufferGeometry[] = [];
+  for (const [x, y, z] of hanging) {
+    for (const dy of [0.24, -0.24]) parts.push(tint(place(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 10), x, y + dy, z), '#2b2724'));
+    parts.push(tint(place(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4), x, y + 0.42, z), '#2b2724'));
+    const b = new THREE.SphereGeometry(0.2, 14, 10);
+    b.scale(1, 1.2, 1);
+    b.translate(x, y, z);
+    b.deleteAttribute('uv');
+    bodies.push(b);
+  }
+
   const merged = bag.add(mergeGeometries(parts, false)!);
   for (const g of parts) g.dispose();
+  roof.dispose();
   const mesh = new THREE.Mesh(merged, solid);
   mesh.name = 'estate';
   group.add(mesh);
   const edges = bag.add(mergeGeometries(lineParts, false)!);
   for (const g of lineParts) g.dispose();
-  group.add(new THREE.LineSegments(edges, lineMat));
-
-  // roof: double-sided tiles with ink ridges and tile rows
-  const { roof, lines } = roofGeometry(beamY + 0.05, P.r + 0.55, 1.75);
-  bag.add(roof);
-  roof.translate(P.x, 0, P.z);
-  const roofMat = toon(bag, TILE, { side: THREE.DoubleSide });
-  group.add(new THREE.Mesh(roof, roofMat));
-  const lg = bag.add(new THREE.BufferGeometry());
-  lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
-  lg.translate(P.x, 0, P.z);
-  group.add(new THREE.LineSegments(lg, bag.add(new THREE.LineBasicMaterial({ color: '#141312', transparent: true, opacity: 0.6 }))));
+  // the ink lines stay out of the rippling mirror (a hairline there is lost, the draw is not)
+  const edgeLines = new THREE.LineSegments(edges, lineMat);
+  edgeLines.layers.set(NO_REFLECT);
+  group.add(edgeLines);
 
   // name plaque on the south beam
   const plaque = new THREE.Mesh(bag.add(new THREE.PlaneGeometry(0.75, 0.28)), bag.add(new THREE.MeshBasicMaterial({ map: canvasTexture(bag, plaqueCanvas()) })));
@@ -328,72 +388,66 @@ export function buildArchitecture(bag: Bag): Architecture {
   });
   const rocks = bag.add(mergeGeometries(rockGeos, false)!);
   for (const g of rockGeos) g.dispose();
-  const rockMesh = new THREE.Mesh(rocks, toon(bag, '#ffffff', { vertexColors: true }));
-  rockMesh.add(new THREE.Mesh(rocks, outlineMaterial(bag, 0.03)));
+  const rockMat = toon(bag, '#ffffff', { vertexColors: true });
+  const rockMesh = new THREE.Mesh(rocks, rockMat);
+  const rockInk = new THREE.Mesh(rocks, outlineMaterial(bag, 0.03));
+  rockInk.layers.set(NO_REFLECT);
+  rockMesh.add(rockInk);
   rockMesh.name = 'rocks';
   group.add(rockMesh);
 
-  // --- lights that come on at night: paper lanterns under the eaves, fire in the stone lanterns
+  // --- lights that come on at night: paper lanterns under the eaves, fire in the stone lanterns.
+  // The fire windows are one mesh, the red bodies one more, every glow one point cloud.
   const glowTex = glowTexture(bag, 128);
-  const glows: THREE.Sprite[] = [];
-  const glowMat = bag.add(new THREE.SpriteMaterial({ map: glowTex, color: '#ffcf8a', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
-  const addGlow = (x: number, y: number, z: number, s: number) => {
-    const sp = new THREE.Sprite(glowMat);
-    sp.position.set(x, y, z);
-    sp.scale.setScalar(s);
-    sp.userData.s = s;
-    glows.push(sp);
-    group.add(sp);
-  };
-  const windowMat = bag.add(new THREE.MeshBasicMaterial({ color: '#5f5a50' }));
+  const glowAt: number[] = [];
+  const windowMat = bag.add(new THREE.MeshBasicMaterial({ color: '#5a4636' }));
+  const wins: THREE.BufferGeometry[] = [];
   for (const l of LANTERNS) {
     const y = terrainY(l.x, l.z) + 0.98;
-    const win = new THREE.Mesh(bag.add(new THREE.BoxGeometry(0.31, 0.14, 0.31)), windowMat);
-    win.position.set(l.x, y, l.z);
-    group.add(win);
-    addGlow(l.x, y, l.z, 1.6);
+    const w = new THREE.BoxGeometry(0.31, 0.14, 0.31).translate(l.x, y, l.z);
+    w.deleteAttribute('uv');
+    wins.push(w);
+    glowAt.push(l.x, y, l.z);
   }
-  const redMat = toon(bag, '#b0473a', { emissive: '#000000' });
-  const capMat = toon(bag, '#2b2724');
-  const lanternGeo = bag.add(new THREE.SphereGeometry(0.2, 14, 10));
-  const capGeo = bag.add(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 10));
-  const cordGeo = bag.add(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4));
-  const lanternMeshes: THREE.Object3D[] = [];
-  for (const ang of [Math.PI / 2 - Math.PI / 6, Math.PI / 2 + Math.PI / 6]) {
-    const x = P.x + Math.cos(ang) * (P.r - 0.5), z = P.z + Math.sin(ang) * (P.r - 0.5);
-    const y = beamY - 0.65;
-    const lan = new THREE.Group();
-    lan.position.set(x, y, z);
-    const body = new THREE.Mesh(lanternGeo, redMat);
-    body.scale.set(1, 1.2, 1);
-    const top = new THREE.Mesh(capGeo, capMat); top.position.y = 0.24;
-    const bot = new THREE.Mesh(capGeo, capMat); bot.position.y = -0.24;
-    const cord = new THREE.Mesh(cordGeo, capMat); cord.position.y = 0.42;
-    lan.add(body, top, bot, cord);
-    group.add(lan);
-    lanternMeshes.push(lan);
-    addGlow(x, y, z, 2.4);
-  }
+  const winGeo = bag.add(mergeGeometries(wins, false)!);
+  for (const w of wins) w.dispose();
+  // small things stay out of the pond's mirror (each reflected mesh is a second draw)
+  const winMesh = new THREE.Mesh(winGeo, windowMat);
+  winMesh.layers.set(NO_REFLECT);
+  group.add(winMesh);
+  const redMat = toon(bag, '#c8412f', { emissive: '#000000' });
+  const bodyGeo = bag.add(mergeGeometries(bodies, false)!);
+  for (const b of bodies) b.dispose();
+  const bodyMesh = new THREE.Mesh(bodyGeo, redMat);
+  bodyMesh.layers.set(NO_REFLECT);
+  group.add(bodyMesh);
+  for (const [x, y, z] of hanging) glowAt.push(x, y, z);
+  const glowGeo = bag.add(new THREE.BufferGeometry());
+  glowGeo.setAttribute('position', new THREE.Float32BufferAttribute(glowAt, 3));
+  const glowMat = bag.add(new THREE.PointsMaterial({ map: glowTex, color: '#ffcf8a', size: 1.9, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+  const glows = new THREE.Points(glowGeo, glowMat);
+  glows.name = 'lantern-glows';
+  glows.visible = false;
+  group.add(glows);
   const lamp = new THREE.PointLight('#ffb870', 0, 9, 1.6);
   lamp.position.set(P.x, beamY - 0.8, P.z + 0.6);
   group.add(lamp);
 
-  const warm = new THREE.Color('#f3cf85');
-  const cold = new THREE.Color('#5f5a50');
+  const warm = new THREE.Color('#ffc978');
+  const cold = new THREE.Color('#5a4636');
+  const shade = nightShader([solid, rockMat]);
   return {
     group,
     setNight(n: number, t: number) {
+      shade(n);
       const flick = 0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1);
-      for (const g of glows) {
-        g.visible = n > 0.02;
-        (g.material as THREE.SpriteMaterial).opacity = 0.55 * n;
-        g.scale.setScalar(g.userData.s * (0.9 + 0.1 * flick));
-      }
+      glows.visible = n > 0.02;
+      glowMat.opacity = 0.6 * n;
+      glowMat.size = 1.9 * (0.9 + 0.1 * flick);
       windowMat.color.copy(cold).lerp(warm, n * flick);
       redMat.emissive.setRGB(0.55 * n * flick, 0.2 * n * flick, 0.08 * n);
       lamp.intensity = 6 * n * flick;
       lamp.visible = n > 0.02;
-      for (let i = 0; i < lanternMeshes.length; i++) lanternMeshes[i].rotation.z = Math.sin(t * 0.9 + i * 2) * 0.03;
     },
   };
 }
@@ -411,7 +465,7 @@ function latticeCanvas(): HTMLCanvasElement {
   g.beginPath();
   g.arc(S / 2, S / 2, S * 0.46, 0, Math.PI * 2);
   g.clip();
-  g.fillStyle = 'rgba(60,58,54,1)';
+  g.fillStyle = 'rgba(74,62,50,1)';
   g.fillRect(0, 0, S, S);
   // openings: cracked ice (冰裂纹) — random convex cells cut out
   const r = makeRng(5121);
@@ -431,7 +485,7 @@ function latticeCanvas(): HTMLCanvasElement {
   g.restore();
   // the frame
   g.globalCompositeOperation = 'source-over';
-  g.strokeStyle = 'rgba(70,68,64,1)';
+  g.strokeStyle = 'rgba(84,70,56,1)';
   g.lineWidth = 14;
   g.beginPath();
   g.arc(S / 2, S / 2, S * 0.46, 0, Math.PI * 2);
@@ -440,7 +494,7 @@ function latticeCanvas(): HTMLCanvasElement {
 }
 
 /** The long white wall round the garden (粉墙黛瓦), following the land, with a few leak windows. */
-export function buildGardenWall(bag: Bag, path: [number, number][], h: number, thick: number): THREE.Group {
+export function buildGardenWall(bag: Bag, path: [number, number][], h: number, thick: number): GardenWall {
   const group = new THREE.Group();
   group.name = 'garden-wall';
   const n = path.length;
@@ -451,7 +505,7 @@ export function buildGardenWall(bag: Bag, path: [number, number][], h: number, t
     return { x, z, nx: tz / l, nz: -tx / l, y: terrainY(x, z) };
   });
   const pos: number[] = [], col: number[] = [], idx: number[] = [];
-  const white = new THREE.Color(WHITEWASH), foot = new THREE.Color('#d9d3c6'), tile = new THREE.Color(TILE), ridge = new THREE.Color('#4a4947');
+  const white = new THREE.Color(WHITEWASH), foot = new THREE.Color('#dccfb4'), tile = new THREE.Color(TILE), ridge = new THREE.Color('#2f4650');
   const quadStrip = (a: (p: typeof P[0]) => [number, number, number], b: (p: typeof P[0]) => [number, number, number], ca: THREE.Color, cb: THREE.Color) => {
     const base = pos.length / 3;
     for (const p of P) {
@@ -478,7 +532,8 @@ export function buildGardenWall(bag: Bag, path: [number, number][], h: number, t
   geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   geo.setIndex(idx);
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, toon(bag, '#ffffff', { vertexColors: true, side: THREE.DoubleSide }));
+  const wallMat = toon(bag, '#ffffff', { vertexColors: true, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, wallMat);
   mesh.name = 'wall';
   group.add(mesh);
   // ink: the eave lines on both sides, the ridge, a line at the foot
@@ -517,6 +572,8 @@ export function buildGardenWall(bag: Bag, path: [number, number][], h: number, t
   wg.setAttribute('position', new THREE.Float32BufferAttribute(wpos, 3));
   wg.setAttribute('uv', new THREE.Float32BufferAttribute(wuv, 2));
   wg.setIndex(widx);
-  group.add(new THREE.Mesh(wg, bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }))));
-  return group;
+  const lattice = bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2 }));
+  lattice.forceSinglePass = true;
+  group.add(new THREE.Mesh(wg, lattice));
+  return { group, setNight: nightShader([wallMat, lattice]) };
 }

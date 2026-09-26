@@ -22,31 +22,32 @@ type BG = T.BufferGeometry;
 let TH: Three;
 export const three = (): Three => TH;
 
+/** The hill places' pigments: warm stone and whitewash, blue-black tiles, 朱 vermilion lacquer, jade. */
 export const COL = {
   ink: '#1b1916',
-  inkSoft: '#3a3631',
-  paper: '#efe9dc',
-  stone: '#cfc8b8',
-  stoneMid: '#b1ab9e',
-  stoneDark: '#8f8a80',
-  stoneWarm: '#c2b7a2',
-  whitewash: '#eee9df',
-  tile: '#5d5c5a',
-  tileDark: '#434241',
-  lacquer: '#8b3e2f',
-  cinnabar: '#b0473a',
-  wood: '#5b3d2e',
-  woodDark: '#3b2a21',
-  woodLight: '#8b6c4c',
-  ochre: '#a8703a',
-  templeWall: '#bfa47c',
-  bronze: '#5f5b45',
-  bronzeDark: '#34322a',
-  indigo: '#3d5a73',
-  malachite: '#5f8a6e',
-  thatch: '#9a8560',
-  bamboo: '#7f9270',
-  bambooDry: '#a79d74',
+  inkSoft: '#3b342d',
+  paper: '#f2e9d6',
+  stone: '#d3c7b0',
+  stoneMid: '#b7aa94',
+  stoneDark: '#93877a',
+  stoneWarm: '#cab796',
+  whitewash: '#f3ebd9',
+  tile: '#434a53',
+  tileDark: '#2c3139',
+  lacquer: '#9a3a29',
+  cinnabar: '#c0412f',
+  wood: '#6b4230',
+  woodDark: '#3d2a1f',
+  woodLight: '#99714a',
+  ochre: '#b27a48',
+  templeWall: '#c8a77f',
+  bronze: '#62593c',
+  bronzeDark: '#35301f',
+  indigo: '#2f5f73',
+  malachite: '#57997a',
+  thatch: '#aa8c5b',
+  bamboo: '#7da368',
+  bambooDry: '#b8a86c',
 };
 
 export const TAU = Math.PI * 2;
@@ -634,8 +635,8 @@ export function rockGeometry(seed: number, w: number, hgt: number, o: { detail?:
   const rng = makeRng(seed);
   const p = g.attributes.position as T.BufferAttribute;
   const colors = new Float32Array(p.count * 3);
-  const base = new TH.Color(o.base ?? '#b9b3a6');
-  const dark = new TH.Color(o.dark ?? '#57544e');
+  const base = new TH.Color(o.base ?? '#bdb29e');
+  const dark = new TH.Color(o.dark ?? '#5a5046');
   const twist = rng.range(-0.5, 0.5);
   const lean = o.lean ?? 0.2;
   for (let i = 0; i < p.count; i++) {
@@ -799,6 +800,39 @@ export function glowCanvas(size = 64, falloff = 1): HTMLCanvasElement {
 }
 
 /** A soft ink-wash puff (smoke, mist, spray). */
+/**
+ * Warm pools of lamplight (#ffb86b) on the ground under lanterns, for the night: one instanced,
+ * additive draw that follows h.night.
+ */
+export function lampPools(h: Hill, at: T.Vector3[], name: string): void {
+  if (!at.length) return;
+  const THREE = h.THREE;
+  const ctx = h.ctx;
+  const geo = h.own(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2));
+  const mat = h.own(new THREE.MeshBasicMaterial({
+    map: h.tex(glowCanvas(64)), color: '#ffb86b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  }));
+  const pools = new THREE.InstancedMesh(geo, mat, at.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  at.forEach((a, i) => {
+    const gy = ctx.groundY(a.x, a.z);
+    const r = Math.min(3, Math.max(1.1, 1.3 + (a.y - gy) * 0.5));
+    pools.setMatrixAt(i, m.compose(p.set(a.x, gy + 0.03, a.z), q, sc.set(r, 1, r)));
+  });
+  pools.instanceMatrix.needsUpdate = true;
+  pools.computeBoundingSphere();
+  pools.name = name;
+  pools.visible = false;
+  pools.renderOrder = 1;
+  h.add(pools);
+  h.frame((_dt, t) => {
+    const n = h.night;
+    mat.opacity = 0.56 * n * (0.92 + 0.08 * Math.sin(t * 7.3) * Math.sin(t * 3.1 + 1));
+    pools.visible = n > 0.02;
+  });
+}
+
 export function puffCanvas(size = 64, seed = 5): HTMLCanvasElement {
   const c = canvas(size, size);
   const g = c.getContext('2d')!;

@@ -226,6 +226,162 @@
 .qb-colophon { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 4px 0 18px !important; font-size: 13px; color: var(--ink-3); letter-spacing: 0.1em; }
 .qb-colophon .brush { font-size: 18px; color: var(--cinnabar); }
 
+/* ---------------------------------------------------------------- 铜钱: chips on errands, quests, 奇遇 */
+.qb-coinchip {
+  display: inline-flex; align-items: center; gap: 4px; flex: none; white-space: nowrap;
+  padding: 1px 8px 1px 3px; border-radius: 999px; font-size: 12.5px; line-height: 18px; letter-spacing: 0.02em;
+  color: #7a5019; background: color-mix(in srgb, #e8c77a 20%, transparent); border: 1px solid color-mix(in srgb, #b8893a 30%, transparent);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.qb-coinchip.is-got { color: var(--ink-3); background: transparent; border-color: var(--line); }
+.qb-coinchip.is-got .coin-icon { filter: saturate(0.4); opacity: 0.8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-coinchip:not(.is-got) { color: #ecc77e; } }
+:root[data-theme='dark'] .qb-coinchip:not(.is-got) { color: #ecc77e; }
+.qb-errand-name { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
+.qb-errand-name .qb-coinchip { font-size: 11.5px; line-height: 16px; }
+.qb-foot-coins { display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; color: #8a5a1c; white-space: nowrap; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-foot-coins { color: #d9b56e; } }
+:root[data-theme='dark'] .qb-foot-coins { color: #d9b56e; }
+.qb-q-reward { flex-wrap: wrap; row-gap: 4px; }
+.qb-q-reward .qb-coinchip { margin-left: 2px; }
+
+/* ---------------------------------------------------------------- 技: a companion's skill */
+.qb-skill { display: flex; align-items: center; gap: 7px; font-size: 13px; line-height: 1.45; color: var(--ink-2); text-align: left; }
+.qb-skill-glyph {
+  flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  font-family: var(--font-brush); font-size: 15px; line-height: 1; color: #fbf5ea;
+  background: radial-gradient(circle at 35% 30%, #d8584a, var(--cinnabar) 70%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--cinnabar) 22%, transparent);
+}
+.qb-skill-text { display: flex; flex-direction: column; min-width: 0; }
+.qb-skill b { font-weight: 400; color: var(--ink); letter-spacing: 0.04em; }
+.qb-skill.is-long { align-items: flex-start; max-width: 380px; margin-top: 4px; }
+.qb-skill.is-long .qb-skill-glyph { width: 30px; height: 30px; font-size: 19px; margin-top: 1px; }
+.qb-skill.is-long .qb-skill-text span { font-size: 13px; color: var(--ink-2); }
+.qb-comp .qb-skill { justify-content: center; margin: -2px 0 6px; }
+.qb-comp .qb-skill-glyph {
+  background: color-mix(in srgb, var(--cinnabar) 8%, var(--paper)); color: var(--cinnabar);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cinnabar) 55%, transparent);
+}
+.qb-skill.is-locked { opacity: 0.7; justify-content: flex-start; margin: 0 0 2px; }
+.qb-comp .qb-skill.is-locked .qb-skill-glyph { background: transparent; color: var(--ink-3); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.qb-skill.is-locked b { color: var(--ink-3); }
+@media (max-width: 619px) { .qb-hero .qb-skill.is-long { text-align: left; } }
+@media (min-width: 940px) { .qb-hero .qb-skill.is-long { text-align: left; } }
+
+/* ---------------------------------------------------------------- 钱囊 */
+.qb-purse-sec { margin-top: 2px; }
+.qb-purse {
+  position: relative; max-width: 620px; margin: 0 auto; padding: 16px 18px 14px; border-radius: 10px; overflow: hidden;
+  border: 1px solid color-mix(in srgb, #b8893a 32%, var(--line));
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, #e8c77a 20%, transparent), transparent 55%),
+    radial-gradient(80% 80% at 100% 100%, color-mix(in srgb, var(--cinnabar) 6%, transparent), transparent 60%),
+    var(--paper-2);
+  box-shadow: var(--shadow); --qb-bg: var(--paper-2);
+}
+.qb-purse-top { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px; }
+.qb-coinart { width: 70px; height: 87px; flex: none; overflow: visible; margin: -4px 0 -6px 2px; filter: drop-shadow(0 5px 8px rgba(80, 50, 10, 0.25)); }
+.qb-coinart-coin { fill: url(#qbCoinG); }
+.qb-coinart-rim { fill: none; stroke: rgba(80, 52, 16, 0.5); stroke-width: 1.6; }
+.qb-coinart-patina circle { fill: #5f8a6e; opacity: 0.28; }
+.qb-coinart-glyphs text { font-family: var(--font-brush); font-size: 19px; fill: #4a300c; opacity: 0.85; text-anchor: middle; dominant-baseline: central; }
+.qb-coinart-cord { fill: none; stroke: var(--cinnabar); stroke-width: 3; stroke-linecap: round; }
+.qb-coinart-knot { fill: var(--cinnabar); }
+.qb-coinart-tassel { fill: none; stroke: var(--cinnabar); stroke-width: 1.4; stroke-linecap: round; opacity: 0.85; }
+.qb-purse-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.qb-purse-main h2 { margin: 0; font-size: 22px; font-weight: 400; line-height: 1.2; color: var(--ink-2); letter-spacing: 0.1em; }
+.qb-purse-main h2.latin { font-size: 20px; font-weight: 500; letter-spacing: 0.02em; }
+.qb-purse-n { display: flex; align-items: baseline; gap: 6px; line-height: 1.1; }
+.qb-purse-n .coin-badge { gap: 8px; align-items: center; font-size: 36px; font-weight: 500; color: var(--ink); font-variant-numeric: lining-nums tabular-nums; }
+.qb-purse-n .coin-badge .coin-icon { align-self: center; }
+.qb-purse-unit { font-size: 16px; color: var(--ink-3); }
+.qb-purse-today { font-size: 13.5px; color: var(--ink-3); letter-spacing: 0.04em; }
+.qb-purse-today.is-up { color: #8a5a1c; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-purse-today.is-up { color: #d9b56e; } }
+:root[data-theme='dark'] .qb-purse-today.is-up { color: #d9b56e; }
+
+.qb-ledger { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.qb-ledger li {
+  display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 10px; border-radius: 999px; font-size: 13px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent); border: 1px solid var(--line); color: var(--ink-2);
+}
+.qb-ledger b { font-weight: 600; color: #8a5a1c; font-variant-numeric: lining-nums; }
+/* the catch-all row names what it holds, quietly */
+.qb-ledger li.has-hint { max-width: 100%; }
+.qb-ledger-hint { margin-left: 5px; font-size: 11px; color: var(--ink-3); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-ledger b { color: #ecc77e; } }
+:root[data-theme='dark'] .qb-ledger b { color: #ecc77e; }
+
+.qb-purse-ways { margin-top: 12px; padding-top: 10px; border-top: 1px dashed color-mix(in srgb, #b8893a 35%, var(--line)); display: grid; gap: 10px; }
+.qb-way { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; }
+.qb-way-mark {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 3px; margin-top: 1px; font-size: 12.5px;
+  background: #b8893a; color: #fbf5ea; transform: rotate(-3deg);
+}
+.qb-way-mark.is-to { background: var(--cinnabar); transform: rotate(3deg); }
+.qb-way-body { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.qb-way-k { font-size: 13px; letter-spacing: 0.12em; color: var(--ink-2); }
+.qb-way-text { font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+.qb-way-note { font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+.qb-sources { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+.qb-sources li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 4px 9px; border-radius: 6px; font-size: 13px;
+  border: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 55%, transparent); min-width: 0;
+}
+.qb-sources li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-sources b { font-weight: 500; font-size: 13.5px; color: #8a5a1c; white-space: nowrap; font-variant-numeric: lining-nums; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .qb-sources b { color: #d9b56e; } }
+:root[data-theme='dark'] .qb-sources b { color: #d9b56e; }
+.qb-way-go { align-self: flex-start; margin: 0 0 0 -10px; white-space: normal; text-align: left; line-height: 1.35; }
+@media (min-width: 620px) {
+  .qb-purse { padding: 18px 22px 16px; }
+  .qb-coinart { width: 80px; height: 99px; }
+  .qb-purse-ways { grid-template-columns: 1.15fr 1fr; gap: 18px; }
+  .qb-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 370px) { .qb-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); } .qb-purse-n .coin-badge { font-size: 30px; } }
+.qb-purse.is-en .qb-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.qb-purse.is-en .qb-way-k, .qb-purse.is-en .qb-purse-main h2 { letter-spacing: 0.02em; }
+.qb-purse.is-en .qb-way-go { letter-spacing: 0.02em; }
+
+/* ---------------------------------------------------------------- 奇遇录 */
+.qb-qy-lead { font-size: 13.5px; color: var(--ink-3); line-height: 1.6; margin: -4px 0 14px !important; max-width: 640px; }
+.qb-qy { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr)); gap: 10px; }
+.qb-qy-card {
+  position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 14px 16px 12px 18px; border-radius: 8px;
+  border: 1px dashed var(--line-strong); background: transparent; --qb-bg: var(--paper);
+}
+.qb-qy-card.is-met {
+  border: 1px solid var(--line); --qb-bg: var(--paper-2);
+  background: linear-gradient(135deg, color-mix(in srgb, #e8c77a 9%, transparent), transparent 45%), var(--paper-2);
+}
+.qb-qy-card.is-met::before {
+  content: ''; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--cinnabar); opacity: 0.75;
+}
+.qb-qy-seal { position: absolute; right: 12px; top: 12px; transform: rotate(-6deg); }
+.qb-qy-seal .qb-seal { display: block; }
+.qb-qy-card.is-met .qb-qy-seal .qb-seal { animation: qb-stamp 0.5s var(--ease) both; }
+.qb-qy-name { margin: 0 64px 0 0; font-weight: 400; display: flex; align-items: baseline; gap: 4px 8px; flex-wrap: wrap; line-height: 1.2; }
+.qb-qy-name .brush { font-size: 23px; }
+.qb-qy-name .latin { font-size: 18.5px; font-weight: 500; }
+.qb-qy-name small { font-size: 13px; font-style: italic; color: var(--ink-3); }
+.qb-qy-meta { font-size: 12.5px; color: var(--ink-3); letter-spacing: 0.06em; margin-right: 64px !important; }
+.qb-qy-where { color: var(--ink-2); }
+.qb-qy-date { color: var(--ink-2); }
+.qb-qy-note {
+  margin: 6px 0 2px; padding: 2px 0 2px 12px; border-left: 2px solid color-mix(in srgb, #b8893a 45%, transparent);
+  font-size: 14px; line-height: 1.7; color: var(--ink);
+}
+.qb-qy-hint { font-size: 13px; line-height: 1.6; color: var(--ink-3); margin: 4px 64px 2px 0 !important; }
+.qb-qy-card:not(.is-met) .qb-qy-name .brush, .qb-qy-card:not(.is-met) .qb-qy-name .latin { color: var(--ink-3); }
+.qb-qy-card:not(.is-met) .qb-qy-seal { opacity: 0.8; }
+.qb-qy-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px 10px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+.qb-qy-who { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; font-size: 12px; color: var(--ink-3); min-width: 0; }
+.qb-qy-who i { font-style: normal; letter-spacing: 0.06em; }
+.qb-qy-who b { font-weight: 400; color: var(--ink-2); padding: 0 6px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 5%, transparent); }
+.qb-qy-card:not(.is-met) .qb-qy-who b { color: var(--ink-3); }
+
 @media (max-width: 400px) {
   .qb-h h2 { font-size: 26px; }
   .qb-errand { grid-template-columns: 54px minmax(0, 1fr) auto 36px; gap: 8px; }
@@ -234,6 +390,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .qb-tally .qb-tally-ring, .qb-q-stamp .qb-seal { animation: none; }
+  .qb-tally .qb-tally-ring, .qb-q-stamp .qb-seal, .qb-qy-card.is-met .qb-qy-seal .qb-seal { animation: none; }
   .qb-comp { transition: none; }
 }

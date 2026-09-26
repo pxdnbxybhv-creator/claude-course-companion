@@ -7,6 +7,9 @@ import { lang } from '../../../app/store';
 import { audio } from '../../../audio/engine';
 import { makeSeal, sealReady } from '../../../ink/seal';
 import { record as playRecord } from '../../../app/play';
+import { TANGRAM_NEW, tangramPay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import { FIGURE, FIGURES } from './figures';
 import { SET, SOLVED, coverage, maskOf, maskTriangles, snap, solveFigure, type Placed, type Pt } from './geometry';
 import { FIG_AREA, TangramTable, WORLD, homePieces, quarterTurn } from './board';
@@ -43,6 +46,8 @@ export function TangramView() {
   const [phase, setPhase] = useState<Phase>('play');
   const [selected, setSelected] = useState(-1);
   const [live, setLive] = useState('');
+  /** What the last figure paid (a new one: 10), for the result card. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const tableRef = useRef<TangramTable | null>(null);
   const S = useRef({ figId, pieces, phase, selected, solved });
@@ -103,6 +108,7 @@ export function TangramView() {
     if (first) {
       setSolved([...s.solved, s.figId]);
       playRecord('tangram');
+      setPaid(payToast(tangramPay(true)));
     }
     setLive(t(`拼成了「${fig.zh}」`, `You made the ${fig.en}`));
   };
@@ -138,6 +144,7 @@ export function TangramView() {
     const home = homePieces();
     setFigId(id);
     setPhase('play');
+    setPaid(null);
     setSelected(-1);
     const tb = tableRef.current;
     tb?.setInked(false);
@@ -305,6 +312,10 @@ export function TangramView() {
                   : t('拖动木板覆在淡墨图上；点一块选中，再点旋转。', 'Drag pieces over the pale ink shape; tap a piece to pick it, tap again to turn it.')}
                 <span class="tg-kbd">{t(' · 键盘：1–7 选板，方向键移，R 转，F 翻', ' · Keys: 1–7 pick, arrows move, R turn, F flip')}</span>
               </p>
+              <PayHint
+                zh={solved.includes(figId) ? '此图已拼过；每拼成一幅新图，得 ' + TANGRAM_NEW + ' 文' : `拼成这幅新图，得 ${TANGRAM_NEW} 文`}
+                en={solved.includes(figId) ? `Made before; each new figure pays ${TANGRAM_NEW} coins` : `Making this new figure pays ${TANGRAM_NEW} coins`}
+              />
             </>
           ) : (
             <Result
@@ -313,6 +324,7 @@ export function TangramView() {
               own={phase === 'won'}
               count={solved.length}
               total={FIGURES.length}
+              paid={paid}
               onNext={() => start(nextId)}
               onAgain={() => start(figId)}
             />
@@ -363,7 +375,7 @@ function FigureName(props: { zh: string; en: string; own: boolean }) {
   );
 }
 
-function Result(props: { figZh: string; figEn: string; own: boolean; count: number; total: number; onNext: () => void; onAgain: () => void }) {
+function Result(props: { figZh: string; figEn: string; own: boolean; count: number; total: number; paid: Paid | null; onNext: () => void; onAgain: () => void }) {
   const t = useT();
   const sealRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -394,6 +406,7 @@ function Result(props: { figZh: string; figEn: string; own: boolean; count: numb
             ? t(`七块板，已拼成 ${props.count} / ${props.total} 幅`, `${props.count} of ${props.total} figures made`)
             : t('看过答案的这一幅不计入，自己再拼一次吧。', 'Peeked figures don’t count — try it yourself.')}
         </p>
+        {props.own && <PaidLine paid={props.paid} />}
       </div>
       <div class="tg-again">
         <button type="button" class="btn" onClick={props.onAgain}>{t('再拼一次', 'Again')}</button>

@@ -3,7 +3,8 @@
 // spreading wash (with 「与之同游」), or a seal slamming down with a wooden thud. Tap, Esc or ~6 s
 // dismiss it; several finish at once → shown one after another. Renders nothing when idle.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { celebrations, nextCelebration, selectCharacter } from '../../app/play';
+import { celebrations, nextCelebration, questCoins, selectCharacter } from '../../app/play';
+import { CoinIcon, fmtCoins } from '../../ui/coins';
 import { go, route } from '../../app/router';
 import { useT } from '../../app/i18n';
 import { lang } from '../../app/store';
@@ -269,6 +270,10 @@ function Card(props: { q: QuestDef; onGone: () => void }) {
             </div>
             <p class="cel-title">「{t(companion.titleZh, companion.titleEn)}」</p>
             <p id="cel-desc" class="cel-ability"><span aria-hidden="true">◈ </span>{t(companion.abilityZh, companion.abilityEn)}</p>
+            {companion.skill && (
+              <p class="cel-skill"><b aria-hidden="true">{companion.skill.glyph}</b>{t(`技 · ${companion.skill.zh}`, `Skill · ${companion.skill.en}`)}</p>
+            )}
+            <p class="cel-coins"><CoinIcon size={16} />{t(`赏钱 ${fmtCoins(questCoins(q))} 文`, `${fmtCoins(questCoins(q))} coins`)}</p>
             <div class="cel-actions">
               <button type="button" class="cel-btn is-seal" onClick={walk}>{t('与之同游', 'Walk together')}</button>
               <button type="button" class="cel-btn" onClick={later2}>{t('稍后', 'Later')}</button>
@@ -283,6 +288,7 @@ function Card(props: { q: QuestDef; onGone: () => void }) {
             <p id="cel-desc" class="cel-sealnote">
               {t(`得印「${sealText ?? ''}」，已收入印谱。`, `Seal earned: ${'seal' in q.reward ? q.reward.sealEn : ''}. Added to your album.`)}
             </p>
+            <p class="cel-coins"><CoinIcon size={16} />{t(`赏钱 ${fmtCoins(questCoins(q))} 文`, `${fmtCoins(questCoins(q))} coins`)}</p>
             <div class="cel-actions">
               <button type="button" class="cel-btn is-seal" onClick={album}>{t('翻看印谱', 'Open the album')}</button>
               <button type="button" class="cel-btn" onClick={later2}>{t('好', 'OK')}</button>

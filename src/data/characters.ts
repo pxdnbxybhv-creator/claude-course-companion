@@ -42,9 +42,29 @@ export interface CharacterDef {
   ability: Ability;
   abilityZh: string;
   abilityEn: string;
+  /** The active skill (技 · Q): one brush glyph for the button, its name and what it does. */
+  skill: { glyph: string; zh: string; en: string; descZh: string; descEn: string };
 }
 
-export const CHARACTERS: CharacterDef[] = [
+/** Each companion's skill (see features/skills). */
+const SKILLS: Record<CharacterId, CharacterDef['skill']> = {
+  scholar: { glyph: '题', zh: '题诗', en: 'Inscribe', descZh: '挥毫题诗，墨字悬空不散；近处花木应声而开。遇石壁、亭柱可留下墨迹。', descEn: 'Brush a line of verse into the air; nearby plants open at the words. Leave your ink on walls and pillars.' },
+  gardener: { glyph: '花', zh: '催花', en: 'Coax Blossom', descZh: '一挥锄，脚下百花齐放，枯枝吐新芽；家园里的菜畦花圃即刻长成。', descEn: 'A sweep of the hoe and flowers burst up all around; bare twigs bud, and homestead beds ripen at once.' },
+  fisher: { glyph: '网', zh: '撒网', en: 'Cast the Net', descZh: '临水随处撒网，一网收起鱼虾与铜钱。', descEn: 'Throw a net into any water and haul up fish — and sometimes coins.' },
+  musician: { glyph: '琴', zh: '高山流水', en: 'Mountains and Waters', descZh: '席地抚琴：鸟停鱼聚，路人驻足，猫也打起呼噜。', descEn: 'Sit and play: birds settle, koi gather, passers-by stop to listen, even the cat purrs.' },
+  swordsman: { glyph: '剑', zh: '轻功', en: 'Lightness Skill', descZh: '踏风疾冲一段，片刻之内可二段跳、踏檐走壁。', descEn: 'Dash on the wind; for a while you can double-jump and run along the eaves.' },
+  taoist: { glyph: '符', zh: '御风符', en: 'Wind Talisman', descZh: '一张黄符，平地乘风而起，高过屋脊；落叶随风打旋。', descEn: 'A yellow talisman lifts you on the wind, higher than the rooftops, with leaves whirling round.' },
+  painter: { glyph: '笔', zh: '神笔', en: 'Magic Brush', descZh: '画一只纸鹤，它会飞向最近的未至之地、未遇之奇。', descEn: 'Paint a paper crane that flies off toward the nearest place — or wonder — you have not yet found.' },
+  player: { glyph: '弈', zh: '推演', en: 'Foresight', descZh: '心算万变：片刻之间万物放慢，跳跃、投壶都从容。', descEn: 'The world slows for a few breaths — time enough for any jump or throw.' },
+  cat: { glyph: '喵', zh: '猫跃', en: 'Pounce', descZh: '一跃上墙头屋顶；鸟不惊、鱼不散，还有几只猫友跟着你走。', descEn: 'One leap onto walls and roofs; birds and fish do not scatter, and a few cat friends tag along.' },
+  rabbit: { glyph: '月', zh: '月华', en: 'Moon Hop', descZh: '蹬月而起，身后洒下月尘，飘飘然滑翔落地。', descEn: 'Kick off the moon, trail moon-dust and glide softly down.' },
+  poet: { glyph: '酒', zh: '斗酒', en: 'A Jug of Wine', descZh: '饮一口酒，诗句绕身飞舞——因地、因时、因季而异，醉步微醺。', descEn: 'A sip of wine and verses swirl round you — chosen for the place, the hour and the season.' },
+  guan: { glyph: '马', zh: '赤兔', en: 'Red Hare', descZh: '唤来赤兔马，纵马驰骋；路人见之，纷纷拱手。', descEn: 'Call Red Hare and gallop; people bow as you pass.' },
+  change: { glyph: '奔', zh: '奔月', en: 'To the Moon', descZh: '广袖轻扬，凌空飘行片刻，可越水、过崖。', descEn: 'Sleeves lift and you float through the air for a while, over water and gaps.' },
+};
+
+
+const CAST: Omit<CharacterDef, 'skill'>[] = [
   { id: 'scholar', zh: '书生', en: 'Scholar', titleZh: '负笈远游', titleEn: 'Travelling with books', descZh: '白衣书生，走进了自己的画里。', descEn: 'A scholar in white who has stepped into his own painting.', unlock: 'default', ability: { kind: 'none' }, abilityZh: '心平气和', abilityEn: 'Even-tempered' },
   { id: 'gardener', zh: '园丁', en: 'Gardener', titleZh: '带月荷锄归', titleEn: 'Home with the hoe by moonlight', descZh: '草帽、水壶，花木见了他就精神。', descEn: 'Straw hat and watering can; plants perk up when he passes.', unlock: 'q-water', ability: { kind: 'grow' }, abilityZh: '浇水时落花更盛', abilityEn: 'Watering brings a shower of petals' },
   { id: 'fisher', zh: '渔翁', en: 'Old Fisherman', titleZh: '独钓寒江雪', titleEn: 'Fishing alone in the snowy river', descZh: '蓑衣斗笠，一竿风月。', descEn: 'Straw cape, bamboo hat, a rod full of wind and moon.', unlock: 'q-fish', ability: { kind: 'fish', factor: 1.8 }, abilityZh: '鱼更易上钩', abilityEn: 'Fish bite sooner' },
@@ -59,5 +79,7 @@ export const CHARACTERS: CharacterDef[] = [
   { id: 'guan', zh: '关公', en: 'Lord Guan', titleZh: '华容道义释曹操', titleEn: 'Letting Cao Cao go at Huarong Pass', descZh: '红脸长髯，青龙偃月。', descEn: 'Red face, long beard, the Green Dragon blade.', unlock: 'q-klotski', ability: { kind: 'speed', factor: 1.25 }, abilityZh: '赤兔之速', abilityEn: 'The speed of Red Hare' },
   { id: 'change', zh: '嫦娥', en: "Chang'e", titleZh: '碧海青天夜夜心', titleEn: 'Blue sea, clear sky, a heart every night', descZh: '集齐同伴之后，月亮上的人也来了。', descEn: 'When every companion has joined you, the lady of the moon comes too.', unlock: 'q-all', ability: { kind: 'float' }, abilityZh: '凌波微步，可行于水上', abilityEn: 'Walks on water' },
 ];
+
+export const CHARACTERS: CharacterDef[] = CAST.map((c) => ({ ...c, skill: SKILLS[c.id] }));
 
 export const CHARACTER: Record<CharacterId, CharacterDef> = Object.fromEntries(CHARACTERS.map((c) => [c.id, c])) as Record<CharacterId, CharacterDef>;

@@ -11,6 +11,8 @@ import { lanternDrift, lowerRiver } from './logic';
 import { begin, end, frameOn, h, night, onEscape, panel, tr, type Panel } from './ui';
 import { glowSprite, ripples } from './fx';
 import * as snd from './sound';
+import { lanternPay } from '../../../games/economy';
+import { pay, payLine } from '../../../games/purse';
 
 interface Style { id: string; zh: string; en: string; petal: string; tip: string; base: string }
 const STYLES: Style[] = [
@@ -148,12 +150,15 @@ export const riverLanterns = feature('mg-lanterns', (bag, ctx) => {
     ctx.audio.pluck(4, 0.4);
     bag.later(600, () => ctx.audio.pluck(2, 0.35));
     record('lantern');
+    const pp = lanternPay();
+    const out = pay(pp);
+    const coinZh = payLine(pp, out, 'zh'), coinEn = payLine(pp, out, 'en');
     released++;
     const v = VERSES[(released - 1) % VERSES.length];
     bag.later(1800, () => ctx.hud.showCard({
       titleZh: '河灯寄愿', titleEn: 'A lantern downstream',
-      bodyZh: `${wish ? `「${wish}」\n\n` : ''}灯顺水去，愿随灯行。\n\n${v.zh}`,
-      bodyEn: `${wish ? `“${wish}”\n\n` : ''}The lantern goes with the water; the wish goes with the lantern.\n\n${v.en}`,
+      bodyZh: `${wish ? `「${wish}」\n\n` : ''}灯顺水去，愿随灯行。\n\n${v.zh}${coinZh ? `\n\n${coinZh}` : ''}`,
+      bodyEn: `${wish ? `“${wish}”\n\n` : ''}The lantern goes with the water; the wish goes with the lantern.\n\n${v.en}${coinEn ? `\n\n${coinEn}` : ''}`,
       seal: '愿',
     }));
   }

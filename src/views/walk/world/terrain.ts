@@ -4,7 +4,7 @@
 // river's channel, and every path graded so it can be walked (≤ ~22°). Beyond the rim the land
 // rises into hills that fade into the painted mountains. Pure numbers — no three.js; deterministic.
 import { makeNoise2, smoothstep } from '../../../core/rng';
-import { LAKE, PATHS, RIVER, RIVER_LAKE_BREAK, WORLD_RADIUS, type XZ } from '../map';
+import { HOME_PLOT, LAKE, PATHS, RIVER, RIVER_LAKE_BREAK, WORLD_RADIUS, type XZ } from '../map';
 import { catmull } from './geom';
 
 export const GRID_MIN = -216;
@@ -36,14 +36,19 @@ const BUMPS: Bump[] = [
   { x: -84, z: 164, elev: 9, flat: 8, width: 38 },
 ];
 
-/** Where the places sit flat (their plateaus), blending back to the land between r0 and r1. */
-const FLATS: { x: number; z: number; elev: number; r0: number; r1: number }[] = [
+/**
+ * Where the places sit flat (their plateaus), blending back to the land between r0 and r1. A little
+ * noise keeps a plateau from looking planed (`grain`, m; the homestead's plot is level to build on).
+ */
+const FLATS: { x: number; z: number; elev: number; r0: number; r1: number; grain?: number }[] = [
   { x: 0, z: 0, elev: 0, r0: 14, r1: 26 },          // garden
   { x: 0, z: 80, elev: 0.05, r0: 24, r1: 40 },      // water town
   { x: -82, z: 28, elev: 1.5, r0: 18, r1: 34 },     // bamboo grove
   { x: -72, z: -73, elev: 9, r0: 9, r1: 16 },       // plum summit
   { x: 40, z: -112, elev: 22, r0: 24, r1: 30 },     // temple terrace
   { x: 88, z: 16, elev: LAKE.waterY + 0.5, r0: 40, r1: 54 }, // round the lake
+  // 家园: the whole square plot (its corners are √2 × half its side out) level, easing out over 12 m
+  { x: HOME_PLOT.x, z: HOME_PLOT.z, elev: 0.6, r0: HOME_PLOT.size * 0.72 + 1, r1: HOME_PLOT.size * 0.72 + 13, grain: 0 },
 ];
 
 /** The paths as graded: the lake-to-temple path is carried on up onto the temple terrace. */
@@ -158,7 +163,7 @@ function macro(x: number, z: number): number {
     const d = hyp(x - f.x, z - f.z);
     if (d >= f.r1) continue;
     const w = smoothstep(f.r1, f.r0, d);
-    h = h + (f.elev + 0.15 * N1(x / 9, z / 9) - h) * w;
+    h = h + (f.elev + (f.grain ?? 0.15) * N1(x / 9, z / 9) - h) * w;
   }
   return h;
 }

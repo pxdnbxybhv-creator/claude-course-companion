@@ -83,6 +83,9 @@ export interface Pond {
   dispose(): void;
 }
 
+const RING_DAY = new THREE.Color('#2a2724');
+const RING_NIGHT = new THREE.Color('#c9cfd8');
+
 export function buildPond(bag: Bag, clarity: number, o: { lowEnd: boolean; reduced: boolean; w: number; h: number }): Pond {
   const group = new THREE.Group();
   group.name = 'pond';
@@ -174,7 +177,7 @@ export function buildPond(bag: Bag, clarity: number, o: { lowEnd: boolean; reduc
         const s = (0.1 + (1 - Math.pow(1 - k, 2.2)) * 0.9) * r.size;
         r.mesh.scale.setScalar(s);
         r.mat.opacity = 0.35 * (1 - k) * (night > 0.5 ? 0.6 : 1);
-        r.mat.color.set(night > 0.5 ? '#c9cfd8' : '#2a2724');
+        r.mat.color.copy(night > 0.5 ? RING_NIGHT : RING_DAY);
       }
       // now and then a fish rises
       if (!o.reduced && t > nextFish) {

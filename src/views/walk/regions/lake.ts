@@ -8,7 +8,7 @@
 import type * as T from 'three';
 import type { RegionModule } from '../types';
 import { ANCHORS, LAKE, RIVER, RIVER_LAKE_BREAK } from '../map';
-import { Kit, Parts, flatsMesh, fontsReady, packAtlas, canvas, sway, BRUSH_FONT, type Flat } from './water-kit';
+import { Kit, Parts, flatsMesh, fontsReady, lampPools, packAtlas, canvas, sway, BRUSH_FONT, type Flat } from './water-kit';
 import { RIDGE, hipRoof, xfLines } from './water-arch';
 import { reedDrawing, willowDrawing } from './water-paint';
 import { segmentDeck } from './water-decks';
@@ -164,8 +164,8 @@ async function buildLake(k: Kit): Promise<void> {
   {
     const { x: px, z: pz, h } = PAV;
     // stone piers and the platform
-    for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) solid.add(k.box(0.55, PY - (WY - 1.2), 0.55, '#a39d90', px + a * (h - 0.4), (PY + WY - 1.2) / 2 - 0.1, pz + b * (h - 0.4), 0, 0.06), 25);
-    solid.add(k.box(h * 2 + 0.3, 0.24, h * 2 + 0.3, '#c9c2b2', px, PY - 0.12, pz, 0, 0.04), 25);
+    for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1]) solid.add(k.box(0.55, PY - (WY - 1.2), 0.55, '#a79c87', px + a * (h - 0.4), (PY + WY - 1.2) / 2 - 0.1, pz + b * (h - 0.4), 0, 0.06), 25);
+    solid.add(k.box(h * 2 + 0.3, 0.24, h * 2 + 0.3, '#cec1a6', px, PY - 0.12, pz, 0, 0.04), 25);
     solid.add(k.box(h * 2 - 0.2, 0.03, h * 2 - 0.2, '#8f6e50', px, PY + 0.015, pz, 0, 0.04), false);
     // columns
     const cols: [number, number][] = [];
@@ -173,8 +173,8 @@ async function buildLake(k: Kit): Promise<void> {
     for (const t of [-1 / 3, 1 / 3]) { cols.push([-(h - 0.25), t * (h - 0.25)], [h - 0.25, t * (h - 0.25)]); }
     const CH = 2.85;
     for (const [a, b] of cols) {
-      solid.add(k.cyl(0.11, 0.12, CH, 8, '#7b3f31', px + a, PY + CH / 2, pz + b), 30);
-      solid.add(k.cyl(0.17, 0.19, 0.14, 8, '#a49e91', px + a, PY + 0.07, pz + b), false);
+      solid.add(k.cyl(0.11, 0.12, CH, 8, '#a4402e', px + a, PY + CH / 2, pz + b), 30);
+      solid.add(k.cyl(0.17, 0.19, 0.14, 8, '#a89d88', px + a, PY + 0.07, pz + b), false);
       k.collider({ x: px + a, z: pz + b, r: 0.16, h: CH });
     }
     // architrave and hanging fretwork (挂落) on all four sides
@@ -212,8 +212,8 @@ async function buildLake(k: Kit): Promise<void> {
       k.fence(px + ax, pz + az, px + bx, pz + bz, 0.22, 1.0);
     }
     // a stone table and two drum stools, a qin on the table
-    solid.add(k.cyl(0.45, 0.32, 0.74, 10, '#b3ad9f', px - 0.6, PY + 0.37, pz), 30);
-    for (const s of [-1, 1]) solid.add(k.cyl(0.18, 0.16, 0.42, 9, '#aaa496', px - 0.6, PY + 0.21, pz + s * 0.85), 30);
+    solid.add(k.cyl(0.45, 0.32, 0.74, 10, '#b8ac95', px - 0.6, PY + 0.37, pz), 30);
+    for (const s of [-1, 1]) solid.add(k.cyl(0.18, 0.16, 0.42, 9, '#aea38c', px - 0.6, PY + 0.21, pz + s * 0.85), 30);
     solid.add(k.box(1.1, 0.05, 0.2, '#4a3226', px - 0.6, PY + 0.77, pz, 0.2), 30);
     k.collider({ x: px - 0.6, z: pz, r: 0.6, h: 0.8 });
     // the roof: a hipped roof with deep flying corners (嫩戗发戗)
@@ -248,12 +248,12 @@ async function buildLake(k: Kit): Promise<void> {
         const t0 = j / slabs, t1 = (j + 1) / slabs;
         const x = a.x + (b.x - a.x) * (t0 + t1) / 2, z = a.z + (b.z - a.z) * (t0 + t1) / 2;
         const y = ya + (yb - ya) * (t0 + t1) / 2;
-        solid.add(k.box(1.6, 0.2, len / slabs - 0.03, j % 2 ? '#c6bfaf' : '#bcb5a5', x, y - 0.1, z, ry, 0.05, Math.atan2(yb - ya, len) * -1), 25);
+        solid.add(k.box(1.6, 0.2, len / slabs - 0.03, j % 2 ? '#cbbea4' : '#c1b49a', x, y - 0.1, z, ry, 0.05, Math.atan2(yb - ya, len) * -1), 25);
       }
       // piers under both ends
       for (const p of [a, b]) {
         const y = p === a ? ya : yb;
-        solid.add(k.box(1.3, y - (WY - 1.1), 0.5, '#a39d90', p.x, (y + WY - 1.1) / 2 - 0.2, p.z, ry, 0.05), 25);
+        solid.add(k.box(1.3, y - (WY - 1.1), 0.5, '#a79c87', p.x, (y + WY - 1.1) / 2 - 0.2, p.z, ry, 0.05), 25);
       }
       // low railing: posts and a rail on both sides. The bends are sharp, so near each one a side's
       // rail stops where it would stand in the neighbouring run's walkway (keeps the turn open).
@@ -273,10 +273,10 @@ async function buildLake(k: Kit): Promise<void> {
         const n = Math.max(2, Math.round((len * (t1 - t0)) / 1.0));
         for (let j = 0; j <= n; j++) {
           const p = railAt(t0 + ((t1 - t0) * j) / n, side);
-          solid.add(k.box(0.14, 0.5, 0.14, '#c9c2b3', p.x, p.y + 0.25, p.z, ry), 30);
+          solid.add(k.box(0.14, 0.5, 0.14, '#cec1a7', p.x, p.y + 0.25, p.z, ry), 30);
         }
         const p0 = railAt(t0, side), p1 = railAt(t1, side);
-        solid.add(k.beam({ x: p0.x, y: p0.y + 0.42, z: p0.z }, { x: p1.x, y: p1.y + 0.42, z: p1.z }, 0.1, '#d2cbbb'), 30);
+        solid.add(k.beam({ x: p0.x, y: p0.y + 0.42, z: p0.z }, { x: p1.x, y: p1.y + 0.42, z: p1.z }, 0.1, '#d7caaf'), 30);
         // and solid: the walker's body stays between the rails
         const m = Math.max(2, Math.ceil((len * (t1 - t0)) / 0.35));
         for (let j = 0; j <= m; j++) {
@@ -291,7 +291,7 @@ async function buildLake(k: Kit): Promise<void> {
         (s) => ya + (yb - ya) * Math.max(0, Math.min(1, (s + (len + e0 + e1) / 2 - e0) / len))));
       // a square landing slab at each bend fills the notch the two runs leave on the outer side
       if (i < ZIG.length - 1) {
-        solid.add(k.box(1.6, 0.2, 1.6, '#bfb8a8', b.x, zy - 0.112, b.z, ry, 0.05), 25);
+        solid.add(k.box(1.6, 0.2, 1.6, '#c4b79d', b.x, zy - 0.112, b.z, ry, 0.05), 25);
         k.deck(segmentDeck(`lake-zigzag-bend-${i}`, { x: b.x - ux * 0.62, z: b.z - uz * 0.62 }, { x: b.x + ux * 0.62, z: b.z + uz * 0.62 }, 0.62, zy));
       }
     }
@@ -309,7 +309,7 @@ async function buildLake(k: Kit): Promise<void> {
     const deckY = (s: number) => yEnd + (crest - yEnd) * Math.pow(Math.max(0, 1 - (s / L) * (s / L)), 2.2);
     const ry = Math.atan2(ax, az);
     const m = new THREE.Matrix4().compose(new THREE.Vector3(bx, 0, bz), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry), new THREE.Vector3(1, 1, 1));
-    const MARBLE = '#e8e3d6';
+    const MARBLE = '#eee2c8';
     const shape = new THREE.Shape();
     const N = 56;
     for (let i = 0; i <= N; i++) { const s = -L + (2 * L * i) / N; if (i === 0) shape.moveTo(s, deckY(s)); else shape.lineTo(s, deckY(s)); }
@@ -332,11 +332,11 @@ async function buildLake(k: Kit): Promise<void> {
       ring.translate(0, yc, 0);
       ring.rotateY(s * Math.PI / 2);
       ring.translate(s * (W / 2 + 0.012), 0, 0);
-      solid.add(k.tint(ring, '#d3cdbf', 0.05, 6).applyMatrix4(m), 20);
-      solid.add(k.box(0.05, 0.42, 0.3, '#c9c2b3', s * (W / 2 + 0.03), yc + R + 0.18, 0).applyMatrix4(m), 30);
+      solid.add(k.tint(ring, '#d8ccb3', 0.05, 6).applyMatrix4(m), 20);
+      solid.add(k.box(0.05, 0.42, 0.3, '#cec1a7', s * (W / 2 + 0.03), yc + R + 0.18, 0).applyMatrix4(m), 30);
     }
     for (let s = -L + 0.3; s <= L - 0.3; s += 0.34) {
-      solid.add(k.box(W - 0.4, 0.12, 0.36, Math.round(s / 0.34) % 2 ? '#e2ddd0' : '#d8d2c4', 0, deckY(s) + 0.02, s, 0, 0.03).applyMatrix4(m), 25);
+      solid.add(k.box(W - 0.4, 0.12, 0.36, Math.round(s / 0.34) % 2 ? '#e8dcc2' : '#ddd1b7', 0, deckY(s) + 0.02, s, 0, 0.03).applyMatrix4(m), 25);
     }
     const posts: number[] = [];
     for (let s = -L + 0.35; s <= L - 0.3; s += 0.95) posts.push(s);
@@ -350,11 +350,11 @@ async function buildLake(k: Kit): Promise<void> {
         const s0 = posts[i - 1], s1 = posts[i];
         const y0 = deckY(s0) + 0.34, y1 = deckY(s1) + 0.34;
         const len = Math.hypot(s1 - s0, y1 - y0);
-        solid.add(k.box(0.09, 0.4, len, '#f0ebe0', x, (y0 + y1) / 2, (s0 + s1) / 2, 0, 0.03, -Math.atan2(y1 - y0, s1 - s0)).applyMatrix4(m), 30);
+        solid.add(k.box(0.09, 0.4, len, '#f6ead1', x, (y0 + y1) / 2, (s0 + s1) / 2, 0, 0.03, -Math.atan2(y1 - y0, s1 - s0)).applyMatrix4(m), 30);
       }
       for (const e of [-1, 1]) {
         const s = e * (L - 0.05);
-        solid.add(k.box(0.22, 0.5, 0.7, '#ddd7ca', x, deckY(s) + 0.25, s).applyMatrix4(m), 30);
+        solid.add(k.box(0.22, 0.5, 0.7, '#e2d6bd', x, deckY(s) + 0.25, s).applyMatrix4(m), 30);
       }
       const a = new THREE.Vector3(x, 0, -L).applyMatrix4(m), b = new THREE.Vector3(x, 0, L).applyMatrix4(m);
       k.fence(a.x, a.z, b.x, b.z, 0.18, 1.1);
@@ -370,7 +370,7 @@ async function buildLake(k: Kit): Promise<void> {
     const g = new THREE.SphereGeometry(1, 20, 8, 0, TAU, 0, Math.PI / 2);
     const p = g.attributes.position;
     const col = new Float32Array(p.count * 3);
-    const top = new THREE.Color('#b8b394'), rim = new THREE.Color('#8f8a7d'), moss = new THREE.Color('#7e8c6c');
+    const top = new THREE.Color('#b8b394'), rim = new THREE.Color('#938975'), moss = new THREE.Color('#7e8c6c');
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
       const n = noise(x * 1.7 + 3, z * 1.7);
@@ -396,10 +396,10 @@ async function buildLake(k: Kit): Promise<void> {
     solid.add(tr, 50);
     // a tiny stone lantern
     const lx = ix - 1.4, lz = iz + 1.2, ly = WY + 1.05;
-    solid.add(k.cyl(0.18, 0.2, 0.12, 6, '#a6a092', lx, ly + 0.06, lz), 30);
-    solid.add(k.cyl(0.05, 0.06, 0.4, 6, '#b1ab9e', lx, ly + 0.32, lz), 30);
-    solid.add(k.box(0.24, 0.2, 0.24, '#b8b2a5', lx, ly + 0.62, lz), 30);
-    solid.add(k.cyl(0.02, 0.26, 0.18, 6, '#8f8a80', lx, ly + 0.81, lz), 30);
+    solid.add(k.cyl(0.18, 0.2, 0.12, 6, '#aa9f89', lx, ly + 0.06, lz), 30);
+    solid.add(k.cyl(0.05, 0.06, 0.4, 6, '#b6aa94', lx, ly + 0.32, lz), 30);
+    solid.add(k.box(0.24, 0.2, 0.24, '#bdb19a', lx, ly + 0.62, lz), 30);
+    solid.add(k.cyl(0.02, 0.26, 0.18, 6, '#938978', lx, ly + 0.81, lz), 30);
     lanternAt.push([lx, ly + 0.62, lz]);
   }
 
@@ -552,7 +552,9 @@ async function buildLake(k: Kit): Promise<void> {
   g2.fillRect(0, 0, 64, 64);
   const pg = new THREE.BufferGeometry();
   pg.setAttribute('position', new THREE.Float32BufferAttribute(lanternAt.flat(), 3));
-  const glowMat = k.own(new THREE.PointsMaterial({ map: k.canvasTex(gc), color: '#ffc47a', size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  const glowTex = k.canvasTex(gc);
+  const pools = lampPools(k, lanternAt, glowTex, 'lake-pools');
+  const glowMat = k.own(new THREE.PointsMaterial({ map: glowTex, color: '#ffc47a', size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
   const glows = new THREE.Points(k.own(pg), glowMat);
   glows.name = 'lake-glows';
   glows.visible = false;
@@ -564,6 +566,7 @@ async function buildLake(k: Kit): Promise<void> {
     lanternMat.emissive.setRGB(0.6 * night * flick, 0.22 * night * flick, 0.08 * night);
     glowMat.opacity = 0.6 * night;
     glows.visible = night > 0.02;
+    pools(night, flick);
   });
 }
 
@@ -614,7 +617,7 @@ function rockGeometry(k: Kit, seed: number): T.BufferGeometry {
   const n = makeNoise2(seed);
   const p = g.attributes.position;
   const col = new Float32Array(p.count * 3);
-  const base = new THREE.Color('#b3ad9f'), dark = new THREE.Color('#5d5a53'), moss = new THREE.Color('#6f7d5f');
+  const base = new THREE.Color('#b8ac95'), dark = new THREE.Color('#605a4e'), moss = new THREE.Color('#6f7d5f');
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     const r = 1 + 0.28 * n(x * 1.4 + 2, y * 1.6 + z);
@@ -636,7 +639,7 @@ function taihuRock(k: Kit, seed: number, w: number, h: number): T.BufferGeometry
   const n = makeNoise2(seed);
   const p = g.attributes.position;
   const col = new Float32Array(p.count * 3);
-  const base = new THREE.Color('#bdb7aa'), dark = new THREE.Color('#57544e');
+  const base = new THREE.Color('#c2b69f'), dark = new THREE.Color('#5a5449');
   for (let i = 0; i < p.count; i++) {
     let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     const big = n(x * 1.3 + z * 0.8 + 3.1, y * 1.6 - 1.7), fine = n(x * 3.7 - z * 2.1, y * 3.3 + z * 1.9 + 5);
@@ -666,7 +669,7 @@ function leafCanvas(seed: number): HTMLCanvasElement {
   grd.addColorStop(0, '#9fb28f');
   grd.addColorStop(0.18, '#6f8c68');
   grd.addColorStop(0.75, '#4f6c52');
-  grd.addColorStop(1, '#3a4d3c');
+  grd.addColorStop(1, '#3c4d38');
   g.fillStyle = grd;
   g.beginPath(); g.arc(cx, cy, R, 0, TAU); g.fill();
   // blotches of wetter ink, as in 没骨 lotus leaves
@@ -765,7 +768,7 @@ function cupGeometry(k: Kit): T.BufferGeometry {
 function flowerGeometry(k: Kit, open: number): T.BufferGeometry {
   const THREE = k.T;
   const parts: T.BufferGeometry[] = [];
-  const base = new THREE.Color('#f6f1e6'), tip = new THREE.Color('#dc8f9d');
+  const base = new THREE.Color('#fcf0d7'), tip = new THREE.Color('#dc8f9d');
   const petal = (a: number, len: number, wid: number, tilt: number, y0: number) => {
     // a diamond petal cupped along its spine: base, two shoulders, a raised mid-ridge, tip
     const pts: V3[] = [[0, 0, 0], [-wid, len * 0.45, 0.06], [0, len * 0.5, -0.05], [wid, len * 0.45, 0.06], [0, len, 0.02]];

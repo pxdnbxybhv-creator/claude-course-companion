@@ -9,6 +9,9 @@ import { lang } from '../../../app/store';
 import { audio } from '../../../audio/engine';
 import { makeSeal, sealReady } from '../../../ink/seal';
 import { recordMax } from '../../../app/play';
+import { feihuaPay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import { LING, PLACES, cnNum, computerLine, drawLing, makeRound, markAt, nextPlace, verdict, type Clause, type Round, type Verdict } from './logic';
 import { loadStats, saveStats, type FeihuaStats } from './store';
 import './feihua.css';
@@ -39,6 +42,8 @@ export function FeihuaView() {
   const [round, setRound] = useState<Round | null>(null);
   const [streak, setStreak] = useState(0);
   const [ending, setEnding] = useState<Ending | null>(null);
+  /** What the chain paid (a coin a line), for the ending. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const [deadline, setDeadline] = useState(0);
   const [now, setNow] = useState(0);
   const [live, setLive] = useState('');
@@ -58,7 +63,10 @@ export function FeihuaView() {
     () => () => {
       clearTimeout(timer.current);
       const s = S.current;
-      if ((s.phase === 'player' || s.phase === 'machine') && s.streak > 0) recordMax('feihua', s.streak);
+      if ((s.phase === 'player' || s.phase === 'machine') && s.streak > 0) {
+        recordMax('feihua', s.streak);
+        payToast(feihuaPay(s.streak));
+      }
     },
     [],
   );
@@ -126,6 +134,7 @@ export function FeihuaView() {
     setChain([]);
     setStreak(0);
     setEnding(null);
+    setPaid(null);
     persist({ ...stats, lastLing: c });
     audio.bell();
     playerTurn(c, 1, false);
@@ -141,6 +150,7 @@ export function FeihuaView() {
     setRound(null);
     persist({ ...st, games: st.games + 1, best: Math.max(st.best, s) });
     recordMax('feihua', s);
+    setPaid(payToast(feihuaPay(s)));
     audio.knock();
     setLive(t(`令断。连 ${s} 句。`, `The chain breaks at ${s}.`));
   };
@@ -314,6 +324,7 @@ export function FeihuaView() {
                 ending={ending}
                 ling={ling}
                 streak={streak}
+                paid={paid}
                 onAgain={() => begin(ling)}
                 onNew={() => begin()}
                 zh={zh}
@@ -390,6 +401,7 @@ function Ready(props: { stats: FeihuaStats; ling: string; onTimer: (on: boolean)
       <button type="button" class="btn btn-seal fh-go" onClick={() => props.onStart(sel ?? undefined)}>
         {sel ? t(`行「${sel}」字令`, `Begin with “${sel}”`) : t('抽一个令字', 'Draw a character')}
       </button>
+      <PayHint zh="每接一句，得钱一文" en="Each line in the chain pays a coin" />
       {props.stats.games > 0 && (
         <p class="fh-record muted">{t(`已行令 ${props.stats.games} 回 · 最长连 ${props.stats.best} 句`, `${props.stats.games} games · best chain ${props.stats.best}`)}</p>
       )}
@@ -397,7 +409,7 @@ function Ready(props: { stats: FeihuaStats; ling: string; onTimer: (on: boolean)
   );
 }
 
-function Over(props: { ending: Ending; ling: string; streak: number; onAgain: () => void; onNew: () => void; zh: boolean }) {
+function Over(props: { ending: Ending; ling: string; streak: number; paid: Paid | null; onAgain: () => void; onNew: () => void; zh: boolean }) {
   const t = useT();
   const { ending: e, ling } = props;
   const q = e.picked?.text;
@@ -412,6 +424,7 @@ function Over(props: { ending: Ending; ling: string; streak: number; onAgain: ()
     <div class="fh-over" role="status">
       <p class="fh-verdict">{t('令断', 'The chain breaks')} · <span class="fh-n">{props.streak}</span> {t('句', props.streak === 1 ? 'line' : 'lines')}{record ? t(' · 新纪录', ' · a new best') : ''}</p>
       <p class="fh-why">{why}</p>
+      <PaidLine paid={props.paid} />
       {e.right.length > 0 && (
         <div class="fh-right">
           <span class="muted">{t('可接：', 'You could have said:')}</span>

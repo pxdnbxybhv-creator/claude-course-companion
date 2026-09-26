@@ -7,6 +7,9 @@ import { lang } from '../../../app/store';
 import { audio } from '../../../audio/engine';
 import { makeSeal, sealReady } from '../../../ink/seal';
 import { flag, record as playRecord } from '../../../app/play';
+import { klotskiCoins, klotskiPay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import {
   COLS, ROWS, LAYOUT, LAYOUTS, ROLE_NAMES, Solver, concreteMove, fits, isSolved, keyOf, movePiece, parseLayout, reachable, type Piece,
 } from './logic';
@@ -71,12 +74,17 @@ export function KlotskiView() {
   const layout = LAYOUT[layoutId];
   /** A solved layout whose play events are still to be recorded. */
   const pendingPlay = useRef<string | null>(null);
+  /** What the last solve paid (15–40 by difficulty), for the result card. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const flushPlay = () => {
     const lid = pendingPlay.current;
     if (!lid) return;
     pendingPlay.current = null;
     playRecord('klotski');
     if (lid === 'hengdao') flag('klotski:hengdao');
+    const i = LAYOUTS.findIndex((l) => l.id === lid);
+    const l = LAYOUTS[i];
+    if (l) setPaid(payToast(klotskiPay(i, LAYOUTS.length, l.zh, l.en)));
   };
   useEffect(() => () => flushPlay(), []);
   /** The latest handlers, for the board's long-lived event callbacks. */
@@ -246,6 +254,7 @@ export function KlotskiView() {
     setHist([]);
     setPhase('play');
     setRecord(false);
+    setPaid(null);
     setSelected(-1);
     setHeld(false);
     boardRef.current?.setPieces(fresh, false);
@@ -415,7 +424,7 @@ export function KlotskiView() {
 
         <div class="klt-side">
           {phase === 'won' ? (
-            <Result t={t} moves={moves} optimal={layout.optimal} best={best[layoutId] ?? moves} record={record} layoutName={nameOf(layout)}
+            <Result t={t} moves={moves} optimal={layout.optimal} best={best[layoutId] ?? moves} record={record} paid={paid} layoutName={nameOf(layout)}
               onAgain={() => begin(layoutId, true)}
               onNext={idx < LAYOUTS.length - 1 ? () => begin(LAYOUTS[idx + 1].id, true) : undefined}
             />
@@ -428,6 +437,7 @@ export function KlotskiView() {
                   {best[layoutId] ? t(` · 你的最佳 ${best[layoutId]} 步`, ` · yours: ${best[layoutId]}`) : ''}
                 </span>
               </p>
+              <PayHint zh={`脱身得 ${klotskiCoins(idx, LAYOUTS.length)} 文`} en={`Solving it pays ${klotskiCoins(idx, LAYOUTS.length)} coins`} />
               <div class="klt-controls">
                 <button type="button" class="btn" onClick={undo} disabled={!hist.length || phase !== 'play'}>
                   {t('悔一步', 'Undo')}
@@ -480,7 +490,7 @@ function MiniLayout(props: { map: string[] }) {
   );
 }
 
-function Result(props: { t: T; moves: number; optimal: number; best: number; record: boolean; layoutName: string; onAgain: () => void; onNext?: () => void }) {
+function Result(props: { t: T; moves: number; optimal: number; best: number; record: boolean; paid: Paid | null; layoutName: string; onAgain: () => void; onNext?: () => void }) {
   const { t } = props;
   const sealRef = useRef<HTMLCanvasElement>(null);
   const zh = lang.value === 'zh';
@@ -513,6 +523,7 @@ function Result(props: { t: T; moves: number; optimal: number; best: number; rec
             {props.record ? t(' · 新纪录', ' · a new best') : ''}
           </span>
         </p>
+        <PaidLine paid={props.paid} />
       </div>
       <blockquote class="klt-poem">
         {zh ? (

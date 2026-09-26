@@ -72,24 +72,73 @@ on through a water town:
 - **山寺 Mountain Temple** — a gate between ochre walls, stairs up to a double-eaved hall, a bell
   pavilion where you can strike the bell (张继's 夜半钟声), a seven-storey pagoda and a waterfall.
 
-A map screen (舆图) takes you back to any place you have visited. Each place has its own music
-and people to talk to. Festivals have easter eggs: on 中秋 a huge moon rises and eight mooncakes
-are hidden around the garden, each with a flavour and a verse; eat all eight and you get 苏轼's
-但愿人长久. 春节, 元宵, 清明, 端午, 七夕, 重阳, 冬至, 腊八 and 元旦 each have their own. On a phone
-you steer with a joystick; on a computer, with WASD.
+Every place has a waypoint stele (驿碑). Walk up to one and its lantern lights; from then on the
+map (舆图) sends you there with a tap. Each place has its own music, and the world keeps real
+time: warm, golden days and indigo nights lit by lanterns and windows. Festivals have easter
+eggs: on 中秋 a huge moon rises at dusk and eight mooncakes are hidden around the garden, each
+with a flavour and a verse; eat all eight and you get 苏轼's 但愿人长久. 春节, 元宵, 清明, 端午,
+七夕, 重阳, 冬至, 腊八 and 元旦 each have their own. On a phone you steer with a joystick and have
+buttons to jump (跃), run (疾) and use your skill (技); on a computer, WASD, Shift, Space and Q.
+
+**Jumping is worth it.** About forty bronze coins a day sit on rooftops, wall tops, scholar rocks
+and branches, where only a jump reaches them (a few need a double jump, a high jump or a glide).
+The bamboo grove has a course of plum-blossom poles (梅花桩) with a best time to beat; stepping
+stones cross the river west of the town; rocks on Plum Ridge climb to a hidden lookout.
+
+**People.** The places are busy: townsfolk stroll the lanes, vendors call from their stalls,
+washerwomen kneel at the river steps, boatmen pole along, monks sweep the temple court. After
+dark there is a night market, lantern-viewers, a lantern boat, and a watchman calling
+「天干物燥，小心火烛」. Some people you can talk to: a peddler (货郎) who sells things you can carry
+(糖葫芦, a pinwheel, an oil-paper umbrella, a lantern, a kite), a storyteller with a different tale
+each day, a fortune teller, a sugar-figure stall, a flower girl whose flowers you can give away,
+an old farmer, and a page boy who has lost his master. They greet each companion differently:
+people bow to 关公, children chase the cat, and everyone stares at 嫦娥.
+
+**奇遇 Chance encounters.** Fourteen small stories happen only at certain places and hours,
+in certain weather or seasons: a woodcutter who understands the qin (知音), two old men at a game
+of go in which years pass (观棋烂柯), a second moon in the lake (捞月), a fox who borrows an
+umbrella on a rainy night, a crane that shows the way, a falling star, a lost purse, a golden
+butterfly, a man marking his boat, the Peach Blossom Spring behind the waterfall (桃花源), a
+drunken immortal at the teahouse, a herd-boy on an ox, Hanshan and Shide sweeping leaves, and the
+old man under the moon. Each plays out differently for some companions (the poet and the moon,
+关公 and the purse, the Taoist child and the fox), and rumours nudge you toward the ones you have
+not met. They are kept in the quest book's 奇遇录.
 
 **同伴 Companions.** You can walk as any of thirteen companions: the scholar, a gardener, an old
-fisherman, a qin player, a wandering swordsman, a Taoist child, a painter, a board-game master,
-Big Ginger the cat, the jade rabbit, a poet, 关公, and 嫦娥 herself. Each has a small gift: the
-swordsman runs faster, the Taoist child jumps higher, the rabbit floats down after a jump, 嫦娥
-walks on water, and the gardener's watering brings a shower of petals. Companions are earned
-through quests, and some of those quests are real-life ones: keep any habit seven days in a row
-and the swordsman joins you; burn five sticks of incense all the way through and the qin player
-does. Others come from play: catch five fish, ring the temple bell, visit all six places, beat
-the Club level at gomoku or xiangqi, find the cat three times, eat all eight mooncakes, chain
-ten lines of 飞花令, solve 横刀立马. When all twelve have joined you, 嫦娥 comes down from the moon.
-**任务簿 The quest book** shows today's three errands, every companion with the quest that
-brings them, and an album of the seals you have earned.
+fisherman, a qin player, a wandering swordsman, a Taoist child, a painter, a go master, Big
+Ginger the cat, the jade rabbit, a poet, 关公, and 嫦娥 herself. Each walks, idles and moves in
+their own way, and each has a skill: the scholar brushes a line of verse into the air, the
+gardener makes flowers burst up around him, the fisher casts a net into any water, the qin
+player's music draws birds, koi and passers-by, the swordsman dashes and can double-jump, the
+Taoist child rides a talisman's wind above the rooftops, the painter's paper crane flies toward
+somewhere you have not been, the go master slows the world, the cat pounces onto walls with
+stray cats in tow, the rabbit hops off the moon and glides, the poet sips wine and verses swirl
+round him (chosen for the place, the season and the hour), 关公 calls his horse 赤兔, and 嫦娥
+floats through the air. Companions are earned through quests, and some of those quests are
+real-life ones: keep any habit seven days in a row and the swordsman joins you; burn five sticks
+of incense all the way through and the qin player does. Others come from play: catch five fish,
+ring the temple bell, visit all six places, beat the Club level at gomoku or xiangqi, find the
+cat three times, eat all eight mooncakes, chain ten lines of 飞花令, solve 横刀立马. When all
+twelve have joined you, 嫦娥 comes down from the moon.
+
+**家园 The homestead.** West of the garden is a plot that is yours. Build mode (营造) looks down on
+it: pick from about thirty things (a thatched cottage, a tiled house, a study, a pavilion, a
+pond and a little bridge, fruit trees, flower beds and vegetable plots, a swing, a well,
+lanterns, a windmill, pet homes, a plaque and couplets with your own words) and place, turn,
+move or sell them. Name the homestead and its name goes over the gate. Adopt pets once you have
+built them a home (a dog, a cat, a rabbit, a crane, ducks, koi, a parrot, a goat), name them,
+feed and stroke them, teach them tricks, and take one along on your walks. Hire people to live
+there (a steward, a cook, a gardener, a student, a young musician, a guard), give them names,
+and they keep their own day: the steward reports the news using the names you gave. Your
+companions drop by now and then.
+
+**铜钱 Coins.** Quests, the day's errands, real check-ins and incense, the games, coins found on
+high places, 奇遇 and the homestead's harvests all pay coins; the homestead, pets, residents and
+the peddler's goods cost them. The quest book keeps the purse, with today's earnings and where
+they came from.
+
+**任务簿 The quest book** shows the purse, today's three errands, every companion with the quest
+that brings them, the 奇遇录, and an album of the seals you have earned.
 
 **弈 Play.** 象棋 Xiangqi against an AI with three levels, from 初学 to 国手 (an iterative-
 deepening search in a background worker, with the full rules: flying general, perpetual check,

@@ -12,11 +12,12 @@ import { registerClearing, registerDeck, type Clearing, type Deck } from './wate
 export type Three = WorldCtx['THREE'];
 export const INK = '#1b1916';
 /**
- * What the night does to a built place's lit surfaces (a multiplier on their day colour). The
- * core's night light is nearly as strong as the day's, so without it the white walls and pale
- * paving of the towns stay day-bright on a dark land and the lit windows have nothing to glow against.
+ * What the night does to a built place's lit surfaces (a multiplier on their day colour): moonlit
+ * ivory — warm, never a grey-blue wash. The core's night light stays fairly strong,
+ * so without it the white walls and pale paving of the towns stay day-bright on a dark land and the
+ * lit windows (amber, emissive) have nothing to glow against.
  */
-export const NIGHT_SHADE = '#9eabbf';
+export const NIGHT_SHADE = '#c0b8b8';
 
 export function reducedMotion(): boolean {
   try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -285,6 +286,39 @@ export function bob<M extends T.Material>(m: M, time: { value: number }, amp: nu
 
 // ───────────── canvases & fonts
 
+/**
+ * Warm pools of lamplight (#ffb86b) on the ground — or on the water, or a bridge deck — under each
+ * lantern, for the night: one instanced, additive draw. Returns a setter for the night (0..1).
+ */
+export function lampPools(kit: Kit, at: [number, number, number][], tex: T.Texture, name: string): (night: number, flick: number) => void {
+  const THREE = kit.T;
+  const ctx = kit.ctx;
+  if (!at.length) return () => {};
+  const geo = kit.own(new THREE.CircleGeometry(1, 24).rotateX(-Math.PI / 2));
+  const mat = kit.own(new THREE.MeshBasicMaterial({
+    map: tex, color: '#ffb86b', transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4,
+  }));
+  const pools = new THREE.InstancedMesh(geo, mat, at.length);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+  at.forEach(([x, y, z], i) => {
+    const w = ctx.waterAt(x, z);
+    const gy = Math.max(ctx.groundY(x, z), w ?? -Infinity);
+    const r = clamp(1.3 + (y - gy) * 0.55, 1.1, 3.2);
+    pools.setMatrixAt(i, m.compose(p.set(x, gy + 0.03, z), q, sc.set(r, 1, r)));
+  });
+  pools.instanceMatrix.needsUpdate = true;
+  pools.computeBoundingSphere();
+  pools.name = name;
+  pools.visible = false;
+  pools.renderOrder = 1;
+  kit.add(pools);
+  return (night, flick) => {
+    mat.opacity = 0.56 * night * flick;
+    pools.visible = night > 0.02;
+  };
+}
+
 export function canvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -399,6 +433,7 @@ export function flatsMesh(kit: Kit, tex: T.Texture, flats: Flat[], name: string)
   g.boundingBox = new THREE.Box3(new THREE.Vector3(minX, minY, minZ), new THREE.Vector3(maxX, maxY, maxZ));
   g.boundingSphere = g.boundingBox.getBoundingSphere(new THREE.Sphere());
   const m = kit.own(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: 0.04, side: THREE.DoubleSide }));
+  m.forceSinglePass = true; // flat cards: one draw for both faces, not a back pass and a front pass
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = kit.time;
     sh.vertexShader = sh.vertexShader
@@ -414,7 +449,7 @@ export function flatsMesh(kit: Kit, tex: T.Texture, flats: Flat[], name: string)
   const mesh = new THREE.Mesh(g, m);
   mesh.name = name;
   mesh.renderOrder = 2;
-  const day = new THREE.Color('#ffffff'), night = new THREE.Color('#aab5c8');
+  const day = new THREE.Color('#ffffff'), night = new THREE.Color('#b0b8dc');
   kit.frame(() => { m.color.copy(kit.ctx.sky.isNight() ? night : day); });
   return mesh;
 }

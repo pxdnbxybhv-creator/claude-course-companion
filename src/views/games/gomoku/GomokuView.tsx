@@ -12,6 +12,9 @@ import { AiClient, type Pending } from './aiClient';
 import { BoardPainter, hitTest, type Ghost } from './board';
 import { loadSaved, writeSaved, statText, LEVEL_NAMES, type Mode, type Saved } from './save';
 import { record as playRecord } from '../../../app/play';
+import { BOARD_WIN_COINS, boardWinPay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import './gomoku.css';
 
 type T = (zh: string, en: string) => string;
@@ -121,27 +124,36 @@ export function GomokuView() {
     };
   }, [aiTurn, moves, level]);
 
-  /** Play events count once per game: set when this game's end is recorded (or it was restored
-   *  already finished), cleared only by startNew — so undo-and-replay of a finished game adds nothing. */
-  const counted = useRef(over);
-  // game end: stroke, seal, sound, stats
+  /** A game restored already finished (from an older save): noted as recorded, nothing counted. */
+  const restoredOver = useRef(over);
+  /** What this game paid (a win over the machine), for the result card. */
+  const [paid, setPaid] = useState<Paid | null>(null);
+  // game end: stroke, seal, sound, stats, play records and pay. Everything that counts is gated on
+  // the saved `recorded` flag (cleared only by startNew, and put back by its Undo toast), so undoing
+  // a finished game and replaying it — even across a reload or a 新局 → 撤销 — counts and pays once.
   useEffect(() => {
     if (!over) return;
-    if (!counted.current) {
-      counted.current = true;
-      playRecord('boardgame');
-      if (vsAi && res.winner === human && level !== 'beginner') playRecord('win:club');
-    }
     winAt.current = performance.now() + (reducedMotion() ? 0 : 260);
-    if (vsAi && res.winner === human) audio.chime(5);
-    else if (vsAi && res.winner) audio.bell();
-    else audio.chime(2);
-    if (vsAi && !recorded && res.winner) {
+    const restored = restoredOver.current;
+    restoredOver.current = false;
+    if (!restored) {
+      if (vsAi && res.winner === human) audio.chime(5);
+      else if (vsAi && res.winner) audio.bell();
+      else audio.chime(2);
+    }
+    if (recorded) return;
+    setRecorded(true);
+    if (restored) return;
+    const won = vsAi && res.winner === human;
+    // the game's own pay first, so its toast leads any errand it finishes
+    if (won) setPaid(payToast(boardWinPay('gomoku', level)));
+    playRecord('boardgame');
+    if (won && level !== 'beginner') playRecord('win:club');
+    if (vsAi && res.winner) {
       const next = { ...stats, [level]: { ...stats[level] } };
-      if (res.winner === human) next[level].w++;
+      if (won) next[level].w++;
       else next[level].l++;
       setStats(next);
-      setRecorded(true);
     }
   }, [over]);
 
@@ -153,7 +165,8 @@ export function GomokuView() {
     if (patch?.human) setHuman(patch.human);
     setMoves([]);
     setRecorded(false);
-    counted.current = false;
+    restoredOver.current = false;
+    setPaid(null);
     setHint(-1);
     if (inProgress && !quiet) {
       toast(t('已开新局', 'New game started'), {
@@ -185,6 +198,8 @@ export function GomokuView() {
       if (!removedHuman) return;
     }
     setHint(-1);
+    // a taken-back game has no result card to pay on (a replayed win pays nothing again: `recorded`)
+    setPaid(null);
     setMoves(m);
     setDropAt(0);
     audio.pluck(-2, 0.4);
@@ -248,7 +263,7 @@ export function GomokuView() {
           </div>
           <span class="visually-hidden" aria-live="polite">{announce}</span>
 
-          {over && <Result t={t} res={res} vsAi={vsAi} human={human} moves={moves.length} record={record} onAgain={() => startNew(undefined, true)} />}
+          {over && <Result t={t} res={res} vsAi={vsAi} human={human} moves={moves.length} record={record} paid={paid} onAgain={() => startNew(undefined, true)} />}
 
           <div class="gmk-controls">
             <button type="button" class="btn" onClick={undo} disabled={!canUndo || moves.length === 0}>
@@ -335,6 +350,9 @@ function Setup(props: { t: T; mode: Mode; level: Level; human: Color; record: st
           ? props.record ?? t('先连成五子者胜，长连亦胜。', 'Five or more in a row wins.')
           : t('二人同坐一案，轮流落子。', 'Two people, one board — take turns.')}
       </p>
+      {props.mode === 'ai' && (
+        <PayHint zh={`胜「${LEVEL_NAMES[props.level][0]}」得 ${BOARD_WIN_COINS[props.level]} 文`} en={`A win at ${LEVEL_NAMES[props.level][1]} pays ${BOARD_WIN_COINS[props.level]} coins`} />
+      )}
     </div>
   );
 }
@@ -377,7 +395,7 @@ function NewGameSheet(props: { open: boolean; t: T; mode: Mode; level: Level; hu
   );
 }
 
-function Result(props: { t: T; res: ReturnType<typeof outcome>; vsAi: boolean; human: Color; moves: number; record: string | null; onAgain: () => void }) {
+function Result(props: { t: T; res: ReturnType<typeof outcome>; vsAi: boolean; human: Color; moves: number; record: string | null; paid: Paid | null; onAgain: () => void }) {
   const { t, res, vsAi, human } = props;
   const sealRef = useRef<HTMLCanvasElement>(null);
   const won = vsAi && res.winner === human;
@@ -412,6 +430,7 @@ function Result(props: { t: T; res: ReturnType<typeof outcome>; vsAi: boolean; h
           <span class="gmk-poet">— {zh ? poem[2] : poem[3]}</span>
         </p>
         {props.record && <p class="gmk-record muted">{props.record}</p>}
+        <PaidLine paid={props.paid} />
       </div>
       <button type="button" class="btn btn-seal gmk-again" onClick={props.onAgain}>
         {t('再来一局', 'Play again')}

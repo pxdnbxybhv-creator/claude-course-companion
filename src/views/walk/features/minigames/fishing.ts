@@ -12,6 +12,8 @@ import { FISH, biteDelay, fishAlbum, newReel, reelZone, rollFish, stepReel, inZo
 import { ability, begin, button, closeButton, end, frameOn, h, hold, night, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import { fishMesh, ripples } from './fx';
 import * as snd from './sound';
+import { fishPay } from '../../../games/economy';
+import { pay, payLine } from '../../../games/purse';
 
 type Phase = 'ready' | 'charge' | 'flying' | 'wait' | 'bite' | 'reel' | 'landing';
 
@@ -306,6 +308,10 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     flag(`fish:${s.id}`);
     if (s.id !== 'kun') recordMax(key, c.cm);
     const album = FISH.filter((f) => play.value.flags[`fish:${f.id}`]).length;
+    // coins: by rarity, and 10 more for a new page in the album
+    const pp = fishPay(s.rarity, !hadIt);
+    const out = pay(pp);
+    const coinZh = payLine(pp, out, 'zh'), coinEn = payLine(pp, out, 'en');
     const size = s.id === 'kun' ? { zh: '不知其几千里也', en: 'Nobody knows how many thousand li' } : { zh: `${c.cm} 厘米`, en: `${c.cm} cm` };
     const rec = !junk && s.id !== 'kun' && prevBest > 0 && c.cm > prevBest ? { zh: '\n—— 新纪录！', en: '\n— A new record!' } : { zh: '', en: '' };
     const first = !hadIt ? { zh: '（鱼谱新添一页）', en: '(A new page in your fish album)' } : { zh: '', en: '' };
@@ -316,8 +322,8 @@ export const fishing = feature('mg-fishing', (bag, ctx) => {
     ctx.hud.showCard({
       titleZh: junk ? `钓到了${s.zh}` : `${rarityZh}${s.zh}`,
       titleEn: junk ? `You caught ${s.en.toLowerCase()}` : `${rarityEn}${s.en}`,
-      bodyZh: `${junk ? '' : size.zh + rec.zh + '\n'}${first.zh}\n「${s.verseZh}」\n—— ${s.srcZh}\n\n鱼谱 ${album}/${FISH.length}`,
-      bodyEn: `${junk ? '' : size.en + rec.en + '\n'}${first.en}\n“${s.verseEn}”\n\nFish album ${album}/${FISH.length}`,
+      bodyZh: `${junk ? '' : size.zh + rec.zh + '\n'}${first.zh}\n「${s.verseZh}」\n—— ${s.srcZh}\n\n鱼谱 ${album}/${FISH.length}${coinZh ? ' · ' + coinZh : ''}`,
+      bodyEn: `${junk ? '' : size.en + rec.en + '\n'}${first.en}\n“${s.verseEn}”\n\nFish album ${album}/${FISH.length}${coinEn ? ' · ' + coinEn : ''}`,
       seal: junk ? '笑' : '渔',
     });
     bag.later(600, () => { if (ui) toReady(); });

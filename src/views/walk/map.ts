@@ -1,9 +1,9 @@
-// The map of the 入画 world: six places joined by paths, a river and a lotus lake.
+// The map of the 入画 world: six places and a homestead joined by paths, a river and a lotus lake.
 // Everything that needs to agree on *where* things are reads it from here (world core, regions,
 // mini-games, the map screen). One unit = one metre; +x east, +z south, y up.
 // The walled garden with the half-acre pond sits at the origin; its moon gate opens south.
 
-export type RegionId = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain';
+export type RegionId = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'home';
 
 /** Background-music themes (see src/audio/music.ts). */
 export type MusicTheme = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'night' | 'festival' | 'hall' | 'quiet';
@@ -32,7 +32,31 @@ export const REGIONS: RegionSpec[] = [
   { id: 'bamboo', zh: '竹林', en: 'Bamboo Grove', blurbZh: '独坐幽篁里，弹琴复长啸。', blurbEn: 'Sitting alone in the hidden bamboo, playing the qin.', center: { x: -82, z: 28 }, radius: 34, elevation: 1.5, theme: 'bamboo' },
   { id: 'plum', zh: '梅岭', en: 'Plum Ridge', blurbZh: '疏影横斜，暗香浮动；岭上有亭。', blurbEn: 'Sparse shadows, drifting fragrance; a pavilion on the ridge.', center: { x: -72, z: -72 }, radius: 30, elevation: 9, theme: 'plum' },
   { id: 'mountain', zh: '山寺', en: 'Mountain Temple', blurbZh: '钟声、塔影与飞瀑。', blurbEn: 'A bell, a pagoda and a waterfall.', center: { x: 40, z: -112 }, radius: 44, elevation: 22, theme: 'mountain' },
+  { id: 'home', zh: '家园', en: 'Homestead', blurbZh: '一方空地，由你起屋、种树、养些猫狗。', blurbEn: 'Open ground for you to build on, plant, and keep a few pets.', center: { x: -50, z: -24 }, radius: 20, elevation: 0.6, theme: 'garden' },
 ];
+
+/**
+ * The homestead's buildable plot: a square of `size` metres centred at (x, z), on a grid of `cell`
+ * metres (cells counted from the north-west corner, i along +x, j along +z). Its gate is in the
+ * east side, facing the garden; a path leads there from the garden's west wall.
+ */
+export const HOME_PLOT = { x: -50, z: -24, size: 24, cell: 1, gate: { x: -38, z: -24 } };
+
+/**
+ * Waypoints (驿): one stone stele per place. Walking up to one lights it for good; from then on the
+ * map (舆图) can send you there with a tap. The garden's is lit from the start.
+ */
+export interface Waypoint { id: RegionId; x: number; z: number; zh: string; en: string }
+export const WAYPOINTS: Waypoint[] = [
+  { id: 'garden', x: 5, z: 27.5, zh: '园门', en: 'Garden Gate' },
+  { id: 'village', x: 3, z: 49, zh: '小桥流水', en: 'The Archway' },
+  { id: 'lake', x: 58, z: 34, zh: '荷塘渡口', en: 'Lotus Dock' },
+  { id: 'bamboo', x: -67.4, z: 30.6, zh: '竹林口', en: 'Grove Edge' },
+  { id: 'plum', x: -77.7, z: -57.7, zh: '梅岭山道', en: 'Ridge Path' },
+  { id: 'mountain', x: 25, z: -85, zh: '云深寺山门', en: 'Temple Gate' },
+  { id: 'home', x: -34.2, z: -20.6, zh: '家园', en: 'Homestead' },
+];
+export const WAYPOINT: Record<RegionId, Waypoint> = Object.fromEntries(WAYPOINTS.map((w) => [w.id, w])) as Record<RegionId, Waypoint>;
 
 export const REGION: Record<RegionId, RegionSpec> = Object.fromEntries(REGIONS.map((r) => [r.id, r])) as Record<RegionId, RegionSpec>;
 
@@ -78,6 +102,8 @@ export const PATHS: XZ[][] = [
   [{ x: 80, z: -2 }, { x: 72, z: -34 }, { x: 60, z: -64 }, { x: 46, z: -92 }],
   // around the garden wall, west side → north
   [{ x: -30, z: 30 }, { x: -34, z: 0 }, { x: -24, z: -32 }, { x: 0, z: -40 }, { x: 24, z: -32 }, { x: 34, z: 0 }, { x: 30, z: 28 }],
+  // the garden's west wall → the homestead gate
+  [{ x: -33, z: -6 }, { x: -35, z: -16 }, { x: -37, z: -24 }],
 ];
 
 /**

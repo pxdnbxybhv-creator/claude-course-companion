@@ -1,10 +1,15 @@
 // The people of the painting: small low-poly figures in the same toon washes and ink outline as the
-// walker — a teahouse keeper, an old fisherman, a monk, a poet, a child with a kite. Each breathes,
-// turns its head toward you when you come near, nods while talking and waves hello.
+// walker — a teahouse keeper, an old fisherman, a monk, a poet, a child with a kite, a peddler, a
+// storyteller… Each breathes, turns its head toward you when you come near, nods while talking and
+// waves hello; they turn to listen and sway when someone plays ('banmu:music'), bow when a lord
+// passes ('banmu:bow') and lean in to sniff when flowers burst open ('banmu:bloom').
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
+import type { XZ } from '../../map';
 import { Bag, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
+import { onSkillEvent } from '../npcs/events';
+import { walkableNear } from './cat';
 
 export type Hat = 'none' | 'bamboo' | 'cap' | 'bald' | 'buns' | 'scholar' | 'bun';
 
@@ -38,6 +43,24 @@ export interface Figure {
   wave(): void;
   /** Face (turn the whole body) toward a point, smoothly. */
   faceTo: { x: number; z: number } | null;
+  /** Walking (0 = still … 1 = a stride): the figure bobs and swings its arms; set by whoever moves it. */
+  walking?: number;
+  /** A reaction under way ('listen' | 'bow' | 'sniff'), if any. */
+  readonly reacting?: string | null;
+  /**
+   * Take this figure away before its bag goes (a resident dismissed, a pet's owner leaving): stops its
+   * animation, its skill listener, its speech mark and greeting, and removes and frees its meshes
+   * (and whatever was hung on it). Safe to call more than once; the bag's own dispose still works.
+   */
+  dispose(): void;
+  readonly disposed?: boolean;
+}
+
+/** Cleanups hung on a figure by speechMark() / greet(), run by its dispose(). */
+const extras = new WeakMap<Figure, (() => void)[]>();
+function onFigureGone(f: Figure, fn: () => void): void {
+  const l = extras.get(f);
+  if (l) l.push(fn); else extras.set(f, [fn]);
 }
 
 /** Build a figure and animate it (added to `parent` at (x, z) on the ground, facing `heading`). */
@@ -48,6 +71,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   const skin = spec.skin ?? '#f0d9bf';
   const hair = spec.hair ?? '#23201d';
   const root = new THREE.Group();
+  root.name = 'npc-figure';
   root.position.copy(at);
   root.rotation.y = heading;
   const body = new THREE.Group();
@@ -147,29 +171,72 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   const still = reducedMotion();
   let waveT = -1;
   const rest = new THREE.Euler();
+  // reactions to skills nearby: turn and sway to music, bow to a lord, lean in to sniff the flowers
+  let react: 'listen' | 'bow' | 'sniff' | null = null, reactT = 0, reactDelay = 0;
+  const src = { x: 0, z: 0 };
+  let dead = false;
+  const offs: (() => void)[] = [];
+  const stop = () => { for (const o of offs.splice(0)) o(); };
   const fig: Figure = {
     root, head, armL, armR, hand: new THREE.Vector3(0, -0.37, 0.01), height: (1.24 - sitDrop) * S, talking: false,
     wave() { if (waveT < 0) rest.copy(armR.rotation); waveT = 0; },
     faceTo: null,
+    walking: 0,
+    get reacting() { return react; },
+    get disposed() { return dead; },
+    dispose() {
+      if (dead) return;
+      dead = true;
+      stop();
+      for (const fn of extras.get(fig)?.splice(0) ?? []) { try { fn(); } catch (e) { console.warn('[npc] dispose', e); } }
+      if (!bag.disposed) bag.drop(root);
+    },
   };
-  let nod = 0, yaw = 0;
+  bag.onDispose(() => { dead = true; stop(); });
+  offs.push(onSkillEvent((e) => {
+    const d = Math.hypot(e.x - root.position.x, e.z - root.position.z);
+    const r = e.r ?? (e.kind === 'music' ? 16 : e.kind === 'bow' ? 11 : 9);
+    if (d > r || !root.visible) return;
+    react = e.kind === 'music' ? 'listen' : e.kind === 'bow' ? 'bow' : 'sniff';
+    reactT = react === 'listen' ? 12 : react === 'bow' ? 2 : 3;
+    reactDelay = d * 0.06;
+    src.x = e.x; src.z = e.z;
+  }));
+  let nod = 0, yaw = 0, lean = 0, sway = 0, strode = false, turned = false, farLod = false;
+  const hulls: T.Object3D[] = [];
+  root.traverse((o) => { if (o.name === 'outline') hulls.push(o); });
+  // where they looked before a reaction turned them (to turn back to)
+  const restAt = { x: at.x + Math.sin(heading) * 4, z: at.z + Math.cos(heading) * 4 };
   const seed = at.x * 1.7 + at.z * 0.3;
-  bag.frame((dt, t) => {
+  offs.push(ctx.onFrame((dt, t) => {
     const p = ctx.player.position;
     const dx = p.x - root.position.x, dz = p.z - root.position.z;
     const d = Math.hypot(dx, dz);
+    // far off, the ink outlines go (four draws fewer); further still, nothing to animate
+    const lod = d > 24;
+    if (lod !== farLod) { farLod = lod; for (const h of hulls) h.visible = !lod; }
     if (d > 45) return; // far away: nothing to see
-    // breathe
+    if (react) {
+      if (reactDelay > 0) reactDelay -= dt;
+      else if ((reactT -= dt) <= 0) react = null;
+    }
+    const acting = react && reactDelay <= 0 ? react : null;
+    // breathe (and bob along when walking)
+    const w = fig.walking ?? 0;
     body.scale.set(S, S * (1 + (still ? 0 : Math.sin(t * 1.6 + seed) * 0.012)), S);
+    body.position.y = still ? 0 : Math.abs(Math.sin(t * 5.6)) * 0.035 * w;
     // turn the body toward whom they face, the head toward you when near
-    if (fig.faceTo) {
-      const want = Math.atan2(fig.faceTo.x - root.position.x, fig.faceTo.z - root.position.z);
+    const face = acting ? src : fig.faceTo ?? (turned ? restAt : null);
+    if (acting) turned = true;
+    if (face) {
+      const want = Math.atan2(face.x - root.position.x, face.z - root.position.z);
       let dd = want - root.rotation.y;
       dd = Math.atan2(Math.sin(dd), Math.cos(dd));
       root.rotation.y += dd * Math.min(1, dt * 3);
+      if (face === restAt && Math.abs(dd) < 0.01) turned = false;
     }
     let wantYaw = 0;
-    if (d < 6) {
+    if (d < 6 && !acting) {
       let a = Math.atan2(dx, dz) - root.rotation.y;
       a = Math.atan2(Math.sin(a), Math.cos(a));
       wantYaw = Math.max(-0.9, Math.min(0.9, a));
@@ -177,7 +244,24 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     yaw += (wantYaw - yaw) * Math.min(1, dt * 4);
     head.rotation.y = yaw;
     nod = fig.talking && !still ? Math.sin(t * 7) * 0.06 : nod * 0.9;
-    head.rotation.x = nod + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02);
+    const k = still ? 0 : 1;
+    const wantLean = acting === 'bow' ? 0.55 * Math.min(1, reactT / 0.5) : acting === 'sniff' ? 0.2 : 0;
+    lean += (wantLean - lean) * Math.min(1, dt * 6);
+    body.rotation.x = lean;
+    const wantSway = acting === 'listen' ? Math.sin(t * 1.9 + seed) * 0.08 * k : 0;
+    sway += (wantSway - sway) * Math.min(1, dt * 4);
+    body.rotation.z = sway;
+    head.rotation.x = nod + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02) + (acting === 'sniff' ? 0.22 : acting === 'listen' ? -0.06 : 0);
+    // arms swing when walking; a raised hand to the nose when sniffing
+    // (only for figures that walk: the others keep the poses their feature gave their arms)
+    if (waveT < 0 && w > 0.01 && !fig.talking) {
+      const sw = Math.sin(t * 5.6) * 0.35 * w * k;
+      armL.rotation.x = sw; armR.rotation.x = -sw;
+      strode = true;
+    } else if (strode && waveT < 0) {
+      armL.rotation.x *= 0.85; armR.rotation.x *= 0.85;
+      if (Math.abs(armL.rotation.x) < 0.002) { armL.rotation.x = armR.rotation.x = 0; strode = false; }
+    }
     // a wave hello
     if (waveT >= 0) {
       waveT += dt;
@@ -187,8 +271,40 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       armR.rotation.x = rest.x * (1 - up) + (still ? 0 : Math.sin(waveT * 12) * 0.25 * up);
       if (k >= 1) { waveT = -1; armR.rotation.copy(rest); }
     }
-  });
+  }));
   return fig;
+}
+
+/** A place near an anchor on open ground, and the heading that looks at `look`. */
+export function stand(ctx: WorldCtx, a: XZ, dx: number, dz: number, look: XZ): { at: T.Vector3; heading: number } {
+  const p = walkableNear(ctx, a.x + dx, a.z + dz, 5);
+  return { at: new ctx.THREE.Vector3(p.x, ctx.groundY(p.x, p.z), p.z), heading: Math.atan2(look.x - p.x, look.z - p.z) };
+}
+
+/** A standing NPC by an anchor, solid (a collider), facing a point. */
+export function person(bag: Bag, ctx: WorldCtx, parent: T.Object3D, spec: FigureSpec, a: XZ, dx: number, dz: number, look: XZ, solid = true): Figure {
+  const s = stand(ctx, a, dx, dz, look);
+  const f = figure(bag, parent, spec, s.at, s.heading);
+  if (solid) bag.onDispose(ctx.addCollider({ x: s.at.x, z: s.at.z, r: 0.35, h: 1.3 }));
+  return f;
+}
+
+/** A spot in front of someone for the talk prompt. */
+export function front(f: Figure, d = 0.9): T.Vector3 {
+  const r = f.root;
+  return r.position.clone().set(r.position.x + Math.sin(r.rotation.y) * d, r.position.y, r.position.z + Math.cos(r.rotation.y) * d);
+}
+
+/** Wave once when the walker first comes near. */
+export function greet(bag: Bag, ctx: WorldCtx, f: Figure, r = 5): void {
+  let near = false;
+  const off = ctx.onFrame(() => {
+    const d = Math.hypot(ctx.player.position.x - f.root.position.x, ctx.player.position.z - f.root.position.z);
+    if (d < r && !near) { near = true; f.wave(); }
+    else if (d > r + 4) near = false;
+  });
+  bag.onDispose(off);
+  onFigureGone(f, off);
 }
 
 /** A floating ink mark over someone with something to say (a brushed glyph on a paper disc). */
@@ -208,14 +324,21 @@ export function speechMark(bag: Bag, fig: Figure, glyph: string): { set(on: bool
   tex.colorSpace = THREE.SRGBColorSpace;
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
   s.scale.set(0.32, 0.32, 1);
+  s.name = 'npc-mark';
   s.position.set(0, fig.height + 0.35, 0);
   bag.add(s, fig.root);
   let on = true;
   const still = reducedMotion();
-  bag.frame((_dt, t) => {
-    s.visible = on;
+  const w = new THREE.Vector3();
+  const off = bag.ctx.onFrame((_dt, t) => {
+    fig.root.getWorldPosition(w);
+    const p = bag.ctx.player.position;
+    s.visible = on && Math.hypot(p.x - w.x, p.z - w.z) < 32;
     if (on && !still) s.position.y = fig.height + 0.35 + Math.sin(t * 2.2) * 0.04;
   });
+  bag.onDispose(off);
+  // the figure going takes its mark along (its sprite, texture and animation)
+  onFigureGone(fig, () => { off(); if (!bag.disposed) bag.drop(s); });
   return { set(v) { on = v; } };
 }
 

@@ -6,6 +6,10 @@
 //   recordMax('feihua', 12)    — remember a best score
 //   flag('bell')               — a one-off achievement
 //   visitRegion('lake')        — the world calls this on arrival
+//   earn(30) / spend(120)      — 铜钱 (coins): earned from quests, errands, real check-ins and
+//                                incense, games and 奇遇; spent in the homestead and at stalls
+//   unlockWaypoint('lake')     — a waypoint stele lit (the map can send you there)
+//   markEncounter('zhiyin')    — a 奇遇 happened
 //
 // Quests are re-evaluated after every change (and whenever habit data changes, for the real-life
 // quests); newly finished ones are queued in `celebrations` for the app to announce.
@@ -32,12 +36,16 @@ export interface PlayState {
   flags: Record<string, true>;
   /** Quest id → the day it was finished. */
   done: Record<string, DateKey>;
-  /** Today's errands. */
-  daily: { day: DateKey; picks: string[]; counts: Record<string, number>; visited: string[] };
+  /** Today's errands. `paid`: errands (and 'all') whose coins were already given today. */
+  daily: { day: DateKey; picks: string[]; counts: Record<string, number>; visited: string[]; paid: string[] };
+  /** 铜钱 in the purse. */
+  coins: number;
+  /** Real-life deeds already paid in coins (check-ins, incense burnt through); null until first seen. */
+  life: { checkins: number; incense: number } | null;
 }
 
 export function emptyPlay(): PlayState {
-  return { v: 1, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [] } };
+  return { v: 1, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [], paid: [] }, coins: 0, life: null };
 }
 
 const CHAR_IDS = new Set(CHARACTERS.map((c) => c.id));
@@ -70,7 +78,10 @@ export function sanitizePlay(raw: unknown): PlayState {
       picks: Array.isArray(d.picks) ? d.picks.filter((p) => typeof p === 'string').slice(0, 3) : [],
       counts: rec(d.counts),
       visited: Array.isArray(d.visited) ? d.visited.filter((p) => typeof p === 'string').slice(0, 12) : [],
+      paid: Array.isArray(d.paid) ? d.paid.filter((p) => typeof p === 'string').slice(0, 8) : [],
     },
+    coins: Math.floor(num(r.coins)),
+    life: r.life && typeof r.life === 'object' ? { checkins: Math.floor(num(r.life.checkins)), incense: Math.floor(num(r.life.incense)) } : null,
   };
 }
 
@@ -130,10 +141,18 @@ export function dailyPicksFor(day: DateKey): DailyDef[] {
 
 function rollDaily(s: PlayState, day: DateKey): PlayState {
   if (s.daily.day === day) return s;
-  return { ...s, daily: { day, picks: dailyPicksFor(day).map((d) => d.id), counts: {}, visited: [] } };
+  return { ...s, daily: { day, picks: dailyPicksFor(day).map((d) => d.id), counts: {}, visited: [], paid: [] } };
 }
 
 // ------------------------------------------------------------------------------------ quests
+
+/**
+ * The demo garden's habits (demo0…demo5, app/demo.ts; real ones get hex ids): months of history
+ * nobody lived. The real-life quests never count it, so looking at the demo pays nothing and brings
+ * no companion.
+ */
+const DEMO_HABIT = /^demo\d+$/;
+const isDemoGarden = (a: AppState) => a.habits.some((h) => DEMO_HABIT.test(h.id));
 
 /** Progress 0..target for a quest, given play and habit data. */
 export function questValue(q: QuestDef, p: PlayState, a: AppState, day: DateKey = todayKey()): number {
@@ -145,10 +164,11 @@ export function questValue(q: QuestDef, p: PlayState, a: AppState, day: DateKey 
     case 'flags': return Object.keys(p.flags).filter((k) => k.startsWith(g.prefix)).length;
     case 'streak': {
       let m = 0;
-      for (const h of a.habits) m = Math.max(m, statsFor(h, a.checkins[h.id] ?? [], day).best);
+      for (const h of a.habits) if (!DEMO_HABIT.test(h.id)) m = Math.max(m, statsFor(h, a.checkins[h.id] ?? [], day).best);
       return m;
     }
-    case 'incense': return a.focus.filter((f) => f.completed).length;
+    // in the demo garden its incense log is made up too: only sticks burnt through here count
+    case 'incense': return isDemoGarden(a) ? p.counters.incense ?? 0 : a.focus.filter((f) => f.completed).length;
     case 'companions': return earnedFrom(p).length;
   }
 }
@@ -158,24 +178,22 @@ export function questTarget(q: QuestDef): number {
   return g.kind === 'flag' ? 1 : g.target;
 }
 
-/** The flag a test code sets: every companion can be chosen (their quests stay as they are). */
-export const ALL_COMPANIONS_FLAG = 'code:all';
-/** Test codes (Settings → 测试码): what each one switches on. */
-const TEST_CODES: Record<string, string> = { CZ: ALL_COMPANIONS_FLAG };
+/** The flag a code sets (see redeemCode). */
+export const CODE_FLAG = 'code:all';
 
-/** Companions earned through their quests (what 群贤毕至 counts; a test code doesn't). */
+/** Companions earned through their quests (what 群贤毕至 counts). */
 function earnedFrom(p: PlayState): CharacterId[] {
   return CHARACTERS.filter((c) => c.unlock === 'default' || p.done[c.unlock]).map((c) => c.id);
 }
 
 function unlockedFrom(p: PlayState): CharacterId[] {
-  return p.flags[ALL_COMPANIONS_FLAG] ? CHARACTERS.map((c) => c.id) : earnedFrom(p);
+  return p.flags[CODE_FLAG] ? CHARACTERS.map((c) => c.id) : earnedFrom(p);
 }
 
-/** Can you walk as `id` with this progress (earned, or opened by a test code)? */
+/** Can you walk as `id` with this progress? */
 export function isUnlockedIn(p: PlayState, id: CharacterId): boolean {
   const c = CHARACTERS.find((x) => x.id === id);
-  return !!c && (!!p.flags[ALL_COMPANIONS_FLAG] || c.unlock === 'default' || !!p.done[c.unlock]);
+  return !!c && (!!p.flags[CODE_FLAG] || c.unlock === 'default' || !!p.done[c.unlock]);
 }
 
 /** Characters you can walk as. */
@@ -184,6 +202,61 @@ export const unlocked = computed(() => unlockedFrom(play.value));
 /** Quest ids finished since the app opened, waiting to be announced (oldest first). */
 export const celebrations = signal<string[]>([]);
 
+// ------------------------------------------------------------------------------------ coins
+
+/** Coins for finishing a quest: a companion's is worth more than a seal's. */
+export function questCoins(q: QuestDef): number {
+  return 'character' in q.reward ? 120 : 80;
+}
+/** Coins for each of today's errands, and for doing all three. */
+export const ERRAND_COINS = 30;
+export const ERRANDS_ALL_COINS = 60;
+/** Coins for each real check-in and each stick of incense burnt all the way through. */
+export const CHECKIN_COINS = 5;
+export const INCENSE_COINS = 15;
+/** The first time the purse sees your habit history it pays for at most this many past deeds. */
+const BACKPAY_MAX = 300;
+/** More new check-ins (or incense sticks) than this in one step is a bulk import: nothing is paid. */
+const BULK_CHECKINS = 3;
+const BULK_INCENSE = 2;
+
+function lifeCounts(a: AppState): { checkins: number; incense: number } {
+  let checkins = 0;
+  for (const d of Object.values(a.checkins)) checkins += d.length;
+  return { checkins, incense: a.focus.filter((f) => f.completed).length };
+}
+
+/** Coins that fell due: new check-ins and incense, and today's errands just finished. */
+function payDue(p: PlayState, a: AppState, day: DateKey): PlayState {
+  let coins = p.coins;
+  const now = lifeCounts(a);
+  let life = p.life;
+  if (!life) {
+    // first sight of an existing history: a little back pay, capped (none for the demo's)
+    if (!isDemoGarden(a)) coins += Math.min(BACKPAY_MAX, now.checkins * CHECKIN_COINS + now.incense * INCENSE_COINS);
+    life = now;
+  } else {
+    // deeds come one at a time: a jump by many at once is an import or the demo garden, not work done
+    const dc = now.checkins - life.checkins, di = now.incense - life.incense;
+    if (dc > 0 && dc <= BULK_CHECKINS) coins += dc * CHECKIN_COINS;
+    if (di > 0 && di <= BULK_INCENSE) coins += di * INCENSE_COINS;
+    // the mark only rises: undoing a check-in takes no coins back, and redoing it pays nothing extra
+    life = { checkins: Math.max(life.checkins, now.checkins), incense: Math.max(life.incense, now.incense) };
+  }
+  let daily = p.daily;
+  if (daily.day === day) {
+    const picks = dailyPicksFor(day);
+    const paid = [...daily.paid];
+    for (const d of picks) {
+      if (!paid.includes(d.id) && (daily.counts[d.key] ?? 0) >= d.target) { paid.push(d.id); coins += ERRAND_COINS; }
+    }
+    if (!paid.includes('all') && picks.every((d) => paid.includes(d.id))) { paid.push('all'); coins += ERRANDS_ALL_COINS; }
+    if (paid.length !== daily.paid.length) daily = { ...daily, paid };
+  }
+  if (coins === p.coins && life === p.life && daily === p.daily) return p;
+  return { ...p, coins, life, daily };
+}
+
 function evaluate(p: PlayState, a: AppState, day: DateKey): PlayState {
   let next = p;
   // Two passes so that "gather twelve companions" can complete in the same step as the twelfth.
@@ -191,18 +264,32 @@ function evaluate(p: PlayState, a: AppState, day: DateKey): PlayState {
     for (const q of QUESTS) {
       if (next.done[q.id]) continue;
       if (questValue(q, next, a, day) >= questTarget(q)) {
-        next = { ...next, done: { ...next.done, [q.id]: day } };
+        next = { ...next, done: { ...next.done, [q.id]: day }, coins: next.coins + questCoins(q) };
         celebrations.value = [...celebrations.value, q.id];
       }
     }
   }
-  return next;
+  return payDue(next, a, day);
+}
+
+/** While set, a rise in coins is not income (a refund and the like). */
+let untracked = false;
+
+/** Coins that came in between two states count as today's (and all-time) earnings. */
+function tracked(prev: PlayState, next: PlayState): PlayState {
+  const gain = next.coins - prev.coins;
+  if (untracked || gain <= 0) return next;
+  return {
+    ...next,
+    counters: { ...next.counters, earned: (next.counters.earned ?? 0) + gain },
+    daily: { ...next.daily, counts: { ...next.daily.counts, earned: (next.daily.counts.earned ?? 0) + gain } },
+  };
 }
 
 function update(fn: (p: PlayState) => PlayState): void {
   const day = today.value;
   const cur = rollDaily(play.value, day);
-  play.value = evaluate(fn(cur), appState.value, day);
+  play.value = tracked(cur, evaluate(fn(cur), appState.value, day));
 }
 
 // Real-life quests (streaks, incense) complete as the habit data changes.
@@ -215,12 +302,14 @@ if (typeof window !== 'undefined') {
       first = false;
       // Don't announce quests already satisfied by old data on the very first load; just mark them.
       const before = celebrations.value;
-      play.value = evaluate(rollDaily(play.value, day), a, day);
+      const r = rollDaily(play.value, day);
+      play.value = tracked(r, evaluate(r, a, day));
       celebrations.value = before;
       return;
     }
     const p = play.peek();
-    const next = evaluate(rollDaily(p, day), a, day);
+    const rolled = rollDaily(p, day);
+    const next = tracked(rolled, evaluate(rolled, a, day));
     if (next !== p) play.value = next;
   });
 }
@@ -268,30 +357,112 @@ export function selectCharacter(id: CharacterId): boolean {
   return true;
 }
 
-/**
- * A test code typed in Settings. 'CZ' opens every companion. Case, spaces and full-width letters
- * don't matter. Nothing is marked as done: the quests and 群贤毕至 still wait to be earned.
- */
-export function redeemCode(raw: string): 'unlocked' | 'already' | 'invalid' {
-  const code = raw.normalize('NFKC').replace(/\s+/g, '').toUpperCase();
-  const key = TEST_CODES[code];
-  if (!key) return 'invalid';
-  if (play.value.flags[key]) return 'already';
-  flag(key);
-  return 'unlocked';
+// ------------------------------------------------------------------------------------ codes
+
+// Codes are kept as salted hashes, never as text: no code's text belongs anywhere in the repo
+// (source, tests, comments, commit messages), and nothing here says what one is for.
+const CODE_SALTS = ['banmu·印', 'banmu·钱'];
+const codeKey = (raw: string) => {
+  const c = raw.normalize('NFKC').replace(/\s+/g, '').toUpperCase();
+  return c ? CODE_SALTS.map((salt) => hashString(salt + c).toString(36)).join('.') : '';
+};
+const CODES = new Set<string>(['1d7uzn2.qrfdbd']);
+/** Tests only: accept another code. */
+export function _acceptCodeForTests(raw: string): void {
+  CODES.add(codeKey(raw));
+}
+export const CODE_GRANT = 99999;
+
+/** A code typed in Settings. Case, spaces and full-width letters don't matter. */
+export function redeemCode(raw: string): 'ok' | 'already' | 'invalid' {
+  const k = codeKey(raw);
+  if (!k || !CODES.has(k)) return 'invalid';
+  if (play.value.flags[CODE_FLAG]) return 'already';
+  untracked = true;
+  try {
+    update((p) => ({ ...p, flags: { ...p.flags, [CODE_FLAG]: true }, coins: p.coins + CODE_GRANT }));
+  } finally {
+    untracked = false;
+  }
+  return 'ok';
 }
 
-/** Is a test code in effect (every companion open)? */
-export const codeActive = computed(() => !!play.value.flags[ALL_COMPANIONS_FLAG]);
+/** Is a code in effect? */
+export const codeActive = computed(() => !!play.value.flags[CODE_FLAG]);
 
-/** Take the test code back: companions go back to what was earned (walk as the scholar if yours was only borrowed). */
+/** Take a code back (the coins stay). */
 export function revokeCode(): void {
   const p = play.value;
-  if (!p.flags[ALL_COMPANIONS_FLAG]) return;
+  if (!p.flags[CODE_FLAG]) return;
   const flags = { ...p.flags };
-  delete flags[ALL_COMPANIONS_FLAG];
+  delete flags[CODE_FLAG];
   const next = { ...p, flags };
   play.value = { ...next, character: earnedFrom(next).includes(p.character) ? p.character : 'scholar' };
+}
+
+// ------------------------------------------------------------------------------------ purse
+
+/** Add coins (a reward). */
+export function earn(n: number): void {
+  const k = Math.floor(n);
+  if (!(k > 0)) return;
+  update((p) => ({ ...p, coins: Math.min(1e9, p.coins + k) }));
+}
+
+/** Give coins back (selling something back, undoing a purchase): not counted as earnings. */
+export function refund(n: number): void {
+  const k = Math.floor(n);
+  if (!(k > 0)) return;
+  untracked = true;
+  try {
+    update((p) => ({ ...p, coins: Math.min(1e9, p.coins + k) }));
+  } finally {
+    untracked = false;
+  }
+}
+
+/** Pay coins if there are enough; false (and nothing taken) otherwise. */
+export function spend(n: number): boolean {
+  const k = Math.max(0, Math.floor(n));
+  if (play.value.coins < k) return false;
+  if (k) update((p) => ({ ...p, coins: p.coins - k }));
+  return true;
+}
+
+/** Coins in the purse. */
+export const coins = computed(() => play.value.coins);
+
+// ------------------------------------------------------------------------------------ waypoints & 奇遇
+
+/** Is a waypoint lit (the garden's always is)? */
+export function waypointOpen(p: PlayState, id: string): boolean {
+  return id === 'garden' || !!p.flags[CODE_FLAG] || !!p.flags[`wp:${id}`];
+}
+
+/** Light a waypoint stele (the world calls this when the walker reaches it). True if it was new. */
+export function unlockWaypoint(id: string): boolean {
+  if (waypointOpen(play.value, id)) return false;
+  flag(`wp:${id}`);
+  return true;
+}
+
+/** Has this 奇遇 happened before? */
+export function encounterMet(p: PlayState, id: string): boolean {
+  return !!p.flags[`qy:${id}`];
+}
+
+/** A 奇遇 happened: remembered (for the 奇遇录) and, the first time, its coins paid. Returns whether it was the first time. */
+export function markEncounter(id: string, coinsFirst = 0): boolean {
+  if (encounterMet(play.value, id)) return false;
+  update((p) => ({
+    ...p,
+    flags: { ...p.flags, [`qy:${id}`]: true },
+    // the day it happened, for the 奇遇录 (quests only read done[q.id], so this key is free)
+    done: { ...p.done, [`qy:${id}`]: today.value },
+    coins: p.coins + Math.max(0, Math.floor(coinsFirst)),
+  }));
+  record('qiyu');
+  return true;
 }
 
 /** Today's errands with progress. */
@@ -318,8 +489,23 @@ export function importPlay(raw: unknown): void {
   play.value = sanitizePlay(raw);
 }
 
+/**
+ * The walk's own small side stores (per viewer, their own keys, not in backups: wares in hand, the
+ * 奇遇' memory, today's parkour coins, today's inscriptions). They go when the progress does; their
+ * modules load with the walk, so the keys are named here.
+ */
+const SIDE_KEYS = ['banmu.npcs.v1', 'banmu.qiyu.v1', 'banmu.parkour.v1', 'banmu.inscribe.v1'];
+let resets = 0;
+/** How many times progress was reset in this visit (a module holding its own copy reloads when it moves). */
+export const playResets = (): number => resets;
+
 export function resetPlay(): void {
   play.value = emptyPlay();
+  celebrations.value = [];
+  resets++;
+  for (const k of SIDE_KEYS) {
+    try { localStorage.removeItem(k); } catch { /* storage unavailable: nothing kept there */ }
+  }
 }
 
-backupExtras.push({ key: 'play', get: exportPlay, set: importPlay });
+backupExtras.push({ key: 'play', get: exportPlay, set: importPlay, reset: resetPlay });

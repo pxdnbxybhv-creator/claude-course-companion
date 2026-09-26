@@ -10,6 +10,8 @@ import { flag } from '../../../../app/play';
 import { begin, button, closeButton, end, frameOn, h, hold, onEscape, panel, pop, tr, type Hold, type Panel } from './ui';
 import { chirps } from '../sfx';
 import * as snd from './sound';
+import { bellPay } from '../../../games/economy';
+import { paidToday, pay, payLine } from '../../../games/purse';
 
 /** The bell the scenery built (named 'bell'), if any. */
 function findBell(root: T.Object3D): T.Object3D | null {
@@ -201,6 +203,15 @@ export const templeBell = feature('mg-bell', (bag, ctx) => {
     r.m.position.set(centre.x, ctx.groundY(centre.x, centre.z) + 0.05, centre.z);
     if (force > 0.5) bag.later(900, () => chirps(5, 0.35));
     flag('bell');
+    // alms: the first strike of the day puts ten coins in your purse
+    let coinZh = '', coinEn = '';
+    if (paidToday('bell') === 0) {
+      const pp = bellPay();
+      const out = pay(pp);
+      coinZh = payLine(pp, out, 'zh');
+      coinEn = payLine(pp, out, 'en');
+      if (coinZh && told) ctx.hud.toast(`香火钱 · ${coinZh}`, `Temple alms · ${coinEn}`, 2400);
+    }
     if (ui) {
       pop(ui.p, tr(ctx, `第${strikes}响`, `Strike ${strikes}`), strikes === 108 ? 'is-red' : 'is-small');
       ui.status.textContent = strikes >= 108 ? tr(ctx, '一百零八响，烦恼尽消', 'A hundred and eight — every worry rung away') : tr(ctx, '钟声远去……再撞一次？', 'The sound rolls away… again?');
@@ -209,8 +220,8 @@ export const templeBell = feature('mg-bell', (bag, ctx) => {
       told = true;
       bag.later(2600, () => ctx.hud.showCard({
         titleZh: '夜半钟声', titleEn: 'The Midnight Bell',
-        bodyZh: '月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。\n\n—— 张继《枫桥夜泊》',
-        bodyEn: 'The moon sets, a crow cries, frost fills the sky;\nriver maples, fishing fires, and I, sleepless.\nFrom Cold Mountain Temple outside Gusu\nthe midnight bell reaches the traveller’s boat.\n\n— Zhang Ji, “Night Mooring by Maple Bridge”',
+        bodyZh: '月落乌啼霜满天，\n江枫渔火对愁眠。\n姑苏城外寒山寺，\n夜半钟声到客船。\n\n—— 张继《枫桥夜泊》' + (coinZh ? `\n\n香火钱 · ${coinZh}` : ''),
+        bodyEn: 'The moon sets, a crow cries, frost fills the sky;\nriver maples, fishing fires, and I, sleepless.\nFrom Cold Mountain Temple outside Gusu\nthe midnight bell reaches the traveller’s boat.\n\n— Zhang Ji, “Night Mooring by Maple Bridge”' + (coinEn ? `\n\nTemple alms · ${coinEn}` : ''),
         seal: '钟',
       }));
     }

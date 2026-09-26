@@ -22,7 +22,8 @@ export function tuftCanvas(seed: number): HTMLCanvasElement {
       const t0 = s / steps, t1 = (s + 1) / steps;
       const p = (t: number) => [x0 + Math.cos(a + bend * t * t) * len * t, H - 2 + Math.sin(a + bend * t * t) * len * t];
       const [ax, ay] = p(t0), [bx, by] = p(t1);
-      g.strokeStyle = `rgba(27,25,22,${0.7 - t0 * 0.35})`;
+      // ink at the root, a deep grass green toward the tip
+      g.strokeStyle = `rgba(${Math.round(30 + 40 * t0)},${Math.round(34 + 62 * t0)},${Math.round(26 + 22 * t0)},${0.75 - t0 * 0.3})`;
       g.lineWidth = 3.6 * (1 - t0) + 0.5;
       g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
     }
@@ -41,7 +42,7 @@ export function reedCanvas(seed: number): HTMLCanvasElement {
     const lean = r.range(-26, 26);
     const top = r.range(40, 110);
     // stem
-    g.strokeStyle = 'rgba(40,36,30,0.8)';
+    g.strokeStyle = 'rgba(62,58,34,0.85)';
     g.lineWidth = 2.2;
     g.beginPath();
     g.moveTo(x0, H);
@@ -53,7 +54,7 @@ export function reedCanvas(seed: number): HTMLCanvasElement {
       const t = (H - y) / (H - top);
       const sx = x0 + lean * t * t;
       const dir = r.chance(0.5) ? 1 : -1;
-      g.strokeStyle = 'rgba(30,28,24,0.75)';
+      g.strokeStyle = 'rgba(58,84,48,0.8)';
       g.lineWidth = 3;
       g.beginPath();
       g.moveTo(sx, y);
@@ -65,7 +66,7 @@ export function reedCanvas(seed: number): HTMLCanvasElement {
       const tt = r();
       const px = x0 + lean + r.gauss() * 4 + lean * 0.15 * tt;
       const py = top + tt * 40;
-      g.fillStyle = `rgba(${r.chance(0.6) ? '150,120,80' : '70,62,52'},${r.range(0.25, 0.55)})`;
+      g.fillStyle = `rgba(${r.chance(0.6) ? '196,150,90' : '120,92,60'},${r.range(0.35, 0.65)})`;
       g.beginPath();
       g.ellipse(px, py, r.range(1.5, 3.5), r.range(3, 7), r.range(-0.4, 0.4), 0, Math.PI * 2);
       g.fill();

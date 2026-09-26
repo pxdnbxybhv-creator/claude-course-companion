@@ -4,14 +4,15 @@
 // (characters/*) its MotionState every frame. The scholar in a moon-white robe with a cinnabar sash
 // is built here, as the default model and the fallback for any character without one.
 import * as THREE from 'three';
-import type { EmoteKind, Player } from '../types';
+import type { EmoteKind, MoveMods, Player } from '../types';
 import type { CharacterModel, MotionState } from '../characters/types';
 import type { Ability, CharacterId } from '../../../data/characters';
 import { Bag, damp, dampAngle, glowTexture, inked, outlineMaterial, toon } from './kit';
 import { NO_REFLECT } from './pond';
+import { JumpGate, squashAt } from './jump';
 
 export type Emote = EmoteKind;
-const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8 };
+const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8, skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
 
 export interface MoveInput {
   /** desired horizontal direction in world space (length 0..1) */
@@ -24,8 +25,12 @@ export interface MoveInput {
 export interface Physics {
   /** The surface under (x, z) for this walker (includes water when it may walk on it). */
   floorY(x: number, z: number): number;
-  /** Push (x, z) out of obstacles and back onto walkable ground; returns the corrected position. */
-  resolve(x: number, z: number, r: number, fromX: number, fromZ: number): [number, number];
+  /**
+   * Push (x, z) out of obstacles and back onto walkable ground; returns the corrected position (the
+   * array may be reused by the next call: read it at once). `feetY`: a prop whose top is below the
+   * walker's feet is stepped over, not pushed against (walls and props can be walked along on top).
+   */
+  resolve(x: number, z: number, r: number, fromX: number, fromZ: number, feetY?: number): readonly [number, number];
   /** Is (x, z) on a built surface (a deck, stair or bridge) rather than bare terrain? Steps onto those are fine. */
   built?(x: number, z: number): boolean;
 }
@@ -41,6 +46,17 @@ const MAX_GRADE = 0.75;
 const LOOK = 0.3;
 /** The jade rabbit's slowest fall (m/s): a jump turns into a drift. */
 const GLIDE_FALL = 0.9;
+/** Walking and running speeds (m/s) before a character's gifts. */
+export const WALK_SPEED = 2.1;
+export const RUN_SPEED = 5.1;
+/** Take-off speed of a jump (m/s): about 0.7 m high. */
+const JUMP_V = 4.2;
+/** Gravity going up, and a little more coming down (a jump that hangs, then lands with intent). */
+const GRAVITY = 12.5;
+const FALL_GRAVITY = 16;
+/** How quickly the walker steers: on the ground, and in the air (enough to aim a landing). */
+const GROUND_ACC = 10;
+const AIR_ACC = 5.5;
 
 function lathe(points: [number, number][], segs = 20): THREE.LatheGeometry {
   return new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), segs);
@@ -327,6 +343,19 @@ export class PlayerController implements Player {
   running = false;
   /** Called after teleport() so the camera can snap along. */
   onTeleport: (() => void) | null = null;
+  /** Feet left the ground in a jump ('ground') or an extra jump in the air ('air'). */
+  onJump: ((kind: 'ground' | 'air') => void) | null = null;
+  /** Feet touched down; `impact` is the falling speed (m/s). */
+  onLand: ((impact: number) => void) | null = null;
+  /** A running footfall (for a puff of dust). */
+  onStride: (() => void) | null = null;
+  private gate = new JumpGate();
+  /** Squash (−) or stretch (+) and the time since it was kicked. */
+  private squashK = 0;
+  private squashT = 1;
+  private strideAt = 0;
+  /** Reduced motion: a smaller squash. */
+  reduced = false;
   /** Set by the world: the surface under a point for this walker. */
   floorAt: (x: number, z: number) => number = () => 0;
   private motion: MotionState = { speed: 0, running: false, grounded: true, vy: 0, emote: null, emoteT: 0, t: 0, riding: false };
@@ -348,8 +377,9 @@ export class PlayerController implements Player {
     this.holder.add(model.root);
     this.root.rotation.y = heading;
 
+    // a warm ink-brown shadow (never a cold grey)
     const sh = new THREE.Mesh(bag.add(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2)), bag.add(new THREE.MeshBasicMaterial({
-      color: '#000000', transparent: true, opacity: 0.3, depthWrite: false,
+      color: '#3a2618', transparent: true, opacity: 0.3, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     })));
     (sh.material as THREE.MeshBasicMaterial).alphaMap = glowTexture(bag, 64, 1.4);
@@ -389,6 +419,7 @@ export class PlayerController implements Player {
     if (kind === 'jump' && this.grounded && !this.frozen) {
       this.vy = 3.4 * this.gifts.jump;
       this.grounded = false;
+      this.gate.launched();
     }
     this.emoteKind = kind;
     this.emoteT = 0;
@@ -414,12 +445,15 @@ export class PlayerController implements Player {
     this.grounded = y === undefined;
     if (y !== undefined && Math.abs(y - this.floorAt(x, z)) < 0.05) this.grounded = true;
     this.standY = this.position.y;
+    this.gate.reset();
+    this.squashT = 1;
     this.onTeleport?.();
   }
 
   freeze(on: boolean): void {
     this.frozen = on;
     this.vx = this.vz = 0;
+    this.gate.reset();
     if (!on) { this.vy = 0; this.grounded = false; this.standY = this.position.y; }
   }
 
@@ -429,8 +463,51 @@ export class PlayerController implements Player {
     if (!obj) { this.grounded = false; this.standY = this.position.y; }
   }
 
+  /**
+   * Riding something a skill brought (关公's Red Hare): the ridden object carries
+   * userData.skillRide = true. The skill key and the 技 button stay live then (to get off), while
+   * a mini-game's boat or a feature's freeze still holds them back.
+   */
+  get heldBySkill(): boolean {
+    return this.riding !== null && this.riding.userData.skillRide === true;
+  }
+
   get isFrozen(): boolean {
     return this.frozen || this.riding !== null;
+  }
+
+  // ── skills: pushes and temporary movement changes (see MoveMods in types.ts)
+  private mods: MoveMods | null = null;
+  private airLeft = 0;
+  /** While > 0 a dash carries: the walker's own steering barely damps it. */
+  private dashT = 0;
+
+  setMoveMods(m: MoveMods | null): void {
+    const had = this.mods?.airJumps ?? 0;
+    this.mods = m ? { ...m } : null;
+    const now = this.mods?.airJumps ?? 0;
+    // on the ground the landing refills them anyway; in the air (a skill cast mid-jump, or right
+    // after its own leap) the new extra jumps arrive at once, and taken-away ones go at once
+    if (this.grounded) this.airLeft = now;
+    else this.airLeft = Math.max(0, Math.min(now, this.airLeft + Math.max(0, now - had)));
+  }
+
+  impulse(vx: number, vy: number, vz: number): void {
+    if (this.frozen || this.riding) return;
+    const ok = (v: number) => (Number.isFinite(v) ? v : 0);
+    this.vx += ok(vx);
+    this.vz += ok(vz);
+    if (Math.hypot(vx, vz) > 0.5) this.dashT = 0.35;
+    if (ok(vy) > 0) {
+      this.vy = Math.max(this.vy, 0) + ok(vy);
+      this.grounded = false;
+      this.gate.launched();
+    }
+  }
+
+  /** Stands on water now (the gift of 凌波, or a skill). */
+  get floats(): boolean {
+    return this.gifts.float || !!this.mods?.float;
   }
 
   update(dt: number, input: MoveInput, phys: Physics): void {
@@ -468,7 +545,12 @@ export class PlayerController implements Player {
     m.emoteT = this.emoteKind ? Math.min(1, this.emoteT / EMOTE_DUR[this.emoteKind]) : 0;
     m.t = this.time;
     m.riding = this.riding !== null;
+    m.mount = (this.riding?.userData.mount as 'horse' | undefined) ?? null;
     try { this.model.update(dt, m); } catch (e) { console.error('[walk] character update failed', e); }
+    // squash and stretch of the whole figure (feet stay planted: the holder scales from the origin)
+    this.squashT += dt;
+    const [sxz, sy] = squashAt(this.squashK * (this.reduced ? 0.4 : 1), this.squashT);
+    this.holder.scale.set(sxz, sy, sxz);
 
     this.shadow.position.set(this.position.x, floor + 0.03, this.position.z);
     const lift = Math.max(0, this.position.y - floor);
@@ -491,8 +573,17 @@ export class PlayerController implements Player {
     const ux = dx / l, uz = dz / l;
     const ft = phys.floorY(x, z);
     const built = phys.built?.(x, z) ?? false;
-    /** Does bare ground rise too steeply just beyond (x, z)? */
-    const faceAhead = () => phys.floorY(x + ux * LOOK, z + uz * LOOK) - ft > LOOK * MAX_GRADE;
+    /**
+     * Does the ground rise too steeply just beyond (x, z)? A built surface there (a deck, a rail, a
+     * stepping stone across a narrow gap) is no cliff: it is judged by its step up from where you
+     * stand, so you stride from one raised surface over a crack onto the next.
+     */
+    const faceAhead = () => {
+      const ax = x + ux * LOOK, az = z + uz * LOOK;
+      const fa = phys.floorY(ax, az);
+      if (phys.built?.(ax, az)) return fa - Math.max(ft, f0) > STEP_UP;
+      return fa - ft > LOOK * MAX_GRADE;
+    };
     let steep: boolean;
     if (built) {
       // onto a stair, a quay or a bridge deck: a stair-sized step is fine
@@ -519,18 +610,23 @@ export class PlayerController implements Player {
 
   private walk(dt: number, input: MoveInput, phys: Physics): number {
     const mag = Math.min(1, Math.hypot(input.x, input.z));
-    if (mag > 0.25 && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
+    // pushing the stick, or a jump, ends an emote (a skill's flourish, a bow, watering…) at once
+    if ((mag > 0.25 || input.jump) && this.emoteKind && this.emoteKind !== 'jump') this.emoteKind = null;
     const busy = this.busy;
-    this.running = input.run;
-    const maxSpeed = (input.run ? 4.3 : 2.1) * mag * this.gifts.speed;
+    const mods = this.mods;
+    this.running = input.run && mag > 0.05;
+    const maxSpeed = (input.run ? RUN_SPEED : WALK_SPEED) * mag * this.gifts.speed * (mods?.speed ?? 1);
     const tx = mag > 0.01 && !busy ? (input.x / Math.max(mag, 1e-6)) * maxSpeed : 0;
     const tz = mag > 0.01 && !busy ? (input.z / Math.max(mag, 1e-6)) * maxSpeed : 0;
-    const acc = this.grounded ? 10 : 3;
+    this.dashT = Math.max(0, this.dashT - dt);
+    // in the air: steer to aim the landing, but let go of the stick and the jump keeps its way
+    const acc = this.dashT > 0 ? 1.2 : this.grounded ? GROUND_ACC : mag > 0.05 ? AIR_ACC : 0.6;
     this.vx = damp(this.vx, tx, acc, dt);
     this.vz = damp(this.vz, tz, acc, dt);
     const px = this.position.x, pz = this.position.z;
     let nx = px + this.vx * dt, nz = pz + this.vz * dt;
-    [nx, nz] = phys.resolve(nx, nz, 0.3, px, pz);
+    const rs = phys.resolve(nx, nz, 0.3, px, pz, this.position.y);
+    nx = rs[0]; nz = rs[1];
     const f0 = phys.floorY(px, pz);
     if (this.blocked(nx, nz, px, pz, f0, phys)) {
       // slide along what stopped you, one axis at a time
@@ -540,36 +636,93 @@ export class PlayerController implements Player {
     }
     const moved = Math.hypot(nx - px, nz - pz);
     this.speed = dt > 0 ? moved / dt : 0;
+    // a wall stops the momentum it took (no sliding off it later at full speed)
+    if (dt > 0 && moved < Math.hypot(this.vx, this.vz) * dt * 0.5) { this.vx = (nx - px) / dt; this.vz = (nz - pz) / dt; }
     this.position.x = nx;
     this.position.z = nz;
 
-    if (input.jump && this.grounded) {
-      this.vy = 4.1 * this.gifts.jump;
+    const jump = this.gifts.jump * (mods?.jump ?? 1);
+    const take = this.gate.step(dt, this.grounded, input.jump && !busy, this.airLeft);
+    if (take === 'ground') {
+      this.vy = JUMP_V * jump;
       this.grounded = false;
+      this.kick(0.12);
+      this.onJump?.('ground');
+    } else if (take === 'air') {
+      // a second jump in the air (轻功)
+      this.airLeft--;
+      this.vy = 3.9 * jump;
+      this.kick(0.1);
+      this.onJump?.('air');
     }
     const floor = phys.floorY(nx, nz);
     if (!this.grounded) {
-      this.vy -= 12.5 * dt;
-      // the jade rabbit drifts down
-      if (this.gifts.glide && this.vy < -GLIDE_FALL) this.vy = -GLIDE_FALL;
-      this.position.y += this.vy * dt;
+      if (mods?.hover) {
+        this.vy = damp(this.vy, 0, 1.6, dt); // held up: no gravity, a gentle settle
+        this.position.y += this.vy * dt;
+      } else this.fall(dt, this.gifts.glide || !!mods?.glide ? GLIDE_FALL : Infinity);
       if (this.position.y <= floor) {
+        const impact = -this.vy;
         this.position.y = floor;
         this.grounded = true;
         this.vy = 0;
+        if (impact > 1.2) {
+          this.kick(-Math.min(0.2, 0.05 + impact * 0.018));
+          this.onLand?.(impact);
+        }
       }
     } else {
       if (floor < this.position.y - 0.35) { this.grounded = false; this.vy = 0; }
       else this.position.y = damp(this.position.y, floor, 25, dt);
     }
-    if (this.grounded) this.standY = floor;
+    if (this.grounded) {
+      this.standY = floor;
+      this.airLeft = mods?.airJumps ?? 0;
+      // a running footfall every so often: a light puff of dust
+      if (this.running && this.speed > 3.2) {
+        this.strideAt += dt * this.speed;
+        if (this.strideAt > 2.6) { this.strideAt = 0; this.onStride?.(); }
+      }
+    }
 
     if (moved > 0.002 && mag > 0.05) {
       this.targetHeading = null;
-      this.heading = dampAngle(this.heading, Math.atan2(this.vx, this.vz), 12, dt);
+      this.heading = dampAngle(this.heading, Math.atan2(this.vx, this.vz), this.grounded ? 12 : 7, dt);
     } else if (this.targetHeading !== null) {
       this.heading = dampAngle(this.heading, this.targetHeading, 8, dt);
     }
     return floor;
+  }
+
+  /**
+   * One step of flight under gravity, integrated exactly (so a jump rises as high at 20 fps as at
+   * 60): GRAVITY while rising, FALL_GRAVITY once past the top, and no faster fall than `cap` (the
+   * jade rabbit's drift).
+   */
+  private fall(dt: number, cap: number): void {
+    let y = this.position.y, v = this.vy, left = dt;
+    if (v > 0) {
+      const up = Math.min(left, v / GRAVITY);
+      y += v * up - 0.5 * GRAVITY * up * up;
+      v -= GRAVITY * up;
+      left -= up;
+      if (left <= 1e-9) { this.position.y = y; this.vy = v; return; }
+      v = Math.min(v, 0);
+    }
+    if (v < -cap) v = -cap;
+    // falling: speed up to the cap, then drift at it
+    const toCap = Math.min(left, Math.max(0, (v + cap) / FALL_GRAVITY));
+    y += v * toCap - 0.5 * FALL_GRAVITY * toCap * toCap;
+    v -= FALL_GRAVITY * toCap;
+    left -= toCap;
+    if (left > 0) y += v * left;
+    this.position.y = y;
+    this.vy = v;
+  }
+
+  /** Stretch (k > 0) or squash (k < 0) the figure for a moment. */
+  private kick(k: number): void {
+    this.squashK = k;
+    this.squashT = 0;
   }
 }

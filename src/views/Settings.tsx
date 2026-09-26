@@ -9,7 +9,7 @@ import { go } from '../app/router';
 import { Segmented, Sheet, Toggle, toast } from '../ui/kit';
 import { audio } from '../audio/engine';
 import { music } from '../audio/music';
-import { codeActive, redeemCode, revokeCode } from '../app/play';
+import { redeemCode } from '../app/play';
 import { makeSeal } from '../ink/seal';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
@@ -20,6 +20,27 @@ const VERSION = '1.0.0';
 
 function stamp(): string {
   return today.value.replace(/-/g, '');
+}
+
+/** Inside a host page (an iframe): scripted downloads are blocked there, or dropped without a word. */
+function isEmbedded(): boolean {
+  try {
+    return window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
+/** May this page write to the clipboard? A host page's permissions policy can forbid it. */
+function clipboardAllowed(): boolean {
+  type Policy = { allowsFeature(feature: string): boolean };
+  const d = document as Document & { permissionsPolicy?: Policy; featurePolicy?: Policy };
+  try {
+    const policy = d.permissionsPolicy ?? d.featurePolicy;
+    return !policy || policy.allowsFeature('clipboard-write');
+  } catch {
+    return true;
+  }
 }
 
 /** Script-driven download; silently does nothing where downloads are blocked (the UI always offers another way). */
@@ -393,7 +414,7 @@ type Confirm =
   | { kind: 'import'; info: BackupInfo }
   | { kind: 'demo' }
   | { kind: 'reset'; step: 1 | 2 }
-  | { kind: 'copy'; json: string }
+  | { kind: 'copy'; json: string; why?: 'download' }
   | { kind: 'paste' };
 
 function DataSection() {
@@ -413,6 +434,8 @@ function DataSection() {
     const r = await hostSave(name, json);
     if (r === 'saved') return void toast(t(`已保存 ${name}`, `Saved ${name}`));
     if (r === 'declined') return;
+    // embedded, a scripted download is refused: hand over the text instead
+    if (isEmbedded()) return setConfirm({ kind: 'copy', json, why: 'download' });
     download(new Blob([json], { type: 'application/json' }), name);
     toast(t('备份已开始下载；若无反应，请改用「复制」', 'Backup download started — if nothing happens, use Copy'), 3600);
   };
@@ -420,7 +443,7 @@ function DataSection() {
     const json = exportJSON();
     const fail = () => setConfirm({ kind: 'copy', json });
     try {
-      if (!navigator.clipboard?.writeText) return fail();
+      if (!navigator.clipboard?.writeText || !clipboardAllowed()) return fail();
       navigator.clipboard.writeText(json).then(() => toast(t('备份已复制到剪贴板', 'Backup copied to the clipboard')), fail);
     } catch {
       fail();
@@ -484,8 +507,8 @@ function DataSection() {
       <Row title={t('载入示例园', 'Load demo garden')} sub={t('六株花木与数月记录，便于一试', 'Six plants with a few months of history')} wrap>
         <button class="btn btn-small" onClick={() => setConfirm({ kind: 'demo' })}>{t('载入', 'Load')}</button>
       </Row>
-      <TestCodeRow />
-      <Row title={<span class="set-danger-text">{t('清空一切', 'Erase everything')}</span>} sub={t('删除所有习惯与记录；设置保留', 'Deletes all habits and records; settings are kept')} wrap>
+      <CodeRow />
+      <Row title={<span class="set-danger-text">{t('清空一切', 'Erase everything')}</span>} sub={t('删除所有习惯与记录，连同入画中的同伴、任务、铜钱与家园；设置保留', 'Deletes all habits and records, and the walk’s companions, quests, coins and homestead; settings are kept')} wrap>
         <button class="btn btn-small set-danger" onClick={() => setConfirm({ kind: 'reset', step: 1 })}>{t('清空', 'Erase')}</button>
       </Row>
 
@@ -521,7 +544,11 @@ function DataSection() {
       <Sheet open={confirm?.kind === 'copy'} onClose={close} title={t('复制备份', 'Copy backup')} label={t('复制备份', 'Copy backup')}>
         {confirm?.kind === 'copy' && (
           <div class="set-sheet">
-            <p>{t('无法自动复制。文本已选中，请手动复制并妥善保存。', 'Couldn’t copy automatically. The text is selected — copy it by hand and keep it somewhere safe.')}</p>
+            <p>
+              {confirm.why === 'download'
+                ? t('此处无法下载文件。文本已选中，请手动复制并妥善保存。', 'Files can’t be downloaded here. The text is selected — copy it by hand and keep it somewhere safe.')
+                : t('无法自动复制。文本已选中，请手动复制并妥善保存。', 'Couldn’t copy automatically. The text is selected — copy it by hand and keep it somewhere safe.')}
+            </p>
             <textarea ref={copyRef} class="set-json" readOnly value={confirm.json} rows={8} onFocus={(e) => e.currentTarget.select()} />
             <div class="set-sheet-btns">
               <button class="btn btn-primary" onClick={close}>{t('好', 'Done')}</button>
@@ -544,7 +571,7 @@ function DataSection() {
       <Sheet open={confirm?.kind === 'reset'} onClose={close} title={t('清空一切', 'Erase everything')} label={t('确认清空', 'Confirm erase')}>
         {confirm?.kind === 'reset' && confirm.step === 1 && (
           <div class="set-sheet">
-            <p>{t(`园中 ${plants} 株、${checkins} 次打卡、所有日记与焚香记录都将删除。设置会保留。`, `All ${plants} plants, ${checkins} check-ins, notes and incense records will be deleted. Settings are kept.`)}</p>
+            <p>{t(`园中 ${plants} 株、${checkins} 次打卡、所有日记与焚香记录，以及入画中的同伴、任务、铜钱与家园，都将删除。设置会保留。`, `All ${plants} plants, ${checkins} check-ins, notes and incense records, and the walk’s companions, quests, coins and homestead, will be deleted. Settings are kept.`)}</p>
             <p class="muted">{t('建议先导出一份备份。', 'Consider exporting a backup first.')}</p>
             <div class="set-sheet-btns">
               <button class="btn" onClick={exportFile}>{t('先导出备份', 'Export backup first')}</button>
@@ -566,59 +593,37 @@ function DataSection() {
   );
 }
 
-/** 测试码: one small row; a code opens every companion (see redeemCode in app/play.ts). */
-function TestCodeRow() {
+/** 兑换码: one small row with a field. */
+function CodeRow() {
   const t = useT();
   const [code, setCode] = useState('');
-  const on = codeActive.value;
-  // the field and the Undo button replace each other: keep the keyboard on whichever is shown
-  const formRef = useRef<HTMLFormElement>(null);
-  const refocus = useRef(false);
-  useEffect(() => {
-    if (!refocus.current) return;
-    refocus.current = false;
-    formRef.current?.querySelector<HTMLElement>(on ? 'button' : 'input')?.focus();
-  }, [on]);
   const submit = (e: Event) => {
     e.preventDefault();
     const r = redeemCode(code);
-    if (r === 'invalid') return void toast(t('测试码无效', 'That code doesn’t work'));
-    refocus.current = true;
+    if (r === 'invalid') return void toast(t('兑换码无效', 'That code doesn’t work'));
     setCode('');
-    toast(r === 'unlocked'
-      ? t('十三位同伴已全部解锁，可在「入画」中挑选', 'All thirteen companions unlocked — pick one in Into the Painting')
-      : t('同伴早已全部解锁', 'Every companion is already unlocked'), 3200);
-  };
-  const undo = () => {
-    refocus.current = true;
-    revokeCode();
-    toast(t('测试码已撤销，同伴恢复为已结识的', 'Code removed — companions are back to the ones you’ve met'));
+    toast(r === 'ok' ? t('兑换成功', 'Redeemed') : t('此码已兑换', 'Already redeemed'));
   };
   return (
-    <form ref={formRef} class="row set-row set-row-wrap set-code" onSubmit={submit}>
-      <label class="row-main" for={on ? undefined : 'set-code'}>
-        <span class="row-title">{t('测试码', 'Test code')}</span>
-        <span class="row-sub">{on ? t('已生效：全部同伴可选', 'Active: every companion is open') : t('解锁全部同伴', 'Unlocks every companion')}</span>
+    <form class="row set-row set-row-wrap set-code" onSubmit={submit}>
+      <label class="row-main" for="set-code">
+        <span class="row-title">{t('兑换码', 'Code')}</span>
       </label>
-      {on ? (
-        <button type="button" class="btn btn-small btn-ghost" onClick={undo} aria-label={t('撤销测试码', 'Remove the test code')}>{t('撤销', 'Undo')}</button>
-      ) : (
-        <div class="set-code-field">
-          <input
-            id="set-code"
-            class="input"
-            value={code}
-            onInput={(e) => setCode(e.currentTarget.value)}
-            maxLength={16}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellcheck={false}
-            enterKeyHint="done"
-            placeholder={t('输入', 'Code')}
-          />
-          <button class="btn btn-small" type="submit" disabled={!code.trim()}>{t('兑换', 'Redeem')}</button>
-        </div>
-      )}
+      <div class="set-code-field">
+        <input
+          id="set-code"
+          class="input"
+          value={code}
+          onInput={(e) => setCode(e.currentTarget.value)}
+          maxLength={16}
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellcheck={false}
+          enterKeyHint="done"
+          placeholder={t('输入', 'Code')}
+        />
+        <button class="btn btn-small" type="submit" disabled={!code.trim()}>{t('兑换', 'Redeem')}</button>
+      </div>
     </form>
   );
 }

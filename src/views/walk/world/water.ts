@@ -1,7 +1,9 @@
 // Open water beyond the garden: the lotus lake, the river (a ribbon along its course that flows),
-// and the pool under the waterfall. Painted, not mirrored — pale paper water with a few ink
-// strokes: slow ripple bands on the lake, streaks drifting downstream, a darker wash toward the
-// deep middle. One shader for all of it (the half-acre pond keeps its real reflection).
+// and the pool under the waterfall. Painted, not mirrored — a jade-teal wash (碧水), paler in the
+// shallows and deeper teal in the middle, with a few ink strokes: slow ripple bands on the lake,
+// streaks drifting downstream; toward the horizon it takes the warm sky, and glints gold where the
+// light catches a ripple. By night: deep indigo-teal with silver ripple lines. One shader for all of
+// it (the half-acre pond keeps its real reflection).
 import * as THREE from 'three';
 import { LAKE } from '../map';
 import { Bag } from './kit';
@@ -27,7 +29,10 @@ void main() {
 const FS = /* glsl */`
 uniform float uTime;
 uniform vec3 uWater;
+uniform vec3 uShallow;
+uniform vec3 uDeep;
 uniform vec3 uInk;
+uniform vec3 uGlint;
 uniform float uNight;
 uniform vec4 uLake;
 varying vec3 vFlow;
@@ -40,32 +45,39 @@ void main() {
   float s = vFlow.x, across = vFlow.y, speed = vFlow.z;
   // how deep it reads: the river's middle, the lake's centre
   float deep = speed > 0.0 ? 1.0 - abs(across) : 1.0 - clamp(length((w - uLake.xy) / uLake.zw), 0.0, 1.0);
-  vec3 col = mix(uWater, uWater * 0.8 + uInk * 0.2, smoothstep(0.2, 1.0, deep) * 0.55);
+  vec3 col = mix(uShallow, uDeep, smoothstep(0.05, 1.0, deep) * 0.85);
+  // lines on the water: ink by day, moonlit silver by night
+  vec3 line = mix(uInk, vec3(0.62, 0.68, 0.8), uNight);
   // slow ripple bands (a few brush lines)
   float r1 = sin(w.x * 0.9 + uTime * 0.5 + sin(w.y * 0.7 - uTime * 0.3) * 1.3);
   float band = sin(w.y * 3.2 + r1 * 0.9 + uTime * 0.25) * sin(w.x * 0.45 + uTime * 0.12);
-  col = mix(col, uInk, smoothstep(0.88, 1.0, band) * 0.13);
+  col = mix(col, line, smoothstep(0.88, 1.0, band) * 0.16);
+  // light caught on the crests: small warm glints (the sun) or silver ones (the moon)
+  float gl = sin(w.x * 2.3 + r1 * 1.7 - uTime * 0.6) * sin(w.y * 2.9 - r1 + uTime * 0.45);
+  col += uGlint * smoothstep(0.93, 1.0, gl) * 0.22;
   // streaks drifting downstream
   if (speed > 0.0) {
     float t = s * 0.55 - uTime * speed;
     float lane = sin(across * 9.0 + sin(s * 0.13) * 2.0);
     float st = smoothstep(0.75, 1.0, sin(t + lane * 1.7) * lane);
-    col = mix(col, uInk, st * 0.16 * (1.0 - abs(across)));
+    col = mix(col, line, st * 0.18 * (1.0 - abs(across)));
     // white water where it runs fast and steep
     float foam = smoothstep(0.6, 1.0, sin(t * 2.3 + across * 17.0) * sin(s * 0.7 + across * 5.0)) * clamp(speed - 1.2, 0.0, 1.0);
     col = mix(col, vec3(1.0), foam * 0.35);
   }
-  // grazing view: the paper sky in it
+  // grazing view: the sky in it (warm haze by day, indigo by night)
   float fres = pow(1.0 - clamp(normalize(vView).y, 0.0, 1.0), 3.0);
-  col = mix(col, uWater * 1.06, fres * 0.5);
-  col *= 1.0 - uNight * 0.1;
+  col = mix(col, uWater, fres * 0.38);
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;
 
-const PAPER = new THREE.Color('#efe9dc');
+/** Jade water: the shallows and the deep, by day and by night. */
+const SHALLOW = new THREE.Color('#98c7b3'), DEEP = new THREE.Color('#4a8d88');
+const SHALLOW_NIGHT = new THREE.Color('#2f4c60'), DEEP_NIGHT = new THREE.Color('#1a2a44');
+const GLINT = new THREE.Color('#fff0c4'), GLINT_NIGHT = new THREE.Color('#c9d4f0');
 
 export interface OpenWater {
   group: THREE.Group;
@@ -123,8 +135,11 @@ export function buildWater(bag: Bag, reduced: boolean): OpenWater {
       THREE.UniformsLib.fog,
       {
         uTime: { value: 0 },
-        uWater: { value: new THREE.Color('#e9e2d2') },
-        uInk: { value: new THREE.Color('#3b4448') },
+        uWater: { value: new THREE.Color('#efe2c4') },
+        uShallow: { value: SHALLOW.clone() },
+        uDeep: { value: DEEP.clone() },
+        uGlint: { value: GLINT.clone() },
+        uInk: { value: new THREE.Color('#2c4a4a') },
         uNight: { value: 0 },
         uLake: { value: new THREE.Vector4(LAKE.x, LAKE.z, LAKE.rx, LAKE.rz) },
       },
@@ -147,8 +162,11 @@ export function buildWater(bag: Bag, reduced: boolean): OpenWater {
     group,
     update(t, water, night) {
       mat.uniforms.uTime.value = reduced ? t * 0.3 : t;
-      // paper water: the fog's colour, lifted toward the paper (less so by night)
-      (mat.uniforms.uWater.value as THREE.Color).copy(water).lerp(PAPER, 0.5 - 0.25 * night);
+      // the sky's colour at grazing angles; jade below it, turning indigo-teal by night
+      (mat.uniforms.uWater.value as THREE.Color).copy(water);
+      (mat.uniforms.uShallow.value as THREE.Color).copy(SHALLOW).lerp(SHALLOW_NIGHT, night);
+      (mat.uniforms.uDeep.value as THREE.Color).copy(DEEP).lerp(DEEP_NIGHT, night);
+      (mat.uniforms.uGlint.value as THREE.Color).copy(GLINT).lerp(GLINT_NIGHT, night);
       mat.uniforms.uNight.value = night;
     },
   };

@@ -9,6 +9,9 @@ import { aiMove, emptyBoard, outcome, play, toMove, winner, type Board, type Lev
 import { TttBoard } from './board';
 import { LEVEL_NAMES, loadStats, saveStats, type TttStats } from './store';
 import { record as playRecord } from '../../../app/play';
+import { TTT_DRAW_HARD, TTT_WIN, tictactoePay } from '../economy';
+import { payToast, type Paid } from '../purse';
+import { PaidLine, PayHint } from '../Paid';
 import './ttt.css';
 
 type Mode = 'ai' | 'pvp';
@@ -40,6 +43,8 @@ export function TicTacToeView() {
   const [session, setSession] = useState<Session>({ a: 0, d: 0, b: 0 });
   const [focus, setFocus] = useState(4);
   const [live, setLive] = useState('');
+  /** What this game paid (a win, or a draw with 难), for under the board. */
+  const [paid, setPaid] = useState<Paid | null>(null);
   const game = useRef(1);
   /** The board as of the latest move (state updates land a render later; input may arrive sooner). */
   const boardNow = useRef(board);
@@ -84,6 +89,7 @@ export function TicTacToeView() {
     boardRef.current?.newGame(game.current);
     persist({ ...stats, mode: m, level: lv, first: f });
     setLive('');
+    setPaid(null);
   };
 
   /** Place a mark (from a human, or the machine) and settle the game if it ends. */
@@ -103,6 +109,8 @@ export function TicTacToeView() {
   };
 
   const settle = (nb: Board, o: Mark | 'draw') => {
+    // the game's own pay first, so its toast leads any errand the game finishes (as in gomoku)
+    if (mode === 'ai') setPaid(payToast(tictactoePay(o === ME ? 'win' : o === AI ? 'loss' : 'draw', level)));
     playRecord('boardgame');
     const w = winner(nb);
     if (w) boardRef.current?.win(w.line[0], w.line[2]);
@@ -250,6 +258,7 @@ export function TicTacToeView() {
             {t('再来一局', 'Play again')}
           </button>
         )}
+        {result && <PaidLine paid={paid} />}
       </div>
 
       <div class="ttt-score" aria-label={t('本局比分', 'This session')}>
@@ -319,6 +328,12 @@ export function TicTacToeView() {
           : t(`同桌 · 累计 〇${stats.pvp.o}胜 ✕${stats.pvp.x}胜 ${stats.pvp.d}和`, `Two players · all-time 〇 ${stats.pvp.o} · ✕ ${stats.pvp.x} · ${stats.pvp.d} draw${stats.pvp.d === 1 ? '' : 's'}`)}
         <span class="ttt-keys"> · {t('数字键 1–9 落子，N 重开', 'Keys 1–9 to play, N for a new game')}</span>
       </p>
+      {mode === 'ai' && (
+        <PayHint
+          zh={`胜一局得 ${TTT_WIN} 文${level === 'hard' ? `，与「难」言和也得 ${TTT_DRAW_HARD} 文` : ''}`}
+          en={`A win pays ${TTT_WIN} coins${level === 'hard' ? `; a draw with Hard, ${TTT_DRAW_HARD}` : ''}`}
+        />
+      )}
     </GameShell>
   );
 }

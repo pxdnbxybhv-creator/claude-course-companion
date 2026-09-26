@@ -53,9 +53,36 @@ export interface Hud {
   setCounter(id: string, label: { zh: string; en: string } | null, value?: string): void;
   /** A centred card, like a small hanging scroll (a poem, a riddle, a festival greeting). */
   showCard(o: { titleZh: string; titleEn: string; bodyZh: string; bodyEn: string; seal?: string }): void;
+  /**
+   * The skill button (技 · Q): the character's skill glyph and name, and its cooldown
+   * (0 = ready … 1 = just used). `active` while the skill lasts. null hides the button.
+   */
+  skill(o: { glyph: string; zh: string; en: string; cooldown: number; active?: boolean } | null): void;
 }
 
-export type EmoteKind = 'eat' | 'bow' | 'jump' | 'wave' | 'throw' | 'cast' | 'row' | 'sit' | 'play' | 'water';
+/**
+ * 'skill' is each character's own signature move (see data/characters.ts skill*): every model
+ * plays it its own way. 'talk' gestures while speaking, 'pet' crouches to stroke an animal,
+ * 'build' hammers, 'dance' is a little celebratory turn, 'sleep' nods off where it stands.
+ */
+export type EmoteKind = 'eat' | 'bow' | 'jump' | 'wave' | 'throw' | 'cast' | 'row' | 'sit' | 'play' | 'water'
+  | 'skill' | 'talk' | 'pet' | 'build' | 'dance' | 'sleep';
+
+/** Temporary movement changes a skill applies on top of the character's own gifts. */
+export interface MoveMods {
+  /** Multiplies walking and running speed. */
+  speed?: number;
+  /** Multiplies jump strength. */
+  jump?: number;
+  /** Extra jumps allowed in the air (a double jump = 1). */
+  airJumps?: number;
+  /** Fall slowly after a jump. */
+  glide?: boolean;
+  /** Stand on water. */
+  float?: boolean;
+  /** Hover: no gravity (flying for a moment); vertical speed is what impulse() gave. */
+  hover?: boolean;
+}
 
 export interface Player {
   readonly position: THREE_NS.Vector3;
@@ -83,6 +110,12 @@ export interface Player {
    * is the hand to follow (its world position), or null when this character has no hand. null gives it back.
    */
   holdProp(prop: string | null): THREE_NS.Object3D | null;
+  /** On the ground (not jumping, falling or hovering). */
+  readonly grounded: boolean;
+  /** A push: a dash along (vx, vz), a leap when vy > 0 (leaves the ground). m/s, added to the current velocity. */
+  impulse(vx: number, vy: number, vz: number): void;
+  /** Temporary movement changes from a skill, on top of the character's gifts; null clears them. */
+  setMoveMods(m: MoveMods | null): void;
 }
 
 /** The movement intent from keys / joystick, readable by features (e.g. rowing a boat). */
@@ -93,11 +126,15 @@ export interface InputState {
   readonly run: boolean;
   /** True on the frame the action button / E is pressed. */
   readonly actionPressed: boolean;
+  /** True on the frame jump (Space / 跃) is pressed. */
+  readonly jumpPressed: boolean;
+  /** True on the frame the skill (Q / 技) is pressed. */
+  readonly skillPressed: boolean;
 }
 
 export interface Sky {
   /** Adjust the moon (features may make it huge for 中秋). */
-  setMoon(o: { visible?: boolean; scale?: number; glow?: number; position?: THREE_NS.Vector3 }): void;
+  setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE_NS.Vector3 }): void;
   /** True between dusk and dawn (real clock, or forced by a feature/preview). */
   isNight(): boolean;
   /** Force night (e.g. fireworks, lanterns) while a feature is active. */
@@ -168,6 +205,11 @@ export interface WorldCtx {
   };
   /** For a moment, swing the camera to show the walker and the point (x, y, z) together (a game's target). */
   frameCamera(x: number, z: number, y: number, secs?: number): void;
+  /**
+   * Slow the world down (0.25 = a quarter speed) or back to 1: onFrame callbacks, critters and the
+   * walker all get the scaled dt; the camera does not. The core eases toward the value.
+   */
+  setTimeScale(f: number): void;
 }
 
 /** Builds one region's scenery (see map.ts REGIONS). Content goes into ctx.regionGroup(id). */

@@ -1,8 +1,9 @@
 // 舆图 — the map of the world, painted on paper in ink from map.ts and the baked land: hills as
 // washes with a few 米点 and ridge strokes, the lotus lake and the river in pale wash, paths as
-// fine broken lines, each place named in brush (faint with a ？ until you have been there), and a
-// cinnabar mark for where you stand. Pure Canvas 2D; no three.js.
-import { LAKE, PATHS, REGIONS, WORLD_RADIUS, type RegionId } from '../map';
+// fine broken lines, each place named in brush (faint with a ？ until you have been there), the
+// waypoint steles (驿碑: a lit lantern once reached, a grey outline before), the homestead's plot,
+// and a cinnabar mark for where you stand. Pure Canvas 2D; no three.js.
+import { HOME_PLOT, LAKE, PATHS, REGIONS, WORLD_RADIUS, type RegionId } from '../map';
 import { RIVER_SAMPLES, POOL, terrain } from './terrain';
 import { makeRng } from '../../../core/rng';
 
@@ -10,6 +11,12 @@ export interface AtlasOpts {
   visited: ReadonlySet<RegionId>;
   player: { x: number; z: number; heading: number } | null;
   lang: 'zh' | 'en';
+  /** The waypoint steles and whether each is lit. */
+  waypoints?: readonly { id: RegionId; x: number; z: number; lit: boolean }[];
+  /** The one picked on the map (drawn with a ring). */
+  picked?: RegionId | null;
+  /** Canvas pixels per CSS pixel (small screens: the steles are drawn big enough to tap). */
+  ui?: number;
 }
 
 /** World → canvas pixels for a square canvas of side S. */
@@ -42,7 +49,8 @@ function landLayer(S: number): HTMLCanvasElement {
     const rim = Math.min(1, Math.max(0, (r - WORLD_RADIUS + 8) / 30));
     const a = Math.min(0.75, up * 0.35 + shade * 0.5 + rim * 0.25);
     const p = (j * N + i) * 4;
-    img.data[p] = 52; img.data[p + 1] = 58; img.data[p + 2] = 60;
+    // warm ink-brown washes (a cold grey reads as desolate)
+    img.data[p] = 84; img.data[p + 1] = 70; img.data[p + 2] = 52;
     img.data[p + 3] = Math.round(a * 255);
   }
   const tmp = document.createElement('canvas');
@@ -58,7 +66,7 @@ function landLayer(S: number): HTMLCanvasElement {
     const x = rng.range(-WORLD_RADIUS - 30, WORLD_RADIUS + 30), z = rng.range(-WORLD_RADIUS - 30, WORLD_RADIUS + 30);
     const h = T.height(x, z);
     if (h < 5 || rng() > h / 30) continue;
-    g.fillStyle = `rgba(30,32,30,${rng.range(0.15, 0.45)})`;
+    g.fillStyle = rng() < 0.35 ? `rgba(62,110,86,${rng.range(0.2, 0.5)})` : `rgba(46,38,30,${rng.range(0.15, 0.45)})`;
     g.beginPath();
     g.ellipse(o + x * k, o + z * k, rng.range(1.2, 2.6) * (S / 600), rng.range(0.6, 1.2) * (S / 600), 0, 0, Math.PI * 2);
     g.fill();
@@ -73,7 +81,7 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
   if (!g) return;
   const { k, c } = atlasScale(S);
   const X = (x: number) => c + x * k, Z = (z: number) => c + z * k;
-  const u = S / 600;
+  const u = S / 600, u0 = u;
   g.clearRect(0, 0, S, S);
   // paper
   g.fillStyle = '#f1e9d8';
@@ -90,7 +98,7 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
   g.lineCap = 'round';
   g.lineJoin = 'round';
   // water: the lake, the river, the pool, the half-acre pond
-  const wash = 'rgba(108,128,138,0.28)';
+  const wash = 'rgba(64,116,128,0.34)';
   g.fillStyle = wash;
   g.beginPath(); g.ellipse(X(LAKE.x), Z(LAKE.z), LAKE.rx * k, LAKE.rz * k, 0, 0, Math.PI * 2); g.fill();
   g.strokeStyle = 'rgba(30,34,36,0.55)';
@@ -144,15 +152,47 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
   g.lineWidth = 1.2 * u;
   g.beginPath(); g.ellipse(X(0), Z(-3.2), 24.5 * k, 19.7 * k, 0, 0, Math.PI * 2); g.stroke();
 
-  // places
+  // the homestead's plot: a faint square of ruled ground
+  {
+    const h = HOME_PLOT.size / 2;
+    g.strokeStyle = 'rgba(120,84,48,0.55)';
+    g.lineWidth = 1 * u;
+    g.setLineDash([2 * u, 2 * u]);
+    g.strokeRect(X(HOME_PLOT.x - h), Z(HOME_PLOT.z - h), HOME_PLOT.size * k, HOME_PLOT.size * k);
+    g.setLineDash([]);
+  }
+
+  // places: each name clear of the steles' icons (a stele often stands near its place's heart) and
+  // of the names already written: the nearest free spot above or below (or a little to one side)
+  const su = Math.max(u0, (o.ui ?? 1) * 1.15);
+  type Box = { x0: number; x1: number; z0: number; z1: number };
+  const taken: Box[] = (o.waypoints ?? []).map((w) => ({ x0: X(w.x) - 10 * su, x1: X(w.x) + 11 * su, z0: Z(w.z) - 17 * su, z1: Z(w.z) + 4 * su }));
+  /** How much of a box would lie over what is already drawn (0 = clear). */
+  const overlap = (x0: number, x1: number, z0: number, z1: number) => {
+    let a = 0;
+    for (const b of taken) a += Math.max(0, Math.min(x1, b.x1) - Math.max(x0, b.x0)) * Math.max(0, Math.min(z1, b.z1) - Math.max(z0, b.z0));
+    return a;
+  };
   for (const r of REGIONS) {
     const seen = o.visited.has(r.id);
-    const x = X(r.center.x), z = Z(r.center.z);
+    const cx = X(r.center.x), cz = Z(r.center.z);
     const name = o.lang === 'zh' ? r.zh : r.en;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     const fs = (o.lang === 'zh' ? 30 : 20) * u;
     g.font = o.lang === 'zh' ? `${fs}px "Ma Shan Zheng", "LXGW WenKai", serif` : `italic ${fs}px "Cormorant Garamond", Georgia, serif`;
+    // the written name's box (with its ？ or seal): the nearest spot that covers nothing, or else
+    // the one that covers least
+    const hw = fs * (o.lang === 'zh' ? (r.zh.length + 1) * 0.5 : (name.length + 2) * 0.26), hh = fs * 0.55;
+    let x = cx, z = cz, best = Infinity;
+    for (let i = -10; i <= 10; i++) {
+      for (let j = -3; j <= 3; j++) {
+        const dz = i * hh * 0.5, dx = j * hw * 0.45;
+        const cost = overlap(cx + dx - hw, cx + dx + hw, cz + dz - hh, cz + dz + hh) * 1e3 + Math.abs(dx) + Math.abs(dz) * 1.3;
+        if (cost < best) { best = cost; x = cx + dx; z = cz + dz; }
+      }
+    }
+    taken.push({ x0: x - hw, x1: x + hw, z0: z - hh, z1: z + hh });
     // a soft paper halo so the name reads over the washes
     g.fillStyle = 'rgba(241,233,216,0.7)';
     g.beginPath(); g.ellipse(x, z, fs * (o.lang === 'zh' ? r.zh.length * 0.62 : name.length * 0.28) + 8 * u, fs * 0.72, 0, 0, Math.PI * 2); g.fill();
@@ -164,6 +204,36 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
       const sx = x + fs * (o.lang === 'zh' ? r.zh.length * 0.55 : name.length * 0.26) + 6 * u, sz = z - fs * 0.35;
       g.fillRect(sx, sz, 9 * u, 9 * u);
     }
+  }
+
+  // the waypoint steles: a little tablet under a roof; lit ones carry a lantern's glow
+  for (const w of o.waypoints ?? []) {
+    const x = X(w.x), z = Z(w.z);
+    const u = Math.max(u0, (o.ui ?? 1) * 1.15);
+    const picked = o.picked === w.id;
+    if (w.lit) {
+      const grd = g.createRadialGradient(x, z - 4 * u, 0, x, z - 4 * u, 16 * u);
+      grd.addColorStop(0, 'rgba(255,184,107,0.75)');
+      grd.addColorStop(1, 'rgba(255,184,107,0)');
+      g.fillStyle = grd;
+      g.beginPath(); g.arc(x, z - 4 * u, 16 * u, 0, Math.PI * 2); g.fill();
+    }
+    if (picked) {
+      g.strokeStyle = 'rgba(185,58,43,0.9)';
+      g.lineWidth = 1.6 * u;
+      g.beginPath(); g.arc(x, z - 3 * u, 14 * u, 0, Math.PI * 2); g.stroke();
+    }
+    g.fillStyle = w.lit ? 'rgba(52,44,36,0.95)' : 'rgba(241,233,216,0.9)';
+    g.strokeStyle = w.lit ? 'rgba(27,25,22,0.95)' : 'rgba(27,25,22,0.35)';
+    g.lineWidth = 1.2 * u;
+    // roof
+    g.beginPath(); g.moveTo(x - 7 * u, z - 9 * u); g.lineTo(x, z - 13 * u); g.lineTo(x + 7 * u, z - 9 * u); g.closePath();
+    g.fill(); g.stroke();
+    // tablet
+    g.beginPath(); g.rect(x - 3.5 * u, z - 9 * u, 7 * u, 11 * u); g.fill(); g.stroke();
+    // lantern
+    g.fillStyle = w.lit ? '#ffb86b' : 'rgba(27,25,22,0.18)';
+    g.beginPath(); g.arc(x + 7 * u, z - 3 * u, 2.4 * u, 0, Math.PI * 2); g.fill();
   }
 
   // you are here
@@ -192,10 +262,17 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
   g.beginPath(); g.moveTo(S - 34 * u, 48 * u); g.lineTo(S - 34 * u, 70 * u); g.stroke();
 }
 
-/** Which place a tap (canvas pixels) lands on. */
-export function atlasHit(S: number, px: number, py: number): RegionId | null {
+/** Which place a tap (canvas pixels) lands on: a waypoint stele first (they are small), else a place's name. */
+export function atlasHit(S: number, px: number, py: number, waypoints?: readonly { id: RegionId; x: number; z: number }[], ui = 1): RegionId | null {
   const { k, c } = atlasScale(S);
   let best: RegionId | null = null, bd = Infinity;
+  const mu = Math.max(S / 600, ui * 1.15);
+  const reachW = Math.max(26 * (S / 600), 24 * ui);
+  for (const w of waypoints ?? []) {
+    const d = Math.hypot(px - (c + w.x * k), py - (c + w.z * k - 5 * mu));
+    if (d < reachW && d < bd) { bd = d; best = w.id; }
+  }
+  if (best) return best;
   for (const r of REGIONS) {
     const d = Math.hypot(px - (c + r.center.x * k), py - (c + r.center.z * k));
     const reach = Math.max(r.radius * k, 34 * (S / 600));

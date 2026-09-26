@@ -4,8 +4,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { go } from '../../app/router';
 import { useT } from '../../app/i18n';
-import { lang as langSig, setSettings, state as appState } from '../../app/store';
-import { play } from '../../app/play';
+import { lang as langSig, setSettings, state as appState, today } from '../../app/store';
+import { ERRAND_COINS, play } from '../../app/play';
+import { ledgerToday } from '../quests/helpers';
+import { CoinBadge, fmtCoins } from '../../ui/coins';
 import { Sheet, Segmented } from '../../ui/kit';
 import { toLunar, festivalsOn as coreFestivals } from '../../core/lunar';
 import { FESTIVALS } from './features';
@@ -13,7 +15,7 @@ import { CharacterSelect } from './characters/Select';
 import { REGION, type RegionId } from './map';
 import { CHARACTER } from '../../data/characters';
 import type { FestivalKey } from './types';
-import type { Arrival, HudBridge, Prompt, SayOpts, WorldHandle } from './world';
+import type { Arrival, HudBridge, Prompt, SayOpts, WaypointInfo, WorldHandle } from './world';
 import './walk.css';
 
 type Phase = 'loading' | 'ready' | 'nowebgl' | 'error';
@@ -22,7 +24,16 @@ interface Card { titleZh: string; titleEn: string; bodyZh: string; bodyEn: strin
 interface Toast { id: number; zh: string; en: string; action?: { zh: string; en: string; run: () => void } }
 interface Dialog extends SayOpts { id: number; resolve: (i: number) => void }
 
-const HINT_KEY = 'banmu.walk.hint';
+const HINT_KEY = 'banmu.walk.hint.v2';
+/** The 疾 switch is remembered for the session. */
+const RUN_KEY = 'banmu.walk.run';
+function readRun(): boolean {
+  try { return sessionStorage.getItem(RUN_KEY) === '1'; } catch { return false; }
+}
+function writeRun(on: boolean): void {
+  try { sessionStorage.setItem(RUN_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+}
+type SkillUi = { glyph: string; zh: string; en: string; cooldown: number; active?: boolean };
 /** The lazily loaded world module, once it has been loaded. */
 let worldModule: typeof import('./world') | null = null;
 const coarse = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
@@ -57,6 +68,7 @@ export function WalkView() {
   const [festival, setFestival] = useState<FestivalKey | null>(queryFestival);
   const [time, setTime] = useState<TimeMode>('now');
   const [sheet, setSheet] = useState(false);
+  const [purseOpen, setPurseOpen] = useState(false);
   const [hint, setHint] = useState(() => !readHintSeen());
   const [touch] = useState(coarse);
   const toastTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -66,6 +78,16 @@ export function WalkView() {
   const arrivalTimer = useRef<ReturnType<typeof setTimeout>>();
   const [curtain, setCurtain] = useState(false);
   const [frozen, setFrozen] = useState(false);
+  const [skillUi, setSkillUi] = useState<SkillUi | null>(null);
+  const [runOn, setRunOn] = useState(readRun);
+  const [shiftHeld, setShiftHeld] = useState(false);
+  // coins arriving: the purse shows +N floating up
+  const purse = play.value.coins;
+  const lastPurse = useRef(purse);
+  const [gains, setGains] = useState<{ id: number; n: number; lane: number }[]>([]);
+  const gainSeq = useRef(0);
+  /** Each +N goes away on its own clock (a second gain never cancels the first one's). */
+  const gainTimers = useRef(new Set<ReturnType<typeof setTimeout>>());
   const [dialogs, setDialogs] = useState<Dialog[]>([]);
   const dialogSeq = useRef(0);
   const [mapOpen, setMapOpen] = useState(false);
@@ -121,6 +143,13 @@ export function WalkView() {
       arrive: (a) => setArrival({ ...a, key: Date.now() }),
       curtain: (on) => setCurtain(on),
       frozen: (on) => setFrozen(on),
+      skill: (o) => setSkillUi((cur) => {
+        if (!o) return null;
+        // cooldowns tick every frame: only re-render on a visible change
+        const cd = Math.round(o.cooldown * 40) / 40;
+        if (cur && cur.glyph === o.glyph && cur.cooldown === cd && !!cur.active === !!o.active && cur.zh === o.zh) return cur;
+        return { ...o, cooldown: cd };
+      }),
     };
     import('./world')
       .then((m) => (worldModule = m, m))
@@ -178,6 +207,45 @@ export function WalkView() {
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
+  // the 疾 switch reaches the world (again after every rebuild) and is remembered for the session
+  useEffect(() => {
+    worldRef.current?.setRun(runOn);
+    writeRun(runOn);
+  }, [runOn, phase]);
+  // Shift held: the run chip lights (it inverts the switch while held)
+  useEffect(() => {
+    if (touch) return;
+    const on = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftHeld(e.type === 'keydown'); };
+    const off = () => setShiftHeld(false);
+    window.addEventListener('keydown', on);
+    window.addEventListener('keyup', on);
+    window.addEventListener('blur', off);
+    return () => { window.removeEventListener('keydown', on); window.removeEventListener('keyup', on); window.removeEventListener('blur', off); };
+  }, [touch]);
+  // coins arriving float up from the purse
+  useEffect(() => {
+    const d = purse - lastPurse.current;
+    lastPurse.current = purse;
+    if (d <= 0 || phase !== 'ready') return;
+    const id = ++gainSeq.current;
+    // gains close together take the next free lane (one under another), never the same spot
+    setGains((g) => {
+      const kept = g.slice(-2);
+      let lane = 0;
+      while (kept.some((x) => x.lane === lane)) lane++;
+      return [...kept, { id, n: d, lane }];
+    });
+    const tm = setTimeout(() => {
+      gainTimers.current.delete(tm);
+      setGains((g) => g.filter((x) => x.id !== id));
+    }, 1900);
+    gainTimers.current.add(tm);
+  }, [purse]);
+  useEffect(() => () => {
+    for (const tm of gainTimers.current) clearTimeout(tm);
+    gainTimers.current.clear();
+  }, []);
+
   // leaving the walk gives the painted plant bitmaps back (they are kept between rebuilds only)
   useEffect(() => () => {
     if (worldModule) worldModule.releasePlantBitmaps();
@@ -185,20 +253,25 @@ export function WalkView() {
 
   // pause walking while a card, a dialogue, the map or a picker is open
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || mapOpen || charOpen || !!dialog);
-  }, [card, sheet, phase, mapOpen, charOpen, dialog]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog]);
 
-  // M opens the map
+  // held by a game, a boat or the homestead's building (not by a skill's own mount, 关公's 赤兔: the
+  // skill button stays up then, and travel simply sets him down)
+  const heldByOther = frozen && !skillUi;
+  // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
+  // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready') return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen) return;
     const onKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
-      if (e.code === 'KeyM' && !e.metaKey && !e.ctrlKey && !card && !dialog) setMapOpen((v) => !v);
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || t.closest?.('.sheet, [aria-modal="true"], [role="dialog"]'))) return;
+      setMapOpen(true);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -244,6 +317,12 @@ export function WalkView() {
     };
   }, [hint, phase]);
 
+  // the skills feature hides the button itself while a game or a boat holds the walker; on its own
+  // mount (Red Hare) it stays, to get off again
+  const showSkill = phase === 'ready' && !!skillUi && !card && !dialog && !mapOpen && !charOpen;
+  // the map and the companions wait, as the M key does, while someone is speaking, a card is up or a
+  // game or the homestead's building holds the walker (travelling would strand what is open)
+  const busy = phase !== 'ready' || !!dialog || !!card || heldByOther;
   const lunar = toLunar(new Date());
   const todayFest = coreFestivals(new Date())[0];
   const preview = festival ? FESTIVALS.find((f) => f.key === festival) : null;
@@ -256,9 +335,15 @@ export function WalkView() {
 
       {/* --- top bar */}
       <header class="walk-top">
-        <button type="button" class="walk-chip walk-leave" onClick={leave}>
-          <span aria-hidden="true">‹</span> {t('出画', 'Leave')}
-        </button>
+        <div class="walk-left">
+          <button type="button" class="walk-chip walk-leave" onClick={leave}>
+            <span aria-hidden="true">‹</span> {t('出画', 'Leave')}
+          </button>
+          <button type="button" class="walk-chip walk-purse" disabled={busy} onClick={(e) => { blurAfter(e); setPurseOpen(true); }} aria-haspopup="dialog" title={t('钱囊', 'Purse')}>
+            <span role="status" aria-live="polite"><CoinBadge size={17} /></span>
+            {gains.map((g) => <span key={g.id} class="walk-purse-gain num" style={{ '--lane': String(g.lane) }} aria-hidden="true">+{fmtCoins(g.n)}</span>)}
+          </button>
+        </div>
         <div class="walk-title">
           <span class={lang === 'zh' ? 'brush' : 'latin'}>{t('入画', 'Into the Painting')}</span>
           <small>
@@ -267,13 +352,13 @@ export function WalkView() {
           </small>
         </div>
         <div class="walk-tools">
-          <button type="button" class="walk-chip walk-tool" onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('角色', 'Characters')} title={t('角色', 'Characters')}>
+          <button type="button" class="walk-chip walk-tool" disabled={busy} onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('同伴', 'Companions')} title={t('同伴', 'Companions')}>
             <span class="brush" aria-hidden="true">{CHARACTER[play.value.character].zh.slice(0, 1)}</span>
-            <span class="walk-tool-label">{t('角色', 'Who')}</span>
+            <span class="walk-tool-label">{t('同伴', 'Companions')}</span>
           </button>
-          <button type="button" class="walk-chip walk-tool" disabled={phase !== 'ready'} onClick={(e) => { blurAfter(e); setMapOpen(true); }} aria-haspopup="dialog" aria-label={t('舆图', 'Map')} title={t('舆图 (M)', 'Map (M)')}>
-            <span class="brush" aria-hidden="true">图</span>
-            <span class="walk-tool-label">{t('舆图', 'Map')}</span>
+          <button type="button" class="walk-chip walk-tool walk-travel" disabled={busy} onClick={(e) => { blurAfter(e); setMapOpen(true); }} aria-haspopup="dialog" aria-label={t('舆图 · 传送', 'Map · travel')} title={t('舆图 · 传送 (M)', 'Map · travel (M)')}>
+            <span class="brush" aria-hidden="true">驿</span>
+            <span class="walk-tool-label">{t('传送', 'Travel')}</span>
           </button>
           <button
             type="button"
@@ -331,6 +416,16 @@ export function WalkView() {
       {phase === 'ready' && touch && <Joystick world={worldRef} onStart={() => hintOff.current?.()} />}
       {phase === 'ready' && touch && (
         <div class="walk-buttons">
+          <button
+            type="button"
+            class={'walk-run' + (runOn ? ' is-on' : '')}
+            aria-pressed={runOn}
+            aria-label={runOn ? t('疾行：开', 'Run: on') : t('疾行：关', 'Run: off')}
+            onPointerDown={(e) => { e.preventDefault(); setRunOn((v) => !v); }}
+          >
+            <span class="brush" aria-hidden="true">疾</span>
+          </button>
+          {showSkill && <SkillButton ui={skillUi!} touch onUse={() => worldRef.current?.skill()} />}
           <button type="button" class="walk-jump" aria-label={t('跳', 'Jump')} onPointerDown={(e) => { e.preventDefault(); worldRef.current?.jump(); }}>
             <span class="brush" aria-hidden="true">跃</span>
           </button>
@@ -345,15 +440,36 @@ export function WalkView() {
           </button>
         </div>
       )}
+      {phase === 'ready' && !touch && (
+        <div class="walk-deck">
+          <button
+            type="button"
+            class={'walk-chip walk-run-chip' + (runOn !== shiftHeld ? ' is-on' : '')}
+            aria-pressed={runOn}
+            title={t('疾行：常跑（按住 Shift 反转）', 'Run: always run (hold Shift to invert)')}
+            onClick={(e) => { blurAfter(e); setRunOn((v) => !v); }}
+          >
+            <span class="brush" aria-hidden="true">疾</span>
+            <span>{runOn ? t('常跑', 'Running') : t('行走', 'Walking')}</span>
+            <kbd>Shift</kbd>
+          </button>
+          {showSkill && <SkillButton ui={skillUi!} touch={false} onUse={() => worldRef.current?.skill()} />}
+        </div>
+      )}
 
       {phase === 'ready' && hint && (
         <button type="button" class="walk-hint" onClick={() => { setHint(false); writeHintSeen(); }}>
           {touch ? (
-            <span>{t('左下摇杆行走 · 推到尽头快跑', 'Joystick bottom-left to walk · push to the edge to run')}<br />{t('拖动画面环顾 · 双指缩放 · 右下互动', 'Drag to look around · pinch to zoom · act bottom-right')}</span>
+            <span>
+              {t('摇杆行走，推到尽头或点「疾」奔跑', 'Joystick to walk; push to the edge or tap 疾 to run')}
+              {/* the skill button shows the companion's own glyph (题, 剑, 符…), never the word 技 */}
+              <br />{t(`「跃」跳上石栏屋檐 · 金圈「${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph}」是同伴绝技`, `跃 jumps onto rails and eaves · the gold-ringed ${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph} is your companion’s skill`)}
+              <br />{t('点亮驿碑后，可从「驿」舆图传送', 'Light a waypoint stele, then travel from the 驿 map')}
+            </span>
           ) : (
             <span>
-              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t('行走', 'walk')} · <kbd>Shift</kbd> {t('快跑', 'run')} · <kbd>{t('空格', 'Space')}</kbd> {t('跳', 'jump')} · <kbd>E</kbd> {t('互动', 'interact')}
-              <br />{t('拖动环顾 · 滚轮远近', 'Drag to look around · scroll to zoom')}
+              <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t('行走', 'walk')} · <kbd>Shift</kbd> {t('奔跑', 'run')} · <kbd>{t('空格', 'Space')}</kbd> {t('跳上高处', 'jump up')} · <kbd>Q</kbd> {t('绝技', 'skill')} · <kbd>E</kbd> {t('互动', 'interact')}
+              <br /><kbd>M</kbd> {t('舆图：点亮驿碑后可直接传送', 'map: travel to any waypoint stele you have lit')} · {t('拖动环顾 · 滚轮远近', 'drag to look · scroll to zoom')}
             </span>
           )}
           <small>{t('知道了', 'Got it')}</small>
@@ -402,10 +518,16 @@ export function WalkView() {
           world={worldRef.current}
           mod={worldModule}
           onClose={() => setMapOpen(false)}
-          onTravel={(id) => { setMapOpen(false); void worldRef.current?.travel(id); }}
+          onTravel={(id) => {
+            setMapOpen(false);
+            // nobody is left talking to thin air: whatever was still being asked is answered first
+            setDialogs((ds) => { for (const d of ds) d.resolve(-1); return []; });
+            void worldRef.current?.travel(id);
+          }}
         />
       )}
       <CharacterSelect open={charOpen} onClose={() => setCharOpen(false)} />
+      <PurseSheet open={purseOpen} onClose={() => setPurseOpen(false)} />
 
       {/* --- a small hanging scroll */}
       {card && (
@@ -469,7 +591,10 @@ export function WalkView() {
   );
 }
 
-/** 舆图 — the painted map: where you are, where you have been; tap a place you know to travel there. */
+/**
+ * 舆图 — the painted map: where you are, the places you have been, and the waypoint steles (驿碑).
+ * Tap a lit stele (or its place) to travel there; an unlit one says 「尚未到访」.
+ */
 function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); onClose(): void; onTravel(id: RegionId): void }) {
   const t = useT();
   const lang = langSig.value;
@@ -478,56 +603,173 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
   const flags = play.value.flags;
   const visited = new Set<RegionId>((Object.keys(REGION) as RegionId[]).filter((id) => flags[`visit:${id}`]));
   const here = props.world.where();
+  const wps: WaypointInfo[] = props.world.waypoints();
+  const litN = wps.filter((w) => w.lit).length;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const css = c.clientWidth || 360;
     const S = Math.round(css * Math.min(2, window.devicePixelRatio || 1));
     if (c.width !== S) { c.width = S; c.height = S; }
-    const draw = () => props.mod.paintAtlas(c, { visited, player: props.world.where(), lang });
+    const draw = () => props.mod.paintAtlas(c, { visited, player: props.world.where(), lang, waypoints: wps, picked: pick, ui: S / css });
     draw();
     // fonts may arrive a moment later
     document.fonts?.ready.then(draw).catch(() => {});
-  }, [lang]);
+  }, [lang, pick]);
+  /** Standing at that very stele (in its place and within a few steps): nowhere to travel. */
+  const isHere = (id: RegionId | null) => {
+    const w = id ? wps.find((x) => x.id === id) : null;
+    return !!w && id === here.region && Math.hypot(here.x - w.x, here.z - w.z) < 12;
+  };
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.code === 'Escape' || e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); props.onClose(); } };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Escape' || e.code === 'KeyM') { e.preventDefault(); e.stopPropagation(); props.onClose(); return; }
+      // Enter travels to the picked, lit stele (just as the 传送 button would)
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && pick && wps.find((w) => w.id === pick)?.lit && !isHere(pick)) {
+        e.preventDefault(); e.stopPropagation(); props.onTravel(pick);
+      }
+    };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, []);
+  }, [pick]);
   const onTap = (e: MouseEvent) => {
     const c = ref.current;
     if (!c) return;
     const r = c.getBoundingClientRect();
-    const id = props.mod.atlasHit(c.width, ((e.clientX - r.left) / r.width) * c.width, ((e.clientY - r.top) / r.height) * c.height);
+    const id = props.mod.atlasHit(c.width, ((e.clientX - r.left) / r.width) * c.width, ((e.clientY - r.top) / r.height) * c.height, wps, c.width / Math.max(1, r.width));
     setPick(id);
   };
   const sel = pick ? REGION[pick] : null;
+  const wp = pick ? wps.find((w) => w.id === pick) ?? null : null;
+  const lit = !!wp?.lit;
   const known = pick ? visited.has(pick) : false;
+  const hereNow = isHere(pick);
   return (
     <div class="walk-map-wrap" onClick={(e) => e.target === e.currentTarget && props.onClose()}>
       <div class="walk-map" role="dialog" aria-modal="true" aria-label={t('舆图', 'Map of the world')}>
         <header class="walk-map-head">
           <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{t('舆图', 'Map')}</h2>
-          <small>{t(`已至 ${visited.size} / 6 处`, `${visited.size} of 6 places visited`)}{here.region ? ' · ' + t(`此处：${REGION[here.region].zh}`, `Here: ${REGION[here.region].en}`) : ''}</small>
+          <small>{t(`驿站已通 ${litN} / ${wps.length}`, `${litN} of ${wps.length} waypoints lit`)}{here.region ? ' · ' + t(`此处：${REGION[here.region].zh}`, `Here: ${REGION[here.region].en}`) : ''}</small>
           <button type="button" class="walk-map-close" onClick={props.onClose} aria-label={t('收起', 'Close')}>✕</button>
         </header>
-        <canvas ref={ref} class="walk-map-canvas" onClick={onTap} role="img" aria-label={t('一幅水墨舆图', 'An ink map of the world')} />
+        <canvas ref={ref} class="walk-map-canvas" onClick={onTap} role="img" aria-label={t('一幅水墨舆图：驿碑标在各处', 'An ink map of the world, with its waypoint steles')} />
+        <ul class="walk-map-list" aria-label={t('驿站', 'Waypoints')}>
+          {wps.map((w) => (
+            <li key={w.id}>
+              <button type="button" class={'walk-map-wp' + (w.lit ? ' is-lit' : '') + (pick === w.id ? ' is-picked' : '')} onClick={() => setPick(w.id)} aria-pressed={pick === w.id}>
+                <i aria-hidden="true" />{t(REGION[w.id].zh, REGION[w.id].en)}
+              </button>
+            </li>
+          ))}
+        </ul>
         <div class="walk-map-foot" aria-live="polite">
           {sel ? (
             <>
-              <div class="walk-map-place">
-                <b class={lang === 'zh' ? 'brush' : 'latin'}>{known ? t(sel.zh, sel.en) : t(`${sel.zh}？`, `${sel.en}?`)}</b>
-                <span>{known ? t(sel.blurbZh, sel.blurbEn) : t('尚未到过。循着小路去看看吧。', 'Not yet visited — follow the paths to find it.')}</span>
+              <div class={'walk-map-place' + (lit ? '' : ' is-dim')}>
+                <b class={lang === 'zh' ? 'brush' : 'latin'}>{lit || known ? t(sel.zh, sel.en) : t(`${sel.zh}？`, `${sel.en}?`)}{wp ? <small>{t(` · ${wp.zh}驿碑`, ` · ${wp.en} stele`)}</small> : null}</b>
+                <span>{lit ? t(sel.blurbZh, sel.blurbEn) : t('尚未到访 · 循着小路走到那里的驿碑前，点亮它的灯。', 'Not yet visited · follow the paths to its stele and light the lantern.')}</span>
               </div>
-              {known && sel.id !== here.region && (
-                <button type="button" class="btn btn-primary walk-map-go" onClick={() => props.onTravel(sel.id)} autoFocus>{t('驿站 · 前往', 'Travel there')}</button>
+              {lit && !hereNow && (
+                <button type="button" class="btn btn-primary walk-map-go" onClick={() => props.onTravel(sel.id)} autoFocus>
+                  <span class="brush" aria-hidden="true">驿</span> {t('传送', 'Travel')}
+                </button>
               )}
+              {lit && hereNow && <span class="walk-map-here">{t('就在此处', 'You are here')}</span>}
             </>
           ) : (
-            <span class="muted">{t('点选到过的地方，可乘驿马前往。', 'Tap a place you have visited to travel there.')}</span>
+            <span class="muted">{t('点选已点亮的驿碑（有灯火的），即可传送前往。', 'Tap a lit waypoint stele (the ones with a lantern glow) to travel there.')}</span>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * 钱囊 — the purse chip opens this: what is in it, what came in today and from where, where coins come
+ * from in one line, and the way to the quest book (its 钱囊 and 奇遇录 in full).
+ */
+function PurseSheet(props: { open: boolean; onClose(): void }) {
+  const t = useT();
+  if (!props.open) return null;
+  const { rows, total } = ledgerToday(play.value, today.value);
+  return (
+    <Sheet open onClose={props.onClose} title={t('钱囊', 'Purse')} label={t('钱囊', 'Purse')}>
+      <div class="walk-purse-sheet">
+        <p class="walk-purse-n"><CoinBadge size={22} /><span>{t('文', 'coins')}</span></p>
+        <p class={'walk-purse-today' + (total > 0 ? ' is-up' : '')}>
+          {total > 0 ? t(`今日进账 +${fmtCoins(total)} 文`, `Today +${fmtCoins(total)}`) : t('今日尚无进账', 'Nothing in yet today')}
+        </p>
+        {rows.length > 0 && (
+          <ul class="walk-purse-rows" aria-label={t('今日进账', "Today's takings")}>
+            {rows.map((r) => <li key={r.key}><span>{t(r.zh, r.en)}</span><b class="num">+{fmtCoins(r.coins)}</b></li>)}
+          </ul>
+        )}
+        <p class="walk-purse-how">
+          <b>{t('钱从何来', 'Where coins come from')}</b>
+          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，都能进账。`,
+            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips and the homestead's harvest.`)}
+        </p>
+        <p class="walk-purse-how">
+          <b>{t('钱往何处', 'What coins are for')}</b>
+          {t('家园起屋、种树、养宠，水乡摊上买些小玩意。', 'The homestead (houses, trees, pets) and the water-town stalls.')}
+        </p>
+        <button type="button" class="btn walk-purse-book" onClick={(e) => { props.onClose(); go('quests', e); }}>
+          {t('任务簿 · 钱囊与奇遇录', 'Quest book · purse and encounters')}<span aria-hidden="true"> ›</span>
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** 技 — the companion's skill: its glyph, a cooldown sweeping back, a glow while it lasts, its name on hover / long-press. */
+function SkillButton(props: { ui: SkillUi; touch: boolean; onUse(): void }) {
+  const t = useT();
+  const u = props.ui;
+  const [tip, setTip] = useState(false);
+  const hold = useRef<ReturnType<typeof setTimeout>>();
+  const hide = useRef<ReturnType<typeof setTimeout>>();
+  const seen = useRef('');
+  // a new skill (another companion) introduces itself for a moment
+  useEffect(() => {
+    const k = u.glyph + u.zh;
+    if (seen.current === k) return;
+    seen.current = k;
+    setTip(true);
+    clearTimeout(hide.current);
+    hide.current = setTimeout(() => setTip(false), 2600);
+  }, [u.glyph, u.zh]);
+  useEffect(() => () => { clearTimeout(hold.current); clearTimeout(hide.current); }, []);
+  const release = () => {
+    clearTimeout(hold.current);
+    clearTimeout(hide.current);
+    hide.current = setTimeout(() => setTip(false), 900);
+  };
+  const cooling = u.cooldown > 0.001;
+  return (
+    <div class={'walk-skill-wrap' + (props.touch ? ' is-touch' : '')}>
+      <button
+        type="button"
+        class={'walk-skill' + (u.active ? ' is-active' : '') + (cooling ? ' is-cooling' : ' is-ready')}
+        style={{ '--cd': String(u.cooldown) }}
+        aria-label={t(`绝技：${u.zh}`, `Skill: ${u.en}`) + (cooling ? t('（冷却中）', ' (recharging)') : '')}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          props.onUse();
+          clearTimeout(hold.current);
+          hold.current = setTimeout(() => { clearTimeout(hide.current); setTip(true); }, 420);
+        }}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onPointerLeave={release}
+        onClick={(e) => { if ((e as MouseEvent).detail === 0) props.onUse(); (e.currentTarget as HTMLElement).blur(); }}
+        onMouseEnter={() => { if (!props.touch) { clearTimeout(hide.current); setTip(true); } }}
+        onMouseLeave={() => { if (!props.touch) setTip(false); }}
+      >
+        <span class="brush walk-skill-glyph" aria-hidden="true">{u.glyph}</span>
+        {!props.touch && <kbd aria-hidden="true">Q</kbd>}
+      </button>
+      {tip && <span class="walk-skill-tip" role="tooltip"><b class="brush">{u.glyph}</b>{t(u.zh, u.en)}</span>}
     </div>
   );
 }

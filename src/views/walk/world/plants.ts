@@ -151,6 +151,9 @@ export function buildPlant(bag: Bag, spec: PlantSpec, slot: PlantSlot, lowEnd: b
   own.getContext('2d')!.drawImage(bmp, 0, 0);
   const tex = canvasTexture(bag, own);
   const mat = bag.add(new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, alphaTest: 0.02, side: THREE.DoubleSide }));
+  // a billboard shows one face at a time: draw both sides in one pass (three.js would otherwise
+  // draw a transparent double-sided plane twice, back then front)
+  mat.forceSinglePass = true;
   const geo = bag.add(new THREE.PlaneGeometry(crop.w * k, crop.h * k));
   const cx = crop.x0 + crop.w / 2, cy = crop.y0 + crop.h / 2;
   geo.translate((cx - d.anchor.x) * k, (d.anchor.y - cy) * k, 0);
@@ -268,13 +271,13 @@ function tabletCanvas(text: string, glyph: string | null, note: string | null = 
   const g = c.getContext('2d')!;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.clearRect(0, 0, W, H);
-  g.fillStyle = '#d3cdbf';
+  g.fillStyle = '#dccfb3';
   g.fillRect(0, 0, W, H);
   // stone mottling
   let s = hashString(text) || 1;
   const r = () => ((s = (Math.imul(s ^ (s >>> 13), 1274126177) + 0x6d2b79f5) >>> 0) / 4294967296);
   for (let i = 0; i < 40; i++) {
-    g.fillStyle = `rgba(60,55,48,${0.02 + r() * 0.05})`;
+    g.fillStyle = `rgba(92,70,48,${0.02 + r() * 0.05})`;
     g.beginPath();
     g.ellipse(r() * W, r() * H, 4 + r() * 18, 3 + r() * 10, r() * 3, 0, Math.PI * 2);
     g.fill();
@@ -338,42 +341,70 @@ function tabletCanvas(text: string, glyph: string | null, note: string | null = 
 
 export interface TabletSpec { x: number; z: number; rot: number; text: string; glyph: string | null; note?: string | null }
 
-/** Re-brush one tablet (its streak changed). */
-export function rebrushTablet(face: THREE.Mesh, spec: TabletSpec): void {
-  const tex = (face.material as THREE.MeshBasicMaterial).map as THREE.CanvasTexture | null;
-  if (!tex) return;
-  tabletCanvas(spec.text, spec.glyph, spec.note ?? null, tex.image as HTMLCanvasElement);
-  tex.needsUpdate = true;
+export interface Tablets {
+  group: THREE.Group;
+  /** The name faces (all tablets share one mesh and one texture atlas). */
+  faces: THREE.Mesh[];
+  /** Re-brush tablet i (its streak changed). */
+  rebrush(i: number, spec: TabletSpec): void;
 }
 
-export function buildTablets(bag: Bag, list: TabletSpec[]): { group: THREE.Group; faces: THREE.Mesh[] } {
+const TW = 160, TH = 244, TCOLS = 8;
+
+/**
+ * The name tablets: the stone bodies merged into one draw, and every name face in one more — the
+ * faces share a texture atlas (one cell per tablet), so a garden of twenty habits still costs two
+ * draws and one line pass.
+ */
+export function buildTablets(bag: Bag, list: TabletSpec[]): Tablets {
   const group = new THREE.Group();
   group.name = 'tablets';
   const faces: THREE.Mesh[] = [];
-  if (!list.length) return { group, faces };
+  if (!list.length) return { group, faces, rebrush() {} };
   const parts: THREE.BufferGeometry[] = [];
   const lines: THREE.BufferGeometry[] = [];
-  const faceGeo = bag.add(new THREE.PlaneGeometry(0.34, 0.52));
-  for (const t of list) {
+  const faceParts: THREE.BufferGeometry[] = [];
+  const cols = Math.min(TCOLS, list.length), rows = Math.ceil(list.length / TCOLS);
+  const atlas = canvas(TW * cols, TH * rows);
+  const ag = atlas.getContext('2d')!;
+  const scratch = canvas(TW, TH);
+  const paintCell = (i: number, t: TabletSpec) => {
+    tabletCanvas(t.text, t.glyph, t.note ?? null, scratch);
+    const cx = (i % TCOLS) * TW, cy = Math.floor(i / TCOLS) * TH;
+    ag.clearRect(cx, cy, TW, TH);
+    ag.drawImage(scratch, cx, cy);
+  };
+  list.forEach((t, i) => {
     const y = terrainY(t.x, t.z) - 0.02;
     const m = new THREE.Matrix4().compose(new THREE.Vector3(t.x, y, t.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, t.rot, 0)), new THREE.Vector3(1, 1, 1));
     const pieces = [
-      tint(new THREE.BoxGeometry(0.58, 0.12, 0.24).translate(0, 0.06, 0), '#a8a295'),
-      tint(new THREE.BoxGeometry(0.44, 0.66, 0.1).translate(0, 0.45, 0), '#c7c1b3'),
-      tint(new THREE.BoxGeometry(0.5, 0.06, 0.13).translate(0, 0.8, 0), '#a8a295'),
+      tint(new THREE.BoxGeometry(0.58, 0.12, 0.24).translate(0, 0.06, 0), '#b3a486'),
+      tint(new THREE.BoxGeometry(0.44, 0.66, 0.1).translate(0, 0.45, 0), '#d2c6ab'),
+      tint(new THREE.BoxGeometry(0.5, 0.06, 0.13).translate(0, 0.8, 0), '#b3a486'),
     ];
     for (const p of pieces) {
       p.applyMatrix4(m);
       parts.push(p);
       lines.push(new THREE.EdgesGeometry(p, 30));
     }
-    const mat = bag.add(new THREE.MeshBasicMaterial({ map: canvasTexture(bag, tabletCanvas(t.text, t.glyph, t.note ?? null)) }));
-    const face = new THREE.Mesh(faceGeo, mat);
-    face.position.set(0, 0.45, 0.052).applyMatrix4(m);
-    face.rotation.y = t.rot;
-    faces.push(face);
-    group.add(face);
-  }
+    paintCell(i, t);
+    // the face, a sliver in front of the stone, its uvs on this tablet's cell of the atlas
+    const f = new THREE.PlaneGeometry(0.34, 0.52).translate(0, 0.45, 0.052);
+    f.applyMatrix4(m);
+    const uv = f.attributes.uv as THREE.BufferAttribute;
+    const u0 = (i % TCOLS) / cols, v0 = 1 - (Math.floor(i / TCOLS) + 1) / rows;
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, u0 + uv.getX(k) / cols, v0 + uv.getY(k) / rows);
+    f.deleteAttribute('normal');
+    faceParts.push(f);
+  });
+  const tex = canvasTexture(bag, atlas);
+  const faceMat = bag.add(new THREE.MeshBasicMaterial({ map: tex }));
+  const faceGeo = bag.add(mergeGeometries(faceParts, false)!);
+  for (const f of faceParts) f.dispose();
+  const face = new THREE.Mesh(faceGeo, faceMat);
+  face.name = 'tablet-faces';
+  faces.push(face);
+  group.add(face);
   const body = bag.add(mergeGeometries(parts, false)!);
   for (const p of parts) p.dispose();
   const edge = bag.add(mergeGeometries(lines, false)!);
@@ -381,7 +412,14 @@ export function buildTablets(bag: Bag, list: TabletSpec[]): { group: THREE.Group
   const mat = bag.add(new THREE.MeshLambertMaterial({ vertexColors: true }));
   group.add(new THREE.Mesh(body, mat));
   group.add(new THREE.LineSegments(edge, bag.add(new THREE.LineBasicMaterial({ color: '#1b1916', transparent: true, opacity: 0.7 }))));
-  return { group, faces };
+  return {
+    group, faces,
+    rebrush(i, spec) {
+      if (i < 0 || i >= list.length) return;
+      paintCell(i, spec);
+      tex.needsUpdate = true;
+    },
+  };
 }
 
 export function plantCollider(e: PlantEntity): { x: number; z: number; r: number } | null {
@@ -408,7 +446,7 @@ export function buildJars(bag: Bag, slots: PlantSlot[]): THREE.Group {
   const water: THREE.BufferGeometry[] = [];
   for (const s of list) {
     const y = terrainY(s.x, s.z) - 0.04;
-    parts.push(tint(new THREE.LatheGeometry(profile, 18).translate(s.x, y, s.z), '#6f6a62', 0.05, hashString(s.key)));
+    parts.push(tint(new THREE.LatheGeometry(profile, 18).translate(s.x, y, s.z), '#46707a', 0.06, hashString(s.key)));
     water.push(new THREE.CircleGeometry(JAR_R - 0.07, 18).rotateX(-Math.PI / 2).translate(s.x, y + JAR_H - 0.09, s.z));
   }
   const body = bag.add(mergeGeometries(parts, false)!);
@@ -418,7 +456,7 @@ export function buildJars(bag: Bag, slots: PlantSlot[]): THREE.Group {
   const edge = new THREE.LineSegments(bag.add(new THREE.EdgesGeometry(body, 40)), bag.add(new THREE.LineBasicMaterial({ color: '#1b1916', transparent: true, opacity: 0.5 })));
   const wg = bag.add(mergeGeometries(water, false)!);
   for (const w of water) w.dispose();
-  const wmesh = new THREE.Mesh(wg, bag.add(new THREE.MeshBasicMaterial({ color: '#8f9186' })));
+  const wmesh = new THREE.Mesh(wg, bag.add(new THREE.MeshBasicMaterial({ color: '#6f8f7e' })));
   group.add(mesh, edge, wmesh);
   return group;
 }

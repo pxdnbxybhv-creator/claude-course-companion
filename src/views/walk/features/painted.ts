@@ -8,6 +8,7 @@ import { rasterize } from '../../../ink/brush';
 import { makeRng, type Rng } from '../../../core/rng';
 import type { Bag } from './kit';
 import type { WorldCtx } from '../types';
+import { NIGHT_SHADE } from '../regions/water-kit';
 
 const TAU = Math.PI * 2;
 const P = PIGMENTS;
@@ -244,7 +245,7 @@ export function paperTint(ctx: WorldCtx): () => T.Color {
     const m = (o as T.Mesh).material as T.MeshBasicMaterial | undefined;
     if (!src && m && !Array.isArray(m) && m.isMeshBasicMaterial && m.map) src = m.color;
   });
-  return () => src ?? fallback.set(ctx.sky.isNight() ? '#9eabbf' : '#ffffff');
+  return () => src ?? fallback.set(ctx.sky.isNight() ? NIGHT_SHADE : '#ffffff');
 }
 
 export interface Billboard {

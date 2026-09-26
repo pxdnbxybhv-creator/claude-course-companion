@@ -14,14 +14,25 @@ interface Palette {
   glow: string;
 }
 
+// A warm living painting: golden paper light by day under a pale 花青 (indigo-teal) wash of sky,
+// rose-gold at dawn, amber at dusk (a bright bounce from below, so white walls glow apricot, not
+// tan); warm ink-brown from below (never blue-grey). Night is a deep indigo sky over a warm dark:
+// an ivory moon on things — more moon and less flat sky fill, so the land has a lit side and a
+// shaded one — a lavender (not blue) sky fill and a warm-brown bounce from below, so lawns, walls and
+// paving read umber and ivory and the blue stays in the sky and the water; dark enough near the
+// ground that the lanterns and the lit windows glow amber against it — cosy, never a teal wash.
 const PALETTES: Record<TimeOfDay, Palette> = {
-  dawn: { top: '#d9d6d2', horizon: '#f1ddcb', fog: '#eddccc', hemiSky: '#f5ebe4', hemiGround: '#a89c8a', hemi: 2.1, sun: '#ffe2c8', sunI: 1.15, tint: '#f6ece2', glow: '#f3b98f' },
-  day: { top: '#e2dccd', horizon: '#f3ede0', fog: '#efe9dc', hemiSky: '#fbf8f1', hemiGround: '#b0a898', hemi: 2.25, sun: '#fff8ec', sunI: 1.25, tint: '#ffffff', glow: '#fff4dc' },
-  dusk: { top: '#d5c2a7', horizon: '#eecfa6', fog: '#e9d1b2', hemiSky: '#f4e0c8', hemiGround: '#9b8a74', hemi: 2.0, sun: '#ffcf9e', sunI: 1.2, tint: '#f5e4cc', glow: '#e89a62' },
-  // Night keeps the paper light — cool silver-blue moonlit xuan, value ≥ ~0.75 — and lets the dark
-  // gather in the upper sky and the far distance; the moon's glow and the lanterns carry the mood.
-  night: { top: '#121a28', horizon: '#6c7788', fog: '#65707f', hemiSky: '#cfd8e8', hemiGround: '#8f98a8', hemi: 2.05, sun: '#e2e9f6', sunI: 0.6, tint: '#c6cedb', glow: '#d8d4c4' },
+  dawn: { top: '#a0bccb', horizon: '#f4d9ba', fog: '#ecdcc8', hemiSky: '#fbeee2', hemiGround: '#8f7866', hemi: 2.0, sun: '#ffdcb4', sunI: 1.25, tint: '#faefe4', glow: '#f7a468' },
+  day: { top: '#97bfcc', horizon: '#efebdf', fog: '#e7e6d8', hemiSky: '#fff8ee', hemiGround: '#a88a68', hemi: 2.05, sun: '#fff3de', sunI: 1.4, tint: '#fffaf2', glow: '#fff0c8' },
+  dusk: { top: '#7b8db5', horizon: '#f2c59a', fog: '#e8cfb6', hemiSky: '#f6e9dc', hemiGround: '#957866', hemi: 2.15, sun: '#ffd3a6', sunI: 1.25, tint: '#f6e5d3', glow: '#f2844a' },
+  night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#aaa8c4', hemiGround: '#74553e', hemi: 1.2, sun: '#ece6da', sunI: 0.9, tint: '#aaa6bc', glow: '#efe2bc' },
 };
+
+/** Fog distances by day and by night: a light warm haze, a closer indigo dark. */
+const FOG = { near: 58, far: 176, nightNear: 26, nightFar: 126 };
+
+/** Water takes the sky's colour through jade: 碧 by day, a deep indigo-teal by night. */
+const WATER: Record<TimeOfDay, string> = { dawn: '#a8c6b6', day: '#97c2b4', dusk: '#b5b89a', night: '#2d4a5c' };
 
 const SKY_VS = /* glsl */`
 varying vec3 vDir;
@@ -31,16 +42,26 @@ void main() {
   gl_Position = p.xyww;
 }`;
 const SKY_FS = /* glsl */`
-uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uFog; uniform vec3 uGlowColor; uniform vec3 uSunDir; uniform float uGlow;
+uniform vec3 uTop; uniform vec3 uHorizon; uniform vec3 uFog; uniform vec3 uGlowColor; uniform vec3 uSunDir; uniform float uGlow; uniform float uNight;
 varying vec3 vDir;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 void main() {
   vec3 d = normalize(vDir);
   float h = d.y;
-  vec3 col = mix(uHorizon, uTop, pow(smoothstep(-0.02, 0.42, h), 0.8));
+  vec3 col = mix(uHorizon, uTop, pow(smoothstep(-0.02, 0.34, h), 0.7));
   col = mix(col, uFog, smoothstep(0.06, -0.05, h));
   float g = max(dot(d, uSunDir), 0.0);
-  col += uGlowColor * (pow(g, 90.0) * 0.28 + pow(g, 12.0) * 0.06) * uGlow;
+  col += uGlowColor * (pow(g, 90.0) * 0.28 + pow(g, 12.0) * 0.06 + pow(g, 3.0) * 0.05) * uGlow;
+  // by night a scatter of small stars in the upper sky (none by the moon, fewer toward the horizon)
+  if (uNight > 0.01) {
+    vec2 sp = vec2(atan(d.z, d.x) * 95.0, asin(clamp(h, -1.0, 1.0)) * 95.0);
+    vec2 cell = floor(sp);
+    float r = hash(cell);
+    vec2 off = vec2(hash(cell + 7.1), hash(cell + 3.7)) - 0.5;
+    float star = smoothstep(0.34, 0.0, length(fract(sp) - 0.5 - off * 0.5)) * step(0.985, r);
+    star *= smoothstep(0.1, 0.45, h) * (1.0 - smoothstep(0.93, 0.99, g)) * (0.4 + 0.6 * hash(cell + 1.3));
+    col += vec3(0.95, 0.92, 0.82) * star * uNight * 0.7;
+  }
   // paper tooth: a faint fibrous grain so the sky reads as a sheet, not a screen
   vec2 q = gl_FragCoord.xy;
   float n = hash(floor(q * 0.5)) * 0.6 + hash(floor(q * vec2(0.05, 0.9))) * 0.4;
@@ -99,6 +120,12 @@ function sunCanvas(): HTMLCanvasElement {
   return c;
 }
 
+/**
+ * The hour as the painted things of the world see it (mountains, lamplight pools): the latest sky's
+ * eased night (0 day … 1 night), updated every frame. For look code that has no per-frame hook.
+ */
+export const skyNow = { night: 0 };
+
 export class SkySystem implements Sky {
   readonly fog: THREE.Fog;
   readonly hemi: THREE.HemisphereLight;
@@ -106,6 +133,8 @@ export class SkySystem implements Sky {
   /** The light falling on unlit painted things (plants, tablets). */
   readonly tint = new THREE.Color('#ffffff');
   readonly fogColor = new THREE.Color();
+  /** Jade water under this sky (the pond and the open water take it). */
+  readonly waterColor = new THREE.Color('#97c2b4');
   /** 0 = day … 1 = night, eased. */
   night01 = 0;
 
@@ -116,7 +145,7 @@ export class SkySystem implements Sky {
   private moonGlow: THREE.Sprite;
   private sun: THREE.Sprite;
   private forced = false;
-  private moonOverride: { visible?: boolean; scale: number; glow: number } = { scale: 1, glow: 1 };
+  private moonOverride: { visible?: boolean | null; scale: number; glow: number } = { scale: 1, glow: 1 };
   private moonDir = new THREE.Vector3(0.28, 0.3, -1).normalize();
   private sunDir = new THREE.Vector3();
   private cur: Record<keyof Palette, THREE.Color | number>;
@@ -141,7 +170,7 @@ export class SkySystem implements Sky {
       vertexShader: SKY_VS, fragmentShader: SKY_FS, side: THREE.BackSide, depthWrite: false, fog: false,
       uniforms: {
         uTop: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uFog: { value: new THREE.Color() },
-        uGlowColor: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uGlow: { value: 1 },
+        uGlowColor: { value: new THREE.Color() }, uSunDir: { value: new THREE.Vector3(0, 1, 0) }, uGlow: { value: 1 }, uNight: { value: 0 },
       },
     }));
     this.dome = new THREE.Mesh(bag.add(new THREE.SphereGeometry(400, 32, 16)), this.domeMat);
@@ -172,6 +201,9 @@ export class SkySystem implements Sky {
     return c;
   }
   private lightDir = new THREE.Vector3();
+  private glowDir = new THREE.Vector3();
+  private moonLight = new THREE.Vector3();
+  private sunLightDir = new THREE.Vector3();
 
   private target(): Palette {
     return PALETTES[this.forced ? 'night' : this.tod];
@@ -200,7 +232,7 @@ export class SkySystem implements Sky {
     this.forced = on;
   }
 
-  setMoon(o: { visible?: boolean; scale?: number; glow?: number; position?: THREE.Vector3 }): void {
+  setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE.Vector3 }): void {
     if (o.visible !== undefined) this.moonOverride.visible = o.visible;
     if (o.scale !== undefined) this.moonOverride.scale = Math.max(0.1, o.scale);
     if (o.glow !== undefined) this.moonOverride.glow = Math.max(0, o.glow);
@@ -218,6 +250,7 @@ export class SkySystem implements Sky {
     const c = this.cur as Record<string, THREE.Color & number>;
     const night = this.isNight() ? 1 : 0;
     this.night01 = dt > 0.5 ? night : damp(this.night01, night, 1.6, dt);
+    skyNow.night = this.night01;
 
     const u = this.domeMat.uniforms;
     (u.uTop.value as THREE.Color).copy(c.top);
@@ -226,9 +259,10 @@ export class SkySystem implements Sky {
     (u.uGlowColor.value as THREE.Color).copy(c.glow);
     this.fog.color.copy(c.fog);
     // by night the near garden stays clear and the dark gathers further off
-    this.fog.near = 30 - 4 * this.night01;
-    this.fog.far = 150 - 40 * this.night01;
+    this.fog.near = FOG.near + (FOG.nightNear - FOG.near) * this.night01;
+    this.fog.far = FOG.far + (FOG.nightFar - FOG.far) * this.night01;
     this.fogColor.copy(c.fog);
+    this.waterColor.copy(SkySystem.col(WATER[this.tod])).lerp(SkySystem.col(WATER.night), this.night01);
     this.hemi.color.copy(c.hemiSky);
     this.hemi.groundColor.copy(c.hemiGround);
     this.hemi.intensity = c.hemi as number;
@@ -237,11 +271,23 @@ export class SkySystem implements Sky {
     this.tint.copy(c.tint);
 
     // light direction: the sun by day, the moon by night
-    const lightDir = this.lightDir.copy(this.sunDir).lerp(this.moonDir, this.night01).normalize();
+    // (moonlight falls from higher than the moon's disc sits: there are no cast shadows to betray
+    // it, and a grazing light would leave the land one flat dark — this way the moonlit side of
+    // every swell and roof reads silver, the far side stays in shade)
+    const moonLight = this.moonLight.copy(this.moonDir);
+    moonLight.y = Math.max(moonLight.y, 0.62);
+    moonLight.normalize();
+    // (and a low sun lights from a little higher than its disc, so dawn and dusk rake the land gold
+    // rather than leaving it to the sky's fill alone)
+    const sunLight = this.sunLightDir.copy(this.sunDir);
+    sunLight.y = Math.max(sunLight.y, 0.24);
+    sunLight.normalize();
+    const lightDir = this.lightDir.copy(sunLight).lerp(moonLight, this.night01).normalize();
     this.sunLight.position.copy(lightDir).multiplyScalar(50);
     this.sunLight.target.position.set(0, 0, 0);
-    (u.uSunDir.value as THREE.Vector3).copy(lightDir);
+    (u.uSunDir.value as THREE.Vector3).copy(this.glowDir.copy(this.sunDir).lerp(this.moonDir, this.night01).normalize());
     u.uGlow.value = this.night01 > 0.5 ? 0.9 * this.moonOverride.glow : 1;
+    u.uNight.value = this.night01;
 
     this.dome.position.copy(camera.position);
     this.celestial.position.copy(camera.position);

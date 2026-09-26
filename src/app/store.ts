@@ -262,9 +262,11 @@ export function setOnboarded(): void {
 
 /**
  * Other stores that want to ride along in backups (e.g. play progress) register here, so the
- * backup file stays one file without this module importing them.
+ * backup file stays one file without this module importing them. `reset` empties the store: an
+ * erase calls it, and so does an import whose backup has nothing for that key (an older backup
+ * replaces everything too, not just what it knew about).
  */
-export const backupExtras: { key: string; get(): unknown; set(raw: unknown): void }[] = [];
+export const backupExtras: { key: string; get(): unknown; set(raw: unknown): void; reset(): void }[] = [];
 
 export function exportJSON(): string {
   const extras = Object.fromEntries(backupExtras.map((b) => [b.key, b.get()]));
@@ -277,15 +279,20 @@ export function importJSON(text: string): boolean {
     const raw = JSON.parse(text);
     if (!raw || typeof raw !== 'object' || !Array.isArray(raw.habits)) return false;
     state.value = sanitize(raw);
-    for (const b of backupExtras) if (b.key in raw) b.set((raw as Record<string, unknown>)[b.key]);
+    for (const b of backupExtras) {
+      if (b.key in raw) b.set((raw as Record<string, unknown>)[b.key]);
+      else b.reset();
+    }
     return true;
   } catch {
     return false;
   }
 }
 
+/** Erase everything but the settings: the garden and every store that rides along in backups. */
 export function resetAll(): void {
   state.value = { ...emptyState(), settings: state.value.settings, onboarded: true };
+  for (const b of backupExtras) b.reset();
 }
 
 /** Replace state wholesale (used by demo seeding and tests). */

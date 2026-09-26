@@ -21,11 +21,11 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
   // moon (a paper disc ringed by a faint wash)
   const mx = W * 0.72, my = H * 0.3, mr = Math.min(W, H) * 0.14;
   const halo = g.createRadialGradient(mx, my, mr * 0.9, mx, my, mr * 2.4);
-  halo.addColorStop(0, 'rgba(90,100,110,0.16)');
-  halo.addColorStop(1, 'rgba(90,100,110,0)');
+  halo.addColorStop(0, 'rgba(226,167,46,0.22)');
+  halo.addColorStop(1, 'rgba(226,167,46,0)');
   g.fillStyle = halo;
   g.fillRect(0, 0, W, H);
-  g.fillStyle = '#f8f3e6';
+  g.fillStyle = '#fbf0d6';
   g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill();
 
   // mountains, far to near
@@ -52,12 +52,13 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
     g.closePath();
     g.fill();
   };
-  ridge(H * 0.52, H * 0.16, 'rgba(91,111,130,A)', 0.28, 3);
-  ridge(H * 0.62, H * 0.12, 'rgba(46,50,54,A)', 0.35, 8);
+  // 青绿: the far ridge in a 花青 wash, the near one in jade over ink-brown
+  ridge(H * 0.52, H * 0.16, 'rgba(63,110,124,A)', 0.32, 3);
+  ridge(H * 0.62, H * 0.12, 'rgba(70,112,78,A)', 0.4, 8);
 
   // far off on the left ridge, the temple's pagoda (the world goes on beyond the garden)
   const pgx = W * 0.2, pgy = H * 0.47;
-  g.fillStyle = 'rgba(46,50,54,0.42)';
+  g.fillStyle = 'rgba(92,60,40,0.5)';
   for (let i = 0; i < 5; i++) {
     const w = u * (3 - i * 0.42), y = pgy - i * u * 2;
     g.fillRect(pgx - w * 0.35, y - u * 1.3, w * 0.7, u * 1.3);
@@ -67,7 +68,7 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
 
   // the river across the middle distance, and an arched bridge where the path meets it
   const ry = H * 0.665;
-  g.fillStyle = 'rgba(108,128,138,0.2)';
+  g.fillStyle = 'rgba(64,116,128,0.26)';
   g.beginPath();
   g.moveTo(0, ry - u * 1.2);
   for (let x = 0; x <= W; x += W / 12) g.lineTo(x, ry - u * (1.1 + 0.4 * Math.sin(x * 0.03)));
@@ -81,7 +82,7 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
     g.beginPath(); g.moveTo(x, ry + u * 0.2); g.lineTo(x + u * 3.5, ry + u * 0.2); g.stroke();
   }
   const bx = W * 0.47, bw = u * 6.5, bh = u * 2.6;
-  g.fillStyle = '#e3dccd';
+  g.fillStyle = '#e6d6b4';
   g.strokeStyle = 'rgba(27,25,22,0.75)';
   g.lineWidth = Math.max(1, u * 0.28);
   g.beginPath();
@@ -100,7 +101,7 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
     const s = (1 - k * 0.65) * u * 2.2;
     g.fillStyle = 'rgba(27,25,22,0.32)';
     g.beginPath(); g.ellipse(x, y, s * 1.15, s * 0.42, rng.range(-0.2, 0.2), 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#ddd5c4';
+    g.fillStyle = '#e2d1ad';
     g.beginPath(); g.ellipse(x, y - s * 0.08, s, s * 0.34, 0, 0, Math.PI * 2); g.fill();
   }
 
@@ -146,7 +147,7 @@ export function paintPreview(canvas: HTMLCanvasElement): void {
   const fx = W * 0.47, fy = H * 0.84, fs = u * 1.15;
   g.fillStyle = 'rgba(27,25,22,0.18)';
   g.beginPath(); g.ellipse(fx, fy + fs * 0.2, fs * 2.4, fs * 0.6, 0, 0, Math.PI * 2); g.fill();
-  g.fillStyle = '#e8e8e1';
+  g.fillStyle = '#f3ead6';
   g.strokeStyle = '#1b1916';
   g.lineWidth = Math.max(1, fs * 0.28);
   g.beginPath();

@@ -12,6 +12,8 @@ import { begin, button, end, h, hold, onEscape, panel, touchInput, tr, type Hold
 import { ripples } from './fx';
 import { dockSpot } from './fishing';
 import * as snd from './sound';
+import { lotusPay } from '../../../games/economy';
+import { pay } from '../../../games/purse';
 
 const SONGS: { zh: string; en: string }[] = [
   { zh: '采莲南塘秋，莲花过人头。\n低头弄莲子，莲子清如水。——《西洲曲》', en: 'Picking lotus in the south pond in autumn, the flowers taller than my head;\nI bow to play with the seeds — clear as water. — “West Isle Song”' },
@@ -197,6 +199,7 @@ export const boating = feature('mg-boat', (bag, ctx) => {
     burst(bag, new THREE.Vector3(pd.x, pd.y + 1, pd.z), '#9fb46a', 10, { speed: 0.8, size: 0.02, life: 1 });
     placePods(0);
     record('lotus');
+    pay(lotusPay());
     picked++;
     const song = SONGS[songI++ % SONGS.length];
     ctx.audio.pluck([0, 2, 4, 7][picked % 4], 0.55);

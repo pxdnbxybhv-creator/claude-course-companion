@@ -1,0 +1,79 @@
+/* 奇遇 · chance encounters: the paper curtain between worlds, a dream's golden haze, the wish button. */
+.qy-curtain {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  background:
+    radial-gradient(120% 90% at 50% 45%, rgba(248, 228, 226, 0.0) 0%, rgba(241, 233, 216, 0.55) 55%, rgba(241, 233, 216, 0.96) 100%),
+    #f1e9d8;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+  display: grid;
+  place-items: center;
+}
+.qy-curtain.is-on { opacity: 1; }
+.qy-curtain p {
+  margin: 0;
+  padding: 0 28px;
+  max-width: 30em;
+  text-align: center;
+  font-family: var(--font-text);
+  font-size: 18px;
+  line-height: 2;
+  color: #3a332b;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 1.1s ease 0.35s, transform 1.1s ease 0.35s;
+}
+.qy-curtain.is-on p { opacity: 1; transform: none; }
+
+/* a dream: a warm golden haze at the edges of the painting */
+.qy-dream {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(90% 75% at 50% 50%, rgba(255, 214, 130, 0) 35%, rgba(255, 205, 120, 0.28) 70%, rgba(247, 226, 180, 0.7) 100%);
+  opacity: 0;
+  transition: opacity 1.6s ease;
+}
+.qy-dream.is-on { opacity: 1; }
+
+/* the wish button while a star falls */
+.qy-wish {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 236px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  color: #3a2a12;
+  background: radial-gradient(circle at 40% 35%, #fff3c9, #f2c86a 60%, #d99a3a);
+  box-shadow: 0 0 0 3px rgba(255, 236, 190, 0.55), 0 0 34px 10px rgba(255, 210, 120, 0.55);
+  font-family: var(--font-brush);
+  font-size: 40px;
+  line-height: 1;
+  animation: qy-wish-in 0.6s ease-out both, qy-wish-glow 1.6s ease-in-out 0.6s infinite alternate;
+}
+.qy-wish small {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-latin), var(--font-text);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
+.qy-wish.is-out { animation: qy-wish-out 0.5s ease-in both; }
+@keyframes qy-wish-in { from { opacity: 0; transform: translateX(-50%) scale(0.6); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+@keyframes qy-wish-out { to { opacity: 0; transform: translateX(-50%) scale(0.8); } }
+@keyframes qy-wish-glow { to { box-shadow: 0 0 0 5px rgba(255, 236, 190, 0.35), 0 0 48px 16px rgba(255, 210, 120, 0.7); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .qy-curtain, .qy-curtain p, .qy-dream { transition-duration: 0.01s; }
+  .qy-wish, .qy-wish.is-out { animation: none; }
+}

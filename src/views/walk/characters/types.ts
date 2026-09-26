@@ -19,6 +19,11 @@ export interface MotionState {
   t: number;
   /** Frozen for a mini-game or riding a boat (sitting / standing pose). */
   riding: boolean;
+  /**
+   * What is ridden, when it is not a seat: 'horse' (关公's Red Hare) sits the figure astride.
+   * Optional: the core fills it from the ridden object's userData.mount.
+   */
+  mount?: 'horse' | null;
 }
 
 export interface CharacterModel {
@@ -34,6 +39,7 @@ export interface CharacterModel {
   hold?(prop: string | null): void;
 }
 
-export type CharacterFactory = (THREE: typeof THREE_NS, opts: { palette: Record<string, string> }) => CharacterModel;
+/** `reduced`: prefers-reduced-motion (read from the media query when not given). */
+export type CharacterFactory = (THREE: typeof THREE_NS, opts: { palette: Record<string, string>; reduced?: boolean }) => CharacterModel;
 
 export type CharacterRegistry = Record<CharacterId, CharacterFactory>;

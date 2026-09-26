@@ -10,6 +10,11 @@ import { SEASONAL } from './seasonal';
 import { closeSfx } from './sfx';
 import { disposeShared, type FreshFeature } from './kit';
 import { MINIGAME_FEATURES } from './minigames';
+import { SKILLS_FEATURES } from './skills';
+import { PARKOUR_FEATURES } from './parkour';
+import { NPCS_FEATURES } from './npcs';
+import { ENCOUNTERS_FEATURES } from './encounters';
+import { HOME_FEATURES } from './home';
 
 export { FESTIVALS };
 
@@ -44,7 +49,10 @@ function finale(): WorldFeature {
   };
 }
 
-const LIST: WorldFeature[] = [...LIFE, ...HIDDEN, midautumn, ...FESTIVE, ...SEASONAL, ...MINIGAME_FEATURES];
+const LIST: WorldFeature[] = [
+  ...LIFE, ...HIDDEN, midautumn, ...FESTIVE, ...SEASONAL, ...MINIGAME_FEATURES,
+  ...SKILLS_FEATURES, ...PARKOUR_FEATURES, ...NPCS_FEATURES, ...ENCOUNTERS_FEATURES, ...HOME_FEATURES,
+];
 
 /** A fresh, independent instance of every feature (their Bags never cross worlds). */
 function freshList(): WorldFeature[] {
