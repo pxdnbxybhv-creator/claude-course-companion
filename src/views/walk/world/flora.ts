@@ -117,7 +117,8 @@ export interface Flora {
   mist: THREE.Mesh;
 }
 
-export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean): Flora {
+/** `density` (the picture quality's) scales the tufts sown here and there by the path. */
+export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean, density = 1): Flora {
   const group = new THREE.Group();
   group.name = 'flora';
   const time = { value: 0 };
@@ -136,7 +137,8 @@ export function buildFlora(bag: Bag, slots: PlantSlot[], reduced: boolean): Flor
   for (const r of ROCKS) around(r.x, r.z, r.w * 0.7, 4);
   for (const l of LANTERNS) around(l.x, l.z, 0.35, 2);
   for (const sl of slots) if (!sl.inWater) { around(sl.tablet.x, sl.tablet.z, 0.35, 2); around(sl.x, sl.z, 0.6, 2); }
-  for (let i = 0; i < 70; i++) {
+  const nWild = Math.round(70 * Math.max(0.3, density));
+  for (let i = 0; i < nWild; i++) {
     const a = rng() * Math.PI * 2, rr = rng.range(4, 22);
     spots.push([Math.cos(a) * rr, Math.sin(a) * rr]);
   }

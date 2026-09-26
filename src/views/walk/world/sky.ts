@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import type { TimeOfDay } from '../../../ink/scene-types';
 import type { Sky } from '../types';
 import { Bag, canvas, canvasTexture, glowTexture, damp } from './kit';
+import { fogFor, type ShadowSpec } from './quality';
+import { ShadowRig } from './shadows';
 
 interface Palette {
   top: string; horizon: string; fog: string;
@@ -28,8 +30,7 @@ const PALETTES: Record<TimeOfDay, Palette> = {
   night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#aaa8c4', hemiGround: '#74553e', hemi: 1.2, sun: '#ece6da', sunI: 0.9, tint: '#aaa6bc', glow: '#efe2bc' },
 };
 
-/** Fog distances by day and by night: a light warm haze, a closer indigo dark. */
-const FOG = { near: 58, far: 176, nightNear: 26, nightFar: 126 };
+/** Fog distances by day and by night (a light warm haze, a closer indigo dark): fogFor() in quality.ts, × the picture quality's distance. */
 
 /** Water takes the sky's colour through jade: 碧 by day, a deep indigo-teal by night. */
 const WATER: Record<TimeOfDay, string> = { dawn: '#a8c6b6', day: '#97c2b4', dusk: '#b5b89a', night: '#2d4a5c' };
@@ -152,6 +153,11 @@ export class SkySystem implements Sky {
   private moonScale = 1;
   private moonGlowK = 1;
   private moonVis = 0;
+  private fogD: ReturnType<typeof fogFor>;
+  private halo: number;
+  /** 身临其境: a soft warm halo round the low sun (the moon has its glow already). */
+  private sunHalo: THREE.Sprite | null = null;
+  private rig: ShadowRig | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -159,7 +165,10 @@ export class SkySystem implements Sky {
     private tod: TimeOfDay,
     hour: number,
     private moonPhase: number,
+    q: { distance?: number; shadows?: ShadowSpec | null; halo?: number; renderer?: THREE.WebGLRenderer } = {},
   ) {
+    this.fogD = fogFor(q.distance ?? 1);
+    this.halo = Math.max(0.5, q.halo ?? 1);
     this.fog = new THREE.Fog('#efe7d7', 20, 115);
     scene.fog = this.fog;
     this.hemi = new THREE.HemisphereLight('#fff', '#888', 2);
@@ -185,7 +194,17 @@ export class SkySystem implements Sky {
     this.sun = new THREE.Sprite(bag.add(new THREE.SpriteMaterial({ map: canvasTexture(bag, sunCanvas()), fog: false, depthWrite: false, transparent: true })));
     this.moon.renderOrder = this.moonGlow.renderOrder = this.sun.renderOrder = -9;
     this.celestial.add(this.moonGlow, this.moon, this.sun);
+    if (this.halo > 1.001) {
+      this.sunHalo = new THREE.Sprite(bag.add(new THREE.SpriteMaterial({ map: glowTexture(bag, 128, 0.5), color: '#f6a66e', fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending, opacity: 0 })));
+      this.sunHalo.renderOrder = -9;
+      this.celestial.add(this.sunHalo);
+    }
     scene.add(this.celestial);
+    if (q.shadows) {
+      const rig = new ShadowRig(scene, this.sunLight, q.shadows, q.renderer ?? null);
+      this.rig = rig;
+      bag.add({ dispose: () => rig.dispose() });
+    }
 
     const hourAngle = ((hour - 6) / 12) * Math.PI; // 0 at 6h (east) … π at 18h (west)
     this.sunDir.set(Math.cos(hourAngle), Math.max(0.06, Math.sin(hourAngle)) * 0.75, 0.55 * Math.max(0.2, Math.sin(hourAngle))).normalize();
@@ -259,8 +278,9 @@ export class SkySystem implements Sky {
     (u.uGlowColor.value as THREE.Color).copy(c.glow);
     this.fog.color.copy(c.fog);
     // by night the near garden stays clear and the dark gathers further off
-    this.fog.near = FOG.near + (FOG.nightNear - FOG.near) * this.night01;
-    this.fog.far = FOG.far + (FOG.nightFar - FOG.far) * this.night01;
+    const F = this.fogD;
+    this.fog.near = F.near + (F.nightNear - F.near) * this.night01;
+    this.fog.far = F.far + (F.nightFar - F.far) * this.night01;
     this.fogColor.copy(c.fog);
     this.waterColor.copy(SkySystem.col(WATER[this.tod])).lerp(SkySystem.col(WATER.night), this.night01);
     this.hemi.color.copy(c.hemiSky);
@@ -283,8 +303,11 @@ export class SkySystem implements Sky {
     sunLight.y = Math.max(sunLight.y, 0.24);
     sunLight.normalize();
     const lightDir = this.lightDir.copy(sunLight).lerp(moonLight, this.night01).normalize();
-    this.sunLight.position.copy(lightDir).multiplyScalar(50);
-    this.sunLight.target.position.set(0, 0, 0);
+    if (this.rig) this.rig.update(dt, camera, lightDir, this.night01);
+    else {
+      this.sunLight.position.copy(lightDir).multiplyScalar(50);
+      this.sunLight.target.position.set(0, 0, 0);
+    }
     (u.uSunDir.value as THREE.Vector3).copy(this.glowDir.copy(this.sunDir).lerp(this.moonDir, this.night01).normalize());
     u.uGlow.value = this.night01 > 0.5 ? 0.9 * this.moonOverride.glow : 1;
     u.uNight.value = this.night01;
@@ -303,7 +326,7 @@ export class SkySystem implements Sky {
     this.moon.position.copy(this.moonDir).multiplyScalar(D);
     this.moon.scale.setScalar(ms);
     this.moonGlow.position.copy(this.moon.position).multiplyScalar(1.01);
-    this.moonGlow.scale.setScalar(ms * (2.4 + Math.min(1.5, this.moonGlowK) * 0.5));
+    this.moonGlow.scale.setScalar(ms * (2.4 + Math.min(1.5, this.moonGlowK) * 0.5) * this.halo);
     const dayMoon = 1 - this.night01 * 0.6;
     (this.moon.material as THREE.SpriteMaterial).opacity = this.moonVis * (this.night01 > 0.5 ? 1 : 0.55 + 0.45 * (1 - dayMoon));
     (this.moonGlow.material as THREE.SpriteMaterial).opacity = this.moonVis * this.night01 * 0.22 * Math.min(1.6, this.moonGlowK) / Math.sqrt(Math.max(1, this.moonScale));
@@ -316,5 +339,11 @@ export class SkySystem implements Sky {
     this.sun.position.copy(this.sunDir).multiplyScalar(D);
     this.sun.scale.setScalar(16);
     (this.sun.material as THREE.SpriteMaterial).opacity = (1 - this.night01) * 0.85;
+    if (this.sunHalo) {
+      this.sunHalo.visible = this.sun.visible;
+      this.sunHalo.position.copy(this.sun.position).multiplyScalar(1.01);
+      this.sunHalo.scale.setScalar(16 * 4.2 * this.halo);
+      (this.sunHalo.material as THREE.SpriteMaterial).opacity = (1 - this.night01) * 0.16 * (this.halo - 1) / 0.35;
+    }
   }
 }

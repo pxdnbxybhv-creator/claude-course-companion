@@ -38,6 +38,33 @@
 .seal-stamp { display: grid; place-items: center; flex: none; }
 .seal-stamp canvas { display: block; }
 
+/* 画面 · picture quality */
+.set-quality-seg { flex: 0 1 auto; max-width: 100%; }
+.set-quality-seg .seg { display: flex; }
+.set-quality-seg .seg button { flex: 1 1 auto; padding: 0 12px; white-space: nowrap; }
+@media (max-width: 520px) {
+  .set-quality-seg { flex: 1 1 100%; }
+  .set-quality-seg .seg { width: 100%; }
+  .set-quality-seg .seg button { padding: 0 6px; }
+}
+.set-quality { padding: 10px 0 12px; border-top: 1px solid var(--line); }
+.set-quality-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.set-quality-meter { display: flex; gap: 5px; }
+.set-quality-meter i {
+  display: block; height: 3px; flex: 0 0 22px; border-radius: 3px 1px 3px 1px; background: var(--paper-3);
+  transition: background-color 0.35s cubic-bezier(0.33, 1, 0.68, 1);
+}
+.set-quality-meter i.on { background: var(--ink-2); }
+.set-quality-meter i.on:last-child { background: var(--cinnabar); }
+.set-quality-line { margin: 0; font-size: 14px; line-height: 1.75; color: var(--ink-2); }
+.set-quality-name { flex: none; font-size: 24px; line-height: 1.2; color: var(--ink); letter-spacing: 0.06em; }
+.set-quality-warn {
+  margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; color: var(--ink-2);
+  background: color-mix(in srgb, var(--cinnabar) 8%, transparent); border-left: 2px solid color-mix(in srgb, var(--cinnabar) 60%, transparent);
+}
+.set-quality .set-hint { margin-top: 6px; }
+@media (prefers-reduced-motion: reduce) { .set-quality-meter i { transition: none; } }
+
 /* volume */
 .set-volume { flex-wrap: wrap; }
 .set-volume-label { flex: 0 0 auto; display: flex; flex-direction: column; min-width: 64px; }

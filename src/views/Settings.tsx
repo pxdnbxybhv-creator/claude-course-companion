@@ -1,4 +1,4 @@
-// 设置 · Settings — seal, language, theme, sound, location, data, about.
+// 设置 · Settings — seal, language, theme, picture, sound, location, data, about.
 import type { ComponentChildren } from 'preact';
 import { hostSave } from '../app/hostSave';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -11,6 +11,7 @@ import { audio } from '../audio/engine';
 import { music } from '../audio/music';
 import { redeemCode } from '../app/play';
 import { makeSeal } from '../ink/seal';
+import { QUALITY_LEVELS, QUALITY_TEXT } from './walk/world/quality';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
 
@@ -228,6 +229,53 @@ function AppearanceSections() {
         </Row>
       </Section>
     </>
+  );
+}
+
+/** A phone or a tablet (where 身临其境 asks the most of the battery). */
+function coarsePointer(): boolean {
+  try {
+    return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/** 画面: how finely 入画 is painted (低 · 中 · 高 · 身临其境). */
+function PictureSection() {
+  const t = useT();
+  const q = state.value.settings.quality;
+  const info = QUALITY_TEXT[q] ?? QUALITY_TEXT.medium;
+  const phone = coarsePointer();
+  return (
+    <Section id="picture" zh="画面" en="Picture">
+      <Row title={t('画质', 'Quality')} sub={t('入画中立体山水的精细程度', 'How finely the 3D landscape of 入画 is painted')} wrap id="set-quality-title">
+        <div class="set-quality-seg">
+          <Segmented<Settings['quality']>
+            label={t('画质', 'Picture quality')}
+            value={q}
+            onChange={(quality) => setSettings({ quality })}
+            options={QUALITY_LEVELS.map((l) => ({ value: l, label: t(QUALITY_TEXT[l].name.zh, QUALITY_TEXT[l].name.en) }))}
+          />
+        </div>
+      </Row>
+      <div class="set-quality" aria-live="polite">
+        <div class="set-quality-head">
+          <span class="set-quality-name brush" lang="zh-CN">{info.name.zh}</span>
+          <span class="set-quality-meter" aria-hidden="true">
+            {QUALITY_LEVELS.map((l, i) => <i key={l} class={i <= QUALITY_LEVELS.indexOf(q) ? 'on' : ''} />)}
+          </span>
+        </div>
+        <p class="set-quality-line">{t(info.zh, info.en)}</p>
+        {phone && q === 'ultra' && (
+          <p class="set-quality-warn">
+            {t('身临其境颇费气力：手机可能发热、更耗电。若觉卡顿，画面会自动放粗一些，或换回「高」。',
+              'Immersive asks a lot of a phone: it may warm up and use more battery. If it stutters, the picture coarsens itself a little — or choose High.')}
+          </p>
+        )}
+        <p class="set-hint">{t('下次进入入画时生效。', 'Takes effect the next time you enter 入画.')}</p>
+      </div>
+    </Section>
   );
 }
 
@@ -677,12 +725,13 @@ export function SettingsView() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
           <h1 class="brush">{t('设置', 'Settings')}</h1>
-          <span class="topbar-sub">{t('印章 · 语言 · 声乐 · 数据', 'Seal · language · sound · data')}</span>
+          <span class="topbar-sub">{t('印章 · 语言 · 画面 · 声乐 · 数据', 'Seal · language · picture · sound · data')}</span>
         </div>
       </header>
       <div class="page set-page">
         <SealSection />
         <AppearanceSections />
+        <PictureSection />
         <SoundSection />
         <LocationSection />
         <DataSection />

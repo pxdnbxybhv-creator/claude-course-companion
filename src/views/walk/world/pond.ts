@@ -86,16 +86,22 @@ export interface Pond {
 const RING_DAY = new THREE.Color('#2a2724');
 const RING_NIGHT = new THREE.Color('#c9cfd8');
 
-export function buildPond(bag: Bag, clarity: number, o: { lowEnd: boolean; reduced: boolean; w: number; h: number }): Pond {
+/**
+ * `mirror` comes from the picture quality: the reflection's resolution against the canvas's (中 0.55,
+ * or 0.4 on a low-end phone; 低 a quarter; 身临其境 full) and every how many frames it is redrawn (低
+ * every other frame: the ripples hide it).
+ */
+export function buildPond(bag: Bag, clarity: number, o: { mirror: { scale: number; every: number }; reduced: boolean; w: number; h: number }): Pond {
   const group = new THREE.Group();
   group.name = 'pond';
   const geo = bag.add(new THREE.CircleGeometry(1, 72));
   geo.scale(POND.rx * 1.14, POND.rz * 1.14, 1);
-  const scale = o.lowEnd ? 0.4 : 0.55;
+  const scale = o.mirror.scale;
+  const minTex = scale < 0.4 ? 128 : 256;
   const water = new Reflector(geo, {
     color: '#ffffff',
-    textureWidth: Math.max(256, Math.round(o.w * scale)),
-    textureHeight: Math.max(256, Math.round(o.h * scale)),
+    textureWidth: Math.max(minTex, Math.round(o.w * scale)),
+    textureHeight: Math.max(minTex, Math.round(o.h * scale)),
     clipBias: 0.003,
     shader: WATER_SHADER,
     multisample: 0,
@@ -107,6 +113,13 @@ export function buildPond(bag: Bag, clarity: number, o: { lowEnd: boolean; reduc
   water.position.set(POND.x, POND.waterY, POND.z);
   water.name = 'water';
   group.add(water);
+  // a mirror redrawn every other frame (低): the last reflection holds in between
+  if (o.mirror.every > 1) {
+    const every = Math.round(o.mirror.every);
+    const draw = water.onBeforeRender;
+    let n = 0;
+    water.onBeforeRender = function (...a: Parameters<typeof draw>) { if (n++ % every === 0) draw.apply(this, a); };
+  }
 
   // duckweed: more the muddier the pond
   const rng = makeRng(8080);
@@ -187,7 +200,7 @@ export function buildPond(bag: Bag, clarity: number, o: { lowEnd: boolean; reduc
       }
     },
     setSize(w, h) {
-      water.getRenderTarget().setSize(Math.max(256, Math.round(w * scale)), Math.max(256, Math.round(h * scale)));
+      water.getRenderTarget().setSize(Math.max(minTex, Math.round(w * scale)), Math.max(minTex, Math.round(h * scale)));
     },
     dispose() {
       water.dispose();
