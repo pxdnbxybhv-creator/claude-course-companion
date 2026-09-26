@@ -367,7 +367,7 @@ export const STAGING: Record<Exclude<Phase, 'chang'>, Partial<Record<VillagerKey
   },
   // 子: the procession has come to the shrine; the elder at the hall door
   zi: {
-    qin: at(0.2, -21.4, 0, -25), liupo: at(-1.3, -21, 0, -25), guiniang: at(1.5, -20.4, 0, -25), duer: at(2.4, -19.6, 0, -25),
+    qin: at(0.2, -21.6, 0, -25), liupo: at(-1.9, -20.6, 0, -25), guiniang: at(2.0, -20.3, 0, -25), duer: at(2.6, -19.2, 0, -25),
     ruan: at(-2.3, -19.8, 0, -25), taoye: at(-2.6, -18.7, 0, -25), sang: at(-1.3, -18.6, 0, -25), ashu: at(2.8, -18.4, 0, -25),
     lusan: at(3.3, -20.4, 0, -25), gegu: at(1.1, -18.3, 0, -25), shigu: at(-12.1, -13.8, -9, -11.5, true), xiaoman: null, yaoyao: null,
   },
