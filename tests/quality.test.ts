@@ -25,7 +25,7 @@ describe('picture quality profiles', () => {
       expect(p.scatter).toEqual({ density: 1, tufts: 30, reeds: 48, shrubs: 70, slabs: 60, rocks: 110 });
       expect(p.landLod).toBe(1);
       expect(p.particles).toBe(1);
-      expect(p.crowd).toBe(1);
+      expect(p.info.density).toBe(1);
       expect(p.halo).toBe(1);
       expect(p.shadows).toBeNull();
       expect(p.bloom).toBe(false);
@@ -54,7 +54,8 @@ describe('picture quality profiles', () => {
       expect(p.pixelRatio).toBeGreaterThanOrEqual(0.75);
       expect(p.minPixelRatio).toBeLessThanOrEqual(0.75);
       expect(p.grade).toBe('off');
-      expect(p.canvasAntialias).toBe(false);
+      // no grade to smooth the edges: the canvas multisamples instead (never a jagged 低)
+      expect(p.canvasAntialias).toBe(true);
       expect(p.shadows).toBeNull();
       expect(p.mirror.scale).toBeLessThanOrEqual(0.25);
       expect(p.mirror.every).toBeGreaterThan(1);
@@ -64,7 +65,7 @@ describe('picture quality profiles', () => {
       expect(p.scatter.tufts).toBeLessThan(m.scatter.tufts);
       expect(p.scatter.density).toBeLessThan(1);
       expect(p.distance).toBeLessThan(1);
-      expect(p.crowd).toBeLessThan(1);
+      expect(p.info.density).toBeLessThan(1);
     }
     expect(gradeSampling(qualityProfile('low', desktop), 1, 1e6)).toEqual({ samples: 0, fxaa: false });
   });

@@ -80,6 +80,11 @@ export interface Pond {
   update(dt: number, t: number, waterColor: THREE.Color, night: number): void;
   ripple(x: number, z: number, size?: number): void;
   setSize(w: number, h: number): void;
+  /**
+   * While true the mirror is redrawn at every render, whatever the frame-skipping (低) or the world's
+   * far-off gate would do: a photograph's frame always holds a fresh reflection.
+   */
+  force: boolean;
   dispose(): void;
 }
 
@@ -113,12 +118,13 @@ export function buildPond(bag: Bag, clarity: number, o: { mirror: { scale: numbe
   water.position.set(POND.x, POND.waterY, POND.z);
   water.name = 'water';
   group.add(water);
-  // a mirror redrawn every other frame (低): the last reflection holds in between
+  // a mirror redrawn every other frame (低): the last reflection holds in between (not while forced)
+  const gate = { force: false };
   if (o.mirror.every > 1) {
     const every = Math.round(o.mirror.every);
     const draw = water.onBeforeRender;
     let n = 0;
-    water.onBeforeRender = function (...a: Parameters<typeof draw>) { if (n++ % every === 0) draw.apply(this, a); };
+    water.onBeforeRender = function (...a: Parameters<typeof draw>) { if (n++ % every === 0 || gate.force) draw.apply(this, a); };
   }
 
   // duckweed: more the muddier the pond
@@ -202,6 +208,8 @@ export function buildPond(bag: Bag, clarity: number, o: { mirror: { scale: numbe
     setSize(w, h) {
       water.getRenderTarget().setSize(Math.max(minTex, Math.round(w * scale)), Math.max(minTex, Math.round(h * scale)));
     },
+    get force() { return gate.force; },
+    set force(on: boolean) { gate.force = on; },
     dispose() {
       water.dispose();
     },

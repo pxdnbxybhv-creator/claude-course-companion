@@ -75,13 +75,32 @@ describe('the size of a photograph', () => {
       for (const long of Object.values(PHOTO_LONG_SIDE)) {
         for (const budget of Object.values(PHOTO_BUDGET)) {
           const r = captureRatio(w, h, 1, long, 4096, budget);
-          expect(w * r * h * r).toBeLessThanOrEqual(budget * 1.001);
+          // (the screen's own frame, already drawn every frame, is never cut down)
+          expect(w * r * h * r).toBeLessThanOrEqual(Math.max(budget, w * h) * 1.001);
           expect(Math.max(w, h) * r).toBeLessThanOrEqual(4096);
         }
       }
     }
-    // a screen already past the budget is not pushed further
-    expect(captureRatio(2560, 1440, 2, 3072, 4096, 5.2e6)).toBeLessThanOrEqual(Math.sqrt(5.2e6 / (2560 * 1440)) + 1e-9);
+    // a screen already past the budget is not pushed further (nor past the GPU's largest surface)
+    expect(captureRatio(2560, 1440, 2, 3072, 4096, 5.2e6)).toBeLessThanOrEqual(2);
+    expect(2560 * captureRatio(2560, 1440, 2, 3072, 4096, 5.2e6)).toBeLessThanOrEqual(4096);
+  });
+
+  it('is never smaller than the view on a hi-dpi screen, and grows with the level', () => {
+    // a MacBook (1512×982 @2) and a 1920×1080 @2 screen: the budget bounds only what a photo adds
+    for (const [w, h] of [[1512, 982], [1920, 1080]]) {
+      let before = 0;
+      for (const long of [PHOTO_LONG_SIDE.medium, PHOTO_LONG_SIDE.high, PHOTO_LONG_SIDE.ultra]) {
+        const r = captureRatio(w, h, 2, long, 4096, PHOTO_BUDGET.desk);
+        expect(r).toBeGreaterThanOrEqual(2);
+        expect(r).toBeGreaterThanOrEqual(before);
+        before = r;
+      }
+    }
+    // a 1× screen still grows from 中 to 身临其境 (within the budget)
+    const m = captureRatio(1280, 800, 1, PHOTO_LONG_SIDE.medium, 4096, PHOTO_BUDGET.desk);
+    const u = captureRatio(1280, 800, 1, PHOTO_LONG_SIDE.ultra, 4096, PHOTO_BUDGET.desk);
+    expect(u).toBeGreaterThan(m);
   });
 });
 

@@ -5,7 +5,7 @@ import type { TimeOfDay } from '../../../ink/scene-types';
 import type { Sky } from '../types';
 import { Bag, canvas, canvasTexture, glowTexture, damp } from './kit';
 import { fogFor, type ShadowSpec } from './quality';
-import { ShadowRig } from './shadows';
+import { ShadowRig, type ShadowAim } from './shadows';
 
 interface Palette {
   top: string; horizon: string; fog: string;
@@ -127,6 +127,13 @@ function sunCanvas(): HTMLCanvasElement {
  */
 export const skyNow = { night: 0 };
 
+
+/** The sun's direction at an hour (0 at 6h in the east … π at 18h in the west); low at dawn and dusk. */
+function aimSun(dir: THREE.Vector3, hour: number, tod: TimeOfDay): void {
+  const a = ((hour - 6) / 12) * Math.PI;
+  dir.set(Math.cos(a), Math.max(0.06, Math.sin(a)) * 0.75, 0.55 * Math.max(0.2, Math.sin(a))).normalize();
+  if (tod === 'dawn' || tod === 'dusk') dir.y = 0.07;
+}
 export class SkySystem implements Sky {
   readonly fog: THREE.Fog;
   readonly hemi: THREE.HemisphereLight;
@@ -206,9 +213,7 @@ export class SkySystem implements Sky {
       bag.add({ dispose: () => rig.dispose() });
     }
 
-    const hourAngle = ((hour - 6) / 12) * Math.PI; // 0 at 6h (east) … π at 18h (west)
-    this.sunDir.set(Math.cos(hourAngle), Math.max(0.06, Math.sin(hourAngle)) * 0.75, 0.55 * Math.max(0.2, Math.sin(hourAngle))).normalize();
-    if (tod === 'dawn' || tod === 'dusk') this.sunDir.y = 0.07;
+    aimSun(this.sunDir, hour, tod);
     this.cur = {} as Record<keyof Palette, THREE.Color | number>;
     this.applyPalette(1);
   }
@@ -251,6 +256,29 @@ export class SkySystem implements Sky {
     this.forced = on;
   }
 
+  /** Whether a feature (or a picture) has forced night on. */
+  isForcedNight(): boolean {
+    return this.forced;
+  }
+
+  /** The hour the world was entered at, kept while a picture turns it (photo mode). */
+  private realHour: { tod: TimeOfDay; sun: THREE.Vector3 } | null = null;
+
+  /** Photo mode: paint the sky at another time of day for a while; `null` puts the real hour back. */
+  setTimeOfDay(tod: TimeOfDay | null): void {
+    if (tod === null) {
+      if (this.realHour) {
+        this.tod = this.realHour.tod;
+        this.sunDir.copy(this.realHour.sun);
+        this.realHour = null;
+      }
+      return;
+    }
+    if (!this.realHour) this.realHour = { tod: this.tod, sun: this.sunDir.clone() };
+    this.tod = tod;
+    aimSun(this.sunDir, tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : tod === 'night' ? 22 : 11, tod);
+  }
+
   setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE.Vector3 }): void {
     if (o.visible !== undefined) this.moonOverride.visible = o.visible;
     if (o.scale !== undefined) this.moonOverride.scale = Math.max(0.1, o.scale);
@@ -263,7 +291,13 @@ export class SkySystem implements Sky {
     return this.moonDir;
   }
 
-  update(dt: number, camera: THREE.Camera): void {
+  /** A photograph's frame: the shadows drawn finer (see ShadowRig.setFine); nothing without real shadows. */
+  shadowFine(fine: boolean): void {
+    this.rig?.setFine(fine);
+  }
+
+  /** `aim`: where the shadows should be instead of round the view (the photo camera: see ShadowRig.update). */
+  update(dt: number, camera: THREE.Camera, aim?: ShadowAim | null): void {
     const k = dt > 0.5 ? 1 : 1 - Math.exp(-dt * 1.6);
     this.applyPalette(k);
     const c = this.cur as Record<string, THREE.Color & number>;
@@ -288,6 +322,15 @@ export class SkySystem implements Sky {
     this.hemi.intensity = c.hemi as number;
     this.sunLight.color.copy(c.sun);
     this.sunLight.intensity = c.sunI as number;
+    if (this.rig) {
+      // with real shadows, more of the light comes from the sun and less from the sky's fill, so a
+      // cast shadow reads even under a low sun (lit ground stays as bright as before: flat ground at
+      // a 28° sun loses ~4%, at noon gains ~1%; the side away from the sun sits a little deeper);
+      // gentler by moonlight
+      const k = 1 - 0.5 * this.night01;
+      this.hemi.intensity *= 1 - 0.15 * k;
+      this.sunLight.intensity *= 1 + 0.3 * k;
+    }
     this.tint.copy(c.tint);
 
     // light direction: the sun by day, the moon by night
@@ -303,7 +346,7 @@ export class SkySystem implements Sky {
     sunLight.y = Math.max(sunLight.y, 0.24);
     sunLight.normalize();
     const lightDir = this.lightDir.copy(sunLight).lerp(moonLight, this.night01).normalize();
-    if (this.rig) this.rig.update(dt, camera, lightDir, this.night01);
+    if (this.rig) this.rig.update(dt, camera, lightDir, this.night01, aim);
     else {
       this.sunLight.position.copy(lightDir).multiplyScalar(50);
       this.sunLight.target.position.set(0, 0, 0);

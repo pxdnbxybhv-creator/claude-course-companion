@@ -867,6 +867,15 @@
 @media (max-width: 760px) {
   .walk-deck .walk-view-chip span:not(.brush), .walk-deck .walk-photo-chip span:not(.brush) { display: none; }
 }
+/* a phone on its side (any short screen): 视 / 影 would climb into the chips and counters at the top
+   right — they stand beside 疾 / 跃 instead (on a desk, just above the action buttons) */
+@media (max-height: 520px) {
+  .walk-rail { bottom: calc(env(safe-area-inset-bottom) + 132px); }
+  .is-touch .walk-rail {
+    right: calc(env(safe-area-inset-right) + 22px + 152px + 16px);
+    bottom: calc(env(safe-area-inset-bottom) + 30px);
+  }
+}
 
 /* through the eyes: a faint ink ring to aim by (a dot when the mouse is locked to the view) */
 .walk-reticle {

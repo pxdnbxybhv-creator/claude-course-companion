@@ -109,6 +109,8 @@ export function WalkView() {
   const [photoOn, setPhotoOn] = useState(false);
   const [photoModal, setPhotoModal] = useState(false);
   const [locked, setLocked] = useState(false);
+  // the page may not lock the mouse (a sandboxed frame): the hint offers dragging instead
+  const [lockBlocked, setLockBlocked] = useState(false);
   const musicOn = appState.value.settings.music;
   const dialog = dialogs[0] ?? null;
   const answer = (i: number) => {
@@ -161,7 +163,7 @@ export function WalkView() {
       curtain: (on) => setCurtain(on),
       frozen: (on) => setFrozen(on),
       camera: (m) => setCamMode(m),
-      lock: (on) => setLocked(on),
+      lock: (on, blocked) => { setLocked(on); if (blocked) setLockBlocked(true); },
       skill: (o) => setSkillUi((cur) => {
         if (!o) return null;
         // cooldowns tick every frame: only re-render on a visible change
@@ -557,7 +559,8 @@ export function WalkView() {
       {/* --- through the eyes: a faint aim point; on a desk, how to lock the mouse to the view */}
       {phase === 'ready' && camMode === 'first' && !photoOn && <div class={'walk-reticle' + (locked ? ' is-locked' : '')} aria-hidden="true" />}
       {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && (
-        <div class="walk-lockhint" role="status">{t('点一下画面即可用鼠标环顾 · Esc 松开', 'Click the view to look with the mouse · Esc to let go')}</div>
+        <div class="walk-lockhint" role="status">{lockBlocked ? t('拖动画面环顾', 'Drag the view to look')
+          : t('点一下画面即可用鼠标环顾 · Esc 松开', 'Click the view to look with the mouse · Esc to let go')}</div>
       )}
 
       {phase === 'ready' && hint && !photoOn && (

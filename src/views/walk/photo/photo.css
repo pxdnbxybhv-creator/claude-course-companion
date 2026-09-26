@@ -95,11 +95,12 @@
 .ph-title small { font-size: 12px; color: #4a443c; letter-spacing: 0.08em; }
 
 /* ---------- 焦: the zoom, down the right edge */
+/* (it sits a little above the middle, clear of 升 / 降 below and of the strip of choices beneath it) */
 .ph-zoom {
   position: absolute;
   right: calc(env(safe-area-inset-right) + 12px);
   top: 50%;
-  transform: translateY(-62%);
+  transform: translateY(-68%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -118,7 +119,7 @@
 .ph-zoom-track {
   position: relative;
   width: 34px;
-  height: min(200px, 26vh);
+  height: min(200px, 22vh);
   border-radius: 999px;
   background: rgba(244, 238, 226, 0.55);
   border: 1px solid var(--ph-line);
@@ -459,6 +460,24 @@
     bottom: auto;
     flex-direction: column-reverse;
   }
+}
+/* ---------- a phone on its side (any short screen): the tabs and their options in one row just under
+   the top bar, so the middle of the picture, where the subject stands, stays clear; a shorter 焦 that
+   clears 升 / 降 */
+@media (max-height: 520px) {
+  .ph-panel,
+  .ph:not(.is-touch) .ph-panel {
+    top: calc(env(safe-area-inset-top) + 60px);
+    bottom: auto;
+    flex-direction: row-reverse;
+    align-items: center;
+    max-width: calc(100vw - 132px);
+  }
+  .ph-panel .ph-chips { min-width: 0; padding: 4px; }
+  .ph-panel .ph-tabs { flex: none; }
+  .ph-opt { min-height: 34px; }
+  .ph-zoom { top: calc(env(safe-area-inset-top) + 112px); transform: none; gap: 6px; }
+  .ph-zoom-track { height: min(200px, max(44px, calc(100vh - 318px))); }
 }
 @media (prefers-reduced-motion: reduce) {
   .ph-chips, .ph-card, .ph-album, .ph-card-wrap { animation: none; }

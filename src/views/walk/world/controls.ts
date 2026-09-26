@@ -28,6 +28,15 @@ export interface InputState {
 
 export type ViewMode = 'third' | 'first';
 
+/**
+ * The page may not lock the mouse at all (a frame sandboxed without allow-pointer-lock, or a policy
+ * against it): found at the first refusal and remembered for the session, so the view stops asking
+ * (each ask logs an error) and the HUD offers dragging instead. Only a refusal before any lock ever
+ * held counts, and not one just after the mouse was let go (the browser's short cool-down after Esc).
+ */
+let lockBlocked = false;
+let lockEverHeld = false;
+
 /** The free photo camera. */
 export interface PhotoCam {
   pos: THREE.Vector3;
@@ -127,8 +136,13 @@ export class Controls {
   get locked(): boolean {
     return this.lockedNow;
   }
-  /** Told when the pointer lock starts or ends (for the HUD's hint). */
-  onLock: ((on: boolean) => void) | null = null;
+  /** Told when the pointer lock starts or ends (for the HUD's hint); `blocked`: this page may not lock it at all. */
+  onLock: ((on: boolean, blocked: boolean) => void) | null = null;
+  /** This page may not lock the mouse (see lockBlocked): look by dragging. */
+  get lockBlocked(): boolean {
+    return lockBlocked;
+  }
+  private lockLostAt = -1e9;
 
   // ── the photo camera
   photo: PhotoCam | null = null;
@@ -199,7 +213,7 @@ export class Controls {
       this.pinch = this.pointers.size >= 2 ? this.pinchDist() : 0;
       // first person on a desktop: a plain click on the view locks the mouse to it
       if (p && e.type === 'pointerup' && p.type === 'mouse' && !this.photo && this.firstNow && !this.pausedNow && this.fp > 0.5 && !this.lockedNow
-        && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 5 && performance.now() - p.t < 400) this.requestLock();
+        && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) < 5 && performance.now() - p.t < 400 && !lockBlocked) this.requestLock();
     }) as EventListener;
     on(el, 'pointerup', up);
     on(el, 'pointercancel', up);
@@ -214,8 +228,18 @@ export class Controls {
       const now = document.pointerLockElement === el;
       if (now === this.lockedNow) return;
       this.lockedNow = now;
-      this.onLock?.(now);
+      if (now) lockEverHeld = true;
+      else this.lockLostAt = performance.now();
+      this.onLock?.(now, lockBlocked);
     }) as EventListener);
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') on(document, 'pointerlockerror', () => this.lockRefused());
+  }
+
+  /** A request to lock the mouse was refused (see lockBlocked). */
+  private lockRefused(): void {
+    if (lockBlocked || lockEverHeld || performance.now() - this.lockLostAt < 2500) return;
+    lockBlocked = true;
+    this.onLock?.(false, true);
   }
 
   /** Look round by a turn of (dx, dy) radians (first person). */
@@ -235,8 +259,8 @@ export class Controls {
   private requestLock(): void {
     try {
       const r = (this.el as HTMLElement & { requestPointerLock(): Promise<void> | void }).requestPointerLock();
-      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => { /* not allowed here (a sandboxed frame) */ });
-    } catch { /* not allowed here */ }
+      if (r && typeof (r as Promise<void>).catch === 'function') (r as Promise<void>).catch(() => this.lockRefused());
+    } catch { this.lockRefused(); }
   }
 
   /** Let go of the mouse (leaving first person, taking photographs). */

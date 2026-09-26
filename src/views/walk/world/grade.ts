@@ -8,12 +8,17 @@
 // samples are few and lays a finer grain; 身临其境 adds a soft bloom on what shines in the dark
 // (lanterns, lit windows, the moon; the brightest whites by day, faintly) and a gentle depth of air —
 // the far land a touch softer and paler, as a painter leaves the distance in a lighter, wetter wash.
+// The depth of air reads the scene's depth, and three marks the scene draws among its own transparent
+// things leave in the target's alpha what the depth cannot tell (see MARK_FS): the painted ranges and
+// the far mist (drawn without depth, at the far plane) soften as the far land does, and what floats in
+// front without writing depth — a speech bubble, a drifting verse, a petal — stays as crisp as it is.
 //
 // The scene goes into an 8-bit target that holds sRGB-encoded colour, exactly as the canvas does,
 // so every wash, glow and translucent ink stroke blends as it did on the screen; the grade then
 // reads it back and writes the canvas. (three.js only lets an "XR" render target take the output
 // colour space, hence the flag below: it changes nothing else in WebGLRenderer 0.186.)
 import * as THREE from 'three';
+import { NO_REFLECT } from './pond';
 import { gradeSampling, type QualityProfile } from './quality';
 
 export interface Grade {
@@ -28,7 +33,8 @@ export interface Grade {
 
 /**
  * DEV: `window.__grab = true` copies the next finished frame into `window.__grabbed` (a PNG data URL);
- * `window.__gradeOff = true` shows the frame ungraded, for comparison.
+ * `window.__gradeOff = true` shows the frame ungraded, for comparison; `window.__airView = true` shows
+ * 身临其境's depth of air alone (white: as far as it goes; black: crisp).
  */
 function grab(renderer: THREE.WebGLRenderer): void {
   const w = window as unknown as { __grab?: boolean; __grabbed?: string };
@@ -64,6 +70,7 @@ uniform sampler2D tDepth;
 uniform sampler2D tSoft;
 uniform vec2 uClip;
 uniform vec3 uAir;
+uniform float uAirView;
 #endif
 varying vec2 vUv;
 
@@ -100,12 +107,22 @@ void main() {
   float n = uNight;
 #ifdef DEPTH
   // 0. the depth of air: past ~35 m the land softens toward a half-size copy of itself and pales a
-  //    little toward the haze (the sky itself, at the far plane, stays as it is: its stars stay sharp)
+  //    little toward the haze. The marks' alpha (MARK_FS) says the rest: on the land, how much of the
+  //    pixel is an overlay in front (a bubble, a verse, a petal: kept crisp); at the far plane, how
+  //    much is the painted ranges and far mist (soft as the far land) rather than the sky itself (its
+  //    stars and moon stay sharp) or something near drawn over it
   float zb = texture2D(tDepth, vUv).r;
+  float mark = texture2D(tScene, vUv).a;
+  float far;
   if (zb < 0.99999) {
     float zn = zb * 2.0 - 1.0;
     float dist = 2.0 * uClip.x * uClip.y / (uClip.y + uClip.x - zn * (uClip.y - uClip.x));
-    float far = smoothstep(32.0, 170.0, dist);
+    far = smoothstep(32.0, 170.0, dist) * (1.0 - mark);
+  } else {
+    far = (1.0 - mark) * 0.85;
+  }
+  if (uAirView > 0.5) { gl_FragColor = vec4(vec3(far), 1.0); return; }
+  if (far > 0.002) {
     vec3 soft = texture2D(tSoft, vUv).rgb;
     c = mix(c, soft, far * 0.62);
     c = mix(c, uAir, far * mix(0.07, 0.04, n));
@@ -218,6 +235,47 @@ void main() {
   gl_FragColor = vec4(c, 1.0);
 }`;
 
+// The depth of air's marks: full-screen strokes drawn inside the scene's own pass, among its
+// transparent things (by renderOrder), that leave the colour alone and write only the alpha of the
+// scene target (which nothing else reads: the canvas is opaque):
+//   -5.5  alpha := 0 everywhere          then the painted ranges (-5) and the far mist (-4) cover it
+//   -3.5  alpha := 1 - alpha             at the far plane: 1 - what is far; whatever is drawn over
+//                                        it later (a branch, a bubble) raises it again
+//    3.5  alpha := 0 where there is land (depth < 1): overlays drawn after it (renderOrder >= 4:
+//         bubbles, verses, particles) leave their own coverage there
+// Everything drawn normally blends alpha as a' = a + alpha (1 - a), so the grade reads, per pixel,
+// how far the far plane is, or how much of the land is hidden behind an overlay.
+const MARK_VS = /* glsl */`
+void main() { gl_Position = vec4(position.xy, 1.0, 1.0); }`;
+const MARK_FS = /* glsl */`
+void main() { gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0); }`;
+
+function markMeshes(tri: THREE.BufferGeometry): THREE.Mesh[] {
+  const mk = (order: number, invert: boolean, landOnly: boolean) => {
+    const m = new THREE.ShaderMaterial({
+      vertexShader: MARK_VS, fragmentShader: MARK_FS, transparent: true, depthWrite: false,
+      depthTest: landOnly, depthFunc: THREE.GreaterDepth, fog: false,
+      blending: THREE.CustomBlending,
+      // colour: untouched (0 · src + 1 · dst)
+      blendEquation: THREE.AddEquation, blendSrc: THREE.ZeroFactor, blendDst: THREE.OneFactor,
+      // alpha: 0, or 1 - dst
+      blendEquationAlpha: invert ? THREE.SubtractEquation : THREE.AddEquation,
+      blendSrcAlpha: invert ? THREE.OneFactor : THREE.ZeroFactor, blendDstAlpha: invert ? THREE.OneFactor : THREE.ZeroFactor,
+    });
+    const mesh = new THREE.Mesh(tri, m);
+    mesh.name = 'grade:mark';
+    mesh.renderOrder = order;
+    mesh.frustumCulled = false;
+    mesh.matrixAutoUpdate = false;
+    // the main view only (never the pond's mirror), never a shadow, never in anyone's raycast
+    mesh.layers.set(NO_REFLECT);
+    mesh.raycast = () => {};
+    mesh.userData.noShadow = true;
+    return mesh;
+  };
+  return [mk(-5.5, false, false), mk(-3.5, true, false), mk(3.5, false, true)];
+}
+
 export interface GradeOptions {
   /** 'off' renders straight; 'standard' is the grade as always; 'fine' and 'rich' as in quality.ts. */
   mode: QualityProfile['grade'];
@@ -301,6 +359,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
       tSoft: { value: null },
       uClip: { value: new THREE.Vector2(0.1, 600) },
       uAir: { value: new THREE.Color('#e7e6d8') },
+      uAirView: { value: 0 },
     },
   });
   const tri = new THREE.BufferGeometry();
@@ -333,6 +392,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
     mat.uniforms.tBloomA.value = blur[1].texture;
     mat.uniforms.tBloomB.value = blur[3].texture;
   }
+  const marks = useDepth ? markMeshes(tri) : [];
   const pass = (m: THREE.ShaderMaterial, to: THREE.WebGLRenderTarget) => {
     quad.material = m;
     renderer.setRenderTarget(to);
@@ -372,6 +432,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
   const off = (e: unknown) => {
     if (import.meta.env.DEV) console.warn('[walk] colour grade off:', e);
     ok = false;
+    for (const m of marks) m.removeFromParent();
     renderer.setRenderTarget(null);
     rt.depthTexture?.dispose();
     rt.dispose();
@@ -397,6 +458,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
       }
       // 2. the scene: an error here belongs to whatever drew it (a feature's onBeforeRender…), not
       //    to the grade — leave the screen as the target and let it through, as a plain render would
+      if (marks.length && marks[0].parent !== scene) for (const m of marks) scene.add(m);
       try {
         renderer.render(scene, camera);
       } finally {
@@ -409,6 +471,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
           if (pc.isPerspectiveCamera) (mat.uniforms.uClip.value as THREE.Vector2).set(pc.near, pc.far);
           const fog = scene.fog as THREE.Fog | null;
           if (fog) (mat.uniforms.uAir.value as THREE.Color).copy(fog.color).convertLinearToSRGB();
+          if (import.meta.env.DEV) mat.uniforms.uAirView.value = (window as unknown as { __airView?: boolean }).__airView ? 1 : 0;
           extras();
           quad.material = mat;
           renderer.setRenderTarget(null);
@@ -444,6 +507,7 @@ export function createGrade(renderer: THREE.WebGLRenderer, o: GradeOptions): Gra
       for (const t of extra) t.dispose();
       mat.dispose();
       for (const m of passMats) m.dispose();
+      for (const m of marks) { m.removeFromParent(); (m.material as THREE.Material).dispose(); }
       tri.dispose();
     },
   };

@@ -387,6 +387,9 @@ export class PlayerController implements Player {
     this.shadow = sh;
   }
 
+  /** How dark the painted blob under the feet is (lighter when a real shadow map draws the shadow). */
+  blobK = 1;
+
   get shadowMesh(): THREE.Mesh {
     return this.shadow;
   }
@@ -556,7 +559,7 @@ export class PlayerController implements Player {
     const lift = Math.max(0, this.position.y - floor);
     const s = (0.75 * Math.min(1.25, Math.max(0.6, this.model.height / 1.3))) / (1 + lift * 0.8);
     this.shadow.scale.set(s, 1, s);
-    (this.shadow.material as THREE.MeshBasicMaterial).opacity = 0.32 / (1 + lift);
+    (this.shadow.material as THREE.MeshBasicMaterial).opacity = (0.32 * this.blobK) / (1 + lift);
   }
 
   /**

@@ -401,7 +401,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const shTex = bag.own(glowTexture(THREE, 64, 0.35));
   const shadows = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(0.9, 0.9).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ map: shTex, color: '#2a1e14', transparent: true, opacity: 0.32, depthWrite: false }),
+    // lighter under a real shadow map (身临其境), where it is only the contact shadow
+    new THREE.MeshBasicMaterial({ map: shTex, color: '#2a1e14', transparent: true, opacity: ctx.renderer.shadowMap.enabled ? 0.18 : 0.32, depthWrite: false }),
     N,
   );
   shadows.boundingSphere = reach;

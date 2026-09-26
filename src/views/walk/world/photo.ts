@@ -4,8 +4,6 @@
 // captured at a raised resolution through the colour grade (the world does the rendering: see
 // `capture` in index.ts). Leaving puts everything back as it was: the view, the time, the hour,
 // the walker.
-import type * as THREE from 'three';
-import type { TimeOfDay } from '../../../ink/scene-types';
 import type { EmoteKind } from '../types';
 import type { Controls } from './controls';
 import type { PlayerController } from './player';
@@ -67,26 +65,6 @@ export interface PhotoHooks {
   entered?(): void;
 }
 
-/**
- * The sky's hour, turned for a picture. SkySystem keeps its hour private; until it offers
- * `setTimeOfDay(tod | null)` itself, the fields it reads are set here (checked first: if they are
- * not there, only 此刻 and 夜 are offered).
- */
-interface SkyHour {
-  setTimeOfDay?: (tod: TimeOfDay | null) => void;
-  tod?: TimeOfDay;
-  sunDir?: THREE.Vector3;
-  forced?: boolean;
-}
-
-/** The sun's direction for an hour, as the sky's constructor places it. */
-function sunFor(dir: THREE.Vector3, tod: TimeOfDay): void {
-  const hour = tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : 11;
-  const a = ((hour - 6) / 12) * Math.PI;
-  dir.set(Math.cos(a), Math.max(0.06, Math.sin(a)) * 0.75, 0.55 * Math.max(0.2, Math.sin(a))).normalize();
-  if (tod === 'dawn' || tod === 'dusk') dir.y = 0.07;
-}
-
 export class PhotoRig implements PhotoApi {
   private on = false;
   private walkerOn = true;
@@ -97,7 +75,7 @@ export class PhotoRig implements PhotoApi {
   /** The world's clock factor, eased (1 runs, 0 stopped). */
   private k = 1;
   private fovFn: ((deg: number) => void) | null = null;
-  private skyWas: { tod: TimeOfDay; sun: THREE.Vector3 | null; forced: boolean } | null = null;
+  private skyWas: { forced: boolean } | null = null;
   private hour: PhotoTime = 'now';
 
   constructor(private h: PhotoHooks) {
@@ -117,8 +95,7 @@ export class PhotoRig implements PhotoApi {
   }
 
   get canSetTime(): boolean {
-    const s = this.h.sky as unknown as SkyHour;
-    return typeof s.setTimeOfDay === 'function' || (typeof s.tod === 'string' && !!s.sunDir && typeof s.sunDir.set === 'function');
+    return true;
   }
 
   enter(): boolean {
@@ -185,25 +162,13 @@ export class PhotoRig implements PhotoApi {
   setTime(t: PhotoTime): void {
     if (t === this.hour) return;
     const sky = this.h.sky;
-    const s = sky as unknown as SkyHour;
-    // what the sky was before the picture turned its hour (put back on 此刻 and on leaving)
-    if (!this.skyWas && t !== 'now') this.skyWas = { tod: s.tod ?? 'day', sun: s.sunDir?.clone() ?? null, forced: !!s.forced };
+    // whether the real hour was night (put back on 此刻 and on leaving)
+    if (!this.skyWas && t !== 'now') this.skyWas = { forced: sky.isForcedNight() };
     this.hour = t;
     const was = this.skyWas;
-    if (typeof s.setTimeOfDay === 'function') {
-      // the sky's own switch, when it has one
-      if (t === 'now') { s.setTimeOfDay(null); if (was) sky.forceNight(was.forced); }
-      else if (t === 'night') { s.setTimeOfDay(null); sky.forceNight(true); }
-      else { sky.forceNight(false); s.setTimeOfDay(t); }
-      return;
-    }
-    const restore = () => { if (was && s.sunDir && was.sun) { s.tod = was.tod; s.sunDir.copy(was.sun); } };
-    if (t === 'now') { restore(); if (was) sky.forceNight(was.forced); return; }
-    if (t === 'night') { restore(); sky.forceNight(true); return; }
-    if (!s.sunDir || typeof s.tod !== 'string') return;
-    sky.forceNight(false);
-    s.tod = t;
-    sunFor(s.sunDir, t);
+    if (t === 'now') { sky.setTimeOfDay(null); if (was) sky.forceNight(was.forced); }
+    else if (t === 'night') { sky.setTimeOfDay(null); sky.forceNight(true); }
+    else { sky.forceNight(false); sky.setTimeOfDay(t); }
   }
 
   /** The world's clock factor this frame (eases to a stop in about a third of a second). */

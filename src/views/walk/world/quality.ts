@@ -67,8 +67,6 @@ export interface QualityProfile {
   landLod: number;
   /** Particles in the air (× today's count). */
   particles: number;
-  /** The share of the everyday crowd that is out (1 = everyone). */
-  crowd: number;
   /** The sun's and the moon's halo (× today's). */
   halo: number;
 }
@@ -86,7 +84,7 @@ export function qualityProfile(level: QualityLevel, d: Device): QualityProfile {
   const base = {
     level: L, info, lowEnd,
     distance: info.distance,
-    particles: 1, crowd: 1, halo: 1, landLod: 1,
+    particles: 1, halo: 1, landLod: 1,
     bloom: false, depth: false, shadows: null,
   };
   switch (L) {
@@ -98,13 +96,14 @@ export function qualityProfile(level: QualityLevel, d: Device): QualityProfile {
         pixelRatio: pr,
         minPixelRatio: Math.min(pr, 0.75),
         adapt: { slowMs: 19, step: 0.125, every: 1.2, samples: 20, after: 3 },
-        canvasAntialias: false,
+        // no grade to smooth the edges, so the canvas multisamples: at one pixel or less a pixel it is
+        // all but free on a phone's tiled GPU, and keeps the eaves, rails and roof ridges clean lines
+        canvasAntialias: true,
         grade: 'off',
         mirror: { scale: 0.25, every: 2 },
         scatter: { density: info.density, tufts: 22, reeds: 36, shrubs: 52, slabs: 44, rocks: 80 },
         landLod: 0.75,
         particles: info.density,
-        crowd: 0.6,
         halo: 1,
       };
     }
@@ -121,7 +120,6 @@ export function qualityProfile(level: QualityLevel, d: Device): QualityProfile {
         scatter: { density: info.density, tufts: 36, reeds: 58, shrubs: 84, slabs: 72, rocks: 132 },
         landLod: info.distance,
         particles: info.density,
-        crowd: 1,
         halo: 1.1,
       };
     }
@@ -137,12 +135,11 @@ export function qualityProfile(level: QualityLevel, d: Device): QualityProfile {
         grade: 'rich',
         bloom: true,
         depth: true,
-        shadows: { mapSize: d.touch ? 1536 : 2048, extent: 32, radius: 2.4, intensity: 0.86 },
+        shadows: { mapSize: d.touch ? 1536 : 2048, extent: 32, radius: 2.4, intensity: 0.94 },
         mirror: { scale: 1, every: 1 },
         scatter: { density: info.density, tufts: 42, reeds: 66, shrubs: 96, slabs: 84, rocks: 150 },
         landLod: info.distance,
         particles: info.density,
-        crowd: 1,
         halo: 1.35,
       };
     }
@@ -192,7 +189,8 @@ export function fogFor(distance: number): { near: number; far: number; nightNear
 }
 
 /**
- * Who of the everyday crowd is out at a lower quality: a fixed share, the same every visit, and never
+ * Who of the everyday crowd is out at a lower quality: a fixed share (the crowd passes the level's
+ * density, ctx.quality.density, capped at 1 — 低 keeps about 55%), the same every visit, and never
  * the people a place is made of (vendors at their stalls, the boatman, the watchman, the monk at his
  * wooden fish, the tea drinkers) — strollers, children and lantern walkers thin out first.
  */

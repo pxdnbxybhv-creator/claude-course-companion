@@ -50,15 +50,16 @@ export function clampPhotoCam(
 
 /**
  * The pixel ratio to render a photograph at: its long side near `longSide` pixels, within the GPU's
- * largest surface (`maxDim`) and a pixel budget, never below the ratio the screen already uses (so
- * a photo is never softer than the view).
+ * largest surface (`maxDim`), and never below the ratio the screen already uses (so a photo is never
+ * softer or smaller than the view). The pixel budget bounds only what a photograph adds beyond the
+ * live frame: the screen's own ratio is already drawn every frame, so it is kept (within `maxDim`).
  */
 export function captureRatio(cssW: number, cssH: number, pr: number, longSide: number, maxDim: number, maxPixels: number): number {
   const w = Math.max(1, cssW), h = Math.max(1, cssH);
   const long = Math.max(w, h);
-  const limit = Math.min(maxDim / long, Math.sqrt(maxPixels / (w * h)));
-  const want = Math.min(longSide / long, limit);
-  const r = Math.max(want, Math.min(pr, limit));
+  const gpu = maxDim / long;
+  const want = Math.min(longSide / long, gpu, Math.sqrt(maxPixels / (w * h)));
+  const r = Math.max(want, Math.min(pr, gpu));
   return Math.max(0.5, Math.floor(r * 100) / 100);
 }
 
