@@ -50,6 +50,8 @@ export interface Settings {
   ambient: AmbientKind;
   focusMinutes: number;
   theme: 'auto' | 'light' | 'dark';
+  /** Picture quality of the 3D walk: 低 / 中 / 高 / 身临其境. */
+  quality: 'low' | 'medium' | 'high' | 'ultra';
   /** Optional coordinates for sunrise/sunset in the almanac. */
   location?: { lat: number; lon: number; label?: string };
 }

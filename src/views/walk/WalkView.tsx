@@ -57,6 +57,7 @@ function queryFestival(): FestivalKey | null {
 export function WalkView() {
   const t = useT();
   const lang = langSig.value;
+  const quality = appState.value.settings.quality;
   const hostRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<WorldHandle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -153,7 +154,7 @@ export function WalkView() {
     };
     import('./world')
       .then((m) => (worldModule = m, m))
-      .then((m) => m.createWorld({ host, lang, festival, time, hud, cancelled: () => cancelled }).then(
+      .then((m) => m.createWorld({ host, lang, festival, time, quality, hud, cancelled: () => cancelled }).then(
         (w) => {
           if (cancelled) { w.dispose(); return; }
           world = w;
@@ -181,7 +182,7 @@ export function WalkView() {
       setFrozen(false);
       setArrival(null);
     };
-  }, [festival, time, lang]);
+  }, [festival, time, lang, quality]);
 
   // an arrival banner shows once the curtain is up, and goes when its brushed-in animation is done
   const arrivalShown = !!arrival && !curtain;

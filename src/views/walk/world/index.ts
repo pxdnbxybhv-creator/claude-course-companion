@@ -6,7 +6,7 @@
 // lazily so three.js stays out of the main chunk.
 import * as THREE from 'three';
 import { effect } from '@preact/signals';
-import type { FestivalKey, Hud, Interactable, InputState as CtxInput, WorldCtx, WorldFeature } from '../types';
+import type { FestivalKey, Hud, Interactable, InputState as CtxInput, QualityInfo, QualityLevel, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
 import { REGION_MODULES } from '../regions';
 import { allDecks, clearedAt, rectClearing, registerClearing } from '../regions/water-decks';
@@ -82,6 +82,8 @@ export interface WorldOptions {
   /** Preview one festival's easter egg (null = whatever today is). */
   festival: FestivalKey | null;
   time: 'now' | 'day' | 'night';
+  /** Picture quality from Settings (低 / 中 / 高 / 身临其境). */
+  quality?: QualityLevel;
   hud: HudBridge;
   cancelled(): boolean;
 }
@@ -167,6 +169,14 @@ const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ; own?: true }> =
   plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
   mountain: { x: 27.1, z: -87.6, face: ANCHORS.templeHall },   // before the temple gate
   home: { x: -34, z: -24, face: { x: -50, z: -24 } },           // at the homestead gate, looking in
+};
+
+/** What each picture quality means for the world's counts and distances (world/quality.ts refines the rest). */
+const QUALITY_INFO: Record<QualityLevel, QualityInfo> = {
+  low: { level: 'low', density: 0.55, distance: 0.75 },
+  medium: { level: 'medium', density: 1, distance: 1 },
+  high: { level: 'high', density: 1.2, distance: 1.2 },
+  ultra: { level: 'ultra', density: 1.45, distance: 1.4 },
 };
 
 /** How far beyond its radius a place stays drawn. */
@@ -865,6 +875,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       return new THREE.Vector3(a.x, w === null ? g : Math.max(g, w), a.z);
     },
     music: worldMusic,
+    quality: QUALITY_INFO[o.quality ?? 'medium'],
+    cameraMode: () => 'third',
     frameCamera(x: number, z: number, y: number, secs?: number) {
       controls.frame(player.position.x, player.position.z, x, z, y, secs);
     },
