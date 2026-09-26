@@ -178,7 +178,8 @@ export interface Land {
   warm(): void;
 }
 
-export function buildLand(bag: Bag, season: Season): Land {
+/** `lod` scales the detail rings with the picture quality (低 draws coarser land sooner, 身临其境 later). */
+export function buildLand(bag: Bag, season: Season, lod = 1): Land {
   const group = new THREE.Group();
   group.name = 'land';
   const overlay = canvasTexture(bag, overlayCanvas(season), { flipY: false });
@@ -315,12 +316,13 @@ export function buildLand(bag: Bag, season: Season): Land {
   };
   const nightLand = new THREE.Color(NIGHT_LAND);
   let lastNight = -1;
-  const want = (d: number) => (d < 56 ? 0 : d < 110 ? 1 : d < 170 ? 2 : 3);
+  const L0 = 56 * lod, L1 = 110 * lod, L2 = 170 * lod;
+  const want = (d: number) => (d < L0 ? 0 : d < L1 ? 1 : d < L2 ? 2 : 3);
   return {
     group,
     material: mat,
     warm() {
-      for (const c of chunks) { geoFor(c, 3); if (Math.hypot(c.cx, c.cz) < 140) geoFor(c, 2); }
+      for (const c of chunks) { geoFor(c, 3); if (Math.hypot(c.cx, c.cz) < 140 * lod) geoFor(c, 2); }
     },
     update(cam, far) {
       // by night the land goes down to a moonlit blue-green dark

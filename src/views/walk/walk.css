@@ -156,11 +156,12 @@
 }
 @keyframes walk-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-/* ---------- prompt */
+/* ---------- prompt (on a desk it stands above the deck at the bottom right — 视 · 影 · 疾 · 技 —
+   which reaches past the middle on a narrower screen and would cover it) */
 .walk-prompt {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 28px);
+  bottom: calc(env(safe-area-inset-bottom) + 96px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -267,7 +268,7 @@
 .walk-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 96px);
+  bottom: calc(env(safe-area-inset-bottom) + 156px);
   transform: translateX(-50%);
   width: max-content;
   max-width: min(92vw, 520px);
@@ -665,7 +666,7 @@
 }
 .walk-run:active { transform: scale(0.92); }
 
-/* ---------- desktop: the run chip and the skill button, bottom right */
+/* ---------- desktop: 视 / 影, the run chip and the skill button, bottom right (the prompt stands above) */
 .walk-deck {
   position: absolute;
   right: calc(env(safe-area-inset-right) + 18px);
@@ -811,3 +812,108 @@
   .walk-skill.is-active { animation: none; box-shadow: 0 0 0 4px rgba(255, 184, 107, 0.55); }
   .walk-purse-gain { animation-duration: 1.2s; }
 }
+
+/* ---------- 视 · the way of looking, and 影 · the photo camera. On a phone, a small rail on the
+   right edge above the thumb's arc; on a desk, two chips in the deck (V, P). */
+.walk-rail {
+  position: absolute;
+  right: calc(env(safe-area-inset-right) + 16px);
+  bottom: calc(env(safe-area-inset-bottom) + 252px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.walk-railbtn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--walk-paper);
+  border: 1.5px solid rgba(27, 25, 22, 0.35);
+  font-size: 20px;
+  color: rgba(27, 25, 22, 0.85);
+  box-shadow: 0 6px 14px -10px rgba(40, 30, 10, 0.6);
+  touch-action: manipulation;
+  transition: transform 0.12s var(--ease), background 0.2s, color 0.2s;
+}
+.walk-railbtn:active { transform: scale(0.92); }
+.walk-railbtn:disabled { opacity: 0.45; }
+.walk-railbtn i {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: #f4eee2;
+  border: 1px solid rgba(27, 25, 22, 0.35);
+  font: 11px/15px var(--font-text), serif;
+  font-style: normal;
+  text-align: center;
+  color: #1b1916;
+}
+.walk-view.is-first { background: #1b1916; color: #f1e9d8; border-color: #1b1916; }
+.walk-view.is-first i { background: #b93a2b; border-color: #8f2a1f; color: #fbf3e4; }
+.walk-photo .brush { color: #8f2a1f; }
+.walk-view-chip, .walk-photo-chip { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.walk-view-chip .brush, .walk-photo-chip .brush { font-size: 19px; line-height: 1; }
+.walk-view-chip kbd, .walk-photo-chip kbd { font-size: 10px; height: 18px; opacity: 0.55; }
+.walk-view-chip.is-on { background: #1b1916; color: #f1e9d8; border-color: #1b1916; }
+.walk-photo-chip .brush { color: #8f2a1f; }
+.walk-photo-chip:disabled { opacity: 0.45; }
+@media (max-width: 760px) {
+  .walk-deck .walk-view-chip span:not(.brush), .walk-deck .walk-photo-chip span:not(.brush) { display: none; }
+}
+/* a phone on its side (any short screen): 视 / 影 would climb into the chips and counters at the top
+   right — they stand beside 疾 / 跃 instead (on a desk, just above the action buttons) */
+@media (max-height: 520px) {
+  .walk-rail { bottom: calc(env(safe-area-inset-bottom) + 132px); }
+  .is-touch .walk-rail {
+    right: calc(env(safe-area-inset-right) + 22px + 152px + 16px);
+    bottom: calc(env(safe-area-inset-bottom) + 30px);
+  }
+}
+
+/* through the eyes: a faint ink ring to aim by (a dot when the mouse is locked to the view) */
+.walk-reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(27, 25, 22, 0.55);
+  box-shadow: 0 0 0 1.5px rgba(244, 238, 226, 0.55);
+  pointer-events: none;
+  animation: walk-fade-in 0.6s ease-out both;
+}
+.walk-reticle.is-locked { width: 6px; height: 6px; margin: -3px 0 0 -3px; background: rgba(27, 25, 22, 0.6); }
+.walk-lockhint {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 26px);
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(27, 25, 22, 0.55);
+  color: #f1e9d8;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: walk-fade-hold 5s ease-out both;
+}
+@keyframes walk-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .walk-reticle { animation: none; }
+}
+/* taking photographs: what features hang over the world (the day's errands, a game's meter) steps
+   away with the rest of the HUD; the canvas takes a crosshair-free, grab-free look */
+.walk.is-photo .walk-layer { visibility: hidden; }
+.walk.is-photo .walk-canvas { cursor: move; }
+.walk.is-first .walk-canvas { cursor: crosshair; }

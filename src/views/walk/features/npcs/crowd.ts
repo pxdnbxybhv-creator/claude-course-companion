@@ -26,6 +26,7 @@ import { Bubbles, type Speaker } from './bubbles';
 import { CALLS, CHASE, FEST_CALLS, HELLO, HELLO_NIGHT, REACT, type CrowdRole } from './lines';
 import { LANTERN_NIGHTS, forCompanion, onDuty, pingPong, type Line, type Shift } from './logic';
 import { onSkillEvent, type SkillEvent } from './events';
+import { crowdKeeps } from '../../world/quality';
 
 // ───────────────────────────── who is where ─────────────────────────────
 
@@ -302,14 +303,19 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const group = ctx.regionGroup(region);
   const rng = dayRng(ctx, `crowd:${region}`);
 
+  // ── at a lower picture quality (低) a fixed share of the strollers, children and lantern walkers
+  //    stay home — never the people a place is made of (crowdKeeps in world/quality.ts)
+  const share = Math.min(1, ctx.quality?.density ?? 1);
   // ── validate the ways: every walked line on open ground (nudged, or the walker stays home)
   const people: Person[] = [];
   let prev: Person | null = null;
-  for (const spec of specs) {
+  for (let si = 0; si < specs.length; si++) {
+    const spec = specs[si];
     // a companion walks beside whoever was listed before (and stays home with them)
     const lead = spec.beside ? prev : null;
     prev = null;
     if (spec.beside && (!lead || !lead.spec.path)) continue;
+    if (!spec.beside && !crowdKeeps(share, si, spec.role, region)) continue;
     if (spec.path && !spec.boat) {
       const pts = spec.path.map((p) => walkableNear(ctx, p.x, p.z, 2.5));
       const { bad, n, where } = blockedAlong(ctx, pts, 0.8, !!spec.loop);
@@ -362,6 +368,23 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   body.boundingSphere = reach;
   outline.boundingSphere = reach;
   body.frustumCulled = outline.frustumCulled = true;
+  // 身临其境 (a real shadow map): they cast their shadows as they stand, walk and wave — the shadow
+  // pass poses the figure just as the body's own shader does
+  if (ctx.renderer.shadowMap.enabled) {
+    const depth = new THREE.MeshDepthMaterial();
+    const pose = mats.body.onBeforeCompile;
+    depth.onBeforeCompile = (sh, r) => {
+      // the depth shader only reads normals for displacement: read them always, then pose as the body does
+      sh.vertexShader = sh.vertexShader
+        .replace(/#ifdef USE_DISPLACEMENTMAP\s*#include <beginnormal_vertex>[\s\S]*?#endif/, '')
+        .replace('#include <begin_vertex>', '#include <beginnormal_vertex>\n#include <begin_vertex>');
+      pose.call(mats.body, sh, r);
+    };
+    depth.customProgramCacheKey = () => 'npc-crowd-depth';
+    body.customDepthMaterial = depth;
+    body.castShadow = true;
+    bag.own(depth);
+  }
   body.name = `npc-crowd:${region}`;
   outline.name = `npc-crowd-outline:${region}`;
   const root = new THREE.Group();
@@ -378,7 +401,8 @@ function buildCrowd(bag: Bag, ctx: WorldCtx, region: RegionId, bubbles: Bubbles,
   const shTex = bag.own(glowTexture(THREE, 64, 0.35));
   const shadows = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(0.9, 0.9).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ map: shTex, color: '#2a1e14', transparent: true, opacity: 0.32, depthWrite: false }),
+    // lighter under a real shadow map (身临其境), where it is only the contact shadow
+    new THREE.MeshBasicMaterial({ map: shTex, color: '#2a1e14', transparent: true, opacity: ctx.renderer.shadowMap.enabled ? 0.18 : 0.32, depthWrite: false }),
     N,
   );
   shadows.boundingSphere = reach;

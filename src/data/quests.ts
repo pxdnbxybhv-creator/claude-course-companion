@@ -58,6 +58,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'q-lookout', zh: '登临', en: 'The Lookout', descZh: '攀上梅岭乱石间的望台。', descEn: 'Climb the rocks on Plum Ridge to the hidden lookout.', hintZh: '梅岭的石头，跳着跳着就上去了。', hintEn: 'Jump from rock to rock on Plum Ridge.', goal: { kind: 'flag', key: 'lookout' }, reward: { seal: '登临', sealEn: 'Lookout' } },
   { id: 'q-qiyu', zh: '奇遇', en: 'Wonders', descZh: '在画中遇见五桩奇遇。', descEn: 'Meet five of the painting\'s chance encounters.', hintZh: '不同的时辰、天气与同伴，遇见的也不同。', hintEn: 'Different hours, weather and companions meet different things.', goal: { kind: 'counter', key: 'qiyu', target: 5 }, reward: { seal: '奇遇', sealEn: 'Wonders' } },
   { id: 'q-home', zh: '安居', en: 'Settled', descZh: '在家园里营造十件物事。', descEn: 'Build ten things at your homestead.', hintZh: '家园门口，「营造」。', hintEn: 'At the homestead gate: Build.', goal: { kind: 'counter', key: 'home:build', target: 10 }, reward: { seal: '安居', sealEn: 'Settled' } },
+  { id: 'q-photo', zh: '取景', en: 'Framing', descZh: '在画中拍下五张照片。', descEn: 'Take five photographs inside the painting.', hintZh: '入画里的「影」，自由走位，找个好角度。', hintEn: 'The camera in the painting: roam free and find an angle.', goal: { kind: 'counter', key: 'photo', target: 5 }, reward: { seal: '取景', sealEn: 'Framing' } },
   { id: 'q-pet', zh: '爱物', en: 'Beloved', descZh: '抚摸家园里的小动物十次。', descEn: 'Stroke your homestead\'s animals ten times.', hintZh: '先在家园里安一个窝，再领养。', hintEn: 'Place a pet home at your homestead, then adopt.', goal: { kind: 'counter', key: 'home-pet', target: 10 }, reward: { seal: '爱物', sealEn: 'Beloved' } },
 ];
 

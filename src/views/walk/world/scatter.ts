@@ -236,6 +236,36 @@ void main() {
   #include <fog_fragment>
 }`;
 
+// 身临其境: the painted trees cast their shadows. The shadow pass draws each flat turned toward the
+// light (its camera is the "camera" here), cut out by the painting's own alpha.
+const TREE_DEPTH_VS = /* glsl */`
+attribute float aVar;
+varying vec2 vUv;
+uniform float uTime;
+uniform float uVariants;
+void main() {
+  vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+  float sc = length(vec3(instanceMatrix[0][0], instanceMatrix[0][1], instanceMatrix[0][2]));
+  vec2 d = cameraPosition.xz - ip.xz;
+  vec2 f = normalize(d + vec2(1e-4));
+  vec3 right = vec3(f.y, 0.0, -f.x);
+  float sway = sin(uTime * 0.8 + ip.x * 0.3 + ip.z * 0.2) * 0.04 * position.y * position.y;
+  vec3 wp = ip + right * (position.x + sway) * sc + vec3(0.0, position.y * sc, 0.0);
+  vUv = vec2((uv.x + aVar) / uVariants, uv.y);
+  gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+}`;
+const TREE_DEPTH_FS = /* glsl */`
+uniform sampler2D uMap;
+varying vec2 vUv;
+void main() {
+  if (texture2D(uMap, vUv).a < 0.35) discard;
+  gl_FragColor = vec4(1.0);
+}`;
+
+/** How far each small thing stays drawn (m) and how many are sown (× 1): the picture quality's (quality.ts). */
+export interface ScatterDetail { density: number; tufts: number; reeds: number; shrubs: number; slabs: number; rocks: number }
+const DETAIL: ScatterDetail = { density: 1, tufts: 30, reeds: 48, shrubs: 70, slabs: 60, rocks: 110 };
+
 export interface Scatter {
   group: THREE.Group;
   update(t: number, cam: THREE.Vector3, tint: THREE.Color, far: number): void;
@@ -248,7 +278,9 @@ export interface Scatter {
 
 interface Cell { cx: number; cz: number; trees: THREE.Object3D | null; shrubs: THREE.Object3D | null; reeds: THREE.Object3D | null; tufts: THREE.Object3D | null; rocks: THREE.Object3D | null; slabs: THREE.Object3D | null }
 
-export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatter {
+export function buildScatter(bag: Bag, season: Season, reduced: boolean, detail: ScatterDetail = DETAIL, shadows = false): Scatter {
+  const dens = Math.max(0.2, detail.density);
+  const nShrub = Math.round(40 * dens), nReed = Math.round(260 * dens), nTuft = Math.round(420 * dens);
   const group = new THREE.Group();
   group.name = 'scatter';
   const T = terrain();
@@ -264,6 +296,10 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
   treeMat.uniforms.uMap.value = atlas;
   treeMat.uniforms.uTime = time;
   const treeGeo = bag.add(new THREE.PlaneGeometry(1, 2).translate(0, 1, 0));
+  const treeDepth = shadows ? bag.add(new THREE.ShaderMaterial({
+    vertexShader: TREE_DEPTH_VS, fragmentShader: TREE_DEPTH_FS, side: THREE.DoubleSide,
+    uniforms: { uMap: { value: atlas }, uTime: time, uVariants: { value: PAINTERS.length } },
+  })) : null;
   const tuftMat = swayMaterial(bag, canvasTexture(bag, tuftCanvas(7)), reduced ? 0 : 0.18, time);
   const reedMat = swayMaterial(bag, canvasTexture(bag, reedCanvas(11)), reduced ? 0 : 0.035, time);
   const shrubMat = swayMaterial(bag, canvasTexture(bag, shrubCanvas(season)), reduced ? 0 : 0.02, time);
@@ -330,7 +366,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
       if (rng() < 0.4) shrubs.push(compose(x + rng.range(-2, 2), y - 0.05, z + rng.range(-2, 2), rng() * 3, rng.range(0.8, 1.3), rng.range(0.7, 1.1), rng.range(0.8, 1.3)));
     }
     // shrubs and boulders on open ground
-    for (let k = 0; k < 40; k++) {
+    for (let k = 0; k < nShrub; k++) {
       const x = x0 + rng() * CELL, z = z0 + rng() * CELL;
       if (Math.hypot(x, z) > WORLD_RADIUS + 20 || core(x, z, 0.6)) continue;
       if (T.pathNear(x, z).d < 2.2 || !dry(x, z, 1)) continue;
@@ -342,7 +378,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
       }
     }
     // reeds: along the river banks and the lake shore
-    for (let k = 0; k < 260; k++) {
+    for (let k = 0; k < nReed; k++) {
       const x = x0 + rng() * CELL, z = z0 + rng() * CELL;
       if (core(x, z, 0.35) || x * x + z * z < 900) continue;
       const w = waterAt(x, z);
@@ -353,7 +389,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
       reeds.push(compose(x, y, z, rng() * 3, 1, rng.range(0.7, 1.2), 1));
     }
     // grass tufts, thicker along the edges of paths
-    for (let k = 0; k < 420; k++) {
+    for (let k = 0; k < nTuft; k++) {
       const x = x0 + rng() * CELL, z = z0 + rng() * CELL;
       if (Math.hypot(x, z) > WORLD_RADIUS || x * x + z * z < 900) continue;
       const pd = T.pathNear(x, z).d;
@@ -373,9 +409,11 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
       tm.computeBoundingSphere();
       if (tm.boundingSphere) tm.boundingSphere.radius += 10;
       tm.name = 'trees';
+      if (treeDepth) { tm.castShadow = true; tm.customDepthMaterial = treeDepth; }
     }
     c.trees = tm;
     c.shrubs = inst(shrubGeo, shrubMat, shrubs);
+    if (shadows && c.shrubs) c.shrubs.castShadow = true;
     c.reeds = inst(reedGeo, reedMat, reeds);
     c.tufts = inst(tuftGeo, tuftMat, tufts);
     const rm = inst(rockGeo, rockMat, rocks);
@@ -462,11 +500,11 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean): Scatte
         const dx = Math.max(0, Math.abs(cam.x - c.cx) - CELL / 2), dz = Math.max(0, Math.abs(cam.z - c.cz) - CELL / 2);
         const d = Math.sqrt(dx * dx + dz * dz);
         if (c.trees) c.trees.visible = d < far;
-        if (c.rocks) c.rocks.visible = d < Math.min(far, 110);
-        if (c.shrubs) c.shrubs.visible = d < 70;
-        if (c.slabs) c.slabs.visible = d < 60;
-        if (c.reeds) c.reeds.visible = d < 48;
-        if (c.tufts) c.tufts.visible = d < 30;
+        if (c.rocks) c.rocks.visible = d < Math.min(far, detail.rocks);
+        if (c.shrubs) c.shrubs.visible = d < detail.shrubs;
+        if (c.slabs) c.slabs.visible = d < detail.slabs;
+        if (c.reeds) c.reeds.visible = d < detail.reeds;
+        if (c.tufts) c.tufts.visible = d < detail.tufts;
       }
     },
   };

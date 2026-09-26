@@ -6,7 +6,7 @@
 // lazily so three.js stays out of the main chunk.
 import * as THREE from 'three';
 import { effect } from '@preact/signals';
-import type { FestivalKey, Hud, Interactable, InputState as CtxInput, WorldCtx, WorldFeature } from '../types';
+import type { FestivalKey, Hud, Interactable, InputState as CtxInput, QualityLevel, WorldCtx, WorldFeature } from '../types';
 import { FEATURES, festivalsOn } from '../features';
 import { REGION_MODULES } from '../regions';
 import { allDecks, clearedAt, rectClearing, registerClearing } from '../regions/water-decks';
@@ -38,7 +38,9 @@ import { BURST_COLOR, buildJars, buildPlant, buildTablets, cnNum, freePlant, gro
 import { InkMarks } from './marks';
 import { giftsOf, PlayerController, ScholarModel, type MoveInput, type Physics } from './player';
 import { DriftingVerses, SongBirds } from './gifts';
-import { Controls, type InputState } from './controls';
+import { Controls, type InputState, type ViewMode } from './controls';
+import { PhotoRig, type PhotoApi } from './photo';
+import { captureRatio, PHOTO_BUDGET, PHOTO_LONG_SIDE } from './photoMath';
 import { buildAir, Bursts } from './particles';
 import { buildFlora } from './flora';
 import { terrain } from './terrain';
@@ -46,6 +48,7 @@ import { buildLand } from './land';
 import { buildWater } from './water';
 import { buildScatter } from './scatter';
 import { createGrade } from './grade';
+import { adaptPixelRatio, qualityProfile } from './quality';
 import { bridgeSpecs, buildBridges, setBridgeReplaced } from './bridges';
 import { Dust } from './fx';
 import { buildSteles, type PlacedWaypoint, type Steles } from './waypoints';
@@ -74,6 +77,10 @@ export interface HudBridge extends Hud {
   curtain(on: boolean): void;
   /** The player is held by a mini-game or a boat: the action button stays live for it. */
   frozen(on: boolean): void;
+  /** The way of looking changed: over the shoulder, through the eyes, the photo camera. */
+  camera?(mode: 'third' | 'first' | 'photo'): void;
+  /** The mouse was locked to the view (first person on a desktop), or let go; `blocked`: this page may not lock it (look by dragging). */
+  lock?(on: boolean, blocked?: boolean): void;
 }
 
 export interface WorldOptions {
@@ -82,6 +89,8 @@ export interface WorldOptions {
   /** Preview one festival's easter egg (null = whatever today is). */
   festival: FestivalKey | null;
   time: 'now' | 'day' | 'night';
+  /** Picture quality from Settings (低 / 中 / 高 / 身临其境). */
+  quality?: QualityLevel;
   hud: HudBridge;
   cancelled(): boolean;
 }
@@ -105,6 +114,10 @@ export interface WorldHandle {
   waypoints(): WaypointInfo[];
   /** Always run (the 疾 toggle); Shift inverts it while held. */
   setRun(on: boolean): void;
+  /** Over the shoulder (第三人称) or through the walker's eyes (第一人称). */
+  setView(v: ViewMode): void;
+  /** 拍照: the free photo camera. */
+  photo: PhotoApi;
   dispose(): void;
 }
 
@@ -169,6 +182,8 @@ const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ; own?: true }> =
   home: { x: -34, z: -24, face: { x: -50, z: -24 } },           // at the homestead gate, looking in
 };
 
+/** What each picture quality means for the world's counts and distances: QUALITY_INFO in world/quality.ts, which refines the rest. */
+
 /** How far beyond its radius a place stays drawn. */
 const SHOW_MARGIN = 70;
 
@@ -199,23 +214,27 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency ?? 4;
-  const lowEnd = touch && cores <= 4;
-  const dpr = Math.min(window.devicePixelRatio || 1, touch ? (lowEnd ? 1.5 : 1.75) : 1.75);
+  // the picture quality (画面): everything that differs between 低 · 中 · 高 · 身临其境 (quality.ts)
+  const qp = qualityProfile(o.quality ?? 'medium', { dpr: window.devicePixelRatio || 1, touch, cores });
+  const lowEnd = qp.lowEnd;
+  const dpr = qp.pixelRatio;
 
   // --- renderer
   let renderer: THREE.WebGLRenderer;
   try {
     // every frame goes through the grade (grade.ts), which multisamples or FXAAs its own target (WebGL2
     // is all three.js draws with now): the canvas's own antialias would be wasted memory. Only where
-    // the grade steps aside (low-end phones) does the canvas smooth its edges itself.
-    renderer = new THREE.WebGLRenderer({ antialias: lowEnd && dpr < 1.6, powerPreference: 'high-performance', alpha: false, stencil: false });
+    // the grade steps aside (低, and low-end phones at 中) does the canvas smooth its edges itself.
+    renderer = new THREE.WebGLRenderer({ antialias: qp.canvasAntialias, powerPreference: 'high-performance', alpha: false, stencil: false });
   } catch (e) {
     throw new WebGLUnavailable(String(e));
   }
   renderer.setPixelRatio(dpr);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
-  renderer.shadowMap.enabled = false;
+  // 身临其境: a real soft shadow from the sun or the moon (sky.ts follows the view with it)
+  renderer.shadowMap.enabled = !!qp.shadows;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   const W = () => Math.max(1, host.clientWidth), H = () => Math.max(1, host.clientHeight);
   renderer.setSize(W(), H());
   const cv = renderer.domElement;
@@ -225,7 +244,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   cv.style.touchAction = 'none';
 
   // every frame reaches the screen through the colour grade (grade.ts)
-  const grade = createGrade(renderer, { lowEnd, reduced });
+  const grade = createGrade(renderer, { mode: qp.grade, bloom: qp.bloom, depth: qp.depth, reduced });
   const disposeRenderer = () => {
     grade.dispose();
     renderer.dispose();
@@ -252,7 +271,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(aspect < 0.8 ? 62 : 50, aspect, 0.1, 600);
   camera.layers.enable(NO_REFLECT);
-  const sky = new SkySystem(scene, bag, base.tod, base.hour, base.moonPhase);
+  const sky = new SkySystem(scene, bag, base.tod, base.hour, base.moonPhase, { distance: qp.distance, shadows: qp.shadows, halo: qp.halo, renderer });
   const mountains = buildMountains(bag);
   scene.add(mountains);
   hud.progress(0.06);
@@ -280,7 +299,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   for (const r of REGIONS) regionGroup(r.id);
   const garden = regionGroup('garden');
 
-  const land = buildLand(bag, base.season);
+  const land = buildLand(bag, base.season, qp.landLod);
   land.warm();
   scene.add(land.group);
   hud.progress(0.22);
@@ -294,7 +313,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const bridges = buildBridges(bag, ownBridges);
   bridges.traverse((o) => o.layers.set(NO_REFLECT));
   scene.add(bridges);
-  const scatter = buildScatter(bag, base.season, reduced);
+  const scatter = buildScatter(bag, base.season, reduced, qp.scatter, !!qp.shadows);
   scene.add(scatter.group);
   // the open country stays out of the pond's mirror (it would cost every draw twice)
   for (const g of [land.group, openWater.group, scatter.group]) g.traverse((o) => o.layers.set(NO_REFLECT));
@@ -314,10 +333,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   scene.add(wall.group);
   const arch = buildArchitecture(bag);
   garden.add(arch.group);
-  const flora = buildFlora(bag, slots, reduced);
+  const flora = buildFlora(bag, slots, reduced, qp.info.density);
   garden.add(flora.group);
   scene.add(flora.mist);
-  const pond = buildPond(bag, habits.length ? clarity : 0.92, { lowEnd, reduced, w: W() * dpr, h: H() * dpr });
+  const pond = buildPond(bag, habits.length ? clarity : 0.92, { mirror: qp.mirror, reduced, w: W() * dpr, h: H() * dpr });
   garden.add(pond.group);
   // the reflection camera sees layer 0 only (no particles, ripples or shadows in the mirror)
   (pond.water.getReflectionCamera(camera) as THREE.Camera).layers.set(0);
@@ -325,7 +344,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // wall: its mirror keeps the last reflection rather than drawing the scene a second time
   const mirrorRender = pond.water.onBeforeRender;
   let mirrorOn = true;
-  pond.water.onBeforeRender = function (...a: Parameters<typeof mirrorRender>) { if (mirrorOn) mirrorRender.apply(this, a); };
+  pond.water.onBeforeRender = function (...a: Parameters<typeof mirrorRender>) { if (mirrorOn || pond.force) mirrorRender.apply(this, a); };
   hud.progress(0.36);
   await nextFrame();
 
@@ -351,7 +370,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     const e = buildPlant(bag, {
       key, habit: h, kind: h ? h.plant : WILD[i].kind, seed: h ? h.seed : WILD[i].seed,
       growth: st ? st.growth : 0.72, vigor: st ? vigorFor(st.freshness) : 0.9,
-    }, slot, lowEnd);
+    }, slot, lowEnd || qp.level === 'low');
     plants.push(e);
     garden.add(e.mesh);
     hud.progress(0.4 + 0.2 * ((i + 1) / total));
@@ -410,6 +429,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   player.character = charId;
   player.gifts = giftsOf(CHARACTER[charId].ability);
   scene.add(player.root, player.shadowMesh);
+  // 身临其境 draws real shadows: the painted blob stays only as a soft contact shadow
+  if (renderer.shadowMap.enabled) player.blobK = 0.5;
   /** The surface this walker stands on: with the gift of 凌波, water holds you up. */
   const standY = (x: number, z: number) => {
     const f = floorY(x, z);
@@ -419,10 +440,20 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   player.floorAt = standY;
   const controls = new Controls(cv, camera, SPAWN.heading, reduced);
+  // the photo camera stays within reach of the walker and out of the water
+  controls.walker = player.position;
+  controls.waterAt = waterAt;
+  controls.onLock = (on, blocked) => hud.lock?.(on, blocked);
+  if (controls.lockBlocked) hud.lock?.(false, true);
   const camY = () => player.eyeHeight;
   const camTarget = new THREE.Vector3();
   const camFollow = (dt: number, snap = false) => {
-    camTarget.set(player.position.x, player.position.y + camY() - 0.95, player.position.z);
+    const p = player.position;
+    camTarget.set(p.x, p.y + camY() - 0.95, p.z);
+    // first person looks out from the walker's eyes, near the top of the head
+    controls.eye.set(p.x, p.y + Math.min(2.2, Math.max(0.5, player.model.height * 0.92)), p.z);
+    controls.grounded = player.grounded;
+    controls.running = player.running;
     controls.update(dt, camTarget, player.heading, player.speed, floorY, snap);
   };
   player.onTeleport = () => camFollow(0, true);
@@ -463,7 +494,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   controls.occlusion = (tx, ty, tz, cx, cy, cz) => Math.min(gateOcclusion(tx, ty, tz, cx, cy, cz), wallOcclusion(tx, ty, tz, cx, cy, cz));
   camFollow(0, true);
 
-  const air = buildAir(bag, base.season, base.tod === 'night', reduced, 1);
+  const air = buildAir(bag, base.season, base.tod === 'night', reduced, 1, qp.particles);
   if (air) scene.add(air.points);
   const bursts = new Bursts(bag, 1);
   scene.add(bursts.points);
@@ -865,6 +896,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       return new THREE.Vector3(a.x, w === null ? g : Math.max(g, w), a.z);
     },
     music: worldMusic,
+    quality: qp.info,
+    cameraMode: () => controls.mode,
     frameCamera(x: number, z: number, y: number, secs?: number) {
       controls.frame(player.position.x, player.position.z, x, z, y, secs);
     },
@@ -904,8 +937,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   // real frame times (ms), for the adaptive pixel ratio and the DEV readout
   const deltas = new Float32Array(120);
   let nDeltas = 0;
-  let adaptAt = 6; // past the start-up hitches (shader compiles, regions dressing the world)
-  const minPr = Math.min(dpr, touch ? 1 : 0.75);
+  let adaptAt = qp.adapt.after; // past the start-up hitches (shader compiles, regions dressing the world)
   const frameStats = () => {
     const n = Math.min(nDeltas, deltas.length);
     if (!n) return { median: 0, p90: 0, n: 0 };
@@ -913,11 +945,12 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     return { median: a[Math.floor(n * 0.5)], p90: a[Math.min(n - 1, Math.floor(n * 0.9))], n };
   };
   const adapt = (t: number) => {
-    if (t < adaptAt || nDeltas < 30) return;
-    adaptAt = t + 2.5;
+    if (t < adaptAt || nDeltas < qp.adapt.samples) return;
+    adaptAt = t + qp.adapt.every;
     const { median } = frameStats();
-    if (median > 22 && pr > minPr + 1e-3) {
-      pr = Math.max(minPr, Math.round((pr - 0.25) * 100) / 100);
+    const next = adaptPixelRatio(qp, pr, median);
+    if (next !== pr) {
+      pr = next;
       renderer.setPixelRatio(pr);
       renderer.setSize(W(), H());
       grade.setSize(W(), H());
@@ -938,11 +971,14 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const hiddenFar = new Map<RegionId, Set<THREE.Object3D>>();
   const stream = () => {
     const p = player.position;
+    // measured from the walker and from the camera, whichever is nearer: the photo camera roams up
+    // to PHOTO_RADIUS from the walker (and settles back from there), and a place it looks into is drawn
+    const c = camera.position;
     const fogFar = sky.fog.far;
     for (const r of REGIONS) {
       const g = regionGroups.get(r.id)!;
-      const d = Math.hypot(p.x - r.center.x, p.z - r.center.z);
-      const isNear = d < r.radius + SHOW_MARGIN;
+      const d = Math.min(Math.hypot(p.x - r.center.x, p.z - r.center.z), Math.hypot(c.x - r.center.x, c.z - r.center.z));
+      const isNear = d < r.radius + SHOW_MARGIN * qp.distance;
       near.set(r.id, isNear);
       const hid = hiddenFar.get(r.id);
       if (isNear) {
@@ -1024,12 +1060,145 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   let clock = 0;
   /** The lens widens a little while running (the world rushes past). */
   let baseFov = camera.fov, fovKick = 0;
+
+  // --- 拍照 · the photo camera (photo.ts). A photograph is one frame rendered at a raised pixel ratio
+  // through the colour grade and copied out at once, before the canvas reaches the screen; then the
+  // pixel ratio, the grade's targets and the point sizes are put back. The pond's mirror keeps its
+  // size (the reflection is sampled through its own projection, so it lines up at any resolution, and
+  // resizing it would throw away the reflection it holds) and is redrawn for both frames, whatever
+  // its frame-skipping (低) or its far-off gate would do.
+  const grabPhoto = (): HTMLCanvasElement | null => {
+    if (!running || warming) return null;
+    const w = W(), h = H();
+    const gl = renderer.getContext();
+    const maxDim = Math.min(4096, gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) as number, gl.getParameter(gl.MAX_TEXTURE_SIZE) as number);
+    const want = captureRatio(w, h, pr, PHOTO_LONG_SIDE[qp.level], maxDim, touch ? PHOTO_BUDGET.touch : PHOTO_BUDGET.desk);
+    const prev = pr;
+    const usePr = (r: number) => {
+      pr = r;
+      renderer.setPixelRatio(r);
+      renderer.setSize(w, h);
+      grade.setSize(w, h);
+      setPx();
+    };
+    let out: HTMLCanvasElement | null = null;
+    pond.force = true;
+    try {
+      // (on a desk, 身临其境's shadows twice as fine for the one frame: a photograph is looked at closely)
+      if (!touch) sky.shadowFine(true);
+      if (want !== prev) usePr(want);
+      grade.render(scene, camera);
+      out = document.createElement('canvas');
+      out.width = cv.width;
+      out.height = cv.height;
+      const g = out.getContext('2d');
+      if (g) g.drawImage(cv, 0, 0);
+      else out = null;
+    } catch (e) {
+      console.warn('[walk] photo capture failed', e);
+      out = null;
+    } finally {
+      if (pr !== prev) usePr(prev);
+      sky.shadowFine(false);
+      try { grade.render(scene, camera); } catch { /* the next frame draws it */ }
+      pond.force = false;
+      // the capture's long frame says nothing about the device: the adaptive pixel ratio counts afresh
+      nDeltas = 0;
+      adaptAt = (performance.now() - t0) / 1000 + qp.adapt.every + 1;
+    }
+    return out;
+  };
+  const photo = new PhotoRig({
+    controls, player, sky, reduced,
+    // not while travelling or while a game, a boat or the building holds the walker (a skill's own
+    // mount stands still for the picture)
+    allowed: () => running && !warming && !traveling && (!player.isFrozen || player.heldBySkill),
+    grab: grabPhoto,
+    place: () => { const r = REGION[region ?? lastPlace]; return { zh: r.zh, en: r.en }; },
+    fovChanged: () => {
+      // back from the photo camera: the lens the walk uses now (the screen may have turned meanwhile)
+      if (!photo.active) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+      setPx();
+    },
+    entered: () => stream(),
+  });
+  // 身临其境 and the photo camera: the shadows' square goes round the ground the view centre falls on
+  // (marched along the view), not below the camera — which may hang 40 m up — and widens a little
+  // with the camera's height, so a bird's-eye frame keeps its shadows under a low sun as well
+  const shadowAim = { at: new THREE.Vector3(), reach: 1 };
+  const aimDir = new THREE.Vector3();
+  /** The ground or the water, whichever the view meets first. */
+  const surfaceY = (x: number, z: number) => Math.max(floorY(x, z), waterAt(x, z) ?? -Infinity);
+  const aimShadows = () => {
+    if (!photo.active || !qp.shadows) return null;
+    const p = camera.position;
+    camera.getWorldDirection(aimDir);
+    const below = surfaceY(p.x, p.z);
+    if (!Number.isFinite(below)) return null;
+    const lift = Math.max(0, p.y - below);
+    let hit = -1;
+    if (aimDir.y < -0.01) {
+      for (let s = 0, st = 0.5; s < 140; st = Math.min(6, st * 1.3)) {
+        s += st;
+        const x = p.x + aimDir.x * s, z = p.z + aimDir.z * s;
+        if (p.y + aimDir.y * s <= surfaceY(x, z)) { hit = s; break; }
+      }
+    }
+    const hz = Math.hypot(aimDir.x, aimDir.z);
+    const ext = qp.shadows.extent;
+    // (looking over the land: a little ahead, as when walking; never so far the near ground goes bare)
+    const d = Math.min(ext * 1.1, hit > 0 ? hit * hz : ext * 0.45 + lift * 0.5);
+    const fx = hz > 1e-4 ? aimDir.x / hz : 0, fz = hz > 1e-4 ? aimDir.z / hz : 0;
+    const x = p.x + fx * d, z = p.z + fz * d;
+    const y = surfaceY(x, z);
+    shadowAim.at.set(x, Number.isFinite(y) ? y : below, z);
+    shadowAim.reach = 1 + Math.max(0, lift - 4) / 40;
+    return shadowAim;
+  };
+  let modeShown: 'third' | 'first' | 'photo' = 'third';
+  let walkerShown = true;
+  let ghostModel: unknown = null;
+  // 身临其境, through the eyes: the walker is not seen but still casts its sun shadow. Its meshes (and
+  // what it holds) draw with shadow-only twins of their materials — the same kind of material, so the
+  // shadow pass treats them as before, writing neither colour nor depth — and get their own back after.
+  // (A twin per material, not the material itself: a character's materials are shared.)
+  let ghostOn = false;
+  const ghostMats = new Map<THREE.Material, THREE.Material>();
+  const ghosted = new Map<THREE.Mesh, { own: THREE.Material | THREE.Material[]; twin: THREE.Material | THREE.Material[] }>();
+  const twinOf = (m: THREE.Material) => {
+    let g = ghostMats.get(m);
+    if (!g) {
+      g = bag.add(m.clone());
+      g.colorWrite = false;
+      g.depthWrite = false;
+      ghostMats.set(m, g);
+    }
+    return g;
+  };
+  const ghostWalker = (on: boolean) => {
+    if (on) {
+      // (again now and then: a new character, or something newly held)
+      player.root.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.material) return;
+        const e = ghosted.get(m);
+        if (e && m.material === e.twin) return;
+        const twin = Array.isArray(m.material) ? m.material.map(twinOf) : twinOf(m.material);
+        ghosted.set(m, { own: m.material, twin });
+        m.material = twin;
+      });
+    } else {
+      for (const [m, e] of ghosted) if (m.material === e.twin) m.material = e.own;
+      ghosted.clear();
+    }
+  };
   const step = (rawDt: number, _realT: number) => {
     frameNo++;
     // ease toward the wanted pace over about a third of a second, never overshooting
     timeScale += (timeScaleWant - timeScale) * Math.min(1, rawDt * 7);
     if (Math.abs(timeScale - timeScaleWant) < 0.005) timeScale = timeScaleWant;
-    const dt = rawDt * timeScale;
+    // (a photograph may stop the world's clock: photo.ts eases it to a standstill)
+    const dt = rawDt * timeScale * photo.timeK(rawDt);
     clock += dt;
     const t = clock;
     const mv = controls.move();
@@ -1045,15 +1214,41 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     inp.skillQueued = false;
     moveIn.x = mv.x; moveIn.z = mv.z; moveIn.run = mv.run;
     moveIn.jump = inp.jumpQueued && !paused && !player.isFrozen;
-    player.update(dt, moveIn, physics);
+    player.update(photo.walkerDt(rawDt, dt), moveIn, physics);
     inp.jumpQueued = false;
+    // through the eyes only while nothing else carries or holds the walker (a game, a boat, a horse,
+    // the homestead's building, travel): the view steps aside meanwhile and comes back after
+    controls.firstAllowed = !player.isFrozen && !traveling;
     camFollow(rawDt);
-    const kick = !reduced && player.running && player.speed > 3.4 && !player.isFrozen ? 5 : 0;
-    const f0 = fovKick;
-    fovKick += (kick - fovKick) * Math.min(1, rawDt * (kick > fovKick ? 2.2 : 3.5));
-    if (Math.abs(fovKick - f0) > 0.01) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+    // through the eyes the (hidden) body faces where one looks, so a skill, a cast or a sword's qi
+    // goes that way too, not where the last step happened to turn it
+    if (controls.throughEyes && !photo.active && !player.isFrozen && !traveling) {
+      const h = Math.atan2(-Math.sin(controls.yaw), -Math.cos(controls.yaw));
+      player.face(player.position.x + Math.sin(h), player.position.z + Math.cos(h));
+      player.heading = h;
+      player.root.rotation.y = h;
+    }
+    // the walker hides from its own eyes (its shadow and what it holds too); in a photograph it shows unless hidden
+    const show = photo.active ? photo.walkerShown : !(controls.fp > 0.05 && camera.position.distanceTo(controls.eye) < 0.9);
+    // (with real shadows, the body hidden from its own eyes stays as a shadow: see ghostWalker)
+    const ghost = !show && !photo.active && renderer.shadowMap.enabled;
+    if (show !== walkerShown || ghost !== ghostOn) {
+      walkerShown = show;
+      if (ghost !== ghostOn) { ghostOn = ghost; ghostWalker(ghost); }
+      player.root.visible = show || ghost;
+      player.shadowMesh.visible = show;
+    } else if (ghostOn && (frameNo % 4 === 0 || player.model !== ghostModel)) { ghostModel = player.model; ghostWalker(true); }
+    const mode = controls.mode;
+    if (mode !== modeShown) { modeShown = mode; hud.camera?.(mode); }
+    if (!photo.active) {
+      const kick = !reduced && player.running && player.speed > 3.4 && !player.isFrozen ? 5 : 0;
+      const f0 = fovKick;
+      fovKick += (kick - fovKick) * Math.min(1, rawDt * (kick > fovKick ? 2.2 : 3.5));
+      if (Math.abs(fovKick - f0) > 0.01) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+    }
     dust.update(dt);
-    sky.update(dt, camera);
+    // (the hour of a photograph turns at its own pace, even with the world's clock stopped)
+    sky.update(photo.active ? rawDt : dt, camera, aimShadows());
     grade.setLight({ night: sky.night01, tint: sky.tint });
     camPos.copy(camera.position);
     mountains.follow(camPos);
@@ -1070,7 +1265,9 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       checkWaypoints();
       dust.setTint(sky.tint, sky.night01);
       if (coreTop && frameNo % 96 === 1) unmirror();
-      mirrorOn = Math.hypot(camera.position.x - POND.x, camera.position.z - POND.z) < 50;
+      // (the photo camera may frame the garden from afar: its mirror stays live while it is on screen —
+      // the mirror only draws when the water itself is drawn)
+      mirrorOn = Math.hypot(camera.position.x - POND.x, camera.position.z - POND.z) < (photo.active ? 120 : 50);
       // the walker shows in the pond only when near it (a character can be dozens of draws)
       const mirrored = Math.hypot(player.position.x - POND.x, player.position.z - POND.z) < 16;
       if (mirrored !== playerMirrored) {
@@ -1349,7 +1546,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   if (running) {
     warming = false;
     nDeltas = 0;
-    adaptAt = (performance.now() - t0) / 1000 + 6;
+    adaptAt = (performance.now() - t0) / 1000 + qp.adapt.after;
     last = performance.now();
     grade.render(scene, camera);
   }
@@ -1401,6 +1598,27 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       ctx, player, controls, sky, plants,
       /** Real frame times: median and 90th percentile (ms) of the last 120 frames, and the pixel ratio. */
       fps: () => { const f = frameStats(); return { median: +f.median.toFixed(1), p90: +f.p90.toFixed(1), fps: f.median ? Math.round(1000 / f.median) : 0, pr }; },
+      /** The picture quality in use (quality.ts) and the pixel ratio now. */
+      quality: () => ({ ...qp, pixelRatioNow: pr }),
+      /** One whole frame as the loop draws it (grade and all), synchronously: its mean cost in ms over n. */
+      bench: (n = 5) => {
+        const gl = renderer.getContext();
+        const px = new Uint8Array(4);
+        const sync = () => gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+        for (let i = 0; i < 2; i++) { renderer.shadowMap.needsUpdate = true; grade.render(scene, camera); sync(); }
+        const ts: number[] = [];
+        for (let i = 0; i < n; i++) {
+          const a = performance.now();
+          renderer.shadowMap.needsUpdate = true;
+          grade.render(scene, camera);
+          sync();
+          ts.push(performance.now() - a);
+        }
+        return { ms: +(ts.reduce((x, y) => x + y, 0) / n).toFixed(1), pr, w: renderer.domElement.width, h: renderer.domElement.height };
+      },
+      /** The photo camera and the way of looking (V / P in the HUD). */
+      photo,
+      view: (v: ViewMode) => controls.setView(v),
       occluders: () => occluders.length,
       colliders: () => colliders.length,
       /**
@@ -1453,6 +1671,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     waypoints: () => (placed.length ? placed.map((w) => ({ id: w.id, x: w.sx, z: w.sz, zh: w.zh, en: w.en, lit: isLit(w.id) }))
       : WAYPOINTS.map((w) => ({ id: w.id, x: w.x, z: w.z, zh: w.zh, en: w.en, lit: isLit(w.id) }))),
     setRun: (on: boolean) => { controls.runToggle = on; },
+    setView: (v: ViewMode) => { controls.setView(v === 'first' ? 'first' : 'third'); },
+    photo,
     dispose,
   };
 }

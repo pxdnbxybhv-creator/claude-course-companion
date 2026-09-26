@@ -112,7 +112,8 @@ export interface Air {
  * Seasonal particles, and fireflies for the night (none in winter: the snow goes on falling in the
  * moonlight). `night` is only the hour the world was built at; update() follows the sky's night.
  */
-export function buildAir(bag: Bag, season: Season, night: boolean, reduced: boolean, px: number): Air | null {
+/** `density` scales how many drift in the air (the picture quality: 低 fewer, 身临其境 more). */
+export function buildAir(bag: Bag, season: Season, night: boolean, reduced: boolean, px: number, density = 1): Air | null {
   let kind: AirKind;
   let colorA = '#b83a4b', colorB = '#e8b4b8';
   let fall = 0.35, wind = 0.25, size = 0.16, spin = 1.2, opacity = 0.85, count = 150;
@@ -129,6 +130,7 @@ export function buildAir(bag: Bag, season: Season, night: boolean, reduced: bool
   // warm nights: fireflies drifting low, amber like the lanterns
   let flies = season === 'winter' ? 0 : season === 'summer' ? 110 : 70;
   if (reduced) { count = Math.round(count * 0.35); flies = Math.round(flies * 0.35); }
+  if (density !== 1) { count = Math.round(count * density); flies = Math.round(flies * density); }
   const rng = makeRng(606);
   const box = new THREE.Vector3(34, 13, 34);
   const total = count + flies;

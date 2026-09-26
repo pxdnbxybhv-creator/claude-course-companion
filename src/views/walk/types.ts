@@ -210,7 +210,24 @@ export interface WorldCtx {
    * walker all get the scaled dt; the camera does not. The core eases toward the value.
    */
   setTimeScale(f: number): void;
+  /** The picture quality in use; scale counts and distances by it. */
+  quality: QualityInfo;
+  /** The camera mode now (features near the camera may hide in 'first', everything poses in 'photo'). */
+  cameraMode(): CameraMode;
 }
+
+/** The picture quality the visitor chose in Settings (画质: 低 / 中 / 高 / 身临其境). */
+export type QualityLevel = 'low' | 'medium' | 'high' | 'ultra';
+export interface QualityInfo {
+  level: QualityLevel;
+  /** Scale for how many small things to show (crowds, particles, grass): ~0.5 on 低, 1 on 中, up to ~1.5 on 身临其境. */
+  density: number;
+  /** Scale for how far things stay drawn (fog, streaming, scatter): ~0.75 on 低, 1 on 中, up to ~1.4 on 身临其境. */
+  distance: number;
+}
+
+/** How the world is being looked at: over the shoulder, through the walker's eyes, or the free photo camera. */
+export type CameraMode = 'third' | 'first' | 'photo';
 
 /** Builds one region's scenery (see map.ts REGIONS). Content goes into ctx.regionGroup(id). */
 export interface RegionModule {

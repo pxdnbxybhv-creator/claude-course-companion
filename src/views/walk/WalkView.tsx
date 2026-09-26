@@ -16,6 +16,7 @@ import { REGION, type RegionId } from './map';
 import { CHARACTER } from '../../data/characters';
 import type { FestivalKey } from './types';
 import type { Arrival, HudBridge, Prompt, SayOpts, WaypointInfo, WorldHandle } from './world';
+import { PhotoMode } from './photo/PhotoMode';
 import './walk.css';
 
 type Phase = 'loading' | 'ready' | 'nowebgl' | 'error';
@@ -32,6 +33,15 @@ function readRun(): boolean {
 }
 function writeRun(on: boolean): void {
   try { sessionStorage.setItem(RUN_KEY, on ? '1' : '0'); } catch { /* private mode */ }
+}
+/** Over the shoulder or through the eyes: remembered for the session. */
+const VIEW_KEY = 'banmu.walk.view';
+type View = 'third' | 'first';
+function readView(): View {
+  try { return sessionStorage.getItem(VIEW_KEY) === 'first' ? 'first' : 'third'; } catch { return 'third'; }
+}
+function writeView(v: View): void {
+  try { sessionStorage.setItem(VIEW_KEY, v); } catch { /* private mode */ }
 }
 type SkillUi = { glyph: string; zh: string; en: string; cooldown: number; active?: boolean };
 /** The lazily loaded world module, once it has been loaded. */
@@ -57,6 +67,7 @@ function queryFestival(): FestivalKey | null {
 export function WalkView() {
   const t = useT();
   const lang = langSig.value;
+  const quality = appState.value.settings.quality;
   const hostRef = useRef<HTMLDivElement>(null);
   const worldRef = useRef<WorldHandle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -92,6 +103,14 @@ export function WalkView() {
   const dialogSeq = useRef(0);
   const [mapOpen, setMapOpen] = useState(false);
   const [charOpen, setCharOpen] = useState(false);
+  // 视 · the way of looking, and 影 · the photo camera
+  const [view, setView] = useState<View>(readView);
+  const [camMode, setCamMode] = useState<'third' | 'first' | 'photo'>('third');
+  const [photoOn, setPhotoOn] = useState(false);
+  const [photoModal, setPhotoModal] = useState(false);
+  const [locked, setLocked] = useState(false);
+  // the page may not lock the mouse (a sandboxed frame): the hint offers dragging instead
+  const [lockBlocked, setLockBlocked] = useState(false);
   const musicOn = appState.value.settings.music;
   const dialog = dialogs[0] ?? null;
   const answer = (i: number) => {
@@ -143,6 +162,8 @@ export function WalkView() {
       arrive: (a) => setArrival({ ...a, key: Date.now() }),
       curtain: (on) => setCurtain(on),
       frozen: (on) => setFrozen(on),
+      camera: (m) => setCamMode(m),
+      lock: (on, blocked) => { setLocked(on); if (blocked) setLockBlocked(true); },
       skill: (o) => setSkillUi((cur) => {
         if (!o) return null;
         // cooldowns tick every frame: only re-render on a visible change
@@ -153,7 +174,7 @@ export function WalkView() {
     };
     import('./world')
       .then((m) => (worldModule = m, m))
-      .then((m) => m.createWorld({ host, lang, festival, time, hud, cancelled: () => cancelled }).then(
+      .then((m) => m.createWorld({ host, lang, festival, time, quality, hud, cancelled: () => cancelled }).then(
         (w) => {
           if (cancelled) { w.dispose(); return; }
           world = w;
@@ -180,8 +201,12 @@ export function WalkView() {
       setCurtain(false);
       setFrozen(false);
       setArrival(null);
+      setPhotoOn(false);
+      setPhotoModal(false);
+      setCamMode('third');
+      setLocked(false);
     };
-  }, [festival, time, lang]);
+  }, [festival, time, lang, quality]);
 
   // an arrival banner shows once the curtain is up, and goes when its brushed-in animation is done
   const arrivalShown = !!arrival && !curtain;
@@ -251,10 +276,33 @@ export function WalkView() {
     if (worldModule) worldModule.releasePlantBitmaps();
   }, []);
 
-  // pause walking while a card, a dialogue, the map or a picker is open
+  // pause walking while a card, a dialogue, the map or a picker is open (or the photo's own card)
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog);
-  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal]);
+
+  // the way of looking reaches the world (again after every rebuild) and is remembered for the session
+  useEffect(() => {
+    worldRef.current?.setView(view);
+    writeView(view);
+  }, [view, phase]);
+  const toggleView = () => setView((v) => (v === 'first' ? 'third' : 'first'));
+  const openPhoto = () => {
+    const w = worldRef.current;
+    if (!w || phase !== 'ready') return;
+    if (!w.photo.enter()) { showToast({ zh: '此刻不便拍照，先把手头的事做完。', en: 'Not now — finish what you are doing first.' }, 2600); return; }
+    hintOff.current?.();
+    setPhotoOn(true);
+  };
+  const closePhoto = () => {
+    worldRef.current?.photo.exit();
+    setPhotoOn(false);
+    setPhotoModal(false);
+  };
+  // somebody speaks or a card comes up: the camera is put away first
+  useEffect(() => {
+    if (photoOn && (card || dialog)) closePhoto();
+  }, [photoOn, card, dialog]);
 
   // held by a game, a boat or the homestead's building (not by a skill's own mount, 关公's 赤兔: the
   // skill button stays up then, and travel simply sets him down)
@@ -262,7 +310,7 @@ export function WalkView() {
   // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
   // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen) return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -271,7 +319,25 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn]);
+
+  // V: over the shoulder / through the eyes; P: the photo camera (not over a card, a dialogue, a
+  // sheet, the map or a picker; the homestead's building keeps its own V). In photo mode its own
+  // keys (Esc, P) put the camera away.
+  useEffect(() => {
+    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.code !== 'KeyV' && e.code !== 'KeyP') || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable || t.closest?.('.sheet, [aria-modal="true"], [role="dialog"]'))) return;
+      if (e.code === 'KeyV') { toggleView(); return; }
+      if (heldByOther) return;
+      e.preventDefault();
+      openPhoto();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -330,11 +396,11 @@ export function WalkView() {
   const blurAfter = (e: Event) => (e.currentTarget as HTMLElement | null)?.blur?.();
 
   return (
-    <section class={'walk' + (touch ? ' is-touch' : '')} aria-label={t('入画', 'Into the Painting')}>
+    <section class={'walk' + (touch ? ' is-touch' : '') + (photoOn ? ' is-photo' : '') + (camMode === 'first' ? ' is-first' : '')} aria-label={t('入画', 'Into the Painting')}>
       <div class="walk-stage" ref={hostRef} />
 
-      {/* --- top bar */}
-      <header class="walk-top">
+      {/* --- top bar (the photo camera has its own) */}
+      {!photoOn && <header class="walk-top">
         <div class="walk-left">
           <button type="button" class="walk-chip walk-leave" onClick={leave}>
             <span aria-hidden="true">‹</span> {t('出画', 'Leave')}
@@ -375,16 +441,16 @@ export function WalkView() {
             <span class="walk-fest-label">{t('节日', 'Festivals')}</span>
           </button>
         </div>
-      </header>
+      </header>}
 
-      {preview && (
+      {preview && !photoOn && (
         <div class="walk-banner" role="status">
           <span>{t(`预览 · ${preview.zh}`, `Preview · ${preview.en}`)}</span>
           <button type="button" onClick={() => setFestival(null)} aria-label={t('回到今日', 'Back to today')}>✕</button>
         </div>
       )}
 
-      {counters.length > 0 && (
+      {counters.length > 0 && !photoOn && (
         <ul class="walk-counters" aria-live="polite">
           {counters.map((c) => (
             <li key={c.id}><span>{t(c.zh, c.en)}</span>{c.value !== undefined && <b>{c.value}</b>}</li>
@@ -402,7 +468,7 @@ export function WalkView() {
       )}
 
       {/* --- what you can do here */}
-      {phase === 'ready' && prompt && !card && !dialog && (
+      {phase === 'ready' && prompt && !card && !dialog && !photoOn && (
         <div class="walk-prompt" aria-live="polite">
           <span class="walk-prompt-label">{t(prompt.labelZh, prompt.labelEn)}</span>
           {!touch && (
@@ -413,8 +479,25 @@ export function WalkView() {
         </div>
       )}
 
-      {phase === 'ready' && touch && <Joystick world={worldRef} onStart={() => hintOff.current?.()} />}
-      {phase === 'ready' && touch && (
+      {phase === 'ready' && touch && !photoOn && <Joystick world={worldRef} onStart={() => hintOff.current?.()} />}
+      {phase === 'ready' && touch && !photoOn && (
+        <div class="walk-rail">
+          <button
+            type="button"
+            class={'walk-railbtn walk-view' + (view === 'first' ? ' is-first' : '')}
+            aria-pressed={view === 'first'}
+            aria-label={view === 'first' ? t('视角：第一人称（点按换回第三人称）', 'View: first person (tap for third person)') : t('视角：第三人称（点按换成第一人称）', 'View: third person (tap for first person)')}
+            onClick={(e) => { blurAfter(e); toggleView(); }}
+          >
+            <span class="brush" aria-hidden="true">视</span>
+            <i aria-hidden="true">{view === 'first' ? t('一', '1') : t('三', '3')}</i>
+          </button>
+          <button type="button" class="walk-railbtn walk-photo" disabled={heldByOther} aria-label={t('拍照', 'Photo mode')} onClick={(e) => { blurAfter(e); openPhoto(); }}>
+            <span class="brush" aria-hidden="true">影</span>
+          </button>
+        </div>
+      )}
+      {phase === 'ready' && touch && !photoOn && (
         <div class="walk-buttons">
           <button
             type="button"
@@ -440,8 +523,24 @@ export function WalkView() {
           </button>
         </div>
       )}
-      {phase === 'ready' && !touch && (
+      {phase === 'ready' && !touch && !photoOn && (
         <div class="walk-deck">
+          <button
+            type="button"
+            class={'walk-chip walk-view-chip' + (view === 'first' ? ' is-on' : '')}
+            aria-pressed={view === 'first'}
+            title={t('视角：第三人称 / 第一人称 (V)', 'View: third / first person (V)')}
+            onClick={(e) => { blurAfter(e); toggleView(); }}
+          >
+            <span class="brush" aria-hidden="true">视</span>
+            <span>{view === 'first' ? t('第一人称', 'First person') : t('第三人称', 'Third person')}</span>
+            <kbd>V</kbd>
+          </button>
+          <button type="button" class="walk-chip walk-photo-chip" disabled={heldByOther} title={t('拍照：自由取景 (P)', 'Photo mode: a free camera (P)')} onClick={(e) => { blurAfter(e); openPhoto(); }}>
+            <span class="brush" aria-hidden="true">影</span>
+            <span>{t('拍照', 'Photo')}</span>
+            <kbd>P</kbd>
+          </button>
           <button
             type="button"
             class={'walk-chip walk-run-chip' + (runOn !== shiftHeld ? ' is-on' : '')}
@@ -457,7 +556,14 @@ export function WalkView() {
         </div>
       )}
 
-      {phase === 'ready' && hint && (
+      {/* --- through the eyes: a faint aim point; on a desk, how to lock the mouse to the view */}
+      {phase === 'ready' && camMode === 'first' && !photoOn && <div class={'walk-reticle' + (locked ? ' is-locked' : '')} aria-hidden="true" />}
+      {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && (
+        <div class="walk-lockhint" role="status">{lockBlocked ? t('拖动画面环顾', 'Drag the view to look')
+          : t('点一下画面即可用鼠标环顾 · Esc 松开', 'Click the view to look with the mouse · Esc to let go')}</div>
+      )}
+
+      {phase === 'ready' && hint && !photoOn && (
         <button type="button" class="walk-hint" onClick={() => { setHint(false); writeHintSeen(); }}>
           {touch ? (
             <span>
@@ -465,11 +571,13 @@ export function WalkView() {
               {/* the skill button shows the companion's own glyph (题, 剑, 符…), never the word 技 */}
               <br />{t(`「跃」跳上石栏屋檐 · 金圈「${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph}」是同伴绝技`, `跃 jumps onto rails and eaves · the gold-ringed ${skillUi?.glyph ?? CHARACTER[play.value.character].skill.glyph} is your companion’s skill`)}
               <br />{t('点亮驿碑后，可从「驿」舆图传送', 'Light a waypoint stele, then travel from the 驿 map')}
+              <br />{t('「视」换第一人称 ·「影」拍照', '视 switches to first person · 影 takes photos')}
             </span>
           ) : (
             <span>
               <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> {t('行走', 'walk')} · <kbd>Shift</kbd> {t('奔跑', 'run')} · <kbd>{t('空格', 'Space')}</kbd> {t('跳上高处', 'jump up')} · <kbd>Q</kbd> {t('绝技', 'skill')} · <kbd>E</kbd> {t('互动', 'interact')}
               <br /><kbd>M</kbd> {t('舆图：点亮驿碑后可直接传送', 'map: travel to any waypoint stele you have lit')} · {t('拖动环顾 · 滚轮远近', 'drag to look · scroll to zoom')}
+              <br /><kbd>V</kbd> {t('第一 / 第三人称', 'first / third person')} · <kbd>P</kbd> {t('拍照', 'photo mode')}
             </span>
           )}
           <small>{t('知道了', 'Got it')}</small>
@@ -479,8 +587,21 @@ export function WalkView() {
       {/* --- mini-game overlays go in here */}
       <div class="walk-layer" ref={layerRef} />
 
+      {/* --- 拍照: the photo camera's own HUD */}
+      {photoOn && phase === 'ready' && worldRef.current && (
+        <PhotoMode
+          world={worldRef.current}
+          touch={touch}
+          stage={hostRef.current}
+          stick={<Joystick world={worldRef} />}
+          onClose={closePhoto}
+          onModal={setPhotoModal}
+          toast={(zh, en) => showToast({ zh, en }, 2800)}
+        />
+      )}
+
       {/* --- arriving somewhere: the place's name brushed across the sky */}
-      {arrival && arrivalShown && (
+      {arrival && arrivalShown && !photoOn && (
         <div class="walk-arrive" key={arrival.key} role="status" aria-live="polite">
           <span class="walk-arrive-name brush">{arrival.zh}</span>
           <span class="walk-arrive-en latin">{arrival.en}</span>
