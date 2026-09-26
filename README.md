@@ -80,6 +80,26 @@ with a flavour and a verse; eat all eight and you get 苏轼's 但愿人长久. 
 七夕, 重阳, 冬至, 腊八 and 元旦 each have their own. On a phone you steer with a joystick and have
 buttons to jump (跃), run (疾) and use your skill (技); on a computer, WASD, Shift, Space and Q.
 
+**视 First or third person.** The 视 button (or V) takes you behind your own eyes: the camera
+eases to eye height, your figure steps out of view, and you look around by dragging (on a
+computer, click to lock the mouse). It steps back behind you on its own while you row, ride or
+build, and comes back afterwards.
+
+**影 Photo mode.** The 影 button (or P) stops the walker for a picture and hands you a free
+camera: fly it up to sixty metres around, rise and sink, zoom from wide to close, and pause the
+world's clock. Your companion can strike a pose and hold it (wave, bow, dance, their skill, sit,
+sleep). Paint the picture at another hour (此刻 · 昼 · 暮 · 夜), give it a filter (原色, 水墨 ink
+wash, 暖, 冷, 旧纸 old paper) and a mount (none, a hanging scroll 画轴 or an album leaf 册页, both
+with your seal and a line naming the place and the date), and use the thirds grid to compose.
+The shutter renders the frame at a higher resolution through the same colour grade. Save it,
+share it, or keep it in the album of your last twelve photos.
+
+**画面 Picture quality.** Settings has four levels for the 3D walk. 低 is for older phones: a
+lower resolution, a quicker mirror, shorter view distances and fewer plants and passers-by. 中 is
+the balanced default. 高 sharpens everything and sees further. 身临其境 (immersive) adds soft
+real shadows from the sun and the moon, a glow on lanterns, windows and the moon, distant hills
+that soften into the air, and the densest plants. It is meant for strong devices.
+
 **Jumping is worth it.** About forty bronze coins a day sit on rooftops, wall tops, scholar rocks
 and branches, where only a jump reaches them (a few need a double jump, a high jump or a glide).
 The bamboo grove has a course of plum-blossom poles (梅花桩) with a best time to beat; stepping
