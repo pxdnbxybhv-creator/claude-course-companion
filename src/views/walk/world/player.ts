@@ -10,6 +10,7 @@ import type { Ability, CharacterId } from '../../../data/characters';
 import { Bag, damp, dampAngle, glowTexture, inked, outlineMaterial, toon } from './kit';
 import { NO_REFLECT } from './pond';
 import { JumpGate, squashAt } from './jump';
+import { facePatch, washTexture } from '../characters/rig';
 
 export type Emote = EmoteKind;
 const EMOTE_DUR: Record<EmoteKind, number> = { eat: 2.1, bow: 1.7, jump: 0.95, wave: 1.9, water: 1.5, throw: 0.9, cast: 1.3, row: 1.5, sit: 2.5, play: 2.8, skill: 1.6, talk: 2.2, pet: 1.8, build: 1.6, dance: 1.9, sleep: 3.2 };
@@ -98,7 +99,11 @@ export class ScholarModel implements CharacterModel {
     const hair = toon(bag, '#23201d');
     const sash = toon(bag, '#a8463a');
     const jade = toon(bag, '#6f8f7a');
-    const blush = bag.add(new THREE.MeshBasicMaterial({ color: '#e7a598', transparent: true, opacity: 0.55 }));
+    // rouge painted onto the face (a soft wash on the skin's own surface), not a lump stuck to it
+    const blush = bag.add(new THREE.MeshBasicMaterial({
+      color: '#e7a598', map: bag.add(washTexture(THREE)), transparent: true, opacity: 0.55, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
+    }));
     const ol = outlineMaterial(bag, 0.014);
     const G = <T extends THREE.BufferGeometry>(g: T) => bag.add(g);
 
@@ -179,10 +184,8 @@ export class ScholarModel implements CharacterModel {
       eye.position.set(0.058 * sx, 0.135, 0.155);
       eye.scale.z = 0.5;
       this.eyes.push(eye);
-      const b = new THREE.Mesh(eyeGeo, blush);
-      b.position.set(0.098 * sx, 0.09, 0.135);
-      b.scale.set(1.3, 0.7, 0.4);
-      this.head.add(eye, b);
+      const cheek = G(facePatch(THREE, new THREE.Vector3(0, 0.15, 0), new THREE.Vector3(0.17, 0.17, 0.17), new THREE.Vector3(0.098 * sx, -0.06, 0.135), 0.25, 0.16));
+      this.head.add(eye, new THREE.Mesh(cheek, blush));
     }
     this.body.add(this.head);
 

@@ -118,6 +118,22 @@ export class Kit {
     return m;
   }
 
+  /** Rouge painted onto skin: a soft round wash (see facePatch), `opacity` at its heart. */
+  rouge(color: string, opacity: number): THREE_NS.MeshBasicMaterial {
+    const key = `r|${color}|${opacity}`;
+    const hit = this.mats.get(key);
+    if (hit) return hit as THREE_NS.MeshBasicMaterial;
+    const T = this.THREE;
+    if (!this.washTex) this.washTex = this.add(washTexture(T));
+    const m = new T.MeshBasicMaterial({
+      color, map: this.washTex, transparent: true, opacity, depthWrite: false,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4,
+    });
+    this.mats.set(key, this.add(m));
+    return m;
+  }
+  private washTex: THREE_NS.DataTexture | null = null;
+
   /** Inverted-hull ink outline: back faces pushed out along the normal (a warm brown-black ink). */
   outline(width: number, color = INK_LINE): THREE_NS.MeshBasicMaterial {
     const w = Math.round(width * 2000) / 2000;
@@ -284,6 +300,62 @@ function mergeParts(kit: Kit, parts: Part[], withColor: boolean, bare: boolean):
   out.setAttribute('skinWeight', new T.BufferAttribute(sw, 4));
   out.setIndex(new T.BufferAttribute(idx, 1));
   return out;
+}
+
+/**
+ * A patch of an ellipsoid's own surface (centre `c`, semi-axes `radii`) round the direction `dir`,
+ * a hair above it: `ah` / `av` are its half-widths in radians, across and up. Its uv runs 0..1 over
+ * the patch, so a round wash texture lies on it as a soft oval — rouge that follows the curve of
+ * the face instead of standing off it.
+ */
+export function facePatch(T: T3, c: THREE_NS.Vector3, radii: THREE_NS.Vector3, dir: THREE_NS.Vector3, ah: number, av: number, lift = 1.004): THREE_NS.BufferGeometry {
+  const nx = 9, ny = 7;
+  const f = dir.clone().normalize();
+  const right = new T.Vector3(0, 1, 0).cross(f).normalize();
+  const up = f.clone().cross(right).normalize();
+  const pos: number[] = [], nor: number[] = [], uv: number[] = [], idx: number[] = [];
+  const d = new T.Vector3();
+  for (let j = 0; j < ny; j++) {
+    for (let i = 0; i < nx; i++) {
+      const u = i / (nx - 1), v = j / (ny - 1);
+      d.copy(f).addScaledVector(right, Math.tan((u * 2 - 1) * ah)).addScaledVector(up, Math.tan((v * 2 - 1) * av)).normalize();
+      // where this direction meets the ellipsoid
+      const t = lift / Math.sqrt((d.x / radii.x) ** 2 + (d.y / radii.y) ** 2 + (d.z / radii.z) ** 2);
+      pos.push(c.x + d.x * t, c.y + d.y * t, c.z + d.z * t);
+      nor.push(d.x, d.y, d.z);
+      uv.push(u, v);
+    }
+  }
+  for (let j = 0; j < ny - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, e = a + nx, g = e + 1;
+      idx.push(a, b, g, a, g, e);
+    }
+  }
+  const geo = new T.BufferGeometry();
+  geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new T.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  return geo;
+}
+
+/** A small white wash whose alpha falls off smoothly from the middle to nothing at the rim. */
+export function washTexture(T: T3, n = 32): THREE_NS.DataTexture {
+  const data = new Uint8Array(n * n * 4);
+  for (let j = 0; j < n; j++) {
+    for (let i = 0; i < n; i++) {
+      const r = Math.min(1, Math.hypot(((i + 0.5) / n) * 2 - 1, ((j + 0.5) / n) * 2 - 1));
+      const s = r * r * (3 - 2 * r); // smoothstep(0, 1, r)
+      const k = (j * n + i) * 4;
+      data[k] = data[k + 1] = data[k + 2] = 255;
+      data[k + 3] = Math.round(255 * (1 - s));
+    }
+  }
+  const t = new T.DataTexture(data, n, n, T.RGBAFormat);
+  t.minFilter = t.magFilter = T.LinearFilter;
+  t.needsUpdate = true;
+  return t;
 }
 
 /**
@@ -938,10 +1010,11 @@ export class Human implements CharacterModel {
         this.head.add(b);
       }
       if (blush > 0) {
-        const b = new T.Mesh(kit.sphere(0.024, 1.4, 0.7, 0.35, 10, 6), kit.basic('#e39a8c', { opacity: blush }));
-        b.position.set(0.1 * sx, y - 0.045, z - 0.025);
-        b.lookAt(0.1 * sx * 3, y - 0.045, z + 1);
-        this.head.add(b);
+        // rouge painted on the skin (a patch of the skull's own surface), not a lump stuck to it
+        const c = new T.Vector3(0, H.headC, 0);
+        const dir = new T.Vector3(0.1 * sx, y - 0.045 - H.headC, z - 0.025);
+        const g = kit.add(facePatch(T, c, new T.Vector3(hr, hr * 0.98, hr * 0.98), dir, 0.25, 0.16));
+        this.head.add(new T.Mesh(g, kit.rouge('#e39a8c', Math.min(0.8, 0.2 + blush * 0.6))));
       }
     }
     if (mouth !== 'none') {
