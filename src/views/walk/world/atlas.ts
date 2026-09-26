@@ -3,13 +3,14 @@
 // fine broken lines, each place named in brush (faint with a ？ until you have been there), the
 // waypoint steles (驿碑: a lit lantern once reached, a grey outline before), the homestead's plot,
 // and a cinnabar mark for where you stand. Pure Canvas 2D; no three.js.
-import { GROUND_REGIONS, HOME_PLOT, LAKE, PATHS, WORLD_RADIUS, type RegionId } from '../map';
+import { GROUND_REGIONS, HOME_PLOT, LAKE, PATHS, REGION, WORLD_RADIUS, type RegionId } from '../map';
 import { RIVER_SAMPLES, POOL, terrain } from './terrain';
 import { makeRng } from '../../../core/rng';
 
 export interface AtlasOpts {
   visited: ReadonlySet<RegionId>;
-  player: { x: number; z: number; heading: number } | null;
+  /** Where the walker stands (with the region: inside a pocket valley there is no mark, only a line). */
+  player: { x: number; z: number; heading: number; region?: RegionId | null } | null;
   lang: 'zh' | 'en';
   /** The waypoint steles and whether each is lit. */
   waypoints?: readonly { id: RegionId; x: number; z: number; lit: boolean }[];
@@ -236,8 +237,22 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
     g.beginPath(); g.arc(x + 7 * u, z - 3 * u, 2.4 * u, 0, Math.PI * 2); g.fill();
   }
 
-  // you are here
-  if (o.player) {
+  // you are here — unless in a pocket valley, which is on no map (「此中之地，不在舆图」)
+  const pocket = o.player?.region ? REGION[o.player.region]?.pocket : undefined;
+  if (o.player && pocket) {
+    g.save();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    const fs = (o.lang === 'zh' ? 26 : 19) * u;
+    g.font = o.lang === 'zh' ? `${fs}px "Ma Shan Zheng", "LXGW WenKai", serif` : `italic ${fs}px "Cormorant Garamond", Georgia, serif`;
+    const text = o.lang === 'zh' ? '此中之地，不在舆图' : 'This place is on no map';
+    const w = g.measureText(text).width;
+    g.fillStyle = 'rgba(241,233,216,0.82)';
+    g.beginPath(); g.ellipse(S / 2, S * 0.5, w * 0.62 + 12 * u, fs * 1.05, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(27,25,22,0.88)';
+    g.fillText(text, S / 2, S * 0.5);
+    g.restore();
+  } else if (o.player) {
     const px = X(o.player.x), pz = Z(o.player.z);
     const h = o.player.heading; // facing (sin h, cos h) in x/z
     const fx = Math.sin(h), fz = Math.cos(h);

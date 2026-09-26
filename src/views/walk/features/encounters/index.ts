@@ -83,10 +83,14 @@ export const encounters = feature('encounters', (bag, ctx) => {
     }
   }
 
+  /** Inside a pocket valley (桃源): no chance encounter starts, none roams in, nobody gossips. */
+  const inPocket = () => { const r = ctx.currentRegion(); return !!r && !!REGION[r].pocket; };
+
   function tick(): void {
     if (active) {
       const { stage, scene } = active;
       if (!scene) return;
+      if (scene.roaming && !stage.engaged && inPocket()) { takeDown(); return; }
       if (stage.abandoned && !stage.finished) { takeDown(); return; }
       const far = stage.dist(scene.x, scene.z);
       if (stage.finished) {
@@ -98,7 +102,7 @@ export const encounters = feature('encounters', (bag, ctx) => {
       } else if (far > scene.r + (stage.engaged ? 90 : 45)) takeDown();
       return;
     }
-    if (busy(ctx) || ctx.player.isFrozen) return;
+    if (busy(ctx) || ctx.player.isFrozen || inPocket()) return;
     const m = moment();
     for (const d of ORDER) {
       if (!SCENES[d.id] || doneToday(mem, d.id, day)) continue;
@@ -132,7 +136,7 @@ export const encounters = feature('encounters', (bag, ctx) => {
   bag.onDispose(ctx.onRegion((r) => {
     rumourTimer++;
     const mine = rumourTimer;
-    if (r === null) return;
+    if (r === null || REGION[r].pocket) return;
     bag.later(4200, () => {
       if (mine !== rumourTimer || ctx.currentRegion() !== r) return;
       // nobody gossips about a wonder that is already in front of you (or while one is under way)

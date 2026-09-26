@@ -14,7 +14,7 @@ import { hashString, makeNoise2, makeRng, smoothstep } from '../../../core/rng';
 import { WORLD_RADIUS } from '../map';
 import { terrain } from './terrain';
 import { deckY } from './bridges';
-import { deckY as regionDeckY } from '../regions/water-decks';
+import { deckWalk, deckWater, deckY as regionDeckY } from '../regions/water-decks';
 
 export const POND = { x: 0, z: 0, rx: 6.6, rz: 4.3, waterY: 0.1 };
 export const BOUNDS_R = 25;
@@ -160,6 +160,9 @@ export function waterAt(x: number, z: number): number | null {
     if (pondQ(x, z) < 1.0) return POND.waterY;
     return null;
   }
+  // a pocket valley's floor keeps its own water (its stream), never the river far below it
+  const own = deckWater(x, z);
+  if (own !== undefined) return own;
   return terrain().waterAt(x, z);
 }
 
@@ -172,7 +175,8 @@ export function walkableGround(x: number, z: number, margin = 0.28): boolean {
     const q = Math.hypot((x - POND.x) / (POND.rx + margin), (z - POND.z) / (POND.rz + margin));
     return q > 1.0;
   }
-  if (deckY(x, z) !== null || regionDeckY(x, z) !== null) return true;
+  if (deckY(x, z) !== null) return true;
+  if (regionDeckY(x, z) !== null) return deckWalk(x, z) ?? true;
   return terrain().waterAt(x, z) === null;
 }
 

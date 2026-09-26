@@ -229,6 +229,10 @@
 
 .garden-first-hint { margin: -2px 0 6px; font-size: 14px; letter-spacing: 0.04em; }
 
-.garden-walk { gap: 6px; margin-left: auto; margin-right: 4px; font-size: 16px; }
+.garden-walk { gap: 6px; margin-left: auto; margin-right: 4px; font-size: 16px; flex: none; white-space: nowrap; }
+/* 信 · letters: the brush glyph, with a cinnabar dot while one is unopened */
+.garden-mail { flex: none; position: relative; color: var(--ink-2); margin-right: -6px; }
+.garden-mail .brush { font-size: 22px; line-height: 1; }
+.garden-mail .mail-unread-dot { top: 8px; right: 7px; }
 .garden-walk .brush { font-size: 18px; letter-spacing: 0.08em; }
 .garden-walk-en:empty { display: none; }

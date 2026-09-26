@@ -10,6 +10,7 @@ import { ScrollView } from '../views/Scroll';
 import { SettingsView } from '../views/Settings';
 import { GamesView } from '../views/Games';
 import { Celebrate } from '../views/quests/Celebrate';
+import { MailHost } from '../views/mail/MailHost';
 import { music } from '../audio/music';
 import { active } from '../views/focus/session';
 import type { MusicTheme } from '../views/walk/map';
@@ -133,6 +134,7 @@ export function App() {
         ))}
       </nav>
       <ToastHost />
+      <MailHost />
       <Celebrate />
     </div>
   );

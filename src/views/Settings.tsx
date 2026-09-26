@@ -11,6 +11,8 @@ import { audio } from '../audio/engine';
 import { music } from '../audio/music';
 import { redeemCode } from '../app/play';
 import { makeSeal } from '../ink/seal';
+import { cleanName } from '../core/names';
+import { NameField } from './mail/NameField';
 import { QUALITY_LEVELS, QUALITY_TEXT } from './walk/world/quality';
 import type { Lang, Settings } from '../core/types';
 import './settings/settings.css';
@@ -131,6 +133,57 @@ function SealStamp(props: { text: string; style: 'bai' | 'zhu'; size?: number; l
   return <div class="seal-stamp" ref={ref} role="img" aria-label={props.label} style={{ width: size, height: size }} />;
 }
 
+/** 拟号 · a few classical 号 to try on (the button cycles them). */
+const HAO: [string, string][] = [
+  ['听雨客', 'Rain-Listener'],
+  ['半亩散人', 'Idler of the Half-Acre'],
+  ['松下客', 'Guest beneath the Pines'],
+  ['抱琴人', 'Keeper of the Qin'],
+  ['种竹翁', 'Old Bamboo-Planter'],
+  ['看云人', 'Cloud-Watcher'],
+  ['南山居士', 'Recluse of the South Hill'],
+  ['一蓑烟雨', 'Rain-Cape'],
+];
+
+/** 名号 — what the painting's people call you (never brushed: it is drawn in the text face). */
+function NameRow() {
+  const t = useT();
+  const zh = state.value.settings.lang === 'zh';
+  const saved = state.value.settings.playerName;
+  const [draft, setDraft] = useState(saved);
+  const hao = useRef(-1);
+  // someone else changed it (the 初见礼, another tab): show it, unless it is what is being typed
+  useEffect(() => { setDraft((d) => (cleanName(d) === saved ? d : saved)); }, [saved]);
+  const commit = (v: string, final: boolean) => {
+    const clean = cleanName(v);
+    if (clean !== state.value.settings.playerName) setSettings({ playerName: clean });
+    if (final) setDraft(clean);
+  };
+  const suggest = () => {
+    const cur = cleanName(draft);
+    let i = hao.current;
+    do { i = (i + 1) % HAO.length; } while (HAO.length > 1 && (HAO[i][0] === cur || HAO[i][1] === cur));
+    hao.current = i;
+    const v = zh ? HAO[i][0] : HAO[i][1];
+    setDraft(v);
+    commit(v, true);
+  };
+  return (
+    <div class="set-name">
+      <NameField
+        id="set-name"
+        class="set-name-field"
+        value={draft}
+        label={t('名号（至多十二字）', 'Your name (up to 12 characters)')}
+        hint={t('画中人如此称呼你；留空则称「园主」。', 'What the people of the painting call you. Leave it empty for “friend”.')}
+        onDraft={setDraft}
+        onCommit={commit}
+      />
+      <button type="button" class="btn btn-small set-hao" onClick={suggest} title={t('拟一个雅号', 'Try a classical style-name')}>{t('拟号', 'Suggest')}</button>
+    </div>
+  );
+}
+
 function SealSection() {
   const t = useT();
   const saved = state.value.settings.sealName;
@@ -144,7 +197,8 @@ function SealSection() {
   };
   const preview = cleanSeal(draft) || '半亩';
   return (
-    <Section id="seal" zh="印章" en="Seal">
+    <Section id="seal" zh="名号 · 印章" en="Name · Seal">
+      <NameRow />
       <div class="set-seal">
         <label class="field set-seal-field">
           <span>{t('印文（一至四字）', 'Seal characters (1–4)')}</span>
@@ -725,7 +779,7 @@ export function SettingsView() {
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
           <h1 class="brush">{t('设置', 'Settings')}</h1>
-          <span class="topbar-sub">{t('印章 · 语言 · 画面 · 声乐 · 数据', 'Seal · language · picture · sound · data')}</span>
+          <span class="topbar-sub">{t('名号 · 印章 · 语言 · 画面 · 声乐 · 数据', 'Name · seal · language · picture · sound · data')}</span>
         </div>
       </header>
       <div class="page set-page">

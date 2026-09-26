@@ -21,8 +21,8 @@ export function displayName(lang: Lang, scope: NameScope = 'world', name = playe
 export function fillName(s: string, lang: Lang, scope: NameScope = 'world', name = playerName.value): string {
   if (!s || s.indexOf('{名}') < 0) return s;
   const n = displayName(lang, scope, name);
-  return s.replace(/(^|[.!?…—"“「]\s*)?\{名\}/g, (_m, lead: string | undefined) => {
-    if (lead !== undefined && lang === 'en' && !name) return lead + n.charAt(0).toUpperCase() + n.slice(1);
-    return (lead ?? '') + n;
-  });
+  if (lang !== 'en' || name) return s.split('{名}').join(n);
+  // a default name at the start of a line or a sentence takes a capital ("Guest: …", "… . Friend")
+  const cap = n.charAt(0).toUpperCase() + n.slice(1);
+  return s.replace(/\{名\}/g, (_m, at: number) => (/(^\s*|[.!?…—"“「]\s*)$/.test(s.slice(0, at)) ? cap : n));
 }

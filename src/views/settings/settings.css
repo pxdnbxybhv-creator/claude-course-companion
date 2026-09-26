@@ -23,6 +23,10 @@
 .set-hint { display: block; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
 
 /* seal */
+/* 名号: the name field and its 拟号 button, above the seal */
+.set-name { display: flex; align-items: flex-end; gap: 10px; padding: 0 0 10px; border-bottom: 1px dashed var(--line); }
+.set-name-field { flex: 1 1 auto; min-width: 0; margin: 4px 0 0; }
+.set-hao { flex: none; margin-bottom: 30px; }
 .set-seal { display: flex; align-items: center; gap: 18px; padding: 6px 0 12px; flex-wrap: wrap; }
 .set-seal-field { flex: 1 1 180px; margin: 8px 0; }
 .set-seal-field input { font-size: 26px; letter-spacing: 0.3em; font-family: var(--font-brush); }

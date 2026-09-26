@@ -8,7 +8,11 @@ import { lang as langSig, setSettings, state as appState, today } from '../../ap
 import { ERRAND_COINS, play } from '../../app/play';
 import { ledgerToday } from '../quests/helpers';
 import { CoinBadge, fmtCoins } from '../../ui/coins';
-import { Sheet, Segmented } from '../../ui/kit';
+import { Sheet, Segmented, Toggle } from '../../ui/kit';
+import { deliverDue, mailUi, openMail } from '../../app/mail';
+import { nameAsk } from '../../app/nameAsk';
+import { fillName, type NameScope } from '../../app/name';
+import { MailGlyph, mailLabel } from '../mail/MailHost';
 import { toLunar, festivalsOn as coreFestivals } from '../../core/lunar';
 import { FESTIVALS } from './features';
 import { CharacterSelect } from './characters/Select';
@@ -113,6 +117,8 @@ export function WalkView() {
   const [lockBlocked, setLockBlocked] = useState(false);
   const musicOn = appState.value.settings.music;
   const dialog = dialogs[0] ?? null;
+  // the letters (信) and the name sheet (askName) are app-wide sheets over the walk
+  const mailOpen = mailUi.value !== null || nameAsk.value !== null;
   const answer = (i: number) => {
     setDialogs((ds) => {
       const [head, ...rest] = ds;
@@ -180,6 +186,8 @@ export function WalkView() {
           world = w;
           worldRef.current = w;
           setPhase('ready');
+          // letters that fell due while walking elsewhere (拾得's, after the temple…) come now
+          deliverDue();
         },
         (err: unknown) => {
           if (cancelled) return;
@@ -278,8 +286,8 @@ export function WalkView() {
 
   // pause walking while a card, a dialogue, the map or a picker is open (or the photo's own card)
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal);
-  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal || mailOpen);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal, mailOpen]);
 
   // the way of looking reaches the world (again after every rebuild) and is remembered for the session
   useEffect(() => {
@@ -310,7 +318,7 @@ export function WalkView() {
   // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
   // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn) return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn || mailOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -319,13 +327,13 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn, mailOpen]);
 
   // V: over the shoulder / through the eyes; P: the photo camera (not over a card, a dialogue, a
   // sheet, the map or a picker; the homestead's building keeps its own V). In photo mode its own
   // keys (Esc, P) put the camera away.
   useEffect(() => {
-    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen) return;
+    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen || mailOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.code !== 'KeyV' && e.code !== 'KeyP') || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -337,7 +345,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther]);
+  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther, mailOpen]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -393,6 +401,9 @@ export function WalkView() {
   const todayFest = coreFestivals(new Date())[0];
   const preview = festival ? FESTIVALS.find((f) => f.key === festival) : null;
   const leave = (e: Event) => go('garden', e);
+  // 名号 at render: `{名}` in any line becomes what the player is called (in 桃源 the unnamed are 客)
+  const nameScope: NameScope = phase === 'ready' && worldRef.current?.where().region === 'taoyuan' ? 'valley' : 'world';
+  const f = (zh: string, en: string) => fillName(t(zh, en), lang, nameScope);
   const blurAfter = (e: Event) => (e.currentTarget as HTMLElement | null)?.blur?.();
 
   return (
@@ -418,6 +429,10 @@ export function WalkView() {
           </small>
         </div>
         <div class="walk-tools">
+          <button type="button" class="walk-chip walk-tool walk-mail" disabled={busy} onClick={(e) => { blurAfter(e); openMail(); }} aria-haspopup="dialog" aria-label={mailLabel(t)} title={mailLabel(t)}>
+            <MailGlyph />
+            <span class="walk-tool-label">{t('书信', 'Letters')}</span>
+          </button>
           <button type="button" class="walk-chip walk-tool" disabled={busy} onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('同伴', 'Companions')} title={t('同伴', 'Companions')}>
             <span class="brush" aria-hidden="true">{CHARACTER[play.value.character].zh.slice(0, 1)}</span>
             <span class="walk-tool-label">{t('同伴', 'Companions')}</span>
@@ -460,9 +475,9 @@ export function WalkView() {
 
       {toast && (
         <div class="walk-toast" key={toast.id} role="status">
-          <span>{t(toast.zh, toast.en)}</span>
+          <span>{f(toast.zh, toast.en)}</span>
           {toast.action && (
-            <button type="button" onClick={() => { toast.action!.run(); setToast(null); }}>{t(toast.action.zh, toast.action.en)}</button>
+            <button type="button" onClick={() => { toast.action!.run(); setToast(null); }}>{f(toast.action.zh, toast.action.en)}</button>
           )}
         </div>
       )}
@@ -470,7 +485,7 @@ export function WalkView() {
       {/* --- what you can do here */}
       {phase === 'ready' && prompt && !card && !dialog && !photoOn && (
         <div class="walk-prompt" aria-live="polite">
-          <span class="walk-prompt-label">{t(prompt.labelZh, prompt.labelEn)}</span>
+          <span class="walk-prompt-label">{f(prompt.labelZh, prompt.labelEn)}</span>
           {!touch && (
             <button type="button" class="walk-prompt-act" onClick={(e) => { blurAfter(e); worldRef.current?.act(); }}>
               <kbd>E</kbd> {t(prompt.actionZh, prompt.actionEn)}
@@ -605,7 +620,7 @@ export function WalkView() {
         <div class="walk-arrive" key={arrival.key} role="status" aria-live="polite">
           <span class="walk-arrive-name brush">{arrival.zh}</span>
           <span class="walk-arrive-en latin">{arrival.en}</span>
-          <span class="walk-arrive-blurb">{t(arrival.blurbZh, arrival.blurbEn)}</span>
+          <span class="walk-arrive-blurb">{f(arrival.blurbZh, arrival.blurbEn)}</span>
           {arrival.first && <span class="walk-arrive-seal brush" aria-hidden="true">初至</span>}
         </div>
       )}
@@ -613,14 +628,14 @@ export function WalkView() {
       {/* --- somebody speaks */}
       {dialog && (
         <div class="walk-say-wrap">
-          <div class="walk-say" role="dialog" aria-modal="false" aria-label={t(dialog.nameZh, dialog.nameEn)} key={dialog.id}>
-            <div class="walk-say-name"><span class={lang === 'zh' ? 'brush' : 'latin'}>{t(dialog.nameZh, dialog.nameEn)}</span></div>
-            <p class="walk-say-text">{t(dialog.zh, dialog.en)}</p>
+          <div class="walk-say" role="dialog" aria-modal="false" aria-label={f(dialog.nameZh, dialog.nameEn)} key={dialog.id}>
+            <div class="walk-say-name"><span class={lang === 'zh' ? 'brush' : 'latin'}>{f(dialog.nameZh, dialog.nameEn)}</span></div>
+            <p class="walk-say-text">{f(dialog.zh, dialog.en)}</p>
             {dialog.choices && dialog.choices.length > 0 ? (
               <div class="walk-say-choices">
                 {dialog.choices.map((c, i) => (
                   <button type="button" key={i} class="walk-say-choice" onClick={() => answer(i)} autoFocus={i === 0}>
-                    {!touch && <kbd>{i + 1}</kbd>} {t(c.zh, c.en)}
+                    {!touch && <kbd>{i + 1}</kbd>} {f(c.zh, c.en)}
                   </button>
                 ))}
               </div>
@@ -653,10 +668,10 @@ export function WalkView() {
       {/* --- a small hanging scroll */}
       {card && (
         <div class="walk-card-wrap" onClick={(e) => e.target === e.currentTarget && setCard(null)}>
-          <div class="walk-card" role="dialog" aria-modal="true" aria-label={t(card.titleZh, card.titleEn)}>
+          <div class="walk-card" role="dialog" aria-modal="true" aria-label={f(card.titleZh, card.titleEn)}>
             <div class="walk-card-rod" aria-hidden="true" />
-            <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{t(card.titleZh, card.titleEn)}</h2>
-            <p class="walk-card-body">{t(card.bodyZh, card.bodyEn)}</p>
+            <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{f(card.titleZh, card.titleEn)}</h2>
+            <p class="walk-card-body">{f(card.bodyZh, card.bodyEn)}</p>
             {card.seal && <span class="walk-seal brush" aria-hidden="true">{card.seal}</span>}
             <button type="button" class="btn walk-card-close" onClick={() => setCard(null)} autoFocus>{t('收起', 'Close')}</button>
             <div class="walk-card-rod is-bottom" aria-hidden="true" />
@@ -693,6 +708,11 @@ export function WalkView() {
             label={t('时辰', 'Time')}
             options={[{ value: 'now', label: t('此刻', 'Now') }, { value: 'day', label: t('昼', 'Day') }, { value: 'night', label: t('夜', 'Night') }]}
           />
+        </div>
+        {/* on a narrow phone the top bar has no room for 乐: the music switch lives here instead */}
+        <div class="walk-sheet-row walk-sheet-music">
+          <span class="walk-sheet-label">{t('音乐', 'Music')}</span>
+          <Toggle checked={musicOn} onChange={(v) => setSettings({ music: v })} label={t('音乐', 'Music')} />
         </div>
         <div class="walk-fest-grid">
           <button type="button" class={'walk-fest-item' + (!festival ? ' is-on' : '')} aria-pressed={!festival} onClick={() => { setFestival(null); setSheet(false); }}>

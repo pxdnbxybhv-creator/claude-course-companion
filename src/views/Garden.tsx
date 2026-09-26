@@ -16,6 +16,8 @@ import { sceneEnv, todayLine } from './garden/env';
 import { EnsoCheck } from './garden/Enso';
 import { Inscription } from './garden/Inscription';
 import { HabitDetail, HabitEditor, Welcome } from './garden/Sheets';
+import { openMail } from '../app/mail';
+import { MailGlyph, mailLabel } from './mail/MailHost';
 import './garden/garden.css';
 
 // Dev / README screenshots: /?demo=1#garden seeds the demo garden once (&lang=en for English),
@@ -143,6 +145,9 @@ export function GardenView() {
         <button type="button" class="btn btn-small garden-walk" onClick={(e) => go('walk', e)} aria-label={t('入画：走进园子', 'Walk into the garden')}>
           <span class="brush" aria-hidden="true">入画</span>
           <span class="garden-walk-en latin">{t('', 'Walk in')}</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon garden-mail" onClick={() => openMail()} aria-haspopup="dialog" aria-label={mailLabel(t)} title={mailLabel(t)}>
+          <MailGlyph />
         </button>
         <button class="btn btn-ghost btn-icon garden-settings" onClick={(e) => go('settings', e)} aria-label={t('设置', 'Settings')}>
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">

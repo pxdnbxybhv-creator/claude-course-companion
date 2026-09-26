@@ -13,6 +13,8 @@ import {
 } from '../../app/play';
 import { CHARACTERS, CHARACTER, type CharacterDef } from '../../data/characters';
 import { QUEST, QUESTS, type QuestDef } from '../../data/quests';
+import { LETTER } from '../../data/letters';
+import { openMail } from '../../app/mail';
 import { ENCOUNTERS, type EncounterDef } from '../../data/encounters';
 import { REGION } from '../walk/map';
 import { CharacterSelect } from '../walk/characters/Select';
@@ -20,7 +22,7 @@ import { CoinBadge, CoinIcon, fmtCoins } from '../../ui/coins';
 import { BrushBar, PaperPage, Portrait, Seal, Tally } from './bits';
 import {
   COMPANION_QUESTS, SEAL_QUESTS, albumRequest, cnCount, companionCount, dayHeading, doneDate, encounterDay, isUnlocked,
-  OTHER_SOURCES, ledgerToday, routeForKey, routeForQuest, sealCount, stampText,
+  OTHER_SOURCES, ledgerToday, namedSources, routeForKey, routeForQuest, sealCount, stampText,
 } from './helpers';
 import { GAMES_PAY_LEAST, GAMES_PAY_TOP } from '../games/economy';
 import './quests.css';
@@ -202,6 +204,12 @@ function Hero(props: { c: CharacterDef; t: T }) {
   );
 }
 
+/** A companion a letter brings: 「初见礼 · 在信中」. */
+function giftLine(c: CharacterDef, t: T): string {
+  const l = c.letter ? LETTER[c.letter] : undefined;
+  return t(`${l?.subject.zh ?? '书信'} · 在信中`, `${l?.subject.en ?? 'A letter'} · in your letters`);
+}
+
 function CompanionCard(props: { c: CharacterDef; t: T }) {
   const { c, t } = props;
   const p = play.value;
@@ -229,6 +237,13 @@ function CompanionCard(props: { c: CharacterDef; t: T }) {
             <span class="qb-prog-n num">{prog.value}/{prog.target}</span>
           </div>
           <p class="qb-hint">{t(q.hintZh, q.hintEn)}</p>
+        </div>
+      ) : c.unlock === 'gift' ? (
+        <div class="qb-lock">
+          <Skill c={c} t={t} locked />
+          <p class="qb-lock-q"><span class="qb-lock-mark" aria-hidden="true">信</span>{giftLine(c, t)}</p>
+          <p class="qb-lock-desc">{t('随一封信而来：拆开信匣里的来信，收下便是。', 'Comes with a letter: open it in your letters and accept it.')}</p>
+          <button type="button" class="btn btn-small qb-comp-go" onClick={() => openMail(c.letter)}>{t('拆信', 'Open the letter')}</button>
         </div>
       ) : null}
     </article>
@@ -423,6 +438,7 @@ function Purse(props: { t: T }) {
     ['游艺', 'Games', `${GAMES_PAY_LEAST}–${GAMES_PAY_TOP}`],
     ['打卡', 'Check-ins', `${CHECKIN_COINS}`],
     ['燃香', 'Incense', `${INCENSE_COINS}`],
+    ...namedSources(p),
     ...OTHER_SOURCES,
   ];
   return (

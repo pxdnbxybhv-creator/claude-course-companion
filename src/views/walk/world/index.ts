@@ -12,7 +12,7 @@ import { REGION_MODULES } from '../regions';
 import { allDecks, clearedAt, rectClearing, registerClearing } from '../regions/water-decks';
 import { FACTORIES } from '../characters';
 import type { CharacterModel } from '../characters/types';
-import { ANCHORS, HOME_PLOT, REGION, REGIONS, WAYPOINTS, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
+import { ANCHORS, HOME_PLOT, REGION, REGIONS, WAYPOINTS, pocketAt, regionAt, type MusicTheme, type RegionId, type XZ } from '../map';
 import { CHARACTER, type CharacterId } from '../../../data/characters';
 import { activeHabits, refreshToday, state, toggleCheckin } from '../../../app/store';
 import { play, record, unlockWaypoint, visitRegion, waypointOpen } from '../../../app/play';
@@ -40,7 +40,7 @@ import { giftsOf, PlayerController, ScholarModel, type MoveInput, type Physics }
 import { DriftingVerses, SongBirds } from './gifts';
 import { Controls, type InputState, type ViewMode } from './controls';
 import { PhotoRig, type PhotoApi } from './photo';
-import { captureRatio, PHOTO_BUDGET, PHOTO_LONG_SIDE } from './photoMath';
+import { captureRatio, fenceDisc, PHOTO_BUDGET, PHOTO_LONG_SIDE } from './photoMath';
 import { buildAir, Bursts } from './particles';
 import { buildFlora } from './flora';
 import { terrain } from './terrain';
@@ -135,6 +135,28 @@ export type { Collider, Occluder };
 
 /** Colliders and occluders are now part of WorldCtx itself; kept as an alias for older call sites. */
 export type WorldCtxCore = WorldCtx;
+
+/**
+ * What the core offers beyond WorldCtx (wave 6, for the pocket valley 桃源 and its story): scripted
+ * camera moves, the arrival banner on cue, the view's heading, the valley clock's sky. Read them
+ * through features/taoyuan/engine.ts (typed, with fallbacks).
+ */
+export interface WorldExtras {
+  /** Move the camera to `to`, looking at `look`, over `secs`, hold `hold` s, then hand the view back. Reduced motion: a cut. */
+  cinematic(o: { to: { x: number; y: number; z: number }; look: { x: number; y: number; z: number }; secs?: number; hold?: number }): Promise<void>;
+  /** End a scripted camera move now. */
+  endCinematic(): void;
+  /** The arrival banner (and the visit flag) for a place — a pocket region announces itself only on cue. */
+  arrive(id: RegionId): void;
+  /** Turn the view to look along a heading (radians, as Player.heading), at once. */
+  faceView(heading: number): void;
+  /** Look again at where the walker is (pocket mode, the region, the music) now, not at the next check. */
+  restream(): void;
+  /** A photo camera fence of the pocket region's own, or null for the default (a disc inside its ring). */
+  photoFence(fn: ((p: { x: number; y: number; z: number }, walker: { x: number; y: number; z: number }) => void) | null): void;
+  /** The pocket region the walker is in now (pocket mode), or null. */
+  pocket(): RegionId | null;
+}
 
 /** Where the ray from t to c first enters an upright cylinder, as a fraction of the way (null = never). */
 function rayCylinder(tx: number, ty: number, tz: number, dx: number, dy: number, dz: number, o: Occluder): number | null {
@@ -274,6 +296,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   const camera = new THREE.PerspectiveCamera(aspect < 0.8 ? 62 : 50, aspect, 0.1, 600);
   camera.layers.enable(NO_REFLECT);
   const sky = new SkySystem(scene, bag, base.tod, base.hour, base.moonPhase, { distance: qp.distance, shadows: qp.shadows, halo: qp.halo, renderer });
+  // the sky, its lights and the shadow rig: always drawn (a pocket valley keeps them too)
+  const skyTop = new Set(scene.children);
   const mountains = buildMountains(bag);
   scene.add(mountains);
   hud.progress(0.06);
@@ -446,6 +470,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   controls.walker = player.position;
   controls.waterAt = waterAt;
   controls.onLock = (on, blocked) => hud.lock?.(on, blocked);
+  // inside a pocket valley the photo camera keeps below the ring of hills (never a glimpse of the void)
+  controls.fence = (p, w) => {
+    if (!pocket) return;
+    if (pocketFence) { pocketFence(p, w); return; }
+    const r = REGION[pocket];
+    fenceDisc(p, r.center, r.pocket!.ring - 20, r.pocket!.y + 31);
+  };
   if (controls.lockBlocked) hud.lock?.(false, true);
   const camY = () => player.eyeHeight;
   const camTarget = new THREE.Vector3();
@@ -797,6 +828,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
   let themeOverride: MusicTheme | null | undefined;
   const themeFor = (): MusicTheme => {
+    // a pocket valley keeps its own music, whatever the hour outside (「山中无甲子」)
+    if (region && REGION[region].pocket) return REGION[region].theme;
     if (sky.isNight()) return 'night';
     const r = region ?? lastPlace;
     if (env.festivals.length && (r === 'garden' || r === 'village')) return 'festival';
@@ -825,14 +858,24 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       applyTheme();
     },
   };
+  /** The arrival banner for a place, and its visit flag. */
+  const arriveAt = (id: RegionId) => {
+    const first = !play.peek().flags[`visit:${id}`];
+    try { visitRegion(id); } catch (e) { console.warn('[walk] visit', e); }
+    const r = REGION[id];
+    hud.arrive({ id, zh: r.zh, en: r.en, blurbZh: r.blurbZh, blurbEn: r.blurbEn, first });
+  };
   const enter = (id: RegionId | null, announce: boolean) => {
     region = id;
     if (id) {
       lastPlace = id;
-      const first = !play.peek().flags[`visit:${id}`];
-      try { visitRegion(id); } catch (e) { console.warn('[walk] visit', e); }
-      const r = REGION[id];
-      if (announce) hud.arrive({ id, zh: r.zh, en: r.en, blurbZh: r.blurbZh, blurbEn: r.blurbEn, first });
+      // (a pocket valley is announced, and counted as visited, on cue: see WorldExtras.arrive)
+      if (!REGION[id].pocket) {
+        const first = !play.peek().flags[`visit:${id}`];
+        try { visitRegion(id); } catch (e) { console.warn('[walk] visit', e); }
+        const r = REGION[id];
+        if (announce) hud.arrive({ id, zh: r.zh, en: r.en, blurbZh: r.blurbZh, blurbEn: r.blurbEn, first });
+      }
     }
     applyTheme();
     for (const fn of regionFns) {
@@ -842,9 +885,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   /** With a little hysteresis: leaving a place takes a few steps past its edge. */
   const trackRegion = () => {
     const p = player.position;
-    const at = regionAt(p.x, p.z);
+    // a pocket valley first (keyed on the walker in 3-D: its floor floats high over open country)
+    const at = pocketAt(p.x, p.y, p.z) ?? regionAt(p.x, p.z);
     if (at === region) return;
-    if (at === null && region) {
+    if (at === null && region && !REGION[region].pocket) {
       const r = REGION[region];
       if (Math.hypot(p.x - r.center.x, p.z - r.center.z) < r.radius * 1.5) return;
     }
@@ -868,7 +912,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     skill: hud.skill,
   };
 
-  const ctx: WorldCtxCore = {
+  let pocketFence: ((p: { x: number; y: number; z: number }, walker: { x: number; y: number; z: number }) => void) | null = null;
+  const ctx: WorldCtxCore & WorldExtras = {
     THREE, scene, camera, renderer,
     groundY: floorY,
     isWalkable,
@@ -906,6 +951,22 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     setTimeScale(f: number) {
       timeScaleWant = Number.isFinite(f) ? Math.max(0.05, Math.min(1, f)) : 1;
     },
+    cinematic: (o) => (running ? controls.cinematic(o) : Promise.resolve()),
+    endCinematic: () => controls.endCinematic(),
+    arrive: (id: RegionId) => arriveAt(id),
+    faceView(heading: number) {
+      if (!Number.isFinite(heading)) return;
+      controls.cancelFrame();
+      controls.yaw = heading + Math.PI;
+      camFollow(0, true);
+    },
+    restream() {
+      stream();
+      trackRegion();
+      applyTheme();
+    },
+    photoFence(fn) { pocketFence = fn; },
+    pocket: () => pocket,
   };
 
   let playerMirrored = true;
@@ -923,6 +984,16 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     // off the water if the new walker cannot stand on it: judged by the new walker's own gifts, since
     // a skill's float (嫦娥's 奔月) is still set this tick and only ends on the skills' next frame
     if (!player.gifts.float && !walkableGround(player.position.x, player.position.z)) {
+      if (pocket) {
+        // in a pocket valley: the nearest dry step on its own floor (never out through its door)
+        const p0 = player.position;
+        for (let k = 1; k < 40; k++) {
+          const ang = k * 2.4, d = 0.4 + k * 0.25;
+          const x = p0.x + Math.cos(ang) * d, z = p0.z + Math.sin(ang) * d;
+          if (isWalkable(x, z)) { player.teleport(x, z); break; }
+        }
+        return;
+      }
       const a = ARRIVE[lastPlace];
       player.teleport(a.x, a.z, Math.atan2(a.face.x - a.x, a.face.z - a.z));
     }
@@ -971,14 +1042,71 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
    */
   const near = new Map<RegionId, boolean>();
   const hiddenFar = new Map<RegionId, Set<THREE.Object3D>>();
+  /**
+   * Pocket mode (桃源): while the walker is inside a pocket region's ring, on its floor, the world
+   * outside is not drawn at all — every other place, the land, the open water, the bridges, what grows,
+   * the garden's ground and wall, the season's air, the far ranges — nor whatever a feature set
+   * straight into the scene far from the pocket. All of it comes back, exactly, on the way out.
+   */
+  let pocket: RegionId | null = null;
+  const pocketHidden = new Set<THREE.Object3D>();
+  let pocketAmbient = false;
+  const coreLayers = (): THREE.Object3D[] => [land.group, openWater.group, bridges, scatter.group, ground.mesh, wall.group, flora.mist, mountains, ...(air ? [air.points] : [])];
+  /** Scene children that always stay: the sky, the walker, the bursts and dust, the gifts that follow the walker. */
+  const pocketKeep = (o: THREE.Object3D) => skyTop.has(o) || o === player.root || o === player.shadowMesh || o === bursts.points || o === dust.points || o === verses.group || o === songBirds.mesh;
+  /** Hide (or give back) what features put straight into the scene, by where it stands: far from the pocket, or far below it. */
+  const pocketScene = () => {
+    if (!pocket) return;
+    const r = REGION[pocket], P = r.pocket!;
+    for (const c of scene.children) {
+      if (c.name.startsWith('region:') || pocketKeep(c) || c.userData.pocket) continue;
+      if (coreLayers().includes(c)) continue;
+      const p = c.position;
+      // (a pool of effects that follows the walker sits at the origin, never culled: it stays)
+      const follows = !c.frustumCulled && Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z) < 1e-3;
+      const far = !follows && (Math.hypot(p.x - r.center.x, p.z - r.center.z) > P.ring + 6 || p.y < P.y - 25);
+      if (far && c.visible) { c.visible = false; pocketHidden.add(c); }
+      else if (!far && pocketHidden.has(c)) { c.visible = true; pocketHidden.delete(c); }
+    }
+  };
+  const setPocket = (pk: RegionId | null) => {
+    if (pk === pocket) return;
+    if (pk) {
+      pocket = pk;
+      for (const o of coreLayers()) if (o.visible) { o.visible = false; pocketHidden.add(o); }
+      pocketScene();
+      // the water's voice inside (unless something else is already playing a bed)
+      try { if (audio.stats().ambient === 'none') { audio.setAmbient('stream'); pocketAmbient = true; } } catch { /* muted */ }
+    } else {
+      pocket = null;
+      for (const o of pocketHidden) o.visible = true;
+      pocketHidden.clear();
+      controls.endCinematic();
+      sky.setMood(null);
+      if (pocketAmbient) { pocketAmbient = false; try { audio.setAmbient('none'); } catch { /* muted */ } }
+    }
+  };
   const stream = () => {
     const p = player.position;
+    setPocket(pocketAt(p.x, p.y, p.z));
+    if (pocket) {
+      for (const r of REGIONS) {
+        const g = regionGroups.get(r.id)!;
+        const on = r.id === pocket;
+        near.set(r.id, on);
+        g.visible = on;
+      }
+      pocketScene();
+      return;
+    }
     // measured from the walker and from the camera, whichever is nearer: the photo camera roams up
     // to PHOTO_RADIUS from the walker (and settles back from there), and a place it looks into is drawn
     const c = camera.position;
     const fogFar = sky.fog.far;
     for (const r of REGIONS) {
       const g = regionGroups.get(r.id)!;
+      // a pocket valley is drawn only from inside
+      if (r.pocket) { g.visible = false; near.set(r.id, false); continue; }
       const d = Math.min(Math.hypot(p.x - r.center.x, p.z - r.center.z), Math.hypot(c.x - r.center.x, c.z - r.center.z));
       const isNear = d < r.radius + SHOW_MARGIN * qp.distance;
       near.set(r.id, isNear);
@@ -1253,13 +1381,15 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     sky.update(photo.active ? rawDt : dt, camera, aimShadows());
     grade.setLight({ night: sky.night01, tint: sky.tint });
     camPos.copy(camera.position);
-    mountains.follow(camPos);
-    flora.mist.position.set(camPos.x, 0, camPos.z);
-    const far = sky.fog.far;
-    land.update(camPos, far);
-    scatter.update(t, camPos, sky.tint, far);
-    openWater.update(t, sky.fogColor, sky.night01);
-    wall.setNight(sky.night01);
+    if (!pocket) {
+      mountains.follow(camPos);
+      flora.mist.position.set(camPos.x, 0, camPos.z);
+      const far = sky.fog.far;
+      land.update(camPos, far);
+      scatter.update(t, camPos, sky.tint, far);
+      openWater.update(t, sky.fogColor, sky.night01);
+      wall.setNight(sky.night01);
+    }
     if (frameNo % 12 === 1) {
       stream();
       trackRegion();
@@ -1277,7 +1407,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
         player.root.traverse((o) => o.layers.set(mirrored ? 0 : NO_REFLECT));
       }
     }
-    if (near.get('garden')) {
+    if (pocket) { /* the garden is not drawn from inside a pocket valley */ }
+    else if (near.get('garden')) {
       for (const e of plants) tickPlant(e, dt, t, camPos, sky.tint, reduced);
       for (const f of tablets.faces) (f.material as THREE.MeshBasicMaterial).color.copy(sky.tint);
       arch.setNight(sky.night01, t);
@@ -1286,7 +1417,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       pond.update(dt, t, sky.waterColor, sky.night01);
       marks.update(dt, sky.night01);
     } else flora.update(t, sky.tint, sky.fogColor);
-    if (air) air.update(t, camPos, sky.night01);
+    if (air && !pocket) air.update(t, camPos, sky.night01);
     bursts.update(dt, t);
     songBirds.update(dt, t, player.position.x, player.position.z);
     verses.update(dt, player.character === 'poet' && player.speed > 0.8 && !player.isFrozen, player.position.x, player.position.y, player.position.z, player.heading, sky.night01, camPos);
@@ -1303,7 +1434,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       if (alt) d = Math.min(d, Math.hypot(alt.x - px, alt.z - pz));
       if (d >= i.radius || d >= bd || Math.abs(i.position.y - player.position.y) >= 3) continue;
       let rid = regionOf.get(i);
-      if (rid === undefined) { rid = regionAt(i.position.x, i.position.z); regionOf.set(i, rid); }
+      if (rid === undefined) { rid = pocketAt(i.position.x, i.position.y, i.position.z) ?? regionAt(i.position.x, i.position.z); regionOf.set(i, rid); }
       if (rid && !near.get(rid)) continue;
       best = i; bd = d;
     }
@@ -1429,6 +1560,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     // (on a skill's mount — 关公's 赤兔 — he simply swings down: the ride(null) below sets him on
     // his feet, and the skill sees he is off and lets the horse go)
     if (player.isFrozen && !player.heldBySkill) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
+    // a pocket valley is on no map, and no road leads there (「不复得路」)
+    if (REGION[id]?.pocket) { hud.toast('此中之地，不在舆图。', 'That place is on no map.'); return; }
     if (!isLit(id)) { hud.toast('那处驿站尚未到访：循路走到驿碑前，点亮它的灯。', 'Not yet visited: walk to its waypoint stele and light the lantern first.'); return; }
     traveling = true;
     try {
@@ -1649,6 +1782,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       waypoints: () => placed.map((w) => [w.id, +w.sx.toFixed(1), +w.sz.toFixed(1), isLit(w.id)]),
       timeScale: () => timeScale,
       region: () => region,
+      pocket: () => pocket,
+      pocketHidden: () => pocketHidden.size,
       regions: () => Object.fromEntries([...regionGroups].map(([k, g]) => [k, { visible: g.visible, near: near.get(k) ?? false, shown: g.children.filter((c) => c.visible).length, children: g.children.length }])),
       where: () => ({ x: +player.position.x.toFixed(2), y: +player.position.y.toFixed(2), z: +player.position.z.toFixed(2), heading: +player.heading.toFixed(2), region, character: player.character }),
       night: (on: boolean) => sky.forceNight(on),

@@ -152,6 +152,11 @@ export class Controls {
   waterAt: (x: number, z: number) => number | null = () => null;
   /** The field of view changed (zoom): the world re-sizes its point sprites; the HUD's slider follows. */
   onFov: ((fov: number) => void) | null = null;
+  /**
+   * A further fence for the photo camera, after the reach and the ground (set by the world: inside a
+   * pocket valley the camera keeps below the ring of hills and inside it). Mutates the position.
+   */
+  fence: ((p: THREE.Vector3, walker: THREE.Vector3) => void) | null = null;
   private saved: { yaw: number; pitch: number; dist: number; look: number; fov: number } | null = null;
   /** Settling back from the photo camera: the pose it left from, and how far along. */
   private ret: { pos: THREE.Vector3; quat: THREE.Quaternion; t: number } | null = null;
@@ -407,6 +412,12 @@ export class Controls {
     this.frameUntil = this.clock + secs;
   }
 
+  /** Let go of a framing under way (the view is being set anew). */
+  cancelFrame(): void {
+    this.frameUntil = -1;
+    this.preFrameYaw = null;
+  }
+
   /** Optional: fraction (0..1] of the way from the target to the camera that is not blocked by a wall. */
   occlusion: ((tx: number, ty: number, tz: number, cx: number, cy: number, cz: number) => number) | null = null;
 
@@ -528,7 +539,55 @@ export class Controls {
         this.camera.quaternion.slerpQuaternions(r.quat, this.qF.copy(this.camera.quaternion), k);
       }
     }
-    this.setNear(e > 0.5 ? NEAR_CLOSE : NEAR_THIRD);
+    if (this.cine) this.runCinematic(dt);
+    this.setNear(e > 0.5 && !this.cine ? NEAR_CLOSE : NEAR_THIRD);
+  }
+
+  // ───────────────────────────── scripted camera moves (ctx.cinematic)
+
+  private cine: { from: THREE.Vector3; fromQ: THREE.Quaternion; to: THREE.Vector3; look: THREE.Vector3; q: THREE.Quaternion; secs: number; hold: number; t: number; done: () => void } | null = null;
+
+  /** A scripted camera move is under way. */
+  get inCinematic(): boolean {
+    return this.cine !== null;
+  }
+
+  /**
+   * Move the camera from where it is now to `to`, looking at `look`, over `secs` (eased), hold it
+   * there for `hold` seconds, then hand the view back (it settles back as from the photo camera).
+   * Reduced motion: a cut there and a cut back. A move already under way ends where it is.
+   */
+  cinematic(o: { to: { x: number; y: number; z: number }; look: { x: number; y: number; z: number }; secs?: number; hold?: number }): Promise<void> {
+    this.endCinematic(false);
+    return new Promise<void>((done) => {
+      const to = new THREE.Vector3(o.to.x, o.to.y, o.to.z);
+      const look = new THREE.Vector3(o.look.x, o.look.y, o.look.z);
+      if (![to.x, to.y, to.z, look.x, look.y, look.z].every(Number.isFinite)) { done(); return; }
+      const q = new THREE.Quaternion().setFromRotationMatrix(this.m4.lookAt(to, look, UP));
+      this.releaseLock();
+      this.cine = {
+        from: this.camera.position.clone(), fromQ: this.camera.quaternion.clone(), to, look, q,
+        secs: Math.max(0, o.secs ?? 2), hold: Math.max(0, o.hold ?? 0), t: 0, done,
+      };
+    });
+  }
+
+  /** End a scripted move now (`settle`: glide back to the follow view; false: stay put for the next move). */
+  endCinematic(settle = true): void {
+    const c = this.cine;
+    if (!c) return;
+    this.cine = null;
+    if (settle && !this.reduced) this.ret = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), t: 0 };
+    c.done();
+  }
+
+  private runCinematic(dt: number): void {
+    const c = this.cine!;
+    c.t += dt;
+    const k = this.reduced || c.secs <= 0 ? 1 : ease(c.t / c.secs);
+    this.camera.position.lerpVectors(c.from, c.to, k);
+    this.camera.quaternion.slerpQuaternions(c.fromQ, c.q, k);
+    if (c.t >= c.secs + c.hold) this.endCinematic(true);
   }
 
   private setNear(n: number): void {
@@ -620,7 +679,10 @@ export class Controls {
     ph.vel.z = damp(ph.vel.z, (fz * iy + rz * ix) * speed, k, dt);
     ph.vel.y = damp(ph.vel.y, lift * speed * 0.7, k, dt);
     ph.pos.addScaledVector(ph.vel, dt);
-    if (this.walker) clampPhotoCam(ph.pos, this.walker, floorY, this.waterAt);
+    if (this.walker) {
+      clampPhotoCam(ph.pos, this.walker, floorY, this.waterAt);
+      this.fence?.(ph.pos, this.walker);
+    }
     this.camera.position.copy(ph.pos);
     this.camera.quaternion.setFromEuler(this.euler.set(ph.pitch, ph.yaw, 0, 'YXZ'));
     if (this.camera.fov !== ph.fov) { this.camera.fov = ph.fov; this.camera.updateProjectionMatrix(); }

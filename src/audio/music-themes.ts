@@ -560,8 +560,36 @@ const quiet: ThemeSpec = {
   },
 };
 
-// taoyuan: until its own theme lands (wave 6), the spring plays the garden's music
-export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet, taoyuan: garden };
+const taoyuan: ThemeSpec = {
+  level: 0.85,
+  style: {
+    bpm: [60, 68], modes: [M(67, 3), M(60, 3), M(62, 3), M(65, 3)], range: [0, 8],
+    cells: FLOW, motifBeats: 4, statements: [1, 2], restChance: 0.08, breath: [1, 2.5], periodRest: [1.5, 3],
+    cadenceBeats: 3, leap: 0.45, modulate: 0.25,
+  },
+  // 桃源: a bright 徵 tune on the 笛 over flowing 古筝 arpeggios and a 笙 pad, every voice sent into the
+  // valley's echo; the zheng takes the 转; a little bell rings off the cliffs now and then
+  arrange(c) {
+    const { p, r } = c;
+    const ev: MusicEvent[] = [];
+    if (p.role === 'zhuan') {
+      ev.push(...plucks(c, 'zheng', mel(c, 0), { gain: 0.72, send: 0.35, bend: 0.4, vib: 0.4, spread: 0.45, echo: 0.2 }));
+    } else {
+      ev.push(...[line(c, 'dizi', p.notes, 0, { gain: 0.5, pan: 0.12, send: 0.42, grace: 0.6, slide: 0.2, echo: 0.28 })].filter(notNull));
+    }
+    ev.push(...arpeggio(c, -1, { gain: 0.38, send: 0.32, every: 2, sub: 0.5, vel: 0.42, echo: 0.15 }));
+    const root = p.role === 'zhuan' ? halfCadence(p.mode.final) : 0;
+    ev.push(pad(c, root, -1, { gain: 0.22, send: 0.5, vel: 0.55, air: 0.6, overlap: 3, echo: 0.2 }));
+    if (p.role === 'qi' && r.chance(0.5)) ev.push(...gliss(c, 0, -3, 7, 0.9, 0, { gain: 0.26, send: 0.4, echo: 0.2 }));
+    if ((p.role === 'cheng' || p.role === 'he') && r.chance(0.35)) {
+      const last = p.notes[p.notes.length - 1];
+      ev.push(hit(c, 'ling', secOf(c, last.beat + 0.5), 0.1, { freq: hz(midiOf(c, 0, 3)), pan: -0.35, send: 0.6, echo: 0.35 }));
+    }
+    return ev;
+  },
+};
+
+export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet, taoyuan };
 
 /** Arrange one phrase of a theme. */
 export function arrange(theme: ThemeId, p: Phrase, r: Rng, seed: number): MusicEvent[] {

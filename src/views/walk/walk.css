@@ -427,6 +427,15 @@
 .walk-tool .brush { font-size: 19px; line-height: 1; }
 .walk-tool:disabled { opacity: 0.45; }
 .walk-music { width: 40px; padding: 0; justify-content: center; }
+/* 信 · letters: its dot shows while one is unopened */
+.walk-mail { position: relative; }
+.walk-mail .mail-unread-dot { top: 4px; right: 4px; box-shadow: 0 0 0 2px rgba(244, 238, 226, 0.95); }
+.walk-sheet-music { display: none; }
+@media (max-width: 420px) {
+  /* no room for 乐 beside 信: the music switch moves into the 节 sheet */
+  .walk-music { display: none; }
+  .walk-sheet-music { display: flex; }
+}
 .walk-music .brush { opacity: 0.4; text-decoration: line-through; text-decoration-thickness: 1px; }
 .walk-music.is-on .brush { opacity: 1; text-decoration: none; }
 @media (max-width: 640px) {

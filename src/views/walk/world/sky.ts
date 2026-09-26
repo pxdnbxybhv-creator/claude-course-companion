@@ -30,6 +30,53 @@ const PALETTES: Record<TimeOfDay, Palette> = {
   night: { top: '#0b1130', horizon: '#2c3766', fog: '#2a3462', hemiSky: '#aaa8c4', hemiGround: '#74553e', hemi: 1.2, sun: '#ece6da', sunI: 0.9, tint: '#aaa6bc', glow: '#efe2bc' },
 };
 
+/**
+ * 谷时 · the valley clock of a pocket region (桃源): a sky of its own that wins over the hour while the
+ * walker is inside (see SkySystem.setMood). 申 honey light · 酉 amber and rose · 戌 indigo · 亥 deep night
+ * and a great moon · 子 the lantern hour · 案 midnight held, blue · 卯 sunrise · 常 the world's hour, but
+ * always spring.
+ */
+export type SkyMood = 'shen' | 'you' | 'xu' | 'hai' | 'zi' | 'case' | 'mao' | 'chang';
+export const SKY_MOODS: readonly SkyMood[] = ['shen', 'you', 'xu', 'hai', 'zi', 'case', 'mao', 'chang'];
+
+interface MoodSpec extends Palette {
+  night: boolean;
+  /** Which hour the sun disc and the water follow (dawn and dusk show the low cinnabar sun). */
+  tod: TimeOfDay;
+  /** Toward the sun (need not be unit). */
+  sunAt: [number, number, number];
+  /** The moon: toward it, and its size; none by day. */
+  moon?: { dir: [number, number, number]; scale: number };
+  /** Fog near and far (m, before the picture quality's distance). */
+  haze: [number, number];
+  water: string;
+}
+
+const MOOD_DAY = { night: false, haze: [32, 150] as [number, number] };
+const MOOD_NIGHT = { night: true, tod: 'night' as TimeOfDay, haze: [20, 118] as [number, number], water: '#2f4c60' };
+const MOODS: Record<Exclude<SkyMood, 'chang'>, MoodSpec> & Record<'chang:dawn' | 'chang:day' | 'chang:dusk' | 'chang:night', MoodSpec> = {
+  shen: { sun: '#ffe0a8', fog: '#f1dabd', ...MOOD_DAY, tod: 'day', top: '#a7c2c4', horizon: '#f6dfb4', haze: [34, 150], hemiSky: '#fff1dc', hemiGround: '#a5866a', hemi: 2.1, sunAt: [-0.72, 0.62, 0.32], sunI: 1.5, tint: '#fff3df', glow: '#ffd08a', water: '#a6c7ae' } as MoodSpec,
+  you: { sun: '#ffc488', fog: '#efc4aa', ...MOOD_DAY, tod: 'dusk', top: '#8d92b6', horizon: '#f7bf95', haze: [30, 140], hemiSky: '#fbe3d0', hemiGround: '#8f6c5c', hemi: 2.15, sunAt: [-0.78, 0.6, 0.16], sunI: 1.3, tint: '#fbe3cd', glow: '#f59a62', water: '#b9b39a' } as MoodSpec,
+  xu: { sun: '#e9dfd0', fog: '#4b4f78', ...MOOD_NIGHT, top: '#27335e', horizon: '#5a5f8a', haze: [22, 124], hemiSky: '#bcb4d0', hemiGround: '#6f5344', hemi: 1.38, sunAt: [0.3, 0.9, 0.2], sunI: 0.82, tint: '#bab2c6', glow: '#f0c89a', moon: { dir: [0.5, 0.72, -0.48], scale: 1.4 } } as MoodSpec,
+  hai: { sun: '#efe6d4', fog: '#2c3564', ...MOOD_NIGHT, top: '#0e1638', horizon: '#2e3868', hemiSky: '#b2aeca', hemiGround: '#6e5240', hemi: 1.26, sunAt: [0.3, 0.9, 0.2], sunI: 1.0, tint: '#aeaac2', glow: '#f3e6c0', moon: { dir: [0.12, 0.62, -0.78], scale: 2.6 } } as MoodSpec,
+  zi: { sun: '#efe6d4', fog: '#27305a', ...MOOD_NIGHT, top: '#0a1130', horizon: '#26305c', hemiSky: '#aeaac8', hemiGround: '#6a4f3e', hemi: 1.22, sunAt: [0.3, 0.9, 0.2], sunI: 1.0, tint: '#a9a6c0', glow: '#f1e2bc', moon: { dir: [0.06, 0.74, -0.67], scale: 2.3 } } as MoodSpec,
+  case: { sun: '#dfe8f4', fog: '#22385e', ...MOOD_NIGHT, top: '#0b1534', horizon: '#223a66', haze: [15, 92], hemiSky: '#9fb3d2', hemiGround: '#4d4a5c', hemi: 1.2, sunAt: [0.3, 0.9, 0.2], sunI: 1.02, tint: '#a3b1c9', glow: '#d8e4f4', water: '#274a66', moon: { dir: [0.06, 0.74, -0.67], scale: 2.3 } } as MoodSpec,
+  mao: { sun: '#ffd2a0', fog: '#f3dcc6', ...MOOD_DAY, tod: 'dawn', top: '#9db8cb', horizon: '#f8d4b0', haze: [30, 146], hemiSky: '#fdeee0', hemiGround: '#957a66', hemi: 2.0, sunAt: [0.8, 0.6, -0.08], sunI: 1.3, tint: '#fbede0', glow: '#f7a468', water: '#a9c6b8' } as MoodSpec,
+  'chang:dawn': { sun: '#ffdcb4', fog: '#efdccb', ...MOOD_DAY, tod: 'dawn', top: '#a2bccb', horizon: '#f6d9bd', hemiSky: '#fcefe4', hemiGround: '#937966', hemi: 2.0, sunAt: [0.8, 0.6, -0.08], sunI: 1.28, tint: '#faefe5', glow: '#f7a86e', water: '#a9c6b8' } as MoodSpec,
+  'chang:day': { sun: '#fff1da', fog: '#efe4d6', ...MOOD_DAY, tod: 'day', top: '#9cc4cf', horizon: '#f4eadb', hemiSky: '#fff8ee', hemiGround: '#a88a68', hemi: 2.05, sunAt: [0.25, 0.82, 0.5], sunI: 1.42, tint: '#fff9f1', glow: '#fff0c8', water: '#98c3b2' } as MoodSpec,
+  'chang:dusk': { sun: '#ffd0a0', fog: '#ebcdb6', ...MOOD_DAY, tod: 'dusk', top: '#8d92b6', horizon: '#f5c49c', hemiSky: '#fae5d3', hemiGround: '#907060', hemi: 2.12, sunAt: [-0.78, 0.6, 0.16], sunI: 1.26, tint: '#f8e5d2', glow: '#f2915a', water: '#b5b59c' } as MoodSpec,
+  'chang:night': { sun: '#efe8da', fog: '#333d6a', ...MOOD_NIGHT, top: '#121a40', horizon: '#34406e', hemiSky: '#b6b2cc', hemiGround: '#76583f', hemi: 1.3, sunAt: [0.3, 0.9, 0.2], sunI: 1.0, tint: '#b2aec4', glow: '#f0e4c2', moon: { dir: [0.3, 0.7, -0.64], scale: 1.5 } } as MoodSpec,
+};
+
+/** 常: the world's hour in the valley's own words — 晨 5–9, 昼 9–17, 暮 17–19, 夜 19–5. */
+export function changTod(hour: number): TimeOfDay {
+  const h = ((hour % 24) + 24) % 24;
+  return h >= 5 && h < 9 ? 'dawn' : h >= 9 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'dusk' : 'night';
+}
+
+/** The palette's own keys (a mood carries more: its hour, its sun, its haze). */
+const PALETTE_KEYS: readonly (keyof Palette)[] = ['top', 'horizon', 'fog', 'hemiSky', 'hemiGround', 'hemi', 'sun', 'sunI', 'tint', 'glow'];
+
 /** Fog distances by day and by night (a light warm haze, a closer indigo dark): fogFor() in quality.ts, × the picture quality's distance. */
 
 /** Water takes the sky's colour through jade: 碧 by day, a deep indigo-teal by night. */
@@ -165,6 +212,18 @@ export class SkySystem implements Sky {
   /** 身临其境: a soft warm halo round the low sun (the moon has its glow already). */
   private sunHalo: THREE.Sprite | null = null;
   private rig: ShadowRig | null = null;
+  /** The valley clock's sky, when one is set (it wins over the hour, a feature's night and a picture's). */
+  private mood: MoodSpec | null = null;
+  private moodId: SkyMood | null = null;
+  /** How fast the sky eases toward its palette (per second): 1.6, or faster for a time-lapse. */
+  private rate = 1.6;
+  /** The sun and the moon as they were before a mood moved them. */
+  private preMood: { sun: THREE.Vector3; moon: THREE.Vector3 } | null = null;
+  private moodSun = new THREE.Vector3();
+  private moodMoon = new THREE.Vector3();
+  /** A fog set by an effect over the mood (near, far, colour). */
+  private fogOver: { near: number; far: number; color: THREE.Color | null } | null = null;
+  private fogNow: { near: number; far: number } | null = null;
 
   constructor(
     scene: THREE.Scene,
@@ -230,12 +289,58 @@ export class SkySystem implements Sky {
   private sunLightDir = new THREE.Vector3();
 
   private target(): Palette {
+    if (this.mood) return this.mood;
     return PALETTES[this.isNight() ? 'night' : this.tod];
+  }
+
+  /**
+   * The valley clock (桃源): a sky of its own — palette, sun, moon, fog and water — that wins over the
+   * hour while it is set. `secs`: how long the sky takes to turn (0 = at once; a time-lapse passes a
+   * few moods in a row with short ones). 'chang' follows the world's hour (see changTod). null gives
+   * the sky back to the hour, at once (it is cleared as the walker leaves the valley).
+   */
+  setMood(mood: SkyMood | null, o: { secs?: number; hour?: number } = {}): void {
+    if (mood === null) {
+      if (!this.mood) return;
+      this.mood = null;
+      this.moodId = null;
+      this.fogOver = null;
+      this.fogNow = null;
+      if (this.preMood) { this.sunDir.copy(this.preMood.sun); this.moonDir.copy(this.preMood.moon); this.preMood = null; }
+      this.rate = 1.6;
+      this.applyPalette(1);
+      return;
+    }
+    const spec = mood === 'chang' ? MOODS[`chang:${changTod(o.hour ?? new Date().getHours() + new Date().getMinutes() / 60)}`] : MOODS[mood];
+    if (!spec) return;
+    if (!this.preMood) this.preMood = { sun: this.sunDir.clone(), moon: this.moonDir.clone() };
+    const first = !this.mood;
+    this.mood = spec;
+    this.moodId = mood;
+    this.moodSun.set(...spec.sunAt).normalize();
+    if (spec.moon) this.moodMoon.set(...spec.moon.dir).normalize();
+    const secs = o.secs ?? (first ? 0 : 2.5);
+    this.rate = secs <= 0 ? 1e6 : 3 / secs;
+    if (secs <= 0) {
+      this.applyPalette(1);
+      this.sunDir.copy(this.moodSun);
+      if (spec.moon) this.moonDir.copy(this.moodMoon);
+    }
+  }
+
+  /** The valley clock's mood now (null outside). */
+  get moodNow(): SkyMood | null {
+    return this.moodId;
+  }
+
+  /** An effect's fog over the mood (a close mist, a clearing), or null to let the mood's fog be. */
+  setFog(o: { near: number; far: number; color?: string } | null): void {
+    this.fogOver = o ? { near: o.near, far: o.far, color: o.color ? new THREE.Color(o.color) : null } : null;
   }
 
   private applyPalette(k: number): void {
     const p = this.target();
-    for (const key of Object.keys(p) as (keyof Palette)[]) {
+    for (const key of PALETTE_KEYS) {
       const v = p[key];
       if (typeof v === 'number') {
         const c = this.cur[key];
@@ -250,6 +355,7 @@ export class SkySystem implements Sky {
 
   /** Night as shown: a picture's hour (photo mode) when one is set, else the clock or a feature's. */
   isNight(): boolean {
+    if (this.mood) return this.mood.night;
     return this.pictureNight ?? (this.forced || this.tod === 'night');
   }
 
@@ -301,11 +407,16 @@ export class SkySystem implements Sky {
 
   /** `aim`: where the shadows should be instead of round the view (the photo camera: see ShadowRig.update). */
   update(dt: number, camera: THREE.Camera, aim?: ShadowAim | null): void {
-    const k = dt > 0.5 ? 1 : 1 - Math.exp(-dt * 1.6);
+    const k = dt > 0.5 ? 1 : 1 - Math.exp(-dt * this.rate);
     this.applyPalette(k);
+    const mood = this.mood;
+    if (mood) {
+      this.sunDir.lerp(this.moodSun, k).normalize();
+      if (mood.moon) this.moonDir.lerp(this.moodMoon, k).normalize();
+    }
     const c = this.cur as Record<string, THREE.Color & number>;
     const night = this.isNight() ? 1 : 0;
-    this.night01 = dt > 0.5 ? night : damp(this.night01, night, 1.6, dt);
+    this.night01 = dt > 0.5 ? night : damp(this.night01, night, Math.min(this.rate, 12), dt);
     skyNow.night = this.night01;
 
     const u = this.domeMat.uniforms;
@@ -318,8 +429,19 @@ export class SkySystem implements Sky {
     const F = this.fogD;
     this.fog.near = F.near + (F.nightNear - F.near) * this.night01;
     this.fog.far = F.far + (F.nightFar - F.far) * this.night01;
-    this.fogColor.copy(c.fog);
-    this.waterColor.copy(SkySystem.col(WATER[this.tod])).lerp(SkySystem.col(WATER.night), this.night01);
+    if (mood) {
+      // the valley's own haze, eased like the palette (and an effect's mist over it)
+      const kd = F.far / 176;
+      const want = this.fogOver ?? { near: mood.haze[0] * kd, far: mood.haze[1] * kd, color: null };
+      const fn = this.fogNow ?? (this.fogNow = { near: want.near, far: want.far });
+      fn.near += (want.near - fn.near) * k;
+      fn.far += (want.far - fn.far) * k;
+      this.fog.near = fn.near;
+      this.fog.far = fn.far;
+      if (this.fogOver?.color) this.fog.color.lerp(this.fogOver.color, 0.85);
+    }
+    this.fogColor.copy(this.fog.color);
+    this.waterColor.copy(SkySystem.col(mood ? mood.water : WATER[this.tod])).lerp(SkySystem.col(WATER.night), mood ? 0 : this.night01);
     this.hemi.color.copy(c.hemiSky);
     this.hemi.groundColor.copy(c.hemiGround);
     this.hemi.intensity = c.hemi as number;
@@ -363,9 +485,11 @@ export class SkySystem implements Sky {
 
     // moon: visible at night (unless new), or whenever a feature asks
     const illum = (1 - Math.cos(this.moonPhase * Math.PI * 2)) / 2;
-    const wantMoon = this.moonOverride.visible ?? (this.night01 > 0.05 && illum > 0.04);
+    // (the valley's night always has its moon, as large as its hour wants)
+    const wantMoon = mood ? !!mood.moon && this.night01 > 0.05 : this.moonOverride.visible ?? (this.night01 > 0.05 && illum > 0.04);
+    const wantScale = mood?.moon ? mood.moon.scale * this.moonOverride.scale : this.moonOverride.scale;
     this.moonVis = dt > 0.5 ? (wantMoon ? 1 : 0) : damp(this.moonVis, wantMoon ? 1 : 0, 2, dt);
-    this.moonScale = dt > 0.5 ? this.moonOverride.scale : damp(this.moonScale, this.moonOverride.scale, 1.5, dt);
+    this.moonScale = dt > 0.5 ? wantScale : damp(this.moonScale, wantScale, 1.5, dt);
     this.moonGlowK = damp(this.moonGlowK, this.moonOverride.glow, 2, dt);
     const D = 300;
     const ms = 22 * this.moonScale;
@@ -380,7 +504,8 @@ export class SkySystem implements Sky {
     this.moonGlow.visible = this.moon.visible && this.night01 > 0.02;
 
     // the cinnabar sun, only when low (dawn, dusk)
-    const low = this.tod === 'dawn' || this.tod === 'dusk';
+    const tod = mood ? mood.tod : this.tod;
+    const low = tod === 'dawn' || tod === 'dusk';
     this.sun.visible = low && this.night01 < 0.9;
     this.sun.position.copy(this.sunDir).multiplyScalar(D);
     this.sun.scale.setScalar(16);

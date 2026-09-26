@@ -10,6 +10,15 @@ export interface Deck {
   cx: number; cz: number; ax: number; az: number; hl: number; hw: number;
   /** Walking height at signed distance s along the axis (−hl … hl). */
   y(s: number): number;
+  /**
+   * Optional, for a surface that is not a ramp (a valley floor with terraces): the height at the world
+   * point (x, z) inside the rectangle, or null where this deck has a hole. Wins over y(s).
+   */
+  yAt?(x: number, z: number): number | null;
+  /** Optional: false where the deck may not be walked (a wall, a pool, the slopes beyond a floor). */
+  walk?(x: number, z: number): boolean;
+  /** Optional: the water surface at (x, z) on this deck (a stream, a pond), or null where it is dry. */
+  water?(x: number, z: number): number | null;
 }
 
 const decks = new Map<string, Deck>();
@@ -32,10 +41,41 @@ export function deckY(x: number, z: number): number | null {
     const s = dx * d.ax + dz * d.az;
     const q = -dx * d.az + dz * d.ax;
     if (Math.abs(s) > d.hl || Math.abs(q) > d.hw) continue;
-    const y = d.y(s);
+    const y = d.yAt ? d.yAt(x, z) : d.y(s);
+    if (y === null) continue;
     if (best === null || y > best) best = y;
   }
   return best;
+}
+
+/** The deck under (x, z) (the highest), or null. */
+function deckAt(x: number, z: number): Deck | null {
+  let best: Deck | null = null, by = -Infinity;
+  for (const d of decks.values()) {
+    const dx = x - d.cx, dz = z - d.cz;
+    const s = dx * d.ax + dz * d.az;
+    const q = -dx * d.az + dz * d.ax;
+    if (Math.abs(s) > d.hl || Math.abs(q) > d.hw) continue;
+    const y = d.yAt ? d.yAt(x, z) : d.y(s);
+    if (y === null) continue;
+    if (y > by) { by = y; best = d; }
+  }
+  return best;
+}
+
+/** On a deck with a walk() rule: whether it may be walked here; null when no such deck is under (x, z). */
+export function deckWalk(x: number, z: number): boolean | null {
+  const d = deckAt(x, z);
+  return d && d.walk ? d.walk(x, z) : null;
+}
+
+/**
+ * On a deck with water of its own (a pocket valley's stream): its surface here, or null where that deck
+ * is dry; undefined when no such deck is under (x, z) (the world's own water applies).
+ */
+export function deckWater(x: number, z: number): number | null | undefined {
+  const d = deckAt(x, z);
+  return d && d.water ? d.water(x, z) : undefined;
 }
 
 /** A straight deck from a to b of half width hw, at a constant height or a height profile. */
