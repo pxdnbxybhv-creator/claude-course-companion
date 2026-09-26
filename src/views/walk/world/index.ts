@@ -180,6 +180,8 @@ const ARRIVE: Record<RegionId, { x: number; z: number; face: XZ; own?: true }> =
   plum: { x: -78, z: -56, face: ANCHORS.plumSummit },
   mountain: { x: 27.1, z: -87.6, face: ANCHORS.templeHall },   // before the temple gate
   home: { x: -34, z: -24, face: { x: -50, z: -24 } },           // at the homestead gate, looking in
+  // 桃源 has no stele and is never a travel target (「不复得路」); should anything ask, its door: the waterfall pool
+  taoyuan: { x: ANCHORS.waterfallPool.x - 2.4, z: ANCHORS.waterfallPool.z - 3.2, face: ANCHORS.waterfall },
 };
 
 /** What each picture quality means for the world's counts and distances: QUALITY_INFO in world/quality.ts, which refines the rest. */

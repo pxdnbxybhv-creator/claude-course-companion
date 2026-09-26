@@ -134,9 +134,10 @@ describe('waypoint steles', () => {
     expect(lightReach(22)).toBe(6);
   });
 
-  it('every place has one stele, and the map\'s spots are on dry, level, reachable land', () => {
+  it('every place on the ground has one stele (a pocket has none), and the map\'s spots are on dry, level, reachable land', () => {
     const T = terrain();
-    expect(new Set(WAYPOINTS.map((w) => w.id)).size).toBe(Object.keys(REGION).length);
+    expect(new Set(WAYPOINTS.map((w) => w.id)).size).toBe(Object.values(REGION).filter((r) => !r.pocket).length);
+    expect(WAYPOINTS.some((w) => REGION[w.id].pocket)).toBe(false);
     for (const w of WAYPOINTS) {
       const t: SpotTest = { walkable: (x, z) => T.waterAt(x, z) === null, height: T.height, pathDist: (x, z) => T.pathNear(x, z).d };
       const s = findSpot(w.x, w.z, t);

@@ -560,7 +560,8 @@ const quiet: ThemeSpec = {
   },
 };
 
-export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet };
+// taoyuan: until its own theme lands (wave 6), the spring plays the garden's music
+export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet, taoyuan: garden };
 
 /** Arrange one phrase of a theme. */
 export function arrange(theme: ThemeId, p: Phrase, r: Rng, seed: number): MusicEvent[] {

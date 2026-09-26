@@ -325,6 +325,26 @@ export function record(key: string, n = 1): void {
   }));
 }
 
+/** Remember the day something happened (first time only): `done[key] = today`. Story beats use it for next-day letters. */
+export function markDay(key: string): void {
+  if (play.value.done[key]) return;
+  update((p) => ({ ...p, done: { ...p.done, [key]: today.value } }));
+}
+
+/**
+ * Coins with a name: they count as today's income under `src:<source>` (the purse's 「钱从何来」
+ * rows read that counter), in one change with the coins themselves.
+ */
+export function earnFrom(source: string, n: number): void {
+  if (!(n > 0)) return;
+  update((p) => ({
+    ...p,
+    coins: Math.min(1e9, p.coins + Math.floor(n)),
+    counters: { ...p.counters, [`src:${source}`]: (p.counters[`src:${source}`] ?? 0) + Math.floor(n) },
+    daily: { ...p.daily, counts: { ...p.daily.counts, [`src:${source}`]: (p.daily.counts[`src:${source}`] ?? 0) + Math.floor(n) } },
+  }));
+}
+
 /** Remember a best score (only ever goes up). */
 export function recordMax(key: string, value: number): void {
   if ((play.value.best[key] ?? 0) >= value) return;

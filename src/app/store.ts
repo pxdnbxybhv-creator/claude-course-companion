@@ -6,6 +6,7 @@ import { PLANT_KINDS } from '../core/types';
 import { hashString, uid } from '../core/rng';
 import { isValidKey, todayKey } from '../core/date';
 import { toggleDay } from '../core/habits';
+import { cleanName } from '../core/names';
 
 const STORAGE_KEY = 'banmu.v1';
 
@@ -22,6 +23,7 @@ export function defaultSettings(): Settings {
   return {
     lang: defaultLang(),
     sealName: '',
+    playerName: '',
     sound: true,
     volume: 0.7,
     music: true,
@@ -79,6 +81,7 @@ export function sanitize(raw: unknown): AppState {
     ...base.settings,
     ...(s.lang === 'zh' || s.lang === 'en' ? { lang: s.lang } : {}),
     sealName: typeof s.sealName === 'string' ? s.sealName.slice(0, 4) : '',
+    playerName: typeof s.playerName === 'string' ? cleanName(s.playerName) : '',
     sound: s.sound !== false,
     music: s.music !== false,
     musicVolume: Number.isFinite(s.musicVolume) ? Math.min(1, Math.max(0, s.musicVolume!)) : base.settings.musicVolume,

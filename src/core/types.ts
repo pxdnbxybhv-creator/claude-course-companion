@@ -42,6 +42,8 @@ export interface Settings {
   lang: Lang;
   /** Up to 4 characters carved into the user's personal seal (印章). */
   sealName: string;
+  /** What the player is called (名号), at most 12 characters, cleaned by core/names.ts; '' = the default. */
+  playerName: string;
   sound: boolean;
   volume: number; // 0..1
   /** Background music (generative, see audio/music.ts). */

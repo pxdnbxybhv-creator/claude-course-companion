@@ -53,6 +53,7 @@ const REGION_WORDS: Record<RegionId, string> = {
   plum: '梅雪香岭疏影寒',
   mountain: '山寺钟云松僧泉峰磬石涧',
   home: '田园屋庐归豆锄宅草屋柴门桑麻篱',
+  taoyuan: '桃花源溪林洞渔津落英芳草阡陌鸡犬',
 };
 const REGION_PLANT: Partial<Record<RegionId, string>> = { plum: 'plum', bamboo: 'bamboo', lake: 'lotus', mountain: 'pine', home: 'chrysanthemum' };
 const ROAD_WORDS = '路行客归马径驿';

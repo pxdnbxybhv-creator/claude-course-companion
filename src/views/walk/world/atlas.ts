@@ -3,7 +3,7 @@
 // fine broken lines, each place named in brush (faint with a ？ until you have been there), the
 // waypoint steles (驿碑: a lit lantern once reached, a grey outline before), the homestead's plot,
 // and a cinnabar mark for where you stand. Pure Canvas 2D; no three.js.
-import { HOME_PLOT, LAKE, PATHS, REGIONS, WORLD_RADIUS, type RegionId } from '../map';
+import { GROUND_REGIONS, HOME_PLOT, LAKE, PATHS, WORLD_RADIUS, type RegionId } from '../map';
 import { RIVER_SAMPLES, POOL, terrain } from './terrain';
 import { makeRng } from '../../../core/rng';
 
@@ -173,7 +173,7 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
     for (const b of taken) a += Math.max(0, Math.min(x1, b.x1) - Math.max(x0, b.x0)) * Math.max(0, Math.min(z1, b.z1) - Math.max(z0, b.z0));
     return a;
   };
-  for (const r of REGIONS) {
+  for (const r of GROUND_REGIONS) {
     const seen = o.visited.has(r.id);
     const cx = X(r.center.x), cz = Z(r.center.z);
     const name = o.lang === 'zh' ? r.zh : r.en;
@@ -273,7 +273,7 @@ export function atlasHit(S: number, px: number, py: number, waypoints?: readonly
     if (d < reachW && d < bd) { bd = d; best = w.id; }
   }
   if (best) return best;
-  for (const r of REGIONS) {
+  for (const r of GROUND_REGIONS) {
     const d = Math.hypot(px - (c + r.center.x * k), py - (c + r.center.z * k));
     const reach = Math.max(r.radius * k, 34 * (S / 600));
     if (d < reach && d < bd) { bd = d; best = r.id; }

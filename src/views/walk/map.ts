@@ -3,10 +3,10 @@
 // mini-games, the map screen). One unit = one metre; +x east, +z south, y up.
 // The walled garden with the half-acre pond sits at the origin; its moon gate opens south.
 
-export type RegionId = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'home';
+export type RegionId = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'home' | 'taoyuan';
 
 /** Background-music themes (see src/audio/music.ts). */
-export type MusicTheme = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'night' | 'festival' | 'hall' | 'quiet';
+export type MusicTheme = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'night' | 'festival' | 'hall' | 'quiet' | 'taoyuan';
 
 export interface XZ { x: number; z: number }
 
@@ -23,6 +23,13 @@ export interface RegionSpec {
   /** Ground height near the centre (m); the terrain is shaped to meet it. */
   elevation: number;
   theme: MusicTheme;
+  /**
+   * A pocket region (桃源): a walled valley on a floor of its own at height `y`, ringed by hills out to
+   * `ring` m from the centre, reached only through its door (the mountain waterfall). It is not on
+   * the ground plane: regionAt() never returns it (see pocketAt), it has no waypoint stele, and the
+   * map never shows it.
+   */
+  pocket?: { y: number; ring: number };
 }
 
 export const REGIONS: RegionSpec[] = [
@@ -33,7 +40,11 @@ export const REGIONS: RegionSpec[] = [
   { id: 'plum', zh: '梅岭', en: 'Plum Ridge', blurbZh: '疏影横斜，暗香浮动；岭上有亭。', blurbEn: 'Sparse shadows, drifting fragrance; a pavilion on the ridge.', center: { x: -72, z: -72 }, radius: 30, elevation: 9, theme: 'plum' },
   { id: 'mountain', zh: '山寺', en: 'Mountain Temple', blurbZh: '钟声、塔影与飞瀑。', blurbEn: 'A bell, a pagoda and a waterfall.', center: { x: 40, z: -112 }, radius: 44, elevation: 22, theme: 'mountain' },
   { id: 'home', zh: '家园', en: 'Homestead', blurbZh: '一方空地，由你起屋、种树、养些猫狗。', blurbEn: 'Open ground for you to build on, plant, and keep a few pets.', center: { x: -50, z: -24 }, radius: 20, elevation: 0.6, theme: 'garden' },
+  { id: 'taoyuan', zh: '桃源', en: 'Peach Blossom Spring', blurbZh: '芳草鲜美，落英缤纷；此中之地，不在舆图。', blurbEn: 'Fresh grass and falling blossom — a place that is on no map.', center: { x: 112, z: -58 }, radius: 40, elevation: 120, theme: 'taoyuan', pocket: { y: 120, ring: 64 } },
 ];
+
+/** The regions on the ground plane (every region but the pockets). */
+export const GROUND_REGIONS: RegionSpec[] = REGIONS.filter((r) => !r.pocket);
 
 /**
  * The homestead's buildable plot: a square of `size` metres centred at (x, z), on a grid of `cell`
@@ -56,7 +67,8 @@ export const WAYPOINTS: Waypoint[] = [
   { id: 'mountain', x: 25, z: -85, zh: '云深寺山门', en: 'Temple Gate' },
   { id: 'home', x: -34.2, z: -20.6, zh: '家园', en: 'Homestead' },
 ];
-export const WAYPOINT: Record<RegionId, Waypoint> = Object.fromEntries(WAYPOINTS.map((w) => [w.id, w])) as Record<RegionId, Waypoint>;
+/** Steles by region (a pocket region has none: 「不复得路」). */
+export const WAYPOINT: Partial<Record<RegionId, Waypoint>> = Object.fromEntries(WAYPOINTS.map((w) => [w.id, w]));
 
 export const REGION: Record<RegionId, RegionSpec> = Object.fromEntries(REGIONS.map((r) => [r.id, r])) as Record<RegionId, RegionSpec>;
 
@@ -140,13 +152,21 @@ export const ANCHORS = {
 
 export type AnchorId = keyof typeof ANCHORS;
 
-/** Which region a point belongs to (nearest centre within 1.35 × radius), or null in between. */
+/** Which ground region a point belongs to (nearest centre within 1.35 × radius), or null in between. Never a pocket. */
 export function regionAt(x: number, z: number): RegionId | null {
   let best: RegionId | null = null;
   let bestD = Infinity;
-  for (const r of REGIONS) {
+  for (const r of GROUND_REGIONS) {
     const d = Math.hypot(x - r.center.x, z - r.center.z) / r.radius;
     if (d < 1.35 && d < bestD) { bestD = d; best = r.id; }
   }
   return best;
+}
+
+/** The pocket region a point in 3-D is inside (within its ring, and no more than 10 m below its floor), or null. */
+export function pocketAt(x: number, y: number, z: number): RegionId | null {
+  for (const r of REGIONS) {
+    if (r.pocket && y > r.pocket.y - 10 && Math.hypot(x - r.center.x, z - r.center.z) < r.pocket.ring) return r.id;
+  }
+  return null;
 }

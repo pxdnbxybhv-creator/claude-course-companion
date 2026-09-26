@@ -2,7 +2,7 @@
 // clock, and where the painter's paper crane flies. No DOM, no three.js (tests/skills.test.ts).
 import type { CharacterId } from '../../../../data/characters';
 import { ENCOUNTERS } from '../../../../data/encounters';
-import { REGION, REGIONS, WAYPOINTS, type RegionId } from '../../map';
+import { GROUND_REGIONS, REGION, WAYPOINTS, type RegionId } from '../../map';
 
 export interface SkillTiming {
   /** Seconds to wait after the skill ends before it can be used again. */
@@ -119,7 +119,7 @@ export function craneTarget(from: { x: number; z: number }, d: Discovery, near =
   const enc = nearest(unmet.filter((u) => now(u.e.id)));
   if (enc) return toEncounter(enc, false);
 
-  const reg = nearest(REGIONS.filter((r) => !d.visited(r.id)).map((r) => ({ r, x: r.center.x, z: r.center.z })));
+  const reg = nearest(GROUND_REGIONS.filter((r) => !d.visited(r.id)).map((r) => ({ r, x: r.center.x, z: r.center.z })));
   if (reg) return { kind: 'region', x: reg.x, z: reg.z, region: reg.r.id, zh: reg.r.zh, en: reg.r.en };
 
   const wait = nearest(unmet);
