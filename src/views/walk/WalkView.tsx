@@ -21,6 +21,9 @@ import { CHARACTER } from '../../data/characters';
 import type { FestivalKey } from './types';
 import type { Arrival, HudBridge, Prompt, SayOpts, WaypointInfo, WorldHandle } from './world';
 import { PhotoMode } from './photo/PhotoMode';
+import { CaseSheet } from './case/CaseSheet';
+import { caseHere, caseSheet, openCaseSheet } from './case/state';
+import { caseIsOpen, progress as caseProgress, ready as caseReady } from './features/taoyuan/case';
 import './walk.css';
 
 type Phase = 'loading' | 'ready' | 'nowebgl' | 'error';
@@ -66,6 +69,13 @@ function queryFestival(): FestivalKey | null {
   } catch {
     return null;
   }
+}
+
+
+/** A long action label in the round button (证据未足, 请众人到庭) breaks evenly (2+2, 3+2) in a smaller hand. */
+function actLen(zh: string | undefined): string {
+  const n = zh ? [...zh].length : 0;
+  return n >= 5 ? ' walk-act-l5' : n === 4 ? ' walk-act-l4' : '';
 }
 
 export function WalkView() {
@@ -119,10 +129,14 @@ export function WalkView() {
   const dialog = dialogs[0] ?? null;
   // the letters (信) and the name sheet (askName) are app-wide sheets over the walk
   const mailOpen = mailUi.value !== null || nameAsk.value !== null;
+  // 案卷 · the casebook of the 桃源 case (its chip shows while the case is open)
+  const caseUi = caseSheet.value !== null;
+  const caseFlags = play.value.flags;
+  const caseOn = caseIsOpen(caseFlags);
   /** A sheet over the walk (a letter, the name sheet) or a text field has the keyboard: the walk's keys wait. */
   const keysElsewhere = (e: KeyboardEvent) => {
     // read at the key press itself: a sheet opened a moment ago counts before the walk re-renders
-    if (mailUi.peek() !== null || nameAsk.peek() !== null) return true;
+    if (mailUi.peek() !== null || nameAsk.peek() !== null || caseSheet.peek() !== null) return true;
     const tg = e.target as HTMLElement | null;
     return !!tg?.closest?.('.sheet, input, textarea, select, [contenteditable]');
   };
@@ -294,8 +308,8 @@ export function WalkView() {
 
   // pause walking while a card, a dialogue, the map or a picker is open (or the photo's own card)
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal || mailOpen);
-  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal, mailOpen]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal || mailOpen || caseUi);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal, mailOpen, caseUi]);
 
   // the way of looking reaches the world (again after every rebuild) and is remembered for the session
   useEffect(() => {
@@ -326,7 +340,7 @@ export function WalkView() {
   // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
   // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn || mailOpen) return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn || mailOpen || caseUi) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -335,13 +349,13 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn, mailOpen]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn, mailOpen, caseUi]);
 
   // V: over the shoulder / through the eyes; P: the photo camera (not over a card, a dialogue, a
   // sheet, the map or a picker; the homestead's building keeps its own V). In photo mode its own
   // keys (Esc, P) put the camera away.
   useEffect(() => {
-    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen || mailOpen) return;
+    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen || mailOpen || caseUi) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.code !== 'KeyV' && e.code !== 'KeyP') || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -353,7 +367,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther, mailOpen]);
+  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther, mailOpen, caseUi]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
@@ -469,6 +483,20 @@ export function WalkView() {
         </div>
       </header>}
 
+      {/* (only in the valley, and not while a game or a scene holds the walker: its ✕ sits in this slot) */}
+      {phase === 'ready' && caseOn && caseHere.value && !photoOn && !heldByOther && (() => {
+        const pr = caseProgress(caseFlags);
+        const ok = caseReady(caseFlags).ok;
+        return (
+          <button type="button" class={'walk-case-chip' + (ok ? ' is-ready' : '')} disabled={busy} onClick={(e) => { blurAfter(e); openCaseSheet(); }} aria-haspopup="dialog"
+            aria-label={t(`案卷 · 物证 ${pr.clues}/12${ok ? ' · 证据已足' : ''}`, `Casebook · evidence ${pr.clues}/12${ok ? ' · enough to judge' : ''}`)}>
+            <span class="brush" aria-hidden="true">案</span>
+            <span class="case-chip-label">{t('案卷', 'Casebook')}</span>
+            <small aria-hidden="true">{pr.clues}/12</small>
+          </button>
+        );
+      })()}
+
       {preview && !photoOn && (
         <div class="walk-banner" role="status">
           <span>{t(`预览 · ${preview.zh}`, `Preview · ${preview.en}`)}</span>
@@ -545,7 +573,7 @@ export function WalkView() {
             onClick={() => worldRef.current?.act()}
             aria-label={prompt ? t(prompt.actionZh, prompt.actionEn) : t('互动', 'Interact')}
           >
-            <span class={lang === 'zh' ? 'brush' : 'latin'}>{prompt ? t(prompt.actionZh, prompt.actionEn) : '·'}</span>
+            <span class={lang === 'zh' ? 'brush' + actLen(prompt?.actionZh) : 'latin'}>{prompt ? t(prompt.actionZh, prompt.actionEn) : '·'}</span>
           </button>
         </div>
       )}
@@ -584,7 +612,7 @@ export function WalkView() {
 
       {/* --- through the eyes: a faint aim point; on a desk, how to lock the mouse to the view */}
       {phase === 'ready' && camMode === 'first' && !photoOn && <div class={'walk-reticle' + (locked ? ' is-locked' : '')} aria-hidden="true" />}
-      {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && (
+      {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && !caseUi && (
         <div class="walk-lockhint" role="status">{lockBlocked ? t('拖动画面环顾', 'Drag the view to look')
           : t('点一下画面即可用鼠标环顾 · Esc 松开', 'Click the view to look with the mouse · Esc to let go')}</div>
       )}
@@ -675,6 +703,7 @@ export function WalkView() {
       )}
       <CharacterSelect open={charOpen} onClose={() => setCharOpen(false)} />
       <PurseSheet open={purseOpen} onClose={() => setPurseOpen(false)} />
+      <CaseSheet />
 
       {/* --- a small hanging scroll */}
       {card && (

@@ -470,4 +470,4 @@ export function doorStateFor(flags: Readonly<Record<string, true>>, hasShideLett
 }
 
 /** The glyphs brushed into the air in the valley (fetched as the valley is built). */
-export const BRUSHED = '初极狭才通人豁然开朗秦汉魏晋过所证断桃花源嗒';
+export const BRUSHED = '初极狭才通人豁然开朗秦汉魏晋过所证断桃花源嗒不知年水自春武陵桑远候门于此四十终得入呼亥正';

@@ -238,6 +238,7 @@ export function ledgerToday(p: PlayState, day: DateKey): { rows: LedgerRow[]; to
 export const SOURCE_NAMES: Record<string, [string, string]> = {
   mail: ['书信', 'Letters'],
   taoyuan: ['桃源', 'Peach Spring'],
+  npcs: ['乡邻', 'Neighbours'],
 };
 
 /**

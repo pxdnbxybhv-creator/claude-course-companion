@@ -157,6 +157,13 @@ export class Controls {
    * pocket valley the camera keeps below the ring of hills and inside it). Mutates the position.
    */
   fence: ((p: THREE.Vector3, walker: THREE.Vector3) => void) | null = null;
+  /**
+   * A place may ask the follow camera to come in closer and look down more (a pocket valley's walled
+   * courtyard, where the eaves and the walls would crowd it): at most `dist`, at least `pitch`. Set by the world.
+   */
+  followLimit: ((target: THREE.Vector3) => { dist: number; pitch: number } | null) | null = null;
+  private limK = 0;
+  private limWant = { dist: 99, pitch: 0 };
   private saved: { yaw: number; pitch: number; dist: number; look: number; fov: number } | null = null;
   /** Settling back from the photo camera: the pose it left from, and how far along. */
   private ret: { pos: THREE.Vector3; quat: THREE.Quaternion; t: number } | null = null;
@@ -458,8 +465,17 @@ export class Controls {
       this.yaw = dampAngle(this.yaw, want, 0.9 * Math.min(1, speed / 2), dt);
     }
 
-    const cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    let d = framing ? Math.min(this.dist, 4.8) : this.dist;
+    // a place that asks for it (a walled courtyard): closer, and looking down more, eased in and out
+    const lim = this.followLimit?.(this.target) ?? null;
+    if (lim) { this.limWant.dist = lim.dist; this.limWant.pitch = lim.pitch; }
+    this.limK = snap || this.reduced ? (lim ? 1 : 0) : damp(this.limK, lim ? 1 : 0, 2.2, dt);
+    let pitchNow = this.pitch, distNow = this.dist;
+    if (this.limK > 1e-3) {
+      pitchNow += (Math.max(this.pitch, this.limWant.pitch) - this.pitch) * this.limK;
+      distNow += (Math.min(this.dist, this.limWant.dist) - this.dist) * this.limK;
+    }
+    const cp = Math.cos(pitchNow), sp = Math.sin(pitchNow);
+    let d = framing ? Math.min(distNow, 4.8) : distNow;
     let x = 0, y = 0, z = 0;
     for (let i = 0; i < 6; i++) {
       x = this.target.x + Math.sin(this.yaw) * cp * d;

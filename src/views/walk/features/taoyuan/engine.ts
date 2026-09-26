@@ -31,6 +31,8 @@ export interface Engine {
   restream(): void;
   /** The photo camera's fence inside the pocket (null: the default disc). */
   photoFence(fn: ((p: { x: number; y: number; z: number }, walker: { x: number; y: number; z: number }) => void) | null): void;
+  /** Bring the follow camera closer and higher where this says (a walled courtyard); null: never. */
+  followLimit(fn: ((target: { x: number; y: number; z: number }) => { dist: number; pitch: number } | null) | null): void;
   /** The pocket region the walker is in (null outside). */
   pocket(): RegionId | null;
   /** The valley clock's sky (null: the hour's own), turning over `secs`. */
@@ -67,6 +69,7 @@ export function engine(ctx: WorldCtx): Engine {
     faceView: (h) => x.faceView?.(h),
     restream: () => x.restream?.(),
     photoFence: (fn) => x.photoFence?.(fn),
+    followLimit: (fn) => x.followLimit?.(fn),
     pocket: () => (x.pocket ? x.pocket() : null),
     // (a mood only inside the pocket: an effect still running as the walker leaves must not paint the world outside)
     setMood: (m, o) => { if (m !== null && x.pocket && !x.pocket()) return; sky.setMood?.(m, o); },

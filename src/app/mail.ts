@@ -195,3 +195,14 @@ if (at >= 0) backupExtras[at] = extra; else backupExtras.push(extra);
 // on load: the 初见礼 (every player, once), and whatever else has fallen due since the last visit
 ensureFirstGift();
 deliverDue();
+
+// and as the story moves on in the same session (the first visit to the temple, a beat in 桃源): the
+// letters that wait on a place or a beat come at once, not on the next load or the next day
+const storyKey = computed(() => Object.keys(play.value.flags).filter((k) => k.startsWith('visit:') || k.startsWith('ty:') || k.startsWith('case:')).sort().join('|'));
+let lastStory = storyKey.peek();
+effect(() => {
+  const k = storyKey.value;
+  if (k === lastStory) return;
+  lastStory = k;
+  settle();
+});

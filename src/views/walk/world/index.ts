@@ -154,6 +154,8 @@ export interface WorldExtras {
   restream(): void;
   /** A photo camera fence of the pocket region's own, or null for the default (a disc inside its ring). */
   photoFence(fn: ((p: { x: number; y: number; z: number }, walker: { x: number; y: number; z: number }) => void) | null): void;
+  /** Let a place bring the follow camera closer and higher (a walled courtyard); null: none. */
+  followLimit(fn: ((target: { x: number; y: number; z: number }) => { dist: number; pitch: number } | null) | null): void;
   /** The pocket region the walker is in now (pocket mode), or null. */
   pocket(): RegionId | null;
 }
@@ -999,6 +1001,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       applyTheme();
     },
     photoFence(fn) { pocketFence = fn; },
+    followLimit(fn) { controls.followLimit = fn; },
     pocket: () => pocket,
   };
 

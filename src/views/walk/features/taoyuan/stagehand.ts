@@ -13,8 +13,9 @@ import { Bag, inked, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { figure, speechMark, talk, type Figure, type FigureSpec } from '../minigames/npc';
 import { Stagehand } from '../encounters/stage';
-import { G, L, W, Y_T, standAt, waterAt, walkAt } from './places';
+import { G, L, LANE_LANTERNS, SHRINE, W, Y_T, standAt, surfaceAt, waterAt, walkAt } from './places';
 import { engine } from './engine';
+import { seeFocus } from './valley';
 import type { TaoyuanWorld } from './world';
 import type { VillagerHandle, VillagerKey } from './hooks';
 import { VILLAGERS, VILLAGER_KEYS, labelOf, metFlag, nameOf, talkKey, type Prop, type Spot } from './folk';
@@ -42,11 +43,45 @@ export function snap(x: number, z: number): { x: number; z: number } {
   return { x, z };
 }
 
+/** Which walled space a valley-local point is in (a view from one to another passes a wall). */
+function zoneOf(x: number, z: number): 'hall' | 'court' | 'out' {
+  const S = SHRINE;
+  if (Math.abs(x) < S.hall.x1 && z < S.hall.z0 && z > S.hall.z1) return 'hall';
+  if (Math.abs(x) < S.wallX && z < S.south && z > S.courtN) return 'court';
+  return 'out';
+}
+
+/** The lane lanterns' posts (world), for the camera to keep clear of. */
+const POSTS = LANE_LANTERNS.map((w) => { const l = L(w.x, w.z); return { x: w.x, z: w.z, top: Y_T + standAt(l.x, l.z) + 3.2 }; });
+
 // ───────────────────────────── the stage
 
 export class StoryStage extends Stagehand {
+  /** Lines are said only while this holds (the story closes it when a beat is cut short). */
+  gate: () => boolean = () => true;
+  private pending = new Set<() => void>();
+
   constructor(ctx: WorldCtx, parent: T.Object3D, readonly tv: TaoyuanWorld, readonly cast: Cast) {
     super(ctx, parent, 'taoyuan:story', 'taoyuan-story', 'taoyuan');
+  }
+
+  /** Wait (real time); resolves early when the stage goes or flushWaits() is called. */
+  override wait(ms: number): Promise<void> {
+    return new Promise((res) => {
+      if (this.bag.disposed) { res(); return; }
+      let done = false;
+      const fin = () => { if (done) return; done = true; this.pending.delete(fin); res(); };
+      this.pending.add(fin);
+      this.bag.later(this.still ? Math.min(ms, 400) : ms, fin);
+    });
+  }
+  /** Every wait under way resolves now (a beat cut short: the walker has left the valley). */
+  flushWaits(): void {
+    for (const f of [...this.pending]) f();
+  }
+  override dispose(): void {
+    super.dispose();
+    this.flushWaits();
   }
 
   /** A companion's name (as a speaker). */
@@ -57,7 +92,7 @@ export class StoryStage extends Stagehand {
 
   /** One line from someone (a villager, the companion, or no one); resolves with the choice (−1: closed). */
   async line(l: SLine, who: CharacterId = this.who): Promise<number> {
-    if (!this.alive) return -1;
+    if (!this.alive || !this.gate()) return -1;
     this.engaged = true;
     if (l.by === 'narr') return this.ctx.hud.say({ nameZh: '', nameEn: '', zh: l.zh, en: l.en, choices: l.choices });
     if (l.by === 'me') {
@@ -67,14 +102,19 @@ export class StoryStage extends Stagehand {
     const k = l.by;
     const met = !!play.peek().flags[metFlag(k)];
     const n = nameOf(k, met);
-    return talk(this.ctx, this.cast.fig(k), n, [l]);
+    this.cast.speaker = k;
+    try {
+      return await talk(this.ctx, this.cast.fig(k), n, [l]);
+    } finally {
+      if (this.cast.speaker === k) this.cast.speaker = null;
+    }
   }
 
   /** Lines in a row; resolves with the last choice (−1 if closed or the world went). */
   async lines(ls: readonly SLine[] | undefined, who: CharacterId = this.who): Promise<number> {
     let last = -1;
     for (const l of ls ?? []) {
-      if (!this.alive) return -1;
+      if (!this.alive || !this.gate()) return -1;
       last = await this.line(l, who);
     }
     return last;
@@ -88,20 +128,56 @@ export class StoryStage extends Stagehand {
 
   /** The camera to `to`, looking at `look`, for a while (not awaited: a newer move ends it). */
   shot(to: XYZ, look: XYZ, secs = 1.2, hold = 30): Promise<void> {
-    return engine(this.ctx).cinematic({ to, look, secs: this.still ? 0.01 : secs, hold });
+    // (the peaches clear the view to whoever the shot is on, not to the walker)
+    const at = { ...look };
+    seeFocus.at = at;
+    return engine(this.ctx).cinematic({ to, look, secs: this.still ? 0.01 : secs, hold }).finally(() => { if (seeFocus.at === at) seeFocus.at = null; });
   }
-  /** Look at a villager from a little in front of them and above. */
-  shotOn(k: VillagerKey, secs = 1.2, hold = 30, d = 3.4): Promise<void> {
+  /** Look at a villager's face, from in front of them, with nobody (and no rock or wall) in the way. */
+  shotOn(k: VillagerKey, secs = 1.2, hold = 30, d = 2.4): Promise<void> {
+    const v = this.frameOn(k, d);
+    return v ? this.shot(v.to, v.look, secs, hold) : Promise.resolve();
+  }
+  /**
+   * Where to look at someone from: across from their face (the way they face, or are turning), a
+   * little to one side and above; else from the walker's side; the first spot with a clear view.
+   */
+  frameOn(k: VillagerKey, d = 2.4): { to: XYZ; look: XYZ } | null {
     const f = this.cast.fig(k);
-    if (!f) return Promise.resolve();
+    if (!f) return null;
     const r = f.root.position;
+    // (someone seated at the long tables has their chin at the table's edge: look down on them from higher)
+    const seated = f.height < 1.2;
+    const look = { x: r.x, y: r.y + f.height * (seated ? 0.78 : 0.86), z: r.z };
+    const lift = 0;
+    let fx: number, fz: number;
+    if (f.faceTo) { fx = f.faceTo.x - r.x; fz = f.faceTo.z - r.z; } else { fx = Math.sin(f.root.rotation.y); fz = Math.cos(f.root.rotation.y); }
+    let n = Math.hypot(fx, fz) || 1;
+    fx /= n; fz /= n;
     const p = this.ctx.player.position;
-    // from the walker's side of them, a little to one side
-    let dx = p.x - r.x, dz = p.z - r.z;
-    const len = Math.hypot(dx, dz) || 1;
-    dx /= len; dz /= len;
-    const to = { x: r.x + dx * d - dz * 1.1, y: r.y + 1.7, z: r.z + dz * d + dx * 1.1 };
-    return this.shot(to, { x: r.x, y: r.y + f.height * 0.8, z: r.z }, secs, hold);
+    let wx = p.x - r.x, wz = p.z - r.z;
+    n = Math.hypot(wx, wz) || 1;
+    wx /= n; wz /= n;
+    // [to one side, how far (× d), how high over the face]
+    // (seated at a table: from over its far half, above the heads of the diners opposite, looking
+    // down at about thirty degrees, so the face and not the tabletop or a hat fills the frame)
+    // (a wide bamboo hat hides the face from above: lower, between the diners opposite, first)
+    const brim = VILLAGERS[k].look.hat === 'bamboo';
+    const TRIES: [number, number, number][] = seated
+      ? [...(brim ? [[0.6, 0.52, 0.3], [-0.6, 0.52, 0.3], [0.6, 0.6, 0.42], [-0.6, 0.6, 0.42]] as [number, number, number][] : []), [0.3, 0.5, 0.72], [-0.3, 0.5, 0.72], [0, 0.45, 0.8], [0.5, 0.55, 0.88], [-0.5, 0.55, 0.88], [0, 0.6, 1.15], [0.6, 0.8, 1.4], [-0.6, 0.8, 1.4]]
+      : [[0.5, 1, 0.5], [-0.5, 1, 0.5], [1.1, 1.15, 0.65], [-1.1, 1.15, 0.65], [0, 1.3, 1.2], [0.9, 1.5, 1.6], [-0.9, 1.5, 1.6]];
+    // (nothing wholly clear: the first spot that is at least not inside a tree, a roof or a rock)
+    let open: XYZ | null = null;
+    for (const [dx, dz] of [[fx, fz], [wx, wz]] as const) {
+      for (const [lat, far, up] of TRIES) {
+        const to = { x: look.x + dx * d * far - dz * lat, y: look.y + up + lift, z: look.z + dz * d * far + dx * lat };
+        if (this.cast.clearView(to, look, k)) return { to, look };
+        if (!open && this.cast.clearView(to, to, k)) open = to;
+      }
+    }
+    if (open) return { to: open, look };
+    // (nothing clear: from higher up, in front of them)
+    return { to: { x: look.x + fx * d, y: look.y + 2.4, z: look.z + fz * d }, look };
   }
   endShot(): void { engine(this.ctx).endCinematic(); }
 
@@ -189,6 +265,8 @@ interface Member {
   prompt: Interactable;
   promptOff: (() => void) | null;
   hulls: T.Object3D[];
+  /** Carries the story's next prompt (the others' prompts shrink while they are near). */
+  carrier: boolean;
   /** 夭夭: her own see-through materials. */
   ghostMats?: T.Material[];
 }
@@ -208,6 +286,8 @@ export class Cast {
   private kite: { obj: T.Object3D; line: T.Line; pos: Float32Array } | null = null;
   readonly still = reducedMotion();
   private offFrame: (() => void) | null = null;
+  /** Who is speaking now (their outline stays on whatever the budget). */
+  speaker: VillagerKey | null = null;
   private ghostFade: { dissolved: boolean; near: boolean; puff: number } = { dissolved: false, near: false, puff: 0 };
 
   constructor(readonly bag: Bag, readonly ctx: WorldCtx, readonly tv: TaoyuanWorld, private opts: CastOpts) {}
@@ -246,7 +326,7 @@ export class Cast {
     const mark = speechMark(this.bag, fig, VILLAGERS[k].mark);
     const old = this.members.get(k);
     const m: Member = old ?? {
-      key: k, fig, prop, sit, mark, at: s, face, target: spot, walk: null, scripted: false, leaving: false, shown: !!spot, hulls: [],
+      key: k, fig, prop, sit, mark, at: s, face, target: spot, walk: null, scripted: false, leaving: false, shown: !!spot, hulls: [], carrier: false,
       prompt: {
         id: `ty.${k}`, position: new TH.Vector3(w.x, w.y, w.z), radius: 2.2, labelZh: '', labelEn: '', actionZh: '搭话', actionEn: 'Talk',
         act: () => this.act(k),
@@ -316,6 +396,8 @@ export class Cast {
   private kiteFlying = true;
   /** 小满 drops the string (B2): the kite drifts off. */
   dropKite(): void { this.kiteFlying = false; }
+  /** A new way in: he has his kite again (it flies whenever he is on the terrace). */
+  resetKite(): void { this.kiteFlying = true; this.kiteT = 0; }
 
   /** Where someone should be now (null: not about). Walks there when it might be seen, else is there. */
   setSpot(k: VillagerKey, spot: Spot | null, o: { instant?: boolean } = {}): void {
@@ -351,7 +433,8 @@ export class Cast {
     const p = L(this.ctx.player.position.x, this.ctx.player.position.z);
     const seen = this.tv.isInside() && m.shown && (Math.hypot(p.x - m.at.x, p.z - m.at.z) < 24 || Math.hypot(p.x - s.x, p.z - s.z) < 24);
     const wantSit = !!spot.sit || !!VILLAGERS[m.key].look.sit;
-    if (!instant && seen && d > 0.2 && d < 26 && !wantSit && !m.sit) {
+    // (someone seated stands up and walks there; 石瞽, who always sits, is simply there)
+    if (!instant && seen && d > 0.2 && d < 26 && !VILLAGERS[m.key].look.sit) {
       // walk there (straight: the valley's lanes are open)
       void this.walkTo(m.key, s.x, s.z, 1.35).then((ok) => { if (ok) this.settle(m, spot); });
       return;
@@ -470,6 +553,7 @@ export class Cast {
     const f = play.peek().flags;
     const lab = sp ? sp.label : labelOf(m.key, !!f[metFlag(m.key)]);
     const act = sp ? sp.action : { zh: '搭话', en: 'Talk' };
+    m.carrier = !!sp;
     if (m.prompt.labelZh !== lab.zh || m.prompt.actionZh !== act.zh || m.prompt.labelEn !== lab.en) {
       Object.assign(m.prompt, { labelZh: lab.zh, labelEn: lab.en, actionZh: act.zh, actionEn: act.en });
     }
@@ -481,14 +565,65 @@ export class Cast {
     await this.opts.onTalk(k);
   }
 
+  /**
+   * Nothing stands between `from` and `to` (world): no villager but `skip`, not the walker, not the
+   * ground or the cleft's rock, no lane-lantern post, and no shrine wall (both ends in the same space).
+   */
+  clearView(from: XYZ, to: XYZ, skip?: VillagerKey): boolean {
+    const lf = L(from.x, from.z), lt = L(to.x, to.z);
+    if (zoneOf(lf.x, lf.z) !== zoneOf(lt.x, lt.z)) return false;
+    const p = this.ctx.player.position;
+    const N = 16;
+    for (let i = 0; i < N; i++) {
+      const k = i / N;
+      const x = from.x + (to.x - from.x) * k, y = from.y + (to.y - from.y) * k, z = from.z + (to.z - from.z) * k;
+      const l = L(x, z);
+      if (y < Y_T + surfaceAt(l.x, l.z) + 0.2) return false;
+      if (Math.hypot(x - p.x, z - p.z) < 0.6 && y < p.y + 2.2 && y > p.y - 0.3) return false;
+      for (const m of this.members.values()) {
+        if (m.key === skip || !m.shown) continue;
+        const r = m.fig.root.position;
+        // (a body, and a head with its hat's brim: wider at the top)
+        const hr = y > r.y + m.fig.height * 0.72 ? 0.62 : 0.4;
+        if (Math.hypot(x - r.x, z - r.z) < hr && y < r.y + m.fig.height + 0.3 && y > r.y - 0.2) return false;
+      }
+      for (const q of POSTS) if (y < q.top && Math.hypot(x - q.x, z - q.z) < 0.45) return false;
+      // the valley's trunks, walls, roofs and rocks, and every peach's blossom (the camera's own spot with room to spare)
+      const v = this.tv.valley?.views;
+      if (v) {
+        const pad = i === 0 ? 0.35 : 0.08;
+        for (const c of v.cyl) if (y > c.y0 - pad && y < c.y1 + pad && Math.hypot(x - c.x, z - c.z) < c.r + pad) return false;
+        for (const b of v.balls) if (Math.hypot(x - b.x, y - b.y, z - b.z) < b.r + pad) return false;
+      }
+    }
+    return true;
+  }
+
   private acc = 0;
+  private near: { m: Member; d: number }[] = [];
   private frame(dt: number, t: number): void {
     const ctx = this.ctx;
     const inside = this.tv.isInside();
     const p = ctx.player.position;
+    const cam = ctx.camera.position;
     this.acc += dt;
     const relabel = this.acc > 0.5;
     if (relabel) this.acc = 0;
+    // the draw budget: outlines on the nearest three within 6 m (only the speaker's at 低), props within 10 m
+    const low = ctx.quality?.level === 'low';
+    const near = this.near;
+    near.length = 0;
+    let carrierNear = false;
+    for (const m of this.members.values()) {
+      if (!m.shown) continue;
+      const r = m.fig.root.position;
+      const d = Math.hypot(p.x - r.x, p.z - r.z);
+      if (!low && d < 6) near.push({ m, d });
+      if (m.carrier && d < 4.5) carrierNear = true;
+    }
+    near.sort((a, b) => a.d - b.d);
+    if (near.length > 3) near.length = 3;
+    const speaker = this.speaker ? this.members.get(this.speaker) : undefined;
     for (const m of this.members.values()) {
       // walking
       const w = m.walk;
@@ -519,13 +654,17 @@ export class Cast {
       if (want && !m.promptOff) m.promptOff = ctx.addInteractable(m.prompt);
       else if (!want && m.promptOff) { m.promptOff(); m.promptOff = null; }
       if (relabel) this.label(m);
-      // outlines only near (four draws fewer each, further off)
+      // (in a crowd, the one with the story's prompt is the one a tap reaches)
+      m.prompt.radius = !m.carrier && carrierNear ? 1.0 : 2.2;
       const d = Math.hypot(p.x - r.position.x, p.z - r.position.z);
-      const near = d < 13;
-      for (const h of m.hulls) if (h.visible !== near) h.visible = near;
+      const hull = m === speaker || near.some((x) => x.m === m);
+      for (const h of m.hulls) if (h.visible !== hull) h.visible = hull;
       // (a hand prop too small to see from afar: one draw fewer)
-      if (m.prop) m.prop.visible = d < 20;
-      m.mark.set(m.shown && inside && this.opts.marked(m.key));
+      if (m.prop) m.prop.visible = d < 10;
+      // (never a mark right over the lens)
+      const camD = Math.hypot(cam.x - r.position.x, cam.y - (r.position.y + m.fig.height), cam.z - r.position.z);
+      // (nor in a story shot: the marks would crowd the frame)
+      m.mark.set(m.shown && inside && camD > 1.8 && !seeFocus.at && this.opts.marked(m.key));
     }
     this.kiteFrame(dt, t);
     this.ghostFrame(dt, t);

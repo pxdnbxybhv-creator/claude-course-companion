@@ -93,8 +93,10 @@ export class PhotoRig implements PhotoApi {
     return this.walkerOn;
   }
 
+  /** The picture's hour can be turned — except in 桃源 while the valley keeps an hour of its own (its story's nights). */
   get canSetTime(): boolean {
-    return true;
+    const m = this.h.sky.moodNow;
+    return !m || m === 'chang';
   }
 
   enter(): boolean {

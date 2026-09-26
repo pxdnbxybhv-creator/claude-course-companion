@@ -63,11 +63,19 @@ export function storyClock(f: Flags): SkyMood {
     case 'feast': return 'you';
     case 'xu': return 'xu';
     case 'hai': return 'hai';
-    case 'zi': return 'zi';
+    // (the seal found gone at 子正: from then on the night is held, FX11)
+    case 'zi': return f['ty:b5s'] ? 'case' : 'zi';
     case 'case': return 'case';
     case 'dawn': case 'farewell': return 'mao';
     default: return 'chang';
   }
+}
+
+/** The judgement's grade, as the case recorded it (bible §4.10); 明 if none is recorded. */
+export type Grade = 'shen' | 'ming' | 'ping' | 'zibai';
+export function gradeFromFlags(f: Flags): Grade {
+  for (const g of ['shen', 'ming', 'ping', 'zibai'] as const) if (f[`case:hz:grade:${g}`]) return g;
+  return 'ming';
 }
 
 /** 阮郎 and 桃叶 have gone out into the world (their passes were stamped in B6). */
@@ -79,11 +87,13 @@ export const OLD_GUEST = 'ty:oldguest';
 /** Every flag the story itself writes (each ≤ 64 characters; none may be set by the owner's code). */
 export const STORY_FLAGS: readonly string[] = [
   ...BEATS.map(beatFlag), OLD_GUEST, 'ty:b5s', 'ty:wish:none', 'ty:wish:again', 'ty:wish:xiaoman', 'ty:zhiyin', 'ty:stele',
-  'ty:peach', 'visit:taoyuan', 'case:hz:open', 'case:hz:parked', 'case:hz:catnose', 'case:hz:c:menxiang', 'item:keep:wulinggou',
+  'ty:peach', 'item:keep:xiantao', 'visit:taoyuan', 'case:hz:open', 'case:hz:parked', 'case:hz:catnose', 'case:hz:c:menxiang', 'item:keep:wulinggou',
 ];
 
 /** The coins of the way out (B8), paid as 桃源 income; the 奇遇 coins came at B2 (markEncounter). */
 export const B8_COINS = 120;
+/** The Taoist child's peach at the spring (B7): paid once, as the old encounter's taoist bonus was. */
+export const PEACH_COINS = 80;
 
 // ───────────────────────────── who speaks
 
@@ -163,7 +173,7 @@ export const B3 = {
     poet: [S('me', '桃花流水窅然去，别有天地非人间。', 'Peach petals on the water drift far away — here is another world, not of men.')],
     cat: [S('narr', '（桂娘在桌底下悄悄塞给大橘一个鱼头。）', '(Under the table, Gui Niang slips Big Ginger a fish head.)'), S('guiniang', '嘘，别让杜二看见。', "Shh — don't let Du Er see.")],
   } as Variants,
-  announce: S('qin', '今夜花朝。戌正一通鼓，亥正采桑舞，子初放灯，子正开殿——老朽要为阮郎钤印出谷。二十年来，头一个。', "Tonight is the Flowers' Birthday. First drums at 戌正, the mulberry dance at 亥正, lanterns at 子初, and at 子正 the hall opens — and I shall stamp 阮郎's pass so he may go out. The first in twenty years."),
+  announce: S('qin', '今夜花朝。戌正一通鼓，亥正采桑舞，子初放灯，子正开殿——老朽要为阮郎钤印出谷。二十年来，头一个。', "Tonight is the Flowers' Birthday. First drums at 戌正 (8 pm), the mulberry dance at 亥正 (10 pm), lanterns at 子初 (11 pm), and at 子正 (midnight) the hall opens — and I shall stamp Ruan Lang's pass so he may go out. The first in twenty years."),
   shadows: [S('narr', '（三娘的杯子停在半空。）', "(Sanniang's cup stops halfway to her lips.)"), S('narr', '（桃叶低头看着地。）', '(Taoye stares at the ground.)'), S('narr', '（石瞽拨了一个低音。）', '(Shi Gu plucks a single low note.)')],
   after: t('杜二回酒坊去了。', 'Du Er has gone back to his brewery.'),
 };
@@ -180,7 +190,7 @@ export const B4 = {
   setAct: t('置坛', 'Set down the jar'),
   setVeil: t('捧坛入殿，置于供桌。', 'You carry the jar into the hall and set it on the altar.'),
   rite: [
-    S('narr', '（秦守拙将玉印放进漆匣，以泥封口，按上私印「守拙」。）', '(Qin Shouzhuo lays the jade seal in its lacquer box, seals the lid with clay, and presses his private seal, 「守拙」, into it.)'),
+    S('narr', '（秦守拙将玉印放进漆匣，以泥封口，按上私印「守拙」。）', '(Qin Shouzhuo lays the jade seal in its lacquer box, seals the lid with clay, and presses his own seal, Shouzhuo, into it.)'),
     S('liupo', '香篆一格一个时辰：戌、亥、子，一格三针，初、正、末。今年我眼花，香印是三娘帮我压的。', 'The incense seal burns one section per double-hour — 戌, 亥, 子 — three pins to a section: start, middle, end. My eyes are poor this year; Sanniang pressed the powder for me.'),
     S('qin', '祭后闭殿，子正方开。谁也不许进。', 'After the rite the hall is shut until midnight. No one goes in.'),
   ],
@@ -194,7 +204,7 @@ export const B4 = {
   rules: S('liupo', '规矩是规矩。祭后不入——老婆子也不入。', 'Rules are rules. No one enters after the rite — not even this old woman.'),
   cat: [S('narr', '（大橘在殿门前炸了毛。）', "(Big Ginger's fur stands on end at the hall door.)"), S('me', '酒味，好浓。', 'Wine. Strong.')],
   menxiang: t('门外酒香', 'Wine at the Door'),
-  after2: t('亥正将至：花场上，采桑舞要开始了。', 'It is nearly 亥正: the mulberry dance is about to begin at the square.'),
+  after2: t('亥正将至：花场上，采桑舞要开始了。', 'It is nearly 亥正 (10 pm): the mulberry dance is about to begin at the square.'),
   // (c) 亥正 · 采桑舞
   dancers: ['sang', 'taoye', 'guiniang', 'gegu', 'ashu', 'ruan', 'duer', 'lusan'] as VillagerKey[],
   dance: S('narr', '（三娘领着采桑舞，众人绕着花神杆，彩带翻飞。）', '(Sanniang leads the mulberry dance; everyone circles the flower pole, ribbons flying.)'),
@@ -262,6 +272,8 @@ export const B6 = {
   } as Variants,
   dawn: t('天亮了。阮郎和桃叶向谷口走去。', 'Day breaks. Ruan Qing and Taoye walk toward the valley mouth.'),
   spring: t('源头有光。', 'There is a light at the spring.'),
+  /** The elder's prompt when B6 is due and has not played (a reload after the judgement). */
+  stamp: t('钤印', 'Stamp the passes'),
 };
 
 // ───────────────────────────── B7 · 源
@@ -286,7 +298,7 @@ export const B7 = {
     rabbit: [S('narr', '（夭夭摸了摸玉兔的耳朵。）', "(Yaoyao strokes the Rabbit's ears.)"), S('yaoyao', '你也是从月亮上被赶下来的？', 'Were you sent down from the moon too?')],
   } as Variants,
   poemWords: '花不知年水自春',
-  peach: t('得仙桃一枚', 'A peach of the immortals'),
+  peach: (n: number) => t(`得仙桃一枚 · 得钱 ${n} 文`, `A peach of the immortals  +${n} coins`),
   after: t('该走了。谷口，众人在等你。', 'It is time to go. Everyone is waiting at the valley mouth.'),
 };
 
@@ -322,6 +334,10 @@ export const LATER = {
   gather: t('请众人到庭', 'Gather everyone'),
   notYet: t('证据未足', 'Not enough evidence yet'),
   missing: (n: number) => t(`（证据还差 ${n} 件。）`, `(Evidence still missing: ${n}.)`),
+  /** 「出谷」 while a beat is under way (the way out waits). */
+  carryFirst: t('先把酒坛抱去祠堂。', 'Carry the jar to the shrine first.'),
+  followFirst: t('先随秦守拙去花场。', 'Follow Qin Shouzhuo to the square first.'),
+  busy: t('且把眼前的事做完。', 'Finish what is in hand first.'),
   /** The parked-late B6 ends in the valley's own hour. */
   after: t('天光大亮，谷里又是寻常的春日。', 'Full daylight; the valley is an ordinary spring day again.'),
 };
@@ -342,6 +358,22 @@ export const STELE = {
 
 // ───────────────────────────── keepsakes the story gives (their names for the keepsake list)
 
-export const KEEPSAKES: Record<string, { zh: string; en: string; noteZh: string; noteEn: string }> = {
-  wulinggou: { zh: '武陵钩', en: 'The Wuling Hook', noteZh: '一枚青铜鱼钩，小满在老碧桃的树洞最里头找到的。', noteEn: 'A bronze fishhook Xiaoman found at the very back of the old 碧桃\'s hollow.' },
+export { KEEPSAKES } from '../../../../data/keepsakes';
+
+// ───────────────────────────── how each beat begins
+
+/** A beat begun by a word with a villager: whose prompt carries it, its label (null: the villager's own name), its action. */
+export interface BeatPrompt { who: VillagerKey; label: Line | null; action: Line }
+
+/** The beats begun by talking to someone (story.ts puts these prompts on them). */
+export const BEAT_PROMPTS: Partial<Record<Beat, BeatPrompt>> = {
+  b3: { who: 'qin', label: null, action: B2.follow },
+  b4a: { who: 'duer', label: B4.jarLabel, action: B4.jarAct },
+  b4b: { who: 'liupo', label: B4.lanternLabel, action: B4.lanternAct },
+  b5: { who: 'qin', label: B5.gatherLabel, action: B5.gatherAct },
+  b6: { who: 'qin', label: null, action: B6.stamp },
 };
+/** The beats begun where the walker stands (story.ts triggers them there; B7 by a prompt in the light). */
+export const BEAT_PLACES: Partial<Record<Beat, 'square' | 'spring' | 'terrace'>> = { b4c: 'square', b7: 'spring', b8: 'terrace' };
+/** The beats begun by the ways in: the door at the pool (B1) and the inner mouth (B2). */
+export const BEAT_WAYS: Partial<Record<Beat, 'door' | 'mouth'>> = { b1: 'door', b2: 'mouth' };

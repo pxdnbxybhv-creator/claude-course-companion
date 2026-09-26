@@ -1,7 +1,8 @@
 // 任务簿 · Quest Book — the purse (钱囊: what's in it, what came in today and from where, and
 // what coins are for), today's three errands, the companions' gallery (who you can walk the
 // painting as, their skills, and what brings the others), every quest with its progress or its
-// stamp and its coins, the seal album (印谱) and the book of chance encounters (奇遇录).
+// stamp and its coins, the seal album (印谱), the book of chance encounters (奇遇录) and the 案卷 of the
+// 桃源 case (walk/case/CaseBook.tsx).
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { GameShell } from '../games/GameShell';
@@ -14,10 +15,12 @@ import {
 import { CHARACTERS, CHARACTER, type CharacterDef } from '../../data/characters';
 import { QUEST, QUESTS, type QuestDef } from '../../data/quests';
 import { LETTER } from '../../data/letters';
+import { heldKeepsakes } from '../../data/keepsakes';
 import { openMail } from '../../app/mail';
 import { ENCOUNTERS, type EncounterDef } from '../../data/encounters';
 import { REGION } from '../walk/map';
 import { CharacterSelect } from '../walk/characters/Select';
+import { CaseBook } from '../walk/case/CaseBook';
 import { CoinBadge, CoinIcon, fmtCoins } from '../../ui/coins';
 import { BrushBar, PaperPage, Portrait, Seal, Tally } from './bits';
 import {
@@ -58,6 +61,8 @@ export function QuestsView() {
       <Quests t={t} />
       <Album t={t} />
       <Encounters t={t} />
+      <CaseBook t={t} />
+      <Keepsakes t={t} />
       <p class="qb-colophon" aria-hidden="true">
         <span class="brush">半亩</span>
         <span>{t('做事，交友，盖印。', 'Do things. Make friends. Collect seals.')}</span>
@@ -497,6 +502,36 @@ function Purse(props: { t: T }) {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------------------------ 信物
+
+/** The keepsakes and clues the letters and 桃源 gave (shown once there is one). */
+function Keepsakes(props: { t: T }) {
+  const { t } = props;
+  const l = lang.value;
+  const held = heldKeepsakes(play.value.flags);
+  if (!held.length) return null;
+  return (
+    <section class="qb-sec" aria-labelledby="qb-keep-h" id="keepsakes">
+      <div id="qb-keep-h">
+        <SectionHead t={t} zh="信物" en="Keepsakes" count={`${held.length}`} />
+      </div>
+      <ul class="qb-qy">
+        {held.map(({ id, kind, k }) => (
+          <li key={kind + id} class="qb-qy-card is-met">
+            <div class="qb-qy-seal"><Seal text={k?.seal ?? '信'} size={46} earned /></div>
+            <h3 class="qb-qy-name">
+              <span class={l === 'zh' ? 'brush' : 'latin'}>{k ? t(k.zh, k.en) : id}</span>
+              {l === 'zh' && k && <small class="latin">{k.en}</small>}
+            </h3>
+            <p class="qb-qy-meta">{kind === 'clue' ? t('线索', 'A clue') : t('信物', 'A keepsake')}</p>
+            {k && <blockquote class="qb-qy-note">{t(k.noteZh, k.noteEn)}</blockquote>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

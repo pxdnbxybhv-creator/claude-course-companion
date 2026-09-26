@@ -13,6 +13,7 @@ import type * as T from 'three';
 import type { Collider, WorldCtx } from '../../types';
 import { Batch, COL, Hill, TAU, hipRoof, place, plaqueCanvas, rockGeometry, roof, stairs, steleCanvas, taperTube } from '../../regions/hill-kit';
 import { registerDeck, type Deck } from '../../regions/water-decks';
+import { engine } from './engine';
 import { makeNoise2, makeRng, type Rng } from '../../../../core/rng';
 import {
   CAVE, CHANNEL, CROSSINGS, FLOOR_R, G, KNOLL, PAVILION, PONDS, RING, SHRINE, SPRING, SQUARE, STREAM, STREAM_LEN, Y_T, LANE_LANTERNS,
@@ -37,7 +38,67 @@ export interface Valley {
   waterMat: T.MeshBasicMaterial;
   /** World heights (the floor as walked, and the drawn surface) at a world point. */
   standY(x: number, z: number): number;
+  /**
+   * What a story camera must not sit in or look through (world): upright cylinders (trunks, walls,
+   * houses and their roofs, rocks, posts) and spheres (the blossom of every peach on the floor).
+   */
+  views: ViewBlockers;
   dispose(): void;
+}
+
+export interface ViewBlockers {
+  cyl: { x: number; z: number; r: number; y0: number; y1: number }[];
+  balls: { x: number; y: number; z: number; r: number }[];
+}
+
+/**
+ * What a story shot looks at (set by the stagehand while its camera move lasts): the peaches clear
+ * the view to it instead of to the walker. Null: the walker.
+ */
+export const seeFocus: { at: { x: number; y: number; z: number } | null } = { at: null };
+
+/** The camera and the walker, for the peaches that clear the view between them (see seeThrough). */
+interface SeeUniforms { uTyCam: { value: T.Vector3 }; uTyWalk: { value: T.Vector3 } }
+
+/**
+ * The instanced peaches dissolve (a screen-door dither) where they would hide the walker from the
+ * camera, or where the camera is inside or brushing past them, instead of filling the view with
+ * blossom or, from inside the ink hull, with black. The tube from the camera to the walker's chest
+ * widens toward the walker; what is beyond the walker stays.
+ */
+function seeThrough<M extends T.Material>(m: M, U: SeeUniforms): M {
+  const key0 = m.customProgramCacheKey();
+  const prev = m.onBeforeCompile;
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
+    sh.uniforms.uTyCam = U.uTyCam;
+    sh.uniforms.uTyWalk = U.uTyWalk;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTyW;')
+      .replace('#include <project_vertex>', `#include <project_vertex>
+\tvec4 tyW = vec4(transformed, 1.0);
+\t#ifdef USE_INSTANCING
+\ttyW = instanceMatrix * tyW;
+\t#endif
+\tvTyW = (modelMatrix * tyW).xyz;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTyW;\nuniform vec3 uTyCam;\nuniform vec3 uTyWalk;')
+      .replace('void main() {', `void main() {
+\t{
+\t\tvec3 ab = uTyWalk - uTyCam;
+\t\tfloat t = clamp(dot(vTyW - uTyCam, ab) / max(dot(ab, ab), 1e-4), 0.0, 1.0);
+\t\tfloat dl = length(vTyW - (uTyCam + ab * t));
+\t\tfloat rr = mix(0.9, 1.25, t);
+\t\tfloat keepK = max(smoothstep(rr * 0.55, rr, dl), smoothstep(0.86, 1.0, t));
+\t\tkeepK = min(keepK, smoothstep(1.2, 2.4, length(vTyW - uTyCam)));
+\t\tif (keepK < 1.0) {
+\t\t\tfloat dith = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
+\t\t\tif (dith >= keepK) discard;
+\t\t}
+\t}`);
+  };
+  m.customProgramCacheKey = () => `${key0}|ty-see`;
+  return m;
 }
 
 const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
@@ -322,6 +383,10 @@ export function buildValley(ctx: WorldCtx): Valley {
   const solids: Collider[] = [];
   let offSolids: (() => void)[] | null = null;
   const solid = (x: number, z: number, r: number, hgt = 2) => { solids.push({ x: G.x + x, z: G.z + z, r, h: hgt }); };
+  // what story cameras keep out of (world): every solid (below), roofs, rocks, and the blossom
+  const views: ViewBlockers = { cyl: [], balls: [] };
+  const viewCyl = (x: number, z: number, r: number, y0: number, y1: number) => { views.cyl.push({ x: G.x + x, z: G.z + z, r, y0: Y_T + y0, y1: Y_T + y1 }); };
+  const viewBall = (x: number, y: number, z: number, r: number) => { views.balls.push({ x: G.x + x, y: Y_T + y, z: G.z + z, r }); };
   const wallLine = (ax: number, az: number, bx: number, bz: number, hgt: number, gap?: { x: number; z: number; w: number }) => {
     const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / 0.45));
     for (let i = 0; i <= n; i++) {
@@ -370,6 +435,7 @@ export function buildValley(ctx: WorldCtx): Valley {
     for (let j = -1; j <= 1; j += 2 / Math.max(1, Math.round(d / 0.9))) pts.push([-hx, j * hz], [hx, j * hz]);
     for (const [lx, lz] of pts) { const [px, pz] = lp(lx, lz); solid(px, pz, 0.34, wallH + 1); }
     solid(x, z, Math.min(w, d) / 2 - 0.1, wallH + 1);
+    viewCyl(x, z, Math.max(w, d) / 2 + 0.4, base, top + wallH + 1.4);
     return top;
   };
 
@@ -383,6 +449,7 @@ export function buildValley(ctx: WorldCtx): Valley {
       solid(px, pz, 0.14, postH);
     }
     hipRoof(b, x, z, ry, w / 2 + 0.45, d / 2 + 0.5, base + postH, 0.9, { color: roofC, curl: 0.1, flare: 0.05, ridge: false });
+    viewCyl(x, z, Math.max(w, d) / 2 + 0.35, base + postH - 0.15, base + postH + 1);
     return base;
   };
 
@@ -720,8 +787,11 @@ export function buildValley(ctx: WorldCtx): Valley {
         const col = white ? (r() < 0.55 ? '#fbeef0' : '#f4c6cf') : (r() < 0.5 ? '#f2a9b8' : '#f7c9d2');
         b.add(place(new TH.IcosahedronGeometry((0.55 + r() * 0.35) * s, 1), p.x, p.y, p.z, r() * TAU, 1, 0.78, 1), col, { hull: true, jitter: 0.06 });
       }
+      viewBall(end.x, end.y + 0.1 * s, end.z, 1.35 * s);
     }
     solid(x, z, 0.45 * s, 3);
+    // (the follow camera pulls in under the crown rather than sitting in it)
+    h.occlude({ x: G.x + x, z: G.z + z, r: 2.9 * s, y0: Y_T + top.y - 0.35 * s, y1: Y_T + top.y + 1.9 * s });
     return trunk;
   };
   {
@@ -735,6 +805,8 @@ export function buildValley(ctx: WorldCtx): Valley {
     const tr = rockGeometry(333, 3.4, 0.7, { detail: 1, base: '#c1b79f', dark: '#7a705f', flat: 0.6 });
     place(tr, -1.4, Y(-1.4, 35.2) - 0.55, 35.2, 0.3, 1, 1, 0.8);
     b.colored(tr, {});
+    // (a low flat rock 小满 stands at the edge of: only keep the camera out of it)
+    viewCyl(-1.4, 35.2, 1.2, Y(-1.4, 35.2) - 0.6, Y(-1.4, 35.2) + 0.25);
   }
 
   // ── the herb garden and the petal clock (葛姑's basin, ruled in ten rings)
@@ -855,10 +927,21 @@ export function buildValley(ctx: WorldCtx): Valley {
     const floorTrees = trees.filter((t) => Math.hypot(t.x, t.z) < FLOOR_R);
     const slopeT = trees.filter((t) => Math.hypot(t.x, t.z) >= FLOOR_R);
     const hi = mergeParts(TH, peachParts(TH, 1)), lo = mergeParts(TH, peachParts(TH, 0));
-    const mat = h.toon('#ffffff', { vc: true });
+    // (the walker is never lost behind a bank of blossom: see seeThrough)
+    const see: SeeUniforms = { uTyCam: { value: new TH.Vector3() }, uTyWalk: { value: new TH.Vector3() } };
+    h.frame(() => {
+      const c = ctx.camera.position, p = ctx.player.position;
+      see.uTyCam.value.copy(c);
+      // (the photo camera frames what it likes: only what it is inside of goes)
+      const f = seeFocus.at;
+      if (f) see.uTyWalk.value.set(f.x, f.y - 0.3, f.z);
+      else if (ctx.cameraMode() === 'photo' || Math.hypot(c.x - p.x, c.z - p.z) > 12) see.uTyWalk.value.copy(c);
+      else see.uTyWalk.value.set(p.x, p.y + 1.0, p.z);
+    });
+    const mat = seeThrough(h.toon('#ffffff', { vc: true }), see);
     const im = new TH.InstancedMesh(hi, mat, floorTrees.length);
     // (the ink hull only needs the silhouette: the coarse tree)
-    const hull = new TH.InstancedMesh(lo, h.outline(0.035), floorTrees.length);
+    const hull = new TH.InstancedMesh(lo, seeThrough(h.outline(0.035), see), floorTrees.length);
     const far = new TH.InstancedMesh(lo, mat, Math.max(1, slopeT.length));
     far.count = slopeT.length;
     const m4 = new TH.Matrix4(), q = new TH.Quaternion(), e = new TH.Euler(), v = new TH.Vector3(), sc = new TH.Vector3();
@@ -868,7 +951,12 @@ export function buildValley(ctx: WorldCtx): Valley {
       m4.compose(v.set(t.x, y - 0.05, t.z), q.setFromEuler(e.set(0, t.ry, 0)), sc.set(t.s, t.s * (0.92 + t.t * 0.18), t.s));
       for (const m of meshes) m.setMatrixAt(i, m4);
       meshes[0].setColorAt(i, tint.setRGB(1, 0.94 + t.t * 0.06, 0.95 + t.t * 0.05));
-      if (Math.hypot(t.x, t.z) < FLOOR_R) solid(t.x, t.z, 0.2 * t.s, 1.8);
+      if (Math.hypot(t.x, t.z) < FLOOR_R) {
+        solid(t.x, t.z, 0.2 * t.s, 1.8);
+        // the crown (peachParts: blossom from about 1.5 to 3 m, a metre and a half round the trunk)
+        const sy = t.s * (0.92 + t.t * 0.18);
+        viewBall(t.x + 0.15 * t.s * Math.cos(t.ry), y + 2.4 * sy, t.z - 0.15 * t.s * Math.sin(t.ry), 1.45 * t.s);
+      }
     });
     put(floorTrees, [im, hull]);
     put(slopeT, [far]);
@@ -906,6 +994,23 @@ export function buildValley(ctx: WorldCtx): Valley {
     },
   };
 
+  for (const c of solids) {
+    const lx = c.x - G.x, lz = c.z - G.z, y = floorAt(lx, lz);
+    viewCyl(lx, lz, c.r, y - 0.1, y + (c.h ?? 2));
+  }
+  // the shrine's eaves: the gate's little roof and the hall's front eave
+  viewCyl(0, S.south, S.gate.w / 2 + 0.8, sy + 2.6, sy + 3.8);
+  for (const ex of [-2.2, 0, 2.2]) viewCyl(ex, S.hall.z0 + 0.3, 1.35, hallY + S.hall.eave - 0.3, hallY + S.hall.eave + 1.9);
+
+  // the walled courtyard and the hall: the follow camera comes in closer and looks down over the walls,
+  // not up from under an eave or from out in the gateway
+  engine(ctx).followLimit((t) => {
+    if (t.y < Y_T - 5 || t.y > Y_T + 20) return null;
+    const lx = t.x - G.x, lz = t.z - G.z;
+    if (Math.abs(lx) > S.wallX + 0.2 || lz > S.south + 0.4 || lz < S.hall.z1 - 0.2) return null;
+    return lz < S.hall.z0 ? { dist: 3.1, pitch: 0.5 } : { dist: 3.9, pitch: 0.68 };
+  });
+
   // the doors start shut? (open: the valley at rest; the story shuts them for the rite)
   let disposed = false;
   const valley: Valley = {
@@ -935,8 +1040,10 @@ export function buildValley(ctx: WorldCtx): Valley {
     caveMat,
     waterMat,
     standY: (x, z) => Y_T + standAt(x - G.x, z - G.z),
+    views,
     dispose() {
       disposed = true;
+      engine(ctx).followLimit(null);
       valley.setFloor(false);
       h.dispose();
     },
@@ -949,7 +1056,9 @@ export function buildValley(ctx: WorldCtx): Valley {
 /** Footprints the trees keep clear of (local x, z, radius). */
 const BUILT: [number, number, number][] = [
   [-23.2, 5.7, 3], [-20.3, 6.6, 1.8], [-24, 8.7, 2.4], [22.4, 4, 3], [23.2, 9.2, 2.6], [18, -10.8, 2.8], [8, -14, 3.4], [-14.2, -15.3, 2.2], [-12.2, -14.2, 1.2],
-  [4.6, 0, 2.4], [-3, 2, 1.2], [26, -20, 4.5], [-20.5, 19.5, 1.8], [-4.6, 36.4, 2.5], [-1.4, 35.2, 2], [-27.5, 1.5, 1.5], [-28.2, 6.5, 1.5], [-19, 11, 1.5], [-31, 0, 4],
+  [4.6, 0, 2.4], [-3, 2, 1.2], [26, -20, 4.5], [-20.5, 19.5, 1.8], [-4.6, 36.4, 2.5], [-1.4, 35.2, 2],
+  // 小满's kite spot on the terrace, where B2 and B8 look at him (no bank peach in front of his face)
+  [-0.6, 31, 1.7], [-27.5, 1.5, 1.5], [-28.2, 6.5, 1.5], [-19, 11, 1.5], [-31, 0, 4],
 ];
 
 /** hill-kit's stairs() places in world coordinates (it reads the ground there); the batch here is local. */

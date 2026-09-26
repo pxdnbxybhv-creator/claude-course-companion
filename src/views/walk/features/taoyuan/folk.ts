@@ -352,9 +352,10 @@ export const STAGING: Record<Exclude<Phase, 'chang'>, Partial<Record<VillagerKey
     ruan: at(5.45, -2, 3.7, -2, true), ashu: at(5.45, -0.8, 3.7, -0.8, true), lusan: at(5.45, 1.3, 3.7, 1.3, true), liupo: at(5.45, 2.4, 3.7, 2.4, true),
     gegu: at(3.75, -0.8, 5.5, -0.8, true), yaoyao: null,
   },
+  // (B3 itself, the feast: 杜二 at the table with everyone — he goes back to his counter when it is over)
   // 戌: the jar is in the hall; 柳婆 waits at the gate with the guest lantern; 小满 has slipped away
   xu: {
-    qin: at(1.6, -15.8, 0, -12), liupo: at(-1, -16.1, -1, -12), xiaoman: null, yaoyao: null,
+    qin: at(1.6, -15.8, 0, -12), liupo: at(-1.8, -15.4, -1, -12), xiaoman: null, yaoyao: null,
     shigu: at(-12.1, -13.8, -9, -11.5, true), duer: at(5.45, -2, 3.7, -2, true), ashu: at(5.45, -0.8, 3.7, -0.8, true),
     guiniang: at(3.4, -3.4, 4.6, -1.3), sang: at(3.75, 1.3, 5.5, 1.3, true), taoye: at(3.75, 2.4, 5.5, 2.4, true),
     ruan: at(-1.2, 1.8, 0, 0), lusan: at(5.45, 1.3, 3.7, 1.3, true), gegu: at(3.75, -0.8, 5.5, -0.8, true),
@@ -388,6 +389,9 @@ export const STAGING: Record<Exclude<Phase, 'chang'>, Partial<Record<VillagerKey
   },
 };
 
+/** Who sits where while B3 plays: the after-feast staging, but 杜二 at the table (the east bench, between 阿黍 and 鲁三). */
+export const B3_SEATS: Partial<Record<VillagerKey, Spot | null>> = { ...STAGING.feast, duer: at(5.45, 0.25, 3.7, 0.25, true) };
+
 type Flags = Readonly<Record<string, true | undefined>>;
 
 /**
@@ -399,7 +403,7 @@ export function spotOf(k: VillagerKey, phase: Phase, part: Part, f: Flags, hour 
   if ((k === 'ruan' || k === 'taoye') && leftValley(f) && phase !== 'case') return null;
   if (k === 'yaoyao') return phase === 'chang' && part === 'dawn' && hour < 7 && f['ty:b7'] ? VILLAGERS.yaoyao.routine.dawn : null;
   // after B2: the elder and 小满 wait by the mouth for you to follow
-  if (phase === 'arrive' && f['ty:b2'] && (k === 'qin' || k === 'xiaoman')) return k === 'qin' ? at(-0.4, 36.4, 0, 42) : at(-1.9, 37.3, 0, 42);
+  if (phase === 'arrive' && f['ty:b2'] && (k === 'qin' || k === 'xiaoman')) return k === 'qin' ? at(-0.4, 36.4, 0, 42) : at(-2.9, 37.4, 0, 42);
   if (phase !== 'chang') {
     const s = STAGING[phase];
     if (k in s) return s[k] ?? null;
@@ -447,7 +451,10 @@ export function talkPlan(k: VillagerKey, who: CharacterId, s: TalkState): TalkPl
     const c = voiced(v.companion, who);
     if (c && c.length) return { lines: [...greet, ...c], meet: false };
   }
-  const pool = v.chat.filter((c) => !c.after || (c.after === 'solved' ? !!f['case:hz:solved'] : !!f['ty:stele']));
+  // (their first line is the festival night's introduction: said once, at the feast or the first talk)
+  const open = (c: ChatLine) => !c.after || (c.after === 'solved' ? !!f['case:hz:solved'] : !!f['ty:stele']);
+  const rest = v.chat.slice(1).filter(open);
+  const pool = rest.length ? rest : v.chat.filter(open);
   // once the case is judged, its line comes first on a new day
   const after = pool.find((c) => c.after === 'solved');
   const line = after && s.today === 0 ? after : pickDaily(pool, s.day, villagerId(k), s.today);

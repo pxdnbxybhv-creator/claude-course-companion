@@ -42,22 +42,21 @@ const COIN_TOAST_MS = 1800;
 /**
  * A keepsake card, shown once the talk it came from is over — a stall-keeper goes on to their usual
  * business after a story, and their dialogue must not cover it — and once the coins' toast has gone
- * (it sits where the card's title is). Given up if the walk is left meanwhile.
+ * (it sits where the card's title is). Timed by the world's own frames: if the walk is left meanwhile,
+ * the frames stop and the card is not shown over something else.
  */
-function cardWhenFree(ctx: WorldCtx, card: Card, notBefore: number): void {
-  const giveUp = performance.now() + 20 * 60_000;
-  const tick = () => {
-    const now = performance.now();
-    if (now > giveUp) return;
+function cardWhenFree(ctx: WorldCtx, card: Card, waitMs: number): void {
+  let waited = 0, check = 0;
+  let off = () => {};
+  off = ctx.onFrame((dt) => {
+    waited += dt * 1000;
+    if (waited < waitMs || (check -= dt) > 0) return;
+    check = 0.2;
     const open = typeof document !== 'undefined' && !!document.querySelector('.walk-say-wrap, .walk-card-wrap, .walk-toast');
-    if (import.meta.env.DEV) (globalThis as { __npcCard?: unknown }).__npcCard = { now, notBefore, busy: busy(ctx), open };
-    if (now >= notBefore && !busy(ctx) && !open) {
-      try { ctx.hud.showCard(card); } catch { /* the walk has closed */ }
-      return;
-    }
-    setTimeout(tick, 200);
-  };
-  setTimeout(tick, 250);
+    if (busy(ctx) || open) return;
+    off();
+    ctx.hud.showCard(card);
+  });
 }
 
 /** A beat told: its flag, one beat a day with this person, and what it brings. */
@@ -73,7 +72,7 @@ function settle(ctx: WorldCtx, x: Folk, beat: NonNullable<TalkPlan['beat']>): vo
     ctx.hud.toast(`+${r.coins} 文`, `+${r.coins} coins`, COIN_TOAST_MS);
   }
   if (r.mail) deliver(r.mail);
-  if (r.card) cardWhenFree(ctx, r.card, performance.now() + (r.coins ? COIN_TOAST_MS + 150 : 0));
+  if (r.card) cardWhenFree(ctx, r.card, r.coins ? COIN_TOAST_MS + 150 : 250);
 }
 
 export interface ConverseOpts {

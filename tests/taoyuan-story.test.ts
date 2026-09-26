@@ -10,12 +10,15 @@ import { CHARACTERS, type CharacterId } from '../src/data/characters';
 import { QUEST } from '../src/data/quests';
 import { LETTERS } from '../src/data/letters';
 import { doorStateFor } from '../src/views/walk/features/taoyuan/places';
+import * as TEXT from '../src/views/walk/features/taoyuan/text';
 import {
-  BEATS, B3, B4, B7, OLD_GUEST, STORY_FLAGS, STELE, beatFlag, caseOpen, leftValley, nextBeat, phaseOf, storyClock, type Beat, type Phase,
+  BEATS, BEAT_PLACES, BEAT_PROMPTS, BEAT_WAYS, B3, B4, B7, KEEPSAKES, OLD_GUEST, STORY_FLAGS, STELE, beatFlag, caseOpen, gradeFromFlags, leftValley, nextBeat, phaseOf,
+  storyClock, type Beat, type Phase,
 } from '../src/views/walk/features/taoyuan/text';
 import {
-  REGULAR_AFTER, STAGING, VILLAGERS, VILLAGER_KEYS, labelOf, metFlag, partOf, spotOf, talkKey, talkPlan, type Part,
+  B3_SEATS, REGULAR_AFTER, STAGING, VILLAGERS, VILLAGER_KEYS, labelOf, metFlag, partOf, spotOf, talkKey, talkPlan, type Part,
 } from '../src/views/walk/features/taoyuan/folk';
+import { TAOYUAN_LETTERS } from '../src/views/walk/features/taoyuan/letters';
 import { walkAt } from '../src/views/walk/features/taoyuan/places';
 import { FOLK } from '../src/views/walk/features/npcs/folk';
 import { ROLES, SPECIES } from '../src/views/walk/features/home/life/logic';
@@ -105,6 +108,80 @@ describe('the beats (bible §3)', () => {
       expect(spotOf(k, 'dawn', 'dawn', upTo('b6', 'case:hz:solved'))).toBeNull();
       expect(spotOf(k, 'chang', 'day', upTo('b8', 'case:hz:solved'))).toBeNull();
     }
+  });
+});
+
+describe('no beat is ever left without a way to begin', () => {
+  it('every beat is started by a way in, a prompt on someone, or a place — one of them', () => {
+    for (const b of BEATS) {
+      const ways = [BEAT_WAYS[b], BEAT_PROMPTS[b], BEAT_PLACES[b]].filter((x) => x !== undefined);
+      expect(ways.length, b).toBe(1);
+      const p = BEAT_PROMPTS[b];
+      if (p) expect(VILLAGER_KEYS, b).toContain(p.who);
+    }
+  });
+  it('whatever the record (a reload at any point, on either path), what comes next can begin', () => {
+    const extras = ['ty:b5s', 'case:hz:open', 'case:hz:solved', 'case:hz:parked'];
+    for (let i = 0; i <= BEATS.length; i++) for (let m = 0; m < 1 << extras.length; m++) {
+      const f = F(...BEATS.slice(0, i).map(beatFlag), ...extras.filter((_, j) => m & (1 << j)));
+      const n = nextBeat(f);
+      if (n === 'case' || n === 'done') continue;
+      expect(BEATS, JSON.stringify(Object.keys(f))).toContain(n);
+      expect(!!(BEAT_WAYS[n] || BEAT_PROMPTS[n] || BEAT_PLACES[n]), n).toBe(true);
+    }
+    // judged, B6 not yet played (a reload in its forty seconds): the elder's 「钤印」 starts it
+    expect(nextBeat(upTo('b5', 'case:hz:open', 'case:hz:solved'))).toBe('b6');
+    expect(BEAT_PROMPTS.b6?.who).toBe('qin');
+  });
+  it('B6 reads the grade the case recorded (明 if none)', () => {
+    expect(gradeFromFlags({})).toBe('ming');
+    expect(gradeFromFlags(F('case:hz:grade:shen'))).toBe('shen');
+    expect(gradeFromFlags(F('case:hz:grade:zibai'))).toBe('zibai');
+  });
+  it('the seal found gone holds the night (FX11) on every way in until the case is opened or parked', () => {
+    expect(storyClock(upTo('b4c'))).toBe('zi');
+    expect(storyClock(upTo('b4c', 'ty:b5s'))).toBe('case');
+    expect(phaseOf(upTo('b4c', 'ty:b5s'))).toBe('zi');
+  });
+  it('the unsigned letter comes by the record too, once the seal is found gone (a reload never loses it)', () => {
+    const l = TAOYUAN_LETTERS.find((x) => x.id === 'ty-wuming')!;
+    expect(l.due!({ ...emptyPlay(), flags: upTo('b4c') }, '2026-09-26')).toBe(false);
+    expect(l.due!({ ...emptyPlay(), flags: upTo('b4c', 'ty:b5s') }, '2026-09-26')).toBe(true);
+  });
+  it("小满's letter tells of the unswept courtyard when the case was parked (B7 always leaves a wish too)", () => {
+    const l = TAOYUAN_LETTERS.find((x) => x.id === 'ty-xiaoman')!;
+    const first = (f: Flags) => l.ps!.find((x) => f[x.flag]);
+    expect(first(upTo('b8', 'case:hz:parked', 'ty:wish:none'))?.flag).toBe('case:hz:parked');
+    expect(first(upTo('b8', 'case:hz:solved', 'ty:wish:again'))?.flag).toBe('ty:wish:again');
+  });
+  it('杜二 sits at the table for the feast (B3), and goes back to his counter after', () => {
+    const d = B3_SEATS.duer!;
+    expect(Math.abs(d.x - 4.6)).toBeLessThan(1.2);
+    expect(Math.abs(d.z)).toBeLessThan(3);
+    expect(STAGING.feast.duer!.x).toBeGreaterThan(15);
+  });
+});
+
+describe('the English', () => {
+  // (the hours keep their names in English, 戌正 and 子初; {名} is the walker's name, filled at render)
+  const ok = (en: string) => en.replace(/\{名\}/g, '').replace(/[申酉戌亥子卯][初正末]?/g, '');
+  const ens: [string, string][] = [];
+  const walk = (o: unknown, path: string): void => {
+    // (the lines made from a number — coins, clues — are called; a letter's `due` is not a line)
+    if (typeof o === 'function') { if (!path.endsWith('.due')) walk((o as (n: number) => unknown)(20), path + '()'); return; }
+    if (!o || typeof o !== 'object') return;
+    for (const [k, v] of Object.entries(o)) {
+      if (typeof v === 'string' && /^(en|\w+En)$/.test(k)) ens.push([`${path}.${k}`, v]);
+      else walk(v, `${path}.${k}`);
+    }
+  };
+  walk(TEXT, 'text');
+  walk(VILLAGERS, 'folk');
+  walk(TAOYUAN_LETTERS, 'letters');
+  walk(KEEPSAKES, 'keepsakes');
+  it('names no one in hanzi (Ge Gu, Taoye, Ruan Qing…)', () => {
+    expect(ens.length).toBeGreaterThan(200);
+    for (const [where, en] of ens) expect(/[\u3400-\u9fff]/.test(ok(en)), `${where}: ${en}`).toBe(false);
   });
 });
 

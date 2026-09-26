@@ -260,6 +260,9 @@
   animation: walk-breathe 2.4s ease-in-out infinite;
 }
 .walk-act span.latin { font-size: 15px; }
+.walk-act span.walk-act-l4, .walk-act span.walk-act-l5 { display: block; line-height: 1.12; text-wrap: balance; letter-spacing: 0.02em; }
+.walk-act span.walk-act-l4 { font-size: 19px; max-width: 2.3em; }
+.walk-act span.walk-act-l5 { font-size: 17px; max-width: 3.3em; }
 .walk-act[disabled] { opacity: 0.55; }
 .walk-jump:active, .walk-act:active { transform: scale(0.92); }
 @keyframes walk-breathe { 0%, 100% { box-shadow: 0 0 0 0 rgba(27, 25, 22, 0.25); } 50% { box-shadow: 0 0 0 8px rgba(27, 25, 22, 0); } }

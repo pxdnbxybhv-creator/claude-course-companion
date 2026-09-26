@@ -246,11 +246,12 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
     const fs = (o.lang === 'zh' ? 26 : 19) * u;
     g.font = o.lang === 'zh' ? `${fs}px "Ma Shan Zheng", "LXGW WenKai", serif` : `italic ${fs}px "Cormorant Garamond", Georgia, serif`;
     const text = o.lang === 'zh' ? '此中之地，不在舆图' : 'This place is on no map';
-    const w = g.measureText(text).width;
-    g.fillStyle = 'rgba(241,233,216,0.82)';
-    g.beginPath(); g.ellipse(S / 2, S * 0.5, w * 0.62 + 12 * u, fs * 1.05, 0, 0, Math.PI * 2); g.fill();
+    // (on a band of paper along the foot of the map, not over the garden's name at its centre)
+    const y = S - fs * 1.6;
+    g.fillStyle = 'rgba(241,233,216,0.9)';
+    g.fillRect(0, y - fs * 0.95, S, fs * 1.9);
     g.fillStyle = 'rgba(27,25,22,0.88)';
-    g.fillText(text, S / 2, S * 0.5);
+    g.fillText(text, S / 2, y);
     g.restore();
   } else if (o.player) {
     const px = X(o.player.x), pz = Z(o.player.z);

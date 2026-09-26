@@ -23,6 +23,11 @@ export interface ComposeOptions {
   at: Date;
   /** A phone: a smaller pixel budget for the mounted picture. */
   touch: boolean;
+  /**
+   * A keepsake seal pressed on the picture itself, low in its left corner, with the inscription
+   * (桃源里印: 「盖在哪里，哪里便算桃源」). Cinnabar, or gold after the case's 神断.
+   */
+  keepSeal?: { text: string; color: string } | null;
 }
 
 export interface Composed {
@@ -295,6 +300,15 @@ export async function mount(photo: HTMLCanvasElement, o: ComposeOptions): Promis
     let seal: HTMLCanvasElement | null = null;
     try { seal = makeSeal(text, { size: Math.max(24, sealPx), dpr: 1, style: 'bai', seed: hashString(text) % 997, color: SEAL_RED }); } catch { seal = null; }
     inscribe(g, L, o, seal, lines);
+    if (o.keepSeal) {
+      const ks = o.keepSeal;
+      try { await sealReady(ks.text); } catch { /* a fallback face will do */ }
+      const S = L.text.size * 1.55;
+      try {
+        const s2 = makeSeal(ks.text, { size: Math.max(22, Math.round(S * k)), dpr: 1, style: 'zhu', shape: 'oval', seed: hashString(ks.text) % 997, color: ks.color });
+        stamp(g, s2, L.photo.x + Math.max(S * 0.9, L.photo.w * 0.05), L.photo.y + L.photo.h - Math.max(S * 0.9, L.photo.h * 0.06), S, -0.05, true);
+      } catch { /* no keepsake seal then */ }
+    }
   }
   return c;
 }

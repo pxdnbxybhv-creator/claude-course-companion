@@ -25,8 +25,11 @@ import { engine } from './engine';
 import { ANCHORS, CAVE, G, L, W, Y_T, standAt } from './places';
 import { taoyuanHooks, type VillagerKey } from './hooks';
 import { Cast, StoryStage, talkCount, worldAt } from './stagehand';
-import { VILLAGERS, VILLAGER_KEYS, metFlag, partOf, spotOf, talkKey, talkPlan, STAGING, type Part } from './folk';
-import { B1, B2, B3, B4, B5, B6, B7, B8, B8_COINS, LATER, OLD_GUEST, STELE, caseOpen, nextBeat, phaseOf, storyClock, type Beat, type SLine } from './text';
+import { B3_SEATS, VILLAGERS, VILLAGER_KEYS, metFlag, partOf, spotOf, talkKey, talkPlan, STAGING, type Part } from './folk';
+import {
+  B1, B2, B3, B4, B5, B6, B7, B8, B8_COINS, BEAT_PLACES, BEAT_PROMPTS, LATER, OLD_GUEST, PEACH_COINS, STELE, caseOpen, gradeFromFlags, nextBeat, phaseOf, storyClock,
+  type Beat, type Grade, type SLine,
+} from './text';
 
 type XYZ = { x: number; y: number; z: number };
 const flags = () => play.peek().flags;
@@ -52,6 +55,27 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   });
   const st = new StoryStage(ctx, ctx.regionGroup('taoyuan'), tv, cast);
   bag.onDispose(() => st.dispose());
+
+  // ───────────── a beat cut short: the walker left the valley mid-beat (the map's travel, a fall)
+  //
+  // Leaving ends the beat: its waits resolve at once, what it left waiting (B4a's altar prompt) gives
+  // up, its lines are no longer said, and it unwinds at its next step without saving its flag — the
+  // next way in offers it again. (Beats begun in an older epoch are dead: `alive()` says so.)
+  let epoch = 0;
+  /** The epoch of the beat (or talk) under way. */
+  let runEpoch = 0;
+  const aborters = new Set<() => void>();
+  let unwound: Promise<void> = Promise.resolve();
+  st.gate = () => runEpoch === epoch;
+  function abortBeat(): void {
+    if (!running) return;
+    epoch++;
+    for (const a of [...aborters]) { try { a(); } catch { /* gone */ } }
+    aborters.clear();
+    st.flushWaits();
+    st.endShot();
+  }
+  bag.onDispose(tv.onLeave(() => abortBeat()));
 
   // ───────────── where everyone is
 
@@ -84,6 +108,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   // every way in: the valley's hour where the story stands, everyone in place
   bag.onDispose(tv.onEnter(() => {
     cast.resetYaoyao();
+    cast.resetKite();
     farewellSaid = false;
     tv.setClock(storyClock(flags()), { secs: 0 });
     tv.shrineDoor(props.doorOpen(), true);
@@ -108,6 +133,9 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 
   /** 「入光」 at the pool: B1 the first time, the plain way in after (the story resumes inside). */
   async function door(): Promise<void> {
+    if (tv.moving) return;
+    // (a beat cut short by the way out is still winding down: let it)
+    if (running && runEpoch !== epoch) await Promise.race([unwound, st.wait(8000)]);
     if (running || tv.moving) return;
     const f = flags();
     const who = ctx.player.character;
@@ -115,6 +143,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     if (first && f['qy:taohua']) flag(OLD_GUEST);
     tv.setClock(storyClock(f), { secs: 0 });
     running = 'b1';
+    runEpoch = epoch;
     try {
       if (first) await st.variant(B1.before, who);
       await tv.enter({ line: first ? B1.veil : undefined, onMouth: () => mouth() });
@@ -158,7 +187,8 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     tv.hush(false);
     eng.arrive('taoyuan');
     const m = ANCHORS.mouth;
-    tv.fx?.words(LATER.mouth, { x: m.x, y: m.y + 4.2, z: m.z - 8 }, { size: 1.1, life: 5, rise: 0.6 });
+    // (low over the valley, clear of the place banner and the HUD's title at the top of the screen)
+    tv.fx?.words(LATER.mouth, { x: m.x, y: m.y + 2.3, z: m.z - 9 }, { size: 1.0, life: 5, rise: 0.4 });
   }
 
   /** 「出谷」: B8's way out once the farewell is due; the plain way out otherwise. */
@@ -168,34 +198,48 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       if (!farewellSaid) await run('b8', b8talk);
       if (farewellSaid) { await b8exit(); return; }
     }
-    if (running) return;
+    if (running) {
+      // (the way out waits for the errand in hand — say so)
+      const l = running === 'b4a' ? LATER.carryFirst : running === 'b3' ? LATER.followFirst : LATER.busy;
+      ctx.hud.toast(l.zh, l.en, 3200);
+      return;
+    }
     await tv.leave();
   }
 
   // ───────────── running a beat
 
-  /** Run a beat: the claim, the walker's hold and the camera are given back whatever happens. */
-  async function run(id: string, fn: () => Promise<void>): Promise<void> {
+  /**
+   * Run a beat: the claim, the walker's hold and the camera are given back whatever happens. A claim
+   * someone else holds (the case's judgement just ending) is waited for — a little, or for B6
+   * (`patient`) two minutes; after that the elder's 「钤印」 prompt still starts it.
+   */
+  async function run(id: string, fn: () => Promise<void>, o: { patient?: boolean } = {}): Promise<void> {
     if (running && running !== 'b1') return;
     const was = running;
     running = id;
-    // (a claim someone else holds — the case's judgement just ending — is waited for a little)
-    for (let i = 0; i < 60 && !st.claim(); i++) await st.wait(150);
-    if (!st.holding) { running = was; return; }
+    const mine = runEpoch = epoch;
+    for (let i = 0; i < (o.patient ? 800 : 60) && !st.claim() && mine === epoch; i++) await st.wait(150);
+    if (!st.holding || mine !== epoch) { st.unclaim(); running = was; return; }
+    let done = () => {};
+    unwound = new Promise<void>((r) => { done = r; });
     try {
       await fn();
     } catch (e) {
       console.error('[walk] taoyuan story', id, e);
     } finally {
+      aborters.clear();
       st.endShot();
       st.hold(false);
       st.unclaim();
       running = was;
       for (const k of VILLAGER_KEYS) cast.script(k, false);
       refresh(false);
+      done();
     }
   }
-  const alive = () => st.alive;
+  /** The beat under way goes on: the world, the walker inside, and no way out taken since it began. */
+  const alive = () => st.alive && tv.isInside() && runEpoch === epoch;
 
   // ───────────── B2 · 豁然开朗
 
@@ -220,9 +264,12 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     if (!alive()) return;
     cast.dropKite();
     st.endShot();
+    // (he runs up and stops right in front of you, where the camera sees him clear of the rock)
     const p = L(ctx.player.position.x, ctx.player.position.z);
-    await cast.walkTo('xiaoman', p.x - 1.3, p.z - 1.4, 2.4);
+    await cast.walkTo('xiaoman', p.x, p.z - 1.6, 2.4);
+    if (!alive()) return;
     cast.face('xiaoman');
+    void st.shotOn('xiaoman', 0.9);
     await st.lines(B2.run, who);
     await st.variant(B2.runVariants, who);
     if (!alive()) return;
@@ -269,7 +316,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     // everyone to the tables (out of sight, up here on the terrace)
     for (const k of VILLAGER_KEYS) {
       if (k === 'qin' || k === 'yaoyao') continue;
-      const s = STAGING.feast[k];
+      const s = B3_SEATS[k];
       cast.script(k, true);
       if (s) cast.stand(k, s.x, s.z, s.face, s.sit); else cast.hide(k);
     }
@@ -301,7 +348,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     // too long behind: set down by the tables
     const sq = W(3.2, -5.4);
     if (Math.hypot(ctx.player.position.x - sq.x, ctx.player.position.z - sq.z) > 9) {
-      await st.curtain(B3.catchUp.zh, B3.catchUp.en, () => { ctx.player.teleport(sq.x, sq.z, Math.atan2(4.6 - 3.2, 0 + 5.4), Y_T + standAt(3.2, -5.4)); eng.restream(); }, 500);
+      await st.curtain(B3.catchUp.zh, B3.catchUp.en, () => { if (!alive()) return; ctx.player.teleport(sq.x, sq.z, Math.atan2(4.6 - 3.2, 0 + 5.4), Y_T + standAt(3.2, -5.4)); eng.restream(); }, 500);
       if (!alive()) return;
     }
     cast.stand('qin', 4.6, -3.9, { x: 4.6, z: 0 });
@@ -405,13 +452,16 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
         act: () => { off(); res(true); },
       };
       const off = st.prompt(it);
+      aborters.add(() => { off(); res(false); });
       st.bag.onDispose(() => res(false));
     });
     if (!placed || !alive()) { jar.drop(); return; }
-    for (let i = 0; i < 200 && !st.claim(); i++) await st.wait(150);
+    for (let i = 0; i < 200 && !st.claim() && alive(); i++) await st.wait(150);
+    if (!alive()) { jar.drop(); return; }
     st.hold(true);
     await st.curtain(B4.setVeil.zh, B4.setVeil.en, () => {
       jar.drop();
+      if (!alive()) return;
       props.set('sealed');
       const c = W(0, -19.6);
       ctx.player.teleport(c.x, c.z, Math.PI, Y_T + standAt(0, -19.6));
@@ -476,12 +526,9 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const fx = tv.fx;
     const dancers = B4.dancers;
     for (const k of dancers) cast.script(k, true);
-    // the drum, the ring
+    // the drum; the ring turns and the ribbons fly from the first beat (under the narration, not after it)
     try { ctx.audio.pluck(-5, 0.9); } catch { /* muted */ }
     const pole = ANCHORS.square;
-    void st.shot({ x: pole.x - 6.5, y: pole.y + 3.2, z: pole.z + 6.5 }, { x: pole.x, y: pole.y + 1.4, z: pole.z }, 1.4);
-    await st.line(B4.dance, who);
-    if (!alive()) return;
     const figs = dancers.map((k) => cast.fig(k)).filter((f): f is NonNullable<typeof f> => !!f);
     const stopRibbons = fx ? fx.ribbons(figs) : () => {};
     const R = 3.4;
@@ -501,6 +548,10 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       });
     });
     st.bag.onDispose(off);
+    const ringDone = () => { off(); stopRibbons(); for (const k of dancers) { const f = cast.fig(k); if (f) f.walking = 0; } };
+    void st.shot({ x: pole.x - 6.5, y: pole.y + 3.2, z: pole.z + 6.5 }, { x: pole.x, y: pole.y + 1.4, z: pole.z }, 1.4);
+    await st.line(B4.dance, who);
+    if (!alive()) { ringDone(); return; }
     // the companions' part in it
     let moonBack: (() => void) | null = null;
     if (who === 'musician') { flag('ty:zhiyin'); try { ctx.player.emote('play'); } catch { /* ok */ } }
@@ -508,16 +559,29 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     if (who === 'rabbit') { try { ctx.player.emote('jump'); } catch { /* ok */ } }
     if (who === 'change') { try { ctx.sky.setMoon({ glow: 1.8, scale: 1.4 }); moonBack = () => ctx.sky.setMoon({ glow: 1, scale: 1 }); } catch { /* ok */ } }
     await st.wait(2600);
-    void st.shotOn('sang', 1, 30, 3.8);
+    // the camera holds on 三娘 for three seconds, following her round the ring — her alibi for 亥正, seen
+    const si = dancers.indexOf('sang');
+    let lead = 0.45;
+    const follow = ctx.onFrame(() => {
+      const f = cast.fig('sang');
+      if (!f || si < 0) return;
+      const r = f.root.position;
+      const a = a0 + (si / dancers.length) * Math.PI * 2;
+      const look = { x: r.x, y: r.y + f.height * 0.72, z: r.z };
+      const at = (l: number) => ({ x: pole.x + Math.sin(a + l) * 6.3, y: r.y + 2.2, z: pole.z + Math.cos(a + l) * 6.3 });
+      // (keep the angle while the view is clear; else the next clear one — a lantern post, the elders by the ring)
+      if (!cast.clearView(at(lead), look, 'sang')) lead = [0.45, 0.2, 0.7, -0.25, 0.95].find((l) => cast.clearView(at(l), look, 'sang')) ?? lead;
+      void eng.cinematic({ to: at(lead), look, secs: 0.01, hold: 30 });
+    });
+    st.bag.onDispose(follow);
     await st.wait(3200);
+    follow();
     st.endShot();
     void st.shot({ x: pole.x + 7, y: pole.y + 4, z: pole.z - 5 }, { x: pole.x, y: pole.y + 1.2, z: pole.z }, 2.4);
     await st.variant(B4.variants, who);
     await st.wait(3600);
-    off();
-    stopRibbons();
+    ringDone();
     moonBack?.();
-    for (const k of dancers) { const f = cast.fig(k); if (f) f.walking = 0; }
     if (!alive()) return;
     flag('ty:b4c');
   }
@@ -571,13 +635,14 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       await st.lines(B5.ruan, who);
       await st.variant(B5.variants, who);
       if (!alive()) return;
-      flag('ty:b5s');
-      // the unsigned letter
+      // the unsigned letter (delivered before the discovery is saved: a reload never loses it —
+      // and the letter is due by the record too, ty:b5s)
       st.endShot();
       await bluebird();
       if (!alive()) return;
       if (deliver('ty-wuming')) toastAction(ctx.hud, B5.bird, B5.read, () => openMail('ty-wuming'));
       else ctx.hud.toast(B5.bird.zh, B5.bird.en, 3600);
+      flag('ty:b5s');
       await st.wait(1200);
       // FX11: the petals stop in the air
       tv.setClock('case', { secs: 3 });
@@ -585,17 +650,23 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       await voice(B5.voice);
       if (!alive()) return;
     } else {
+      // (the discovery seen before a reload: the letter, if it never came; the night held)
+      if (deliver('ty-wuming')) toastAction(ctx.hud, B5.bird, B5.read, () => openMail('ty-wuming'));
+      if (tv.clock !== 'case') tv.setClock('case', { secs: 3 });
       cast.face('qin');
       await st.line(B5.again, who);
     }
-    // the choice
+    // the choice (「此案，我来断」 only when there is a case to judge)
     cast.face('qin');
     void st.shotOn('qin', 1);
-    const k = await st.line(B5.choice, who);
+    const canJudge = !!taoyuanHooks.case;
+    let k = await st.line(canJudge ? B5.choice : { ...B5.choice, choices: B5.choice.choices!.slice(1) }, who);
     if (!alive() || k < 0) return;
+    if (!canJudge) k = 1;
     if (k === 0 && taoyuanHooks.case) {
       await st.line(B5.judge, who);
       if (!alive()) return;
+      if (tv.clock !== 'case') tv.setClock('case', { secs: 3 });
       flag('case:hz:open');
       flag('ty:b5');
       props.set('none');
@@ -666,7 +737,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 
   // ───────────── B6 · 双印 (the case judged)
 
-  async function b6(grade: string): Promise<void> {
+  async function b6(grade: Grade): Promise<void> {
     const who = st.who;
     const late = has('ty:b8');
     st.hold(true);
@@ -701,8 +772,13 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     await st.wait(1200);
     // 嗒 — and the dawn
     st.endShot();
+    // (from inside the courtyard, clear of the people in it: the gate wall never in front of the lens)
     const hd = ANCHORS.hallDoor;
-    void st.shot({ x: hd.x + 3, y: hd.y + 2.2, z: hd.z + 6 }, { x: hd.x, y: hd.y + 1, z: hd.z }, 1.2);
+    const hdLook = { x: hd.x, y: hd.y + 1, z: hd.z };
+    const hdCam = ([[2.6, 4.6], [-2.6, 4.6], [0.6, 4.9], [3.3, 3.2]] as const)
+      .map(([dx, dz]) => ({ x: hd.x + dx, y: hd.y + 2.2, z: hd.z + dz }))
+      .find((c) => cast.clearView(c, hdLook)) ?? { x: hd.x + 2.6, y: hd.y + 3.2, z: hd.z + 4.6 };
+    void st.shot(hdCam, hdLook, 1.2);
     await tv.da();
     if (!alive()) return;
     st.endShot();
@@ -731,7 +807,12 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const fx = tv.fx;
     st.hold(true);
     const sp = ANCHORS.spring;
-    void st.shot({ x: sp.x + 2.2, y: sp.y + 2.2, z: sp.z + 6.5 }, { x: sp.x, y: sp.y + 1.3, z: sp.z }, 1.6);
+    // (from the south bank, wherever the walker is not in the way)
+    const look = { x: sp.x, y: sp.y + 1.3, z: sp.z };
+    const cam = ([[2.2, 6.5], [-2.4, 6.4], [4.4, 5.2], [-4.6, 5.0], [0.4, 7.4]] as const)
+      .map(([dx, dz]) => ({ x: sp.x + dx, y: sp.y + 2.2, z: sp.z + dz }))
+      .find((c) => cast.clearView(c, look)) ?? { x: sp.x + 2.2, y: sp.y + 3.6, z: sp.z + 6.5 };
+    void st.shot(cam, look, 1.6);
     const y = fx?.gatherFigure({ at: sp });
     if (y) await Promise.race([y.formed, st.wait(9000)]);
     if (!alive()) { y?.remove(); return; }
@@ -744,7 +825,13 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     await st.line(B7.replies[k], who);
     flag(B7.wishes[k]);
     await st.variant(B7.variants, who);
-    if (who === 'taoist') { flag('ty:peach'); ctx.hud.toast(B7.peach.zh, B7.peach.en, 3600); }
+    if (who === 'taoist' && !has('ty:peach')) {
+      flag('ty:peach');
+      flag('item:keep:xiantao');
+      earnFrom('taoyuan', PEACH_COINS);
+      const pc = B7.peach(PEACH_COINS);
+      ctx.hud.toast(pc.zh, pc.en, 3600);
+    }
     if (who === 'poet' && fx) {
       fx.words(B7.poemWords, { x: sp.x, y: sp.y + 0.8, z: sp.z + 1.4 }, { size: 0.55, life: 6, rise: 0.3 });
       void fx.petalBurst({ x: sp.x, y: sp.y + 0.4, z: sp.z + 2 }, { n: 120, up: 0.5, spread: 1, lit: true, wind: { x: 0, z: 2.4 } });
@@ -775,15 +862,36 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     ctx.hud.toast(B8.go.zh, B8.go.en, 4200);
   }
 
+  let exiting = false;
   async function b8exit(): Promise<void> {
-    if (tv.moving || has('ty:b8')) return;
-    // (the keepsake, the coins, the day it closed — then the way shuts behind you)
-    flag('item:keep:wulinggou');
-    earnFrom('taoyuan', B8_COINS);
+    if (exiting || tv.moving || has('ty:b8')) return;
+    exiting = true;
+    // the keepsake, the coins (once) and the day it closed; the way shuts behind you (FX14) — and only
+    // once its closing card is put away does the quest's own seal (ty:b8, q-taoyuan) come up
+    const first = !has('item:keep:wulinggou');
+    if (first) { flag('item:keep:wulinggou'); earnFrom('taoyuan', B8_COINS); }
     markDay('ty:b8');
-    flag('ty:b8');
-    const rw = B8.rewards(B8_COINS);
-    await tv.leave({ close: true, line: B8.line, card: { ...B8.card, bodyZh: `${B8.card.bodyZh}\n\n${rw.zh}`, bodyEn: `${B8.card.bodyEn}\n\n${rw.en}` } });
+    let sealed = false;
+    const seal = () => {
+      if (sealed) return;
+      sealed = true;
+      exiting = false;
+      if (!tv.isInside()) flag('ty:b8');
+      tv.setDoorState(null);
+    };
+    bag.onDispose(seal);
+    tv.setDoorState('closed');
+    try {
+      const rw = B8.rewards(B8_COINS);
+      const card = first ? { ...B8.card, bodyZh: `${B8.card.bodyZh}\n\n${rw.zh}`, bodyEn: `${B8.card.bodyEn}\n\n${rw.en}` } : B8.card;
+      await tv.leave({ close: true, line: B8.line, card });
+      if (!tv.isInside()) {
+        await st.wait(400);
+        for (let i = 0; i < 1200 && cardUp(); i++) await st.wait(150);
+      }
+    } finally {
+      seal();
+    }
     try { deliverDue(); } catch { /* the box is optional */ }
   }
 
@@ -817,9 +925,14 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const n = nextBeat(f);
     const met = !!f[metFlag(k)];
     const label = met ? { zh: VILLAGERS[k].zh, en: VILLAGERS[k].en } : VILLAGERS[k].epithet;
+    // the next beat's own prompt (text.ts BEAT_PROMPTS), on whoever carries it — not while it is under way
+    const bp = n === 'case' || n === 'done' ? undefined : BEAT_PROMPTS[n];
+    if (bp && bp.who === k && running !== n) {
+      const b = n as Beat;
+      if (b === 'b5' && f['ty:b5s']) return { label: B5.choiceLabel, action: B5.choiceAct, act: () => startBeat(b) };
+      return { label: bp.label ?? label, action: bp.action, act: () => startBeat(b) };
+    }
     if (k === 'qin') {
-      if (n === 'b3' && f['ty:b2']) return { label, action: B2.follow, act: () => run('b3', b3) };
-      if (n === 'b5') return f['ty:b5s'] ? { label: B5.choiceLabel, action: B5.choiceAct, act: () => run('b5', b5) } : { label: B5.gatherLabel, action: B5.gatherAct, act: () => run('b5', b5) };
       if (caseOpen(f) && taoyuanHooks.case) {
         let ok = false;
         try { ok = taoyuanHooks.case.ready().ok; } catch { ok = false; }
@@ -831,10 +944,24 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
         return { label, action: LATER.oldCase, act: () => run('oldcase', oldCase) };
       }
     }
-    if (k === 'duer' && n === 'b4a') return { label: B4.jarLabel, action: B4.jarAct, act: () => run('b4a', b4a) };
-    if (k === 'liupo' && n === 'b4b') return { label: B4.lanternLabel, action: B4.lanternAct, act: () => run('b4b', b4b) };
     return null;
   }
+
+  /** Every beat, started (the compiler keeps this whole: no beat is ever left without a way to begin). */
+  const BEAT_RUN: Record<Beat, () => Promise<void>> = {
+    b1: () => door(),
+    b2: () => run('b2', b2),
+    b3: () => run('b3', b3),
+    b4a: () => run('b4a', b4a),
+    b4b: () => run('b4b', b4b),
+    b4c: async () => { await run('b4c', b4c); if (alive() && has('ty:b4c') && !has('ty:b5')) await run('b5', b5); },
+    b5: () => run('b5', b5),
+    // (B6 waits for the case to give the claim back, however long its judgement takes to end)
+    b6: () => run('b6', () => b6(gradeFromFlags(flags())), { patient: true }),
+    b7: () => run('b7', b7),
+    b8: () => run('b8', b8talk),
+  };
+  function startBeat(b: Beat): Promise<void> { return BEAT_RUN[b](); }
 
   async function judge(): Promise<void> {
     if (running) return;
@@ -846,7 +973,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   /** Who shows their mark (worked out once a second: the next beat's carrier; in ordinary days, whoever you have never talked to). */
   let marks = new Set<VillagerKey>();
   function marked(k: VillagerKey): boolean {
-    return !st.holding && !running && marks.has(k);
+    return !st.holding && !running && !ctx.player.isFrozen && marks.has(k);
   }
   function remark(): void {
     const next = new Set<VillagerKey>();
@@ -862,9 +989,10 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const n = nextBeat(f);
     const p = ctx.player.position;
     const near = (a: XYZ, r: number) => Math.hypot(p.x - a.x, p.z - a.z) < r && Math.abs(p.y - a.y) < 4;
-    if (n === 'b4c' && near(ANCHORS.square, 7.5)) void (async () => { await run('b4c', b4c); if (alive() && has('ty:b4c') && !has('ty:b5')) await run('b5', b5); })();
-    else if (n === 'b8' && !farewellSaid && near(ANCHORS.terrace, 6.5)) void run('b8', b8talk);
-    springLight(n === 'b7');
+    const place = n === 'case' || n === 'done' ? undefined : BEAT_PLACES[n];
+    if (place === 'square' && near(ANCHORS.square, 7.5)) void startBeat(n as Beat);
+    else if (place === 'terrace' && !farewellSaid && near(ANCHORS.terrace, 6.5)) void startBeat(n as Beat);
+    springLight(place === 'spring');
   }
 
   // the light at the spring (B7's prompt)
@@ -876,7 +1004,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       const off = st.prompt({
         id: 'ty:spring', position: new ctx.THREE.Vector3(sp.x, sp.y, sp.z + 2.8), radius: 3.2,
         labelZh: B7.label.zh, labelEn: B7.label.en, actionZh: B7.act.zh, actionEn: B7.act.en,
-        act: () => run('b7', b7),
+        act: () => startBeat('b7'),
       });
       spring = { off, glow };
     } else if (!on && spring) {
@@ -894,6 +1022,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     if (prev && !(prev === 'b4a' && !st.holding)) return;
     if (!st.claim()) return;
     running = prev ?? 'talk';
+    if (!prev) runEpoch = epoch;
     const who = st.who;
     try {
       // the case's first (a testimony, a confrontation)
@@ -920,7 +1049,8 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   // ───────────── the hooks the case uses
 
   const hooks = {
-    solved: (grade: 'shen' | 'ming' | 'ping' | 'zibai') => { void run('b6', () => b6(grade)); },
+    // (the judgement may still be letting go of its claim: B6 waits for it)
+    solved: (grade: Grade) => { void run('b6', () => b6(grade), { patient: true }); },
     villager: (k: VillagerKey) => cast.handle(k),
   };
   taoyuanHooks.story = hooks;
@@ -939,10 +1069,12 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       next: () => nextBeat(flags()),
       phase: () => phaseOf(flags()),
       running: () => running,
+      epoch: () => ({ epoch, runEpoch }),
+      start: (b: Beat) => startBeat(b),
       farewell: () => farewellSaid,
       run: (b: Beat) => {
         const fns: Record<string, () => Promise<void>> = { b2, b3, b4a, b4b, b4c, b5, b7, b8: b8talk };
-        if (b === 'b6') return run('b6', () => b6('ming'));
+        if (b === 'b6') return run('b6', () => b6(gradeFromFlags(flags())), { patient: true });
         return fns[b] ? run(b, fns[b]) : null;
       },
       exit: () => b8exit(),
@@ -952,6 +1084,10 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       act: (k: VillagerKey) => { const s = storyPrompt(k); return s ? s.act() : talkTo(k); },
       cast: () => VILLAGER_KEYS.map((k) => ({ k, shown: cast.isShown(k), at: cast.local(k), world: cast.position(k) })),
       refresh: () => refresh(true),
+      // (camera checks: everyone in their B3 seats; a close shot on someone)
+      seat: () => { for (const k of VILLAGER_KEYS) { const sp = B3_SEATS[k]; if (sp) { cast.script(k, true); cast.stand(k, sp.x, sp.z, sp.face, sp.sit); } } },
+      unseat: () => { for (const k of VILLAGER_KEYS) cast.script(k, false); refresh(true); },
+      shot: (k: VillagerKey) => st.frameOn(k),
       props: () => props.state(),
     };
     bag.onDispose(() => { if (w.__tystory) delete w.__tystory; });
@@ -959,6 +1095,11 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 });
 
 export const TAOYUAN_FEATURES = [taoyuanStory];
+
+/** The walk's card (a hanging scroll) is up now. */
+function cardUp(): boolean {
+  try { return !!document.querySelector('.walk-card'); } catch { return false; }
+}
 
 // ───────────────────────────── a toast with an action (the hud's own, if the core lends it)
 

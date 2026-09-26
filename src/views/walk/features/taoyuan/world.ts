@@ -45,6 +45,18 @@ export class TaoyuanWorld {
       if (!this.moving) this.valley?.setFloor(false);
     }));
     this.offs.push(ctx.onFrame(() => this.tickCleft()));
+    // the world was rebuilt (a quality, language or hour change) while the walker was inside: back in
+    // at the inner mouth once the new world is running, not at the garden gate a whole cave away
+    if (resumeAt && performance.now() - resumeAt < 20000) {
+      resumeAt = 0;
+      let frames = 0;
+      const off = ctx.onFrame(() => {
+        if (++frames < 20) return;
+        off();
+        if (!this.disposed && !this.inside && !this.moving) void this.enter({ line: null, atMouth: true });
+      });
+      this.offs.push(off);
+    }
   }
 
   // ───────────── build
@@ -212,6 +224,7 @@ export class TaoyuanWorld {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    resumeAt = this.inside ? performance.now() : 0;
     for (const f of this.offs.splice(0)) f();
     for (const f of this.exitOffs.splice(0)) f();
     engine(this.ctx).photoFence(null);
@@ -226,6 +239,8 @@ export class TaoyuanWorld {
 
 
 const worlds = new WeakMap<WorldCtx, TaoyuanWorld>();
+/** When a world went while its walker was inside (a rebuild follows at once: see the constructor). */
+let resumeAt = 0;
 
 /** The valley world of this 3D world (null until the region module has built its door). */
 export function taoyuan(ctx: WorldCtx): TaoyuanWorld | null {

@@ -60,6 +60,7 @@ export function buildDoor(ctx: WorldCtx, tv: TaoyuanWorld): Door {
     return s;
   };
   const light = mk('#ffe6b0', 5), light2 = mk('#ffd0d8', 2.4), halo = mk('#fff4dc', 9);
+  const lowQ = ctx.quality.level === 'low';
   // petals circling the pool, drifting out on the water (they come from the valley: always)
   const NP = Math.round(48 * Math.min(1.4, ctx.quality.density));
   const pp = new Float32Array(NP * 3);
@@ -106,10 +107,16 @@ export function buildDoor(ctx: WorldCtx, tv: TaoyuanWorld): Door {
     if (acc > 1.5) { acc = 0; recompute(); }
     const on = state === 'open' || state === 'reopened' ? 1 : 0;
     k += (on - k) * Math.min(1, dt * 1.2);
-    const f = 0.9 + Math.sin(t * 1.3) * 0.1;
-    (light.material as T.SpriteMaterial).opacity = 0.55 * k * f;
-    (light2.material as T.SpriteMaterial).opacity = 0.7 * k * f * (state === 'reopened' ? 1.2 : 1);
-    (halo.material as T.SpriteMaterial).opacity = 0.16 * k * f;
+    // (a slow breath, so the eye catches it from the stepping stones; brighter and larger where no bloom helps it)
+    const f = 0.84 + Math.sin(t * 1.3) * 0.08 + Math.sin(t * 0.55) * 0.12;
+    const gain = lowQ ? 1.75 : 1.2, grow = lowQ ? 1.3 : 1;
+    (light.material as T.SpriteMaterial).opacity = Math.min(1, 0.55 * k * f * gain);
+    (light2.material as T.SpriteMaterial).opacity = Math.min(1, 0.7 * k * f * gain * (state === 'reopened' ? 1.2 : 1));
+    (halo.material as T.SpriteMaterial).opacity = Math.min(1, 0.16 * k * f * gain);
+    if (k > 0.01) {
+      const b = grow * (1 + Math.sin(t * 0.55) * 0.07);
+      light.scale.setScalar(5 * b); light2.scale.setScalar(2.4 * b); halo.scale.setScalar(9 * b * (lowQ ? 1.15 : 1));
+    }
     light.visible = light2.visible = halo.visible = k > 0.01;
     if (!group.parent?.visible) return;
     for (let i = 0; i < NP; i++) {
