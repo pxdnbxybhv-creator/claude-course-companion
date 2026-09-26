@@ -230,7 +230,7 @@ export class SkySystem implements Sky {
   private sunLightDir = new THREE.Vector3();
 
   private target(): Palette {
-    return PALETTES[this.forced ? 'night' : this.tod];
+    return PALETTES[this.isNight() ? 'night' : this.tod];
   }
 
   private applyPalette(k: number): void {
@@ -248,25 +248,28 @@ export class SkySystem implements Sky {
     }
   }
 
+  /** Night as shown: a picture's hour (photo mode) when one is set, else the clock or a feature's. */
   isNight(): boolean {
-    return this.forced || this.tod === 'night';
+    return this.pictureNight ?? (this.forced || this.tod === 'night');
   }
 
+  /** A feature's night (features share this one flag); a picture's hour lies over it without touching it. */
   forceNight(on: boolean): void {
     this.forced = on;
   }
 
-  /** Whether a feature (or a picture) has forced night on. */
-  isForcedNight(): boolean {
-    return this.forced;
-  }
-
   /** The hour the world was entered at, kept while a picture turns it (photo mode). */
   private realHour: { tod: TimeOfDay; sun: THREE.Vector3 } | null = null;
+  /** A picture's night (photo mode): true at 夜, false at the other hours, null when none is set. */
+  private pictureNight: boolean | null = null;
 
-  /** Photo mode: paint the sky at another time of day for a while; `null` puts the real hour back. */
+  /**
+   * Photo mode: paint the sky at another time of day for a while; `null` puts the real hour back
+   * (and whatever night a feature holds by then). Night is drawn over the real hour's sun.
+   */
   setTimeOfDay(tod: TimeOfDay | null): void {
-    if (tod === null) {
+    this.pictureNight = tod === null ? null : tod === 'night';
+    if (tod === null || tod === 'night') {
       if (this.realHour) {
         this.tod = this.realHour.tod;
         this.sunDir.copy(this.realHour.sun);
@@ -276,7 +279,7 @@ export class SkySystem implements Sky {
     }
     if (!this.realHour) this.realHour = { tod: this.tod, sun: this.sunDir.clone() };
     this.tod = tod;
-    aimSun(this.sunDir, tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : tod === 'night' ? 22 : 11, tod);
+    aimSun(this.sunDir, tod === 'dusk' ? 18.2 : tod === 'dawn' ? 6.2 : 11, tod);
   }
 
   setMoon(o: { visible?: boolean | null; scale?: number; glow?: number; position?: THREE.Vector3 }): void {

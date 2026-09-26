@@ -75,7 +75,6 @@ export class PhotoRig implements PhotoApi {
   /** The world's clock factor, eased (1 runs, 0 stopped). */
   private k = 1;
   private fovFn: ((deg: number) => void) | null = null;
-  private skyWas: { forced: boolean } | null = null;
   private hour: PhotoTime = 'now';
 
   constructor(private h: PhotoHooks) {
@@ -107,7 +106,6 @@ export class PhotoRig implements PhotoApi {
     this.held = false;
     this.paused = false;
     this.hour = 'now';
-    this.skyWas = null;
     this.h.controls.enterPhoto();
     this.h.entered?.();
     return true;
@@ -117,7 +115,6 @@ export class PhotoRig implements PhotoApi {
     if (!this.on) return;
     this.on = false;
     this.setTime('now');
-    this.skyWas = null;
     this.paused = false;
     // a held pose is let go: the walker finishes the gesture and stands at ease
     this.posing = null;
@@ -161,14 +158,10 @@ export class PhotoRig implements PhotoApi {
 
   setTime(t: PhotoTime): void {
     if (t === this.hour) return;
-    const sky = this.h.sky;
-    // whether the real hour was night (put back on 此刻 and on leaving)
-    if (!this.skyWas && t !== 'now') this.skyWas = { forced: sky.isForcedNight() };
     this.hour = t;
-    const was = this.skyWas;
-    if (t === 'now') { sky.setTimeOfDay(null); if (was) sky.forceNight(was.forced); }
-    else if (t === 'night') { sky.setTimeOfDay(null); sky.forceNight(true); }
-    else { sky.forceNight(false); sky.setTimeOfDay(t); }
+    // the picture's hour lies over the world's: a feature's night (the one shared flag) is left to
+    // the features, so 此刻 and leaving show whatever they hold by then
+    this.h.sky.setTimeOfDay(t === 'now' ? null : t);
   }
 
   /** The world's clock factor this frame (eases to a stop in about a third of a second). */

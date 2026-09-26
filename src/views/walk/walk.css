@@ -156,11 +156,12 @@
 }
 @keyframes walk-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 
-/* ---------- prompt */
+/* ---------- prompt (on a desk it stands above the deck at the bottom right — 视 · 影 · 疾 · 技 —
+   which reaches past the middle on a narrower screen and would cover it) */
 .walk-prompt {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 28px);
+  bottom: calc(env(safe-area-inset-bottom) + 96px);
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -267,7 +268,7 @@
 .walk-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 96px);
+  bottom: calc(env(safe-area-inset-bottom) + 156px);
   transform: translateX(-50%);
   width: max-content;
   max-width: min(92vw, 520px);
@@ -665,7 +666,7 @@
 }
 .walk-run:active { transform: scale(0.92); }
 
-/* ---------- desktop: the run chip and the skill button, bottom right */
+/* ---------- desktop: 视 / 影, the run chip and the skill button, bottom right (the prompt stands above) */
 .walk-deck {
   position: absolute;
   right: calc(env(safe-area-inset-right) + 18px);
