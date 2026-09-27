@@ -1,0 +1,177 @@
+// Atlas pages: sprites are painted once into small canvases, then packed on shelves into 1024² pages
+// (one texture per page for drawImage). Every sprite gets a white hit-flash twin (source-in), and
+// on demand a 倒影 twin (lightness inverted, hue kept: white ink on black paper).
+import { paintStroke } from '../../../ink/brush';
+import type { Sprite } from '../types';
+import type { Spec } from './kit';
+import { B } from './kit';
+import { PAPER } from './palette';
+
+export const PAGE = 1024;
+
+export function canvas(w: number, h: number): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(w));
+  c.height = Math.max(1, Math.ceil(h));
+  return c;
+}
+export function ctx2d(c: HTMLCanvasElement): CanvasRenderingContext2D {
+  const g = c.getContext('2d');
+  if (!g) throw new Error('2d context unavailable');
+  return g;
+}
+
+export interface Painted {
+  img: HTMLCanvasElement;
+  flash: HTMLCanvasElement;
+  /** Size in u (including the padding) and the anchor (0..1). */
+  w: number;
+  h: number;
+  ax: number;
+  ay: number;
+}
+
+export interface RenderOpts {
+  /** px per u. */
+  k: number;
+  seed: number;
+  /** Halo width in px. */
+  halo: number;
+  /** Lightness-invert the result (倒影). */
+  invert?: boolean;
+  /** Replace every colour by white ink on a black halo (镜主). */
+  ghost?: boolean;
+}
+
+/** Paint a spec's variant into a fresh canvas with its halo; plus its flash twin. */
+export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
+  const [x0, y0, x1, y1] = spec.box;
+  const k = o.k;
+  const haloKind = o.ghost ? 'dark' : spec.halo ?? 'paper';
+  const hp = haloKind === 'none' ? 0 : o.halo;
+  const pad = hp + 2;
+  const cw = Math.ceil((x1 - x0) * k) + pad * 2, ch = Math.ceil((y1 - y0) * k) + pad * 2;
+  const ox = pad - x0 * k, oy = pad - y0 * k;
+  const b = new B(o.seed);
+  spec.paint(b, v);
+  // paint on one shared scratch context: the brush's grain patterns are cached per context
+  const sc = scratch(cw, ch);
+  const g = sc.g;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1;
+  g.globalCompositeOperation = 'source-over';
+  g.clearRect(0, 0, cw, ch);
+  for (const op of b.ops) {
+    g.setTransform(k, 0, 0, k, ox, oy);
+    if (op.k === 'stroke') paintStroke(g, op.s);
+    else { g.save(); try { op.f(g); } finally { g.restore(); } }
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  const ink = canvas(cw, ch);
+  ctx2d(ink).drawImage(sc.c, 0, 0, cw, ch, 0, 0, cw, ch);
+  if (o.ghost) ghostify(ink);
+  let out = ink;
+  if (hp > 0) {
+    out = canvas(cw, ch);
+    const q = ctx2d(out);
+    const d = hp, e = hp * 0.72;
+    for (const [dx, dy] of [[d, 0], [-d, 0], [0, d], [0, -d], [e, e], [-e, e], [e, -e], [-e, -e]]) q.drawImage(ink, dx, dy);
+    q.globalCompositeOperation = 'source-in';
+    q.fillStyle = haloKind === 'dark' ? 'rgba(12,12,16,0.78)' : hexA(PAPER, 0.92);
+    q.fillRect(0, 0, cw, ch);
+    q.globalCompositeOperation = 'source-over';
+    q.drawImage(ink, 0, 0);
+  }
+  if (o.invert) invertLightness(out);
+  const flash = canvas(cw, ch);
+  const f = ctx2d(flash);
+  f.drawImage(out, 0, 0);
+  f.globalCompositeOperation = 'source-in';
+  f.fillStyle = '#fffdf6';
+  f.fillRect(0, 0, cw, ch);
+  return { img: out, flash, w: cw / k, h: ch / k, ax: ox / cw, ay: oy / ch };
+}
+
+let scr: { c: HTMLCanvasElement; g: CanvasRenderingContext2D } | null = null;
+function scratch(w: number, h: number) {
+  if (!scr) { const c = canvas(Math.max(256, w), Math.max(256, h)); scr = { c, g: ctx2d(c) }; }
+  else if (scr.c.width < w || scr.c.height < h) { scr.c.width = Math.max(scr.c.width, w); scr.c.height = Math.max(scr.c.height, h); }
+  return scr;
+}
+
+function hexA(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+/** 倒影: invert each pixel's luminance, keep its hue and saturation (the W3C SetLum/ClipColor). */
+export function invertLightness(c: HTMLCanvasElement): void {
+  const g = ctx2d(c);
+  let img: ImageData;
+  try { img = g.getImageData(0, 0, c.width, c.height); } catch { return; }
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    let r = d[i] / 255, gg = d[i + 1] / 255, bb = d[i + 2] / 255;
+    const L = 0.3 * r + 0.59 * gg + 0.11 * bb;
+    const dl = 1 - 2 * L;
+    r += dl; gg += dl; bb += dl;
+    const l = 1 - L;
+    const n = Math.min(r, gg, bb), x = Math.max(r, gg, bb);
+    if (n < 0) { const s = l / (l - n || 1); r = l + (r - l) * s; gg = l + (gg - l) * s; bb = l + (bb - l) * s; }
+    if (x > 1) { const s = (1 - l) / (x - l || 1); r = l + (r - l) * s; gg = l + (gg - l) * s; bb = l + (bb - l) * s; }
+    d[i] = r * 255; d[i + 1] = gg * 255; d[i + 2] = bb * 255;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+/** 镜主: white ink on black — luminance inverted to grey, a cold tint. */
+function ghostify(c: HTMLCanvasElement): void {
+  const g = ctx2d(c);
+  let img: ImageData;
+  try { img = g.getImageData(0, 0, c.width, c.height); } catch { return; }
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const L = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+    const v = 1 - L * 0.85;
+    d[i] = 235 * v + 10; d[i + 1] = 240 * v + 10; d[i + 2] = 250 * v + 5;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+/** Shelf-packed pages. */
+export class Pages {
+  pages: HTMLCanvasElement[] = [];
+  private x = 0;
+  private y = 0;
+  private rowH = 0;
+  /** Copy `src` into a page; returns the page and the rect. Oversized images keep their own canvas. */
+  put(src: HTMLCanvasElement): { img: HTMLCanvasElement; sx: number; sy: number } {
+    const w = src.width, h = src.height;
+    if (w > PAGE / 2 || h > PAGE / 2) return { img: src, sx: 0, sy: 0 };
+    let page = this.pages[this.pages.length - 1];
+    if (!page || this.x + w > PAGE) { this.x = 0; this.y += this.rowH + 1; this.rowH = 0; }
+    if (!page || this.y + h > PAGE) {
+      page = canvas(PAGE, PAGE);
+      this.pages.push(page);
+      this.x = 0; this.y = 0; this.rowH = 0;
+    }
+    const sx = this.x, sy = this.y;
+    ctx2d(page).drawImage(src, sx, sy);
+    this.x += w + 1;
+    this.rowH = Math.max(this.rowH, h);
+    return { img: page, sx, sy };
+  }
+  dispose() {
+    for (const p of this.pages) { p.width = 1; p.height = 1; }
+    this.pages = [];
+  }
+}
+
+/** Pack a painted pair into pages as two Sprites. */
+export function pack(pages: Pages, p: Painted): { s: Sprite; f: Sprite } {
+  const a = pages.put(p.img), b = pages.put(p.flash);
+  const base = { sw: p.img.width, sh: p.img.height, w: p.w, h: p.h, ax: p.ax, ay: p.ay };
+  return { s: { img: a.img, sx: a.sx, sy: a.sy, ...base }, f: { img: b.img, sx: b.sx, sy: b.sy, ...base } };
+}

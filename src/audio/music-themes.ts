@@ -589,7 +589,131 @@ const taoyuan: ThemeSpec = {
   },
 };
 
-export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet, taoyuan };
+// ---------------------------------------------------------------------------
+// 水月幻镜 (the mirror, GDD §12, §22): a calm theme for lobby, shop and waves, and a darker, drum-led
+// theme for bosses. The map colours both — 月湖 古琴 and 箫 in 宫 · 墨林 洞箫 and 手鼓 · 广寒 笙 and
+// 编钟 (琵琶 for bosses) — and sets the tempo. The mirror's audio calls setMirrorColour before it
+// switches theme; a theme already playing keeps its colour until it next starts.
+
+export type MirrorColour = 'lake' | 'forest' | 'palace';
+let mirrorColour: MirrorColour = 'lake';
+export function setMirrorColour(map: MirrorColour): void { mirrorColour = map; }
+export const getMirrorColour = (): MirrorColour => mirrorColour;
+
+const MIRROR_STYLE: Record<MirrorColour, Style> = {
+  lake: {
+    bpm: [84, 104], modes: [M(53, 0), M(60, 0), M(62, 4), M(55, 1)], range: [-1, 8],
+    cells: MED, motifBeats: 4, statements: [2, 2], restChance: 0.06, breath: [0.5, 1.5], periodRest: [1, 2],
+    cadenceBeats: 2, leap: 0.45, modulate: 0.3,
+  },
+  forest: {
+    bpm: [96, 120], modes: [M(62, 4), M(57, 4), M(64, 1), M(67, 3)], range: [-1, 7],
+    cells: LIVELY, motifBeats: 4, statements: [2, 2], restChance: 0.06, breath: [0.5, 1.5], periodRest: [1, 2],
+    cadenceBeats: 2, leap: 0.5, modulate: 0.3,
+  },
+  palace: {
+    bpm: [100, 124], modes: [M(67, 3), M(60, 0), M(64, 2), M(62, 1)], range: [0, 8],
+    cells: LIVELY, motifBeats: 4, statements: [2, 2], restChance: 0.05, breath: [0.5, 1], periodRest: [1, 2],
+    cadenceBeats: 2, leap: 0.5, modulate: 0.35,
+  },
+};
+const MIRROR_BOSS_STYLE: Record<MirrorColour, Style> = {
+  lake: {
+    bpm: [100, 112], modes: [M(57, 4), M(64, 2), M(62, 4)], range: [-2, 6],
+    cells: LIVELY, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1.5],
+    cadenceBeats: 2, leap: 0.55, modulate: 0.25,
+  },
+  forest: {
+    bpm: [112, 124], modes: [M(62, 4), M(64, 2), M(57, 4)], range: [-2, 6],
+    cells: LIVELY, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1.5],
+    cadenceBeats: 2, leap: 0.55, modulate: 0.25,
+  },
+  palace: {
+    bpm: [116, 124], modes: [M(64, 4), M(59, 2), M(62, 4)], range: [-2, 6],
+    cells: LIVELY, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1.5],
+    cadenceBeats: 2, leap: 0.55, modulate: 0.25,
+  },
+};
+
+/** Melody notes as 编钟 strikes: bronze bells, one cached render per pitch. */
+function bells(c: Ctx, notes: MNote[], oct: number, gain: number, prio: 0 | 1 | 2 = 0): MusicEvent[] {
+  return notes.map((n) => {
+    const m = midiOf(c, n.deg, oct);
+    const e = hit(c, 'ling', secOf(c, n.beat), gain * (0.75 + 0.35 * n.vel), { freq: hz(m), pan: panOf(m, 0.3, 0.1), send: 0.35, echo: 0.1, prio });
+    e.notes = [{ t: 0, dur: Math.max(0.3, secOf(c, n.dur)), midi: m }];
+    return e;
+  });
+}
+
+const mirror: ThemeSpec = {
+  level: 0.8,
+  get style() { return MIRROR_STYLE[mirrorColour]; },
+  arrange(c) {
+    const { p, r } = c;
+    const ev: MusicEvent[] = [];
+    const last = p.notes[p.notes.length - 1];
+    if (mirrorColour === 'lake') {
+      // 古琴 sings, a 箫 takes the second statement, 古筝 ripples under the 转; a 木鱼 keeps a soft pulse
+      if (p.role === 'cheng') ev.push(...[line(c, 'xiao', p.notes, 0, { gain: 0.6, pan: -0.15, send: 0.42, grace: 0.45, slide: 0.25 })].filter(notNull));
+      else ev.push(...plucks(c, 'qin', mel(c, 0), { gain: 0.85, send: 0.32, bend: 0.3, glide: 0.2, vib: 0.5, spread: 0.25 }));
+      if (p.role === 'zhuan') ev.push(...arpeggio(c, -1, { gain: 0.38, send: 0.3, every: 2, sub: 0.5, vel: 0.4 }));
+      ev.push(...pattern(c, 'wood', 2, [[0, 1], [1, 0.6]], { gain: 0.07, pan: 0.35, send: 0.25, drop: 0.2 }));
+      if (p.role === 'he') ev.push(...plucks(c, 'qin', [{ beat: last.beat, dur: last.dur, midi: midiOf(c, 0, -1), vel: 0.45 }], { gain: 0.55, send: 0.35, prio: 1 }));
+    } else if (mirrorColour === 'forest') {
+      // 洞箫 low and breathy over 手鼓; the 笛 answers in the 转; bamboo knocks in the wind
+      const x = p.role === 'zhuan'
+        ? line(c, 'dizi', p.notes, 0, { gain: 0.5, pan: 0.15, send: 0.4, grace: 0.6, slide: 0.2, echo: 0.12 })
+        : line(c, 'xiao', p.notes, -1, { gain: 0.68, pan: -0.15, send: 0.42, grace: 0.45, slide: 0.3 });
+      if (x) ev.push(x);
+      ev.push(...pattern(c, 'tang', 4, [[0, 1], [1.5, 0.5], [2, 0.8], [3, 0.45], [3.5, 0.6]], { gain: 0.26, pan: -0.2, send: 0.1, drop: 0.06 }));
+      ev.push(...pattern(c, 'rim', 2, [[0.5, 0.6], [1.5, 0.7]], { gain: 0.1, pan: 0.3, send: 0.08, drop: 0.2 }));
+      ev.push(pad(c, p.role === 'zhuan' ? halfCadence(p.mode.final) : 0, -1, { gain: 0.16, send: 0.5, vel: 0.5, air: 1, octave: false }));
+      if (r.chance(0.35)) ev.push(hit(c, 'wood', secOf(c, r.range(0.5, p.end)), 0.08, { pan: r.range(-0.6, 0.6), send: 0.5 }));
+    } else {
+      // 笙 chords under 编钟 bells; the 古筝 walks the bass; a small bell rings off the jade
+      ev.push(...bells(c, p.notes, 1, 0.34));
+      ev.push(pad(c, p.role === 'zhuan' ? halfCadence(p.mode.final) : 0, -1, { gain: 0.24, send: 0.45, vel: 0.6, air: 0.4, overlap: 2.5 }));
+      const bass: { beat: number; dur: number; midi: number; vel: number }[] = [];
+      for (let b = 0; b < p.end; b += 2) {
+        const under = p.notes.filter((n) => n.beat <= b + 1e-6).pop() ?? p.notes[0];
+        bass.push({ beat: b, dur: 1.5, midi: midiOf(c, rootUnder(p, under.deg), -1), vel: 0.45 });
+      }
+      ev.push(...plucks(c, 'zheng', bass, { gain: 0.42, send: 0.25, spread: 0.3, prio: 1 }));
+      ev.push(...pattern(c, 'bang', 2, [[0, 1], [1, 0.6]], { gain: 0.06, pan: 0.4, send: 0.1, drop: 0.25 }));
+    }
+    if (p.role === 'qi' && r.chance(0.5)) ev.push(hit(c, 'xiaoluo', 0, 0.08, { pan: 0.3, send: 0.3 }));
+    return ev;
+  },
+};
+
+const mirrorBoss: ThemeSpec = {
+  level: 0.85,
+  get style() { return MIRROR_BOSS_STYLE[mirrorColour]; },
+  arrange(c) {
+    const { p, r } = c;
+    const ev: MusicEvent[] = [];
+    const last = p.notes[p.notes.length - 1];
+    // the drums lead: 大鼓 on one and three, the 堂鼓 fills, 小锣 on the off-beat, a 大锣 opens every period
+    ev.push(...pattern(c, 'big', 4, [[0, 1], [2, 0.85], [3.5, 0.5]], { gain: 0.42, pan: -0.1, send: 0.14 }));
+    ev.push(...pattern(c, 'tang', 2, [[0.5, 0.5], [1, 0.7], [1.5, 0.55]], { gain: 0.22, pan: 0.25, send: 0.1, drop: 0.15 }));
+    ev.push(...pattern(c, 'xiaoluo', 4, [[1, 1], [3, 0.8]], { gain: 0.08, pan: 0.4, send: 0.15, drop: 0.2 }));
+    if (p.role === 'qi') ev.push(hit(c, 'daluo', 0, 0.24, { send: 0.3, pan: 0.05, prio: 1 }), hit(c, 'bo', 0, 0.12, { pan: 0.3 }));
+    if (mirrorColour === 'lake') {
+      ev.push(...[line(c, 'xiao', p.notes, -1, { gain: 0.62, pan: -0.1, send: 0.35, grace: 0.4, slide: 0.35 })].filter(notNull));
+      ev.push(...plucks(c, 'qin', mel(c, -1, strongOnly(p.notes)), { gain: 0.6, send: 0.3, bend: 0.3, spread: 0.2, prio: 1 }));
+    } else if (mirrorColour === 'forest') {
+      ev.push(...[line(c, p.role === 'zhuan' ? 'suona' : 'erhu', p.notes, p.role === 'zhuan' ? 0 : -1, { gain: p.role === 'zhuan' ? 0.5 : 0.7, pan: 0.05, send: 0.25, grace: 0.5, slide: 0.4 })].filter(notNull));
+    } else {
+      ev.push(...plucks(c, 'pipa', mel(c, 0), { gain: 0.78, send: 0.2, trem: 0.35, spread: 0.3, center: -0.1 }));
+      ev.push(...bells(c, strongOnly(p.notes), 1, 0.2, 1));
+    }
+    if (p.role === 'he') ev.push(hit(c, 'daluo', secOf(c, last.beat), 0.18, { send: 0.3, pan: 0.1, prio: 1 }));
+    if (r.chance(0.25)) ev.push(hit(c, 'bo', secOf(c, r.int(1, Math.max(1, Math.floor(p.end - 1)))), 0.07, { pan: -0.4 }));
+    return ev;
+  },
+};
+
+export const THEMES: Record<ThemeId, ThemeSpec> = { garden, village, lake, bamboo, plum, mountain, night, festival, hall, quiet, taoyuan, mirror, 'mirror-boss': mirrorBoss };
 
 /** Arrange one phrase of a theme. */
 export function arrange(theme: ThemeId, p: Phrase, r: Rng, seed: number): MusicEvent[] {
