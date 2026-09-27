@@ -3,10 +3,10 @@
 // money move is one batch with its counter, then meta is written, then payOwed() settles the purse.
 import { batch } from '@preact/signals';
 import { flushPlay, mirror, payOwed, saveMetaNow, updateMeta } from '../../../app/mirror';
-import { play, record, recordMax, refund, spend, unlocked } from '../../../app/play';
+import { codeActive, play, record, recordMax, refund, spend, unlocked } from '../../../app/play';
 import { hashString } from '../../../core/rng';
 import { todayKey } from '../../../core/date';
-import type { HeartFaceId, MapId, RimId, VowId } from '../ids';
+import { DIFF_REG, type HeartFaceId, type MapId, type RimId, type VowId } from '../ids';
 import type {
   CharacterId, CodexKey, DeathResult, DiffIndex, EndCause, MirrorMeta, MirrorSettings, RunReport, RunSave, TitleId, VowRanks,
   WaveResult, WaveSetup,
@@ -18,6 +18,16 @@ import { bankSleeve, nextRun, reconcileTicket, releaseHeld, rollDay, settlePay, 
 import { activeHeart, buyHeart, dailySpec, foldKills, masteryLevel, pickHeartFace, settleMeta, unlocksOf } from './meta';
 import { beginWave, endWave, foldPartial, newRun, waveSetup } from './run';
 import { migrateRun, validateRun } from './save';
+
+/**
+ * The difficulties and maps the lobby may offer: those earned, or every one of them while the
+ * owner's code is active (for testing). It opens choices only — pay, bonuses and records follow
+ * the ordinary rules.
+ */
+export function openOf(m: Pick<MirrorMeta, 'diffMax' | 'mapsOpen'>): { diffMax: DiffIndex; mapsOpen: 1 | 2 | 3 } {
+  if (codeActive.value) return { diffMax: (DIFF_REG.length - 1) as DiffIndex, mapsOpen: 3 };
+  return { diffMax: m.diffMax, mapsOpen: m.mapsOpen };
+}
 
 /** A fresh run seed (crypto when available; never Math.random). */
 function freshSeed(): number {
@@ -88,8 +98,9 @@ export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; r
     map = spec.map; diff = 1; vows = {};
     term = spec.term; mutator = spec.mutator; boon = spec.boon; seed = spec.seed;
   } else {
-    diff = Math.max(0, Math.min(m.diffMax, diff)) as DiffIndex;
-    if (['lake', 'forest', 'palace'].indexOf(map) >= m.mapsOpen) map = 'lake';
+    const open = openOf(m);
+    diff = Math.max(0, Math.min(open.diffMax, diff)) as DiffIndex;
+    if (['lake', 'forest', 'palace'].indexOf(map) >= open.mapsOpen) map = 'lake';
     vows = cleanVows(vows);
   }
   const run = newRun({

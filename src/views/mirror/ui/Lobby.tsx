@@ -14,7 +14,7 @@ import { DIFF_REG, MAP_REG, MUTATOR_REG, TERM_MOD_REG, VOW_REG, type MapId, type
 import type { DiffIndex, MirrorMeta, VowRanks } from '../types';
 import { DIFFS, HEAT_MAX, MAPS, PAY, VOWS } from '../data';
 import { dailySpec, endlessBossesOf, entryQuote, gross, heatOf, lobbyStatus, masteryLevel, quoteNow } from '../logic';
-import { newerSave, setLobby } from '../logic/session';
+import { newerSave, openOf, setLobby } from '../logic/session';
 import { Icon, Portrait, Seal } from './icons';
 import { CompanionSheet } from './Select';
 import { Confirm } from './Pause';
@@ -72,7 +72,7 @@ export function Lobby(props: {
         <>
           <div class="mj-maps" role="radiogroup" aria-label={t('地图', 'Map')}>
             {MAP_REG.map((x, i) => {
-              const open = i < m.mapsOpen;
+              const open = i < openOf(m).mapsOpen;
               const u = MAPS[x.id].unlock;
               return (
                 <button
@@ -92,7 +92,7 @@ export function Lobby(props: {
           </div>
           <div class="mj-diffs" role="radiogroup" aria-label={t('镜境', 'Difficulty')}>
             {DIFF_REG.map((d, i) => {
-              const open = i <= m.diffMax;
+              const open = i <= openOf(m).diffMax;
               const u = DIFFS[i].unlock;
               return (
                 <button
