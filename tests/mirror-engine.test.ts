@@ -154,7 +154,7 @@ describe('engine-core: every weapon, item and monster', () => {
         eng.dispose();
       }
     }
-  });
+  }, 60_000); // ≈ 2.3 s alone; over 5 s on a CI runner
 
   it('every item runs in a wave (all 75 at once, several builds)', () => {
     const items = Object.fromEntries(ITEM_REG.map((i) => [i.id, Math.max(1, Math.min(2, ITEMS[i.id].max || 2))])) as Partial<Record<ItemId, number>>;
