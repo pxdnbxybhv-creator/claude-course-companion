@@ -4,6 +4,12 @@
 /* The 3D walk is immersive: no tab bar (it has its own way back). */
 .shell[data-route='walk'] .tabbar { display: none; }
 .shell[data-route='walk'] .view { padding-bottom: 0; }
+/* 水月幻镜: while a run shows (a wave, a between-wave screen, a pause) the arena has the whole screen. */
+.shell:has(.mirror-live) .tabbar { display: none; }
+.shell:has(.mirror-live) .view { padding-bottom: 0; animation: none; }
+/* A run is paused in the mirror: one small ink dot on the 镜 glyph (the only nudge). */
+.tab { position: relative; }
+.tab-dot { position: absolute; top: 6px; left: calc(50% + 13px); width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: 0.8; pointer-events: none; }
 .view { flex: 1; padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px); animation: view-in 0.6s var(--ease); }
 @keyframes view-in { from { opacity: 0; } to { opacity: 1; } }
 

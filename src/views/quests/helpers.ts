@@ -239,6 +239,7 @@ export const SOURCE_NAMES: Record<string, [string, string]> = {
   mail: ['书信', 'Letters'],
   taoyuan: ['桃源', 'Peach Spring'],
   npcs: ['乡邻', 'Neighbours'],
+  mirror: ['幻镜', 'Mirror'],
 };
 
 /**
@@ -256,9 +257,12 @@ export function namedSources(p: PlayState): [string, string, string][] {
  * amounts live with the walk's features; kept here in rough so the quest book need not load them):
  * finds on roofs, stepping stones, the pole run and the lookouts (1–4 a coin spot, 20 a lookout, 30 a
  * first pole run); the neighbours' tips and thanks (5–25); the homestead (a harvest 8, a dog's dig
- * 12–30, a visitor's gift 20–60); the companions' skills (coins tangled in the fisher's net, 2–8).
+ * 12–30, a visitor's gift 20–60); the companions' skills (coins tangled in the fisher's net, 2–8);
+ * 水月幻镜 (a run's 返照钱 up to 70 plus up to 20 铜钱 picked up: mirror data/meta.ts PAY.RUN_CAP and
+ * PAY.COIN_RUN, written out so the quest book need not load the mirror's data).
  */
 export const OTHER_SOURCES: [string, string, string][] = [
+  ['幻镜', 'Mirror', '1–90'],
   ['拾遗', 'Finds', '1–30'],
   ['乡邻', 'Neighbours', '5–25'],
   ['家园', 'Homestead', '8–60'],

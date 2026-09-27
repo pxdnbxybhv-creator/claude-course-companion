@@ -13,6 +13,11 @@ import { Celebrate } from '../views/quests/Celebrate';
 import { MailHost } from '../views/mail/MailHost';
 import { music } from '../audio/music';
 import { active } from '../views/focus/session';
+import { mirror } from './mirror';
+import { computed } from '@preact/signals';
+
+/** Is a run paused in the mirror? (a computed boolean, so the shell re-renders only when it flips) */
+const mirrorActive = computed(() => !!mirror.value.active);
 import type { MusicTheme } from '../views/walk/map';
 
 /** Load a page's code the first time it is opened (games and the 3D walk are large). */
@@ -40,10 +45,11 @@ const TangramView = lazyView(() => import('../views/games/tangram/TangramView'))
 const FeihuaView = lazyView(() => import('../views/games/feihua/FeihuaView'));
 const QuestsView = lazyView(() => import('../views/quests/QuestsView'));
 const WalkView = lazyView(() => import('../views/walk/WalkView'));
+const MirrorView = lazyView(() => import('../views/mirror'));
 
 /** Background music by page; the 3D walk picks its own themes by region. */
 function themeFor(r: Route): MusicTheme | null | 'walk' {
-  if (r === 'walk') return 'walk';
+  if (r === 'walk' || r === 'mirror') return 'walk'; // the walk and the mirror drive their own themes
   if (r === 'focus') return null; // the incense has its own ambience
   if (r === 'games' || r === 'quests' || ['snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua'].includes(r)) return 'hall';
   return 'garden';
@@ -57,6 +63,7 @@ const TABS: { id: Route; glyph: string; en: string }[] = [
   { id: 'focus', glyph: '香', en: 'Focus' },
   { id: 'almanac', glyph: '历', en: 'Almanac' },
   { id: 'games', glyph: '弈', en: 'Play' },
+  { id: 'mirror', glyph: '镜', en: 'Mirror' },
   { id: 'scroll', glyph: '卷', en: 'Scroll' },
 ];
 
@@ -64,6 +71,8 @@ export function App() {
   const t = useT();
   const r = route.value;
   const { theme, sound, volume, music: musicOn, musicVolume } = state.value.settings;
+  // a run waits in the mirror: the 镜 glyph carries one ink dot (no counts, no red badges)
+  const mirrorPaused = mirrorActive.value && r !== 'mirror';
   useEffect(() => {
     audio.setEnabled(sound);
     audio.setVolume(volume);
@@ -120,6 +129,7 @@ export function App() {
         {r === 'feihua' && <FeihuaView />}
         {r === 'quests' && <QuestsView />}
         {r === 'walk' && <WalkView />}
+        {r === 'mirror' && <MirrorView />}
       </main>
       <nav class="tabbar" aria-label={t('主导航', 'Main')}>
         {TABS.map((tab) => (
@@ -129,7 +139,8 @@ export function App() {
             onClick={(e) => go(tab.id, e)}
           >
             <span class="tab-glyph brush" aria-hidden="true">{tab.glyph}</span>
-            <span class="tab-label">{t(tabZh(tab.id), tab.en)}</span>
+            {tab.id === 'mirror' && mirrorPaused && <i class="tab-dot" aria-hidden="true" />}
+            <span class="tab-label">{t(tabZh(tab.id), tab.en)}{tab.id === 'mirror' && mirrorPaused ? <span class="visually-hidden">{t('（镜中有一照暂停）', ' (a run is paused)')}</span> : null}</span>
           </button>
         ))}
       </nav>
@@ -141,6 +152,6 @@ export function App() {
 }
 
 function tabZh(r: Route): string {
-  const names: Partial<Record<Route, string>> = { garden: '园圃', focus: '一炷香', almanac: '时令', games: '游艺', scroll: '长卷', settings: '设置' };
+  const names: Partial<Record<Route, string>> = { garden: '园圃', focus: '一炷香', almanac: '时令', games: '游艺', mirror: '幻镜', scroll: '长卷', settings: '设置' };
   return names[r] ?? '';
 }

@@ -189,6 +189,37 @@ character in the right place, from over a hundred classical poems. 五子棋 Gom
 AI with three levels. 贪吃蛇 Snake, drawn as one long ink stroke that eats plum blossoms to a
 rising guqin melody. 井字棋 Tic-tac-toe, whose circles and crosses are brushed in stroke by stroke.
 
+**镜 水月幻镜 The Mirror of Water and Moon.** A tab of its own: an endless arena game in the
+spirit of *Brotato*, painted in ink inside an old bronze mirror. You walk as one of the thirteen
+companions; your weapons fire on their own while you dodge, gather 月华 (moonlight) from the fallen
+and, between waves, spend it in the mirror's shop. Each companion has their own 气血 (HP), 护甲
+(armour) and speed, a mirror skill made for this game (the scholar's 一字千钧 brushes a giant 镇
+onto the ground, the qin player's 广陵散 turns foes into allies, 关公's 拖刀计 feigns a retreat and
+sweeps, 嫦娥's 广寒清辉 rises out of reach and lands in a pool of moonlight) and a nature that
+bends the build: the cat has nine lives, the poet's 醉 meter fills without wine, 关公 never loses
+more than a fifth of his HP to one blow.
+
+- **27 weapons and 75 items**, in 14 schools you grow into: 墨宝 paints an army of ink creatures
+  and lets them fight, 仙剑 keeps flying swords that orbit, launch, pierce and return, and there
+  are also great glaives, a golden bell that hits back, talismans, the qin's crowd control,
+  drunken crits, fortune, healing, go-stone minefields, moonlit dodges, speed, curses, and the
+  lone sword against the hundred schools.
+- **Three maps**: 月湖 Moon Lake, 墨林 the ink bamboo and 广寒 the moon palace, each with its own
+  hazards and 36 monsters in all, plus elites and treasure spirits.
+- **A boss every ten waves**, nine in all, from classical lore: the carp king at the Dragon Gate,
+  the mirage clam, the moon in the water, 夔 the thunder drum, the nine-tailed fox, 刑天, 吴刚,
+  the golden toad and the hound that eats the moon. Past wave 30 the mirror has no end, and in
+  it wait twin reflections and your own self in white ink.
+- **Difficulty is yours**: six mirror levels from 闲游 (gentle) to 无相, and ten vows to raise
+  the stakes one notch at a time. Bosses drop 镜心, which the heart-mirror turns into small
+  lasting boons.
+- **The price**: a run costs 20 coins and lasts until you fall, and the first run each day is
+  free. You earn coins back by how far you get, plus copper coins that drop in the arena, up to
+  300 a day. The day's mirror (今日镜) is a seeded challenge that changes daily, with the season's
+  solar term, a twist and a boon of its own.
+- **It hits hard**: foes flash and splatter ink, the screen shakes a little (you can turn that off),
+  big blows pause the moment, and the music drives at 118–146 bpm, with its own theme for every boss.
+
 **乐 Music.** The background music is generative and synthesised live: 古筝, 琵琶, 箫, 笛, 二胡, 笙,
 a gently played 唢呐, drums, gongs and bells. It composes pentatonic tunes in 起承转合 periods,
 with a new tune every day, and changes with the place and the hour. The garden is contemplative,
