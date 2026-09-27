@@ -592,8 +592,9 @@ const taoyuan: ThemeSpec = {
 // ---------------------------------------------------------------------------
 // 水月幻镜 (the mirror, GDD §12, §22): a calm theme for lobby, shop and waves, and a darker, drum-led
 // theme for bosses. The map colours both — 月湖 古琴 and 箫 in 宫 · 墨林 洞箫 and 手鼓 · 广寒 笙 and
-// 编钟 (琵琶 for bosses) — and sets the tempo. The mirror's audio calls setMirrorColour before it
-// switches theme; a theme already playing keeps its colour until it next starts.
+// 编钟 (琵琶 for bosses) — and sets the tempo and the level. The mirror's audio calls setMirrorColour
+// before it switches theme; the tempo and modes are fixed when a Conductor is built, so on a map
+// change with the same theme id the mirror's audio restarts the theme (sfx.ts music()).
 
 export type MirrorColour = 'lake' | 'forest' | 'palace';
 let mirrorColour: MirrorColour = 'lake';
@@ -645,8 +646,12 @@ function bells(c: Ctx, notes: MNote[], oct: number, gain: number, prio: 0 | 1 | 
   });
 }
 
+/** Per-colour level (the music lab asks for −24…−18 dBFS): the forest's breathy 洞箫 over hand drums
+ *  sits ≈3 dB under the others, and a sparse lake day could dip under −24. */
+const MIRROR_LEVEL: Record<MirrorColour, number> = { lake: 0.9, forest: 1.1, palace: 0.88 };
+
 const mirror: ThemeSpec = {
-  level: 0.8,
+  get level() { return MIRROR_LEVEL[mirrorColour]; },
   get style() { return MIRROR_STYLE[mirrorColour]; },
   arrange(c) {
     const { p, r } = c;

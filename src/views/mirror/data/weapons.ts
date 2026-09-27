@@ -135,19 +135,19 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   },
   brush: {
     id: 'brush', classes: ['ink'], kind: 'paint', dmg: [8, 14, 22, 36], cd: 4.0, range: 400, scale: { spirit: 2 },
-    crit: 0, critX: 1.8, knock: 10, price: 30, p: { life: 10, atk: [0.7, 0.7, 0.8, 0.9], r: [30, 120, 60, 90], taunt: 1 },
+    crit: 0, critX: 0, knock: 10, price: 30, p: { life: 10, atk: [0.7, 0.7, 0.8, 0.9], r: [30, 120, 60, 90], taunt: 1 },
     text: b('画出墨宝 10 秒：墨雀啄 / 墨鲤冲 / 墨鹤俯冲', 'Paints a creature for 10 s: sparrow / carp / crane by tier'),
     t4: b('画墨虎：每 0.9 秒扑 r 90 并嘲讽 1 秒', 'Paints the ink tiger: pounces r 90 every 0.9 s and taunts 1 s'), verse: b('神笔马良', 'Ma Liang\'s magic brush'),
   },
   inkstone: {
     id: 'inkstone', classes: ['ink'], kind: 'turret', dmg: [5, 8, 13, 20], cd: 6.0, range: 400, scale: { spirit: 1 },
-    crit: 0, critX: 1.8, knock: 10, price: 28, p: { life: 8, atk: 0.8, blobs: [1, 1, 1, 2], followT4: 60 },
+    crit: 0, critX: 0, knock: 10, price: 28, p: { life: 8, atk: 0.8, blobs: [1, 1, 1, 2], followT4: 60 },
     text: b('足下置砚 8 秒，每 0.8 秒吐墨丸；算作墨宝', 'A turret at your feet for 8 s; an ink blob every 0.8 s; counts as a 墨宝'),
     t4: b('两丸，并随你 60 u/s', 'Fires 2 blobs and follows you at 60 u/s'), verse: b('研墨以待', 'Ink ground and waiting'),
   },
   crane: {
     id: 'crane', classes: ['ink'], kind: 'familiar', dmg: [10, 16, 26, 40], cd: 1.0, range: 450, scale: { spirit: 0.9 },
-    crit: 0, critX: 1.8, knock: 20, price: 30, p: { orbit: 120, burstT4: 80 },
+    crit: 0, critX: 0, knock: 20, price: 30, p: { orbit: 120, burstT4: 80 },
     text: b('常伴纸鹤（不占上限），绕身 r 120 俯冲而回', 'A permanent familiar outside the cap; circles at r 120, dives and returns'),
     t4: b('俯冲爆 r 80', 'Its dives burst for r 80'), verse: b('千纸鹤，寄相思', 'A thousand cranes carry longing'),
   },

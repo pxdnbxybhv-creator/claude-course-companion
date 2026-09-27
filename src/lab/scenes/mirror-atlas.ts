@@ -1,7 +1,10 @@
 // /lab.html?scene=mirror-atlas&map=lake&k=2&group=mon,elite&invert=0&labels=1
 // Every mirror sprite (水月幻镜) painted through the real painter, with its atlas id and bake time.
 // group: char mon elite boss wpn item sum proj drop fx num (default: all). k: px per u.
-import { createPainter, allAtlasIds } from '../../views/mirror/paint';
+// clip=1: the edge check — every frame of every id at 2 and 1.15 px/u; any ink on a sprite
+// canvas's outermost pixel ring means a mark was cut (logs [mirror-clip] {ok, cut}).
+import { createPainter, allAtlasIds, specOf } from '../../views/mirror/paint';
+import { renderSpec } from '../../views/mirror/paint/atlas';
 import type { AtlasId, RunSave } from '../../views/mirror/types';
 import type { MapId } from '../../views/mirror/ids';
 import { fillPaper } from '../../ink/paper';
@@ -14,6 +17,7 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   const scale = Number(p.get('scale') ?? 1);
   const painter = createPainter(map, (p.get('q') ?? 'high') as 'high', dpr);
   const ids = allAtlasIds().filter((id) => groups.includes(id.split(':')[0]));
+  if (p.get('clip') === '1') return clipCheck(canvas, ids);
   const t0 = performance.now();
   if (invert) {
     // 倒影: the endless stage bakes enemies inverted, and an inverted arena shows them
@@ -50,4 +54,32 @@ export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   });
   g.fillStyle = invert ? '#eee' : '#000'; g.font = '13px system-ui';
   g.fillText(`${ids.length} ids · ${rows.length} frames · bake ${ms.toFixed(0)} ms (${(ms / Math.max(1, rows.length)).toFixed(1)} ms/frame) · dpr ${dpr} · map ${map}${invert ? ' · 倒影' : ''}`, 8, 22);
+}
+
+/** Ink on the outermost pixel ring of a sprite canvas = a cut mark. */
+async function clipCheck(canvas: HTMLCanvasElement, ids: string[]) {
+  try { await document.fonts.load(`32px 'Ma Shan Zheng'`, '镇月雷火当令杜玉十万亿'); } catch { /* fallback faces */ }
+  const cut: string[] = [];
+  let frames = 0;
+  for (const id of ids) {
+    const sp = specOf(id, 'guan');
+    if (!sp) { cut.push(`${id}: no painter`); continue; }
+    for (let v = 0; v < (sp.spec.n ?? 1); v++) for (const k of [2, 1.15]) {
+      frames++;
+      const c = renderSpec(sp.spec, v, { k, seed: 7, halo: 2, ghost: sp.ghost }).img;
+      const W = c.width, H = c.height, d = c.getContext('2d')!.getImageData(0, 0, W, H).data;
+      let n = 0, max = 0;
+      const at = (x: number, y: number) => { const a = d[(y * W + x) * 4 + 3]; if (a > 8) { n++; max = Math.max(max, a); } };
+      for (let x = 0; x < W; x++) { at(x, 0); at(x, H - 1); }
+      for (let y = 1; y < H - 1; y++) { at(0, y); at(W - 1, y); }
+      if (n) cut.push(`${id} v${v} k${k}: ${n} px, max α ${max}`);
+    }
+  }
+  const g = canvas.getContext('2d')!;
+  canvas.width = innerWidth; canvas.height = 40 + cut.length * 16;
+  g.fillStyle = '#fff'; g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = cut.length ? '#b00' : '#060'; g.font = '13px system-ui';
+  g.fillText(`${frames} frames · ${cut.length ? cut.length + ' cut at the edge' : 'nothing cut at the edge'}`, 8, 22);
+  cut.forEach((t, i) => g.fillText(t, 8, 44 + i * 16));
+  console.log('[mirror-clip]', JSON.stringify({ ok: !cut.length, frames, cut }));
 }

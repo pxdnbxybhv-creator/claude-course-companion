@@ -13,7 +13,7 @@ interface Opt { robeW?: number; hem?: number; head?: number; lean?: number }
 
 /** A pool of moonlight under the companion: the one pale thing among 焦墨 enemies. */
 function standing(b: B, y: number, accent: string) {
-  b.flat((g) => { g.fillStyle = '#f6f7fb'; g.globalAlpha = 0.6; g.beginPath(); g.ellipse(0, y + 3, 13, 4.2, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = accent === INK ? '#6f8ea6' : accent; g.globalAlpha = 0.7; g.lineWidth = 1; g.beginPath(); g.ellipse(0, y + 3, 13, 4.2, 0, 0, Math.PI * 2); g.stroke(); });
+  b.flat((g) => { g.fillStyle = '#f6f7fb'; g.globalAlpha = 0.6; g.beginPath(); g.ellipse(0, y + 3, 13, 4.2, 0, 0, Math.PI * 2); g.fill(); g.strokeStyle = accent === INK ? '#6f8ea6' : accent; g.globalAlpha = 0.7; g.lineWidth = 1; g.beginPath(); g.ellipse(0, y + 3, 13, 4.2, 0, 0, Math.PI * 2); g.stroke(); }, [-13.6, y - 1.8, 13.6, y + 7.8]);
 }
 /** Feet, robe, collar, head; returns the head centre. */
 function body(b: B, L: CharLook, v: F, o: Opt = {}): { hx: number; hy: number; hr: number; lean: number } {

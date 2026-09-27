@@ -1,4 +1,5 @@
-// Hash router: #garden, #focus, #almanac, #scroll, #settings, #games (+ one per game, #quests), #walk
+// Hash router: #garden, #focus, #almanac, #scroll, #settings, #games (+ one per game, #quests), #walk,
+// #mirror (水月幻镜: its own 镜 tab, not one of the games)
 // (a leading slash, #/garden, is accepted too). Plain-token hashes survive being embedded in hosts
 // that only pass through simple anchors.
 //
@@ -10,8 +11,8 @@ import { transition, type Origin } from './transition';
 export type Route =
   | 'garden' | 'focus' | 'almanac' | 'scroll' | 'settings'
   | 'games' | 'snake' | 'tictactoe' | 'gomoku' | 'xiangqi' | 'klotski' | 'tangram' | 'feihua' | 'quests'
-  | 'walk';
-const ROUTES: Route[] = ['garden', 'focus', 'almanac', 'scroll', 'settings', 'games', 'snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua', 'quests', 'walk'];
+  | 'walk' | 'mirror';
+const ROUTES: Route[] = ['garden', 'focus', 'almanac', 'scroll', 'settings', 'games', 'snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua', 'quests', 'walk', 'mirror'];
 
 /** The games live under the 弈 tab. */
 export const GAME_ROUTES: Route[] = ['snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua', 'quests'];

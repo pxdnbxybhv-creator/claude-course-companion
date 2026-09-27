@@ -41,6 +41,9 @@ export function bossesAt(run: RunSave, w: number): { ids: (BossId | 'mirrorself'
   return { ids: [map.bosses[a], map.bosses[c]], hp: base * ENDLESS_BOSS.twins.hpX, twins: true };
 }
 
+/** Types drawn at one group tick at most (a late wave's tick is 2–4 of them). */
+const MAX_DRAWS = 8;
+
 /** The wave's spawn plan: groups, elites (with 镜印), treasures, the boss, scaling and planned kills. */
 export function wavePlan(run: RunSave, w: number): SpawnPlan {
   const rng = rngFor(run.seed, w, 'spawn');
@@ -63,16 +66,24 @@ export function wavePlan(run: RunSave, w: number): SpawnPlan {
   let kills = 0;
   for (let t = F.firstGroup; t <= end + 1e-9; t += g) {
     const inHorde = horde && L !== null && t >= F.hordeBoost[0] * L && t <= F.hordeBoost[1] * L;
-    carry += perGroup * (inHorde ? F.hordeBoost[2] : 1);
-    const i = weighted(rng, weights);
-    if (i < 0) continue;
-    const m = MONSTERS[roster[i]];
-    // a group is packs of one type: as many as the carried budget buys (at most 3 packs), the rest carries on
-    const n = Math.min(3 * m.pack * burst, Math.floor(carry / m.cost + 1e-9));
-    if (n < 1) continue;
-    groups.push({ t: Math.round(t * 100) / 100, id: m.id, n });
-    carry -= n * m.cost;
-    kills += n;
+    const due = perGroup * (inHorde ? F.hordeBoost[2] : 1);
+    carry += due;
+    const at = Math.round(t * 100) / 100;
+    // A group is packs of one type drawn by weight: as many as the carried budget buys, at most 3 packs
+    // (so a cheap draw stays a crowd, not a flood). While more than a group's worth is still carried
+    // (late waves, where one group's budget buys more than 3 packs), another type joins at the same tick,
+    // so the whole B(w) is spent (≈1.2·B on horde waves); what is left carries on to the next group.
+    for (let draw = 0; draw < MAX_DRAWS; draw++) {
+      const i = weighted(rng, weights);
+      if (i < 0) break;
+      const m = MONSTERS[roster[i]];
+      const n = Math.min(3 * m.pack * burst, Math.floor(carry / m.cost + 1e-9));
+      if (n < 1) break;
+      groups.push({ t: at, id: m.id, n });
+      carry -= n * m.cost;
+      kills += n;
+      if (carry < due) break;
+    }
   }
   // elites
   const pairs = Math.max(1, Math.round(mutatorValue(run, 'shuangjing', w)));

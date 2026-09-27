@@ -37,14 +37,16 @@ export function arenaGeom(map: MapId, seed: number): ArenaGeom {
     }
     let tries = 0;
     let placed = 0;
-    while (placed < spec.n && tries < 400) {
+    while (placed < spec.n && tries < 3000) {
       tries++;
+      // a crowded draw (墨林's 14 clumps) relaxes the walking gap after a while, so every clump is placed
+      const gap = tries <= 300 ? 110 : tries <= 1200 ? 80 : 60;
       const r = spec.r[0] + (spec.r[1] - spec.r[0]) * rng();
       const x = b.minX + (b.maxX - b.minX) * rng();
       const y = b.minY + (b.maxY - b.minY) * rng();
       if (!insideShape(def.shape, x, y, r + 90)) continue;
       if (Math.hypot(x, y) < 200 + r) continue; // keep the centre (where you enter) open
-      if (obstacles.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 110)) continue;
+      if (obstacles.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + gap)) continue;
       obstacles.push({ x: Math.round(x), y: Math.round(y), r: Math.round(r), kind: spec.kind, blocks: spec.blocks });
       placed++;
     }

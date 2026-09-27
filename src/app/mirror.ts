@@ -8,6 +8,7 @@ import { CHARACTERS } from '../data/characters';
 import type { DateKey } from '../core/types';
 import { todayKey } from '../core/date';
 import type { Best, MirrorMeta, MirrorSettings, PayDay, RunSave } from '../views/mirror/types';
+import { RUN_VER } from '../views/mirror/types';
 import { backupExtras } from './store';
 import { earnFrom, play, record } from './play';
 
@@ -52,6 +53,8 @@ function strList<T extends string>(v: unknown, max = 64): T[] {
 /** A run save that at least has the shape of one; logic/save.ts validateRun checks every id on resume. */
 function activeShape(v: unknown): RunSave | null {
   if (!isObj(v)) return null;
+  // a run saved by a newer build is kept as it is, for that build (session.newerSave)
+  if (typeof v.ver === 'number' && v.ver > RUN_VER) return v as unknown as RunSave;
   if (typeof v.ver !== 'number' || typeof v.char !== 'string' || typeof v.map !== 'string' || typeof v.seed !== 'number') return null;
   if (!Array.isArray(v.weapons) || !isObj(v.items) || !isObj(v.pending) || !isObj(v.stats) || !isObj(v.runStats)) return null;
   if (typeof v.wave !== 'number' || !Number.isFinite(v.wave)) return null;
@@ -150,7 +153,23 @@ function load(): MirrorMeta {
     return defaultMeta();
   }
 }
-export const mirror = signal<MirrorMeta>(typeof localStorage === 'undefined' ? defaultMeta() : load());
+/**
+ * Is there a storage to talk to? In a sandboxed iframe without allow-same-origin even *reading* the
+ * `localStorage` identifier throws (a bare `typeof` does not stop that), so it is asked inside a try.
+ */
+function hasStorage(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage !== null;
+  } catch {
+    return false;
+  }
+}
+function boot(): MirrorMeta {
+  if (hasStorage()) return load();
+  storageOk.value = false; // the lobby shows 「此处不能存档，关页即失」; the run still plays in memory
+  return defaultMeta();
+}
+export const mirror = signal<MirrorMeta>(boot());
 
 function writeNow(m: MirrorMeta): void {
   const json = JSON.stringify(m);
@@ -172,7 +191,7 @@ effect(() => {
 /** Write the meta now (entering, every shop action, wave start/end, settlement). */
 export function saveMetaNow(): void {
   clearTimeout(saveTimer);
-  if (typeof localStorage !== 'undefined') writeNow(mirror.value);
+  if (hasStorage()) writeNow(mirror.value);
 }
 /** Update and write at once. */
 export function updateMeta(fn: (m: MirrorMeta) => MirrorMeta): void {
@@ -196,6 +215,21 @@ if (typeof window !== 'undefined') {
 }
 
 // ───────────────────────────────────────────── the purse
+/** Where src/app/play.ts keeps the purse (its own debounced write lands 120 ms later). */
+const PLAY_KEY = 'banmu.play.v1';
+/**
+ * Write the purse now, before meta records a money move (入镜's fee and ticket, 镜碎's refund and
+ * counters, a void refund, a payout), so a hard kill in between can never leave meta ahead of the purse.
+ * CHANGE REQUEST pending: once play.ts exports savePlayNow(), call that here instead.
+ */
+export function flushPlay(): void {
+  if (!hasStorage()) return;
+  try {
+    localStorage.setItem(PLAY_KEY, JSON.stringify(play.value));
+  } catch {
+    /* storage unavailable: the purse lives in memory, as play.ts does */
+  }
+}
 /**
  * The only door from the mirror to the purse: what meta owes goes in with its counter in one write
  * (earnFrom counts it as today's 「幻镜」 income), then meta records it as paid.
@@ -207,6 +241,7 @@ export function payOwed(): void {
     earnFrom('mirror', n);
     record('mirror:coin', n);
   });
+  flushPlay();
   updateMeta((m) => ({ ...m, coinsPaid: m.coinsPaid + n, owed: Math.max(0, m.owed - n) }));
 }
 /** Meta ↔ counters['mirror:coin'], both ways (whichever write the tab died between). Same rule as logic/economy reconcileCoins. */

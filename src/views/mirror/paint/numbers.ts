@@ -1,24 +1,17 @@
 // Damage numbers from a glyph cache: each style's digits are rendered once (after the fonts load)
 // into a small strip; drawNumber is a handful of drawImage calls. Big numbers are abbreviated the
-// same way as the HUD: 1.2万 / 12万 / 3.4亿 in Chinese, 12.3k / 1.2M in English.
+// same way as the HUD (logic fmtBig): 1.2万 / 12.3万 / 3.4亿 in Chinese, 12.3k / 1.2m in English.
+import { fmtBig } from '../logic/formulas';
 import type { NumStyle } from '../types';
 import { canvas, ctx2d } from './atlas';
 import { BRUSH_FONT, TEXT_FONT } from './kit';
 import { DANGER } from './palette';
 
-/** 1234 → '1234' · 12345 → '1.2万' / '12.3k' · 123456 → '12万' / '123k' · 1.2e8 → '1.2亿' / '120M'. */
-export function abbrev(n: number, lang: 'zh' | 'en'): string {
-  const v = Math.round(Math.abs(n));
-  const sign = n < 0 ? '-' : '';
-  const f = (x: number) => (x < 10 ? (Math.floor(x * 10) / 10).toFixed(1).replace(/\.0$/, '') : String(Math.floor(x)));
-  if (v < 10000) return sign + v;
-  if (lang === 'zh') return sign + (v < 1e8 ? f(v / 1e4) + '万' : f(v / 1e8) + '亿');
-  if (v < 1e6) return sign + (v < 1e5 ? (Math.floor(v / 100) / 10).toFixed(1).replace(/\.0$/, '') : String(Math.floor(v / 1000))) + 'k';
-  if (v < 1e9) return sign + f(v / 1e6) + 'M';
-  return sign + f(v / 1e9) + 'B';
-}
+/** The HUD's and the shop's abbreviation (logic fmtBig), so a number reads the same everywhere:
+ *  1234 → '1234' · 15500 → '1.6万' / '15.5k' · 123456 → '12.3万' / '123k' · 2.5e6 → '250万' / '2.5m'. */
+export const abbrev = (n: number, lang: 'zh' | 'en'): string => fmtBig(n, lang);
 
-const GLYPHS = '0123456789.+-kMB万亿';
+const GLYPHS = '0123456789.+-kmb万亿';
 interface StyleDef { px: number; font: string; fill: string; edge: string; edgeW: number }
 const STYLES: Record<NumStyle, StyleDef> = {
   hit: { px: 13, font: TEXT_FONT, fill: '#1b1916', edge: 'rgba(244,239,228,0.95)', edgeW: 3 },

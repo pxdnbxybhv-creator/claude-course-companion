@@ -14,6 +14,7 @@ import { hashString, makeRng } from '../../../core/rng';
 import { addDays, fromKey } from '../../../core/date';
 import { termContext } from '../../../core/solarterms';
 import { computeStats } from './formulas';
+import { MS_AT_30 } from './run';
 import { dailyFor, newFirsts } from './economy';
 import { pickDistinct } from './rng';
 
@@ -137,10 +138,12 @@ export function settleMeta(meta: MirrorMeta, run: RunSave, cause: EndCause, toda
   // deeds
   const deeds = { ...meta.deeds };
   for (const d of DEED_REG) {
-    if ('char' in d && d.char && d.char !== run.char) continue;
+    // 墨龙图's second way (hold 4 墨宝) is open to every companion, not only its own
+    const altHit = 'alt' in d && !!d.alt && (rs[d.alt.stat] ?? 0) >= d.alt.goal;
+    if ('char' in d && d.char && d.char !== run.char && !altHit) continue;
     if ('minDiff' in d && d.minDiff !== undefined && run.diff < d.minDiff) continue;
     let v = Math.max(0, rs[d.stat] ?? 0);
-    if ('alt' in d && d.alt && (rs[d.alt.stat] ?? 0) >= d.alt.goal) v = d.goal;
+    if (altHit) v = d.goal;
     const prev = deeds[d.id] ?? 0;
     deeds[d.id] = Math.min(d.goal, d.mode === 'sum' ? prev + v : Math.max(prev, v));
   }
@@ -176,7 +179,9 @@ export function settleMeta(meta: MirrorMeta, run: RunSave, cause: EndCause, toda
     const better = cur === undefined || (RECORD_LOWER.includes(id) ? v < cur : v > cur);
     if (better) { records[id] = v; newRecords.push(id); }
   };
-  if (zhaopo && run.ms > 0) rec('fastestClear', Math.round(run.ms / 6000) / 10);
+  // wave time up to wave 30 only (endless waves after it don't count against the record)
+  const ms30 = rs[MS_AT_30] ?? (W === 30 ? run.ms : 0);
+  if (zhaopo && ms30 > 0) rec('fastestClear', Math.round(ms30 / 6000) / 10);
   rec('bigHit', rs.peakHit);
   rec('mostSummons', rs.peakSummons);
   rec('mostSwords', rs.peakSwordsAir);

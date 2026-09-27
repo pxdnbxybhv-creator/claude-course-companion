@@ -195,32 +195,52 @@ export const SFX_NAMES: readonly SfxName[] = [
   'crate', 'shatter', 'ritualCoins', 'ritualGlint', 'uiTap',
 ];
 
-/** Mixing: gain, reverb send, per-kind cap per 50 ms, and whether the music ducks under it. */
-export const SFX_MIX: Record<SfxName, { gain: number; send: number; cap: number; duck?: number }> = {
-  hitMelee: { gain: 0.45, send: 0.06, cap: 2 },
-  hitShot: { gain: 0.4, send: 0.05, cap: 2 },
-  hitTalisman: { gain: 0.3, send: 0.15, cap: 1 },
-  summon: { gain: 0.5, send: 0.25, cap: 1 },
-  crit: { gain: 0.38, send: 0.2, cap: 1 },
-  pickup: { gain: 0.35, send: 0.15, cap: 2 },
-  coin: { gain: 0.6, send: 0.2, cap: 2 },
-  coinString: { gain: 0.65, send: 0.2, cap: 1 },
-  coinTen: { gain: 0.75, send: 0.25, cap: 1, duck: 0.6 },
-  levelUp: { gain: 0.7, send: 0.3, cap: 1, duck: 0.45 },
-  gong: { gain: 0.6, send: 0.3, cap: 1, duck: 0.5 },
-  bell: { gain: 0.55, send: 0.25, cap: 1, duck: 0.4 },
-  merge: { gain: 0.55, send: 0.25, cap: 1 },
+/** How one voice is mixed and limited. */
+export interface SfxMix {
+  gain: number;
+  /** Reverb send. */
+  send: number;
+  /** Per-kind cap per 50 ms. */
+  cap: number;
+  /** The music ducks under it (depth). */
+  duck?: number;
+  /** A combat sound that shares the global 4-per-50 ms window; every other kind is a cue that
+   *  checks only its own cap, so hit spam can never starve it. */
+  spam?: true;
+  /** Tuned to 宫 F: replayed with ±0.8% rate jitter at most (a semitone is 5.9%). */
+  pitched?: true;
+}
+
+/** Rate jitter: unpitched voices vary freely; pitched ones stay on the F pentatonic. */
+export const JITTER = 0.06;
+export const PITCHED_JITTER = 0.008;
+
+/** Mixing: gain, reverb send, per-kind cap per 50 ms, whether the music ducks, spam and pitch. */
+export const SFX_MIX: Record<SfxName, SfxMix> = {
+  hitMelee: { gain: 0.45, send: 0.06, cap: 2, spam: true },
+  hitShot: { gain: 0.4, send: 0.05, cap: 2, spam: true },
+  hitTalisman: { gain: 0.3, send: 0.15, cap: 1, spam: true, pitched: true },
+  summon: { gain: 0.5, send: 0.25, cap: 1, spam: true, pitched: true },
+  crit: { gain: 0.38, send: 0.2, cap: 1, spam: true, pitched: true },
+  pickup: { gain: 0.35, send: 0.15, cap: 2, spam: true, pitched: true },
+  coin: { gain: 0.6, send: 0.2, cap: 2, pitched: true },
+  coinString: { gain: 0.65, send: 0.2, cap: 1, pitched: true },
+  coinTen: { gain: 0.75, send: 0.25, cap: 1, duck: 0.6, pitched: true },
+  levelUp: { gain: 0.7, send: 0.3, cap: 1, duck: 0.45, pitched: true },
+  gong: { gain: 0.6, send: 0.3, cap: 1, duck: 0.5, pitched: true },
+  bell: { gain: 0.55, send: 0.25, cap: 1, duck: 0.4, pitched: true },
+  merge: { gain: 0.55, send: 0.25, cap: 1, pitched: true },
   hurt: { gain: 0.7, send: 0.05, cap: 1 },
   dodge: { gain: 0.4, send: 0.1, cap: 1 },
-  kill: { gain: 0.35, send: 0.08, cap: 2 },
+  kill: { gain: 0.35, send: 0.08, cap: 2, spam: true },
   bossDrum: { gain: 0.8, send: 0.2, cap: 1, duck: 0.35 },
-  phaseBreak: { gain: 0.7, send: 0.3, cap: 1, duck: 0.35 },
+  phaseBreak: { gain: 0.7, send: 0.3, cap: 1, duck: 0.35, pitched: true },
   beatTick: { gain: 0.3, send: 0.05, cap: 1 },
   buy: { gain: 0.55, send: 0.15, cap: 1 },
-  reroll: { gain: 0.5, send: 0.2, cap: 1 },
-  crate: { gain: 0.6, send: 0.2, cap: 1 },
+  reroll: { gain: 0.5, send: 0.2, cap: 1, pitched: true },
+  crate: { gain: 0.6, send: 0.2, cap: 1, pitched: true },
   shatter: { gain: 0.85, send: 0.3, cap: 1, duck: 0.25 },
   ritualCoins: { gain: 0.7, send: 0.25, cap: 1 },
-  ritualGlint: { gain: 0.6, send: 0.3, cap: 1 },
+  ritualGlint: { gain: 0.6, send: 0.3, cap: 1, pitched: true },
   uiTap: { gain: 0.35, send: 0.05, cap: 2 },
 };

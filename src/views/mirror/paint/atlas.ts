@@ -2,9 +2,10 @@
 // (one texture per page for drawImage). Every sprite gets a white hit-flash twin (source-in), and
 // on demand a 倒影 twin (lightness inverted, hue kept: white ink on black paper).
 import { paintStroke } from '../../../ink/brush';
+import { grainPattern } from '../../../ink/paper';
 import type { Sprite } from '../types';
 import type { Spec } from './kit';
-import { B } from './kit';
+import { B, extentOps } from './kit';
 import { PAPER } from './palette';
 
 export const PAGE = 1024;
@@ -45,15 +46,16 @@ export interface RenderOpts {
 
 /** Paint a spec's variant into a fresh canvas with its halo; plus its flash twin. */
 export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
-  const [x0, y0, x1, y1] = spec.box;
   const k = o.k;
   const haloKind = o.ghost ? 'dark' : spec.halo ?? 'paper';
   const hp = haloKind === 'none' ? 0 : o.halo;
   const pad = hp + 2;
-  const cw = Math.ceil((x1 - x0) * k) + pad * 2, ch = Math.ceil((y1 - y0) * k) + pad * 2;
-  const ox = pad - x0 * k, oy = pad - y0 * k;
   const b = new B(o.seed);
   spec.paint(b, v);
+  // the canvas covers what the marks really reach (brush half-widths, discs, glyphs), not just the box
+  const [x0, y0, x1, y1] = extentOps(b.ops, spec.box);
+  const cw = Math.ceil((x1 - x0) * k) + pad * 2, ch = Math.ceil((y1 - y0) * k) + pad * 2;
+  const ox = pad - x0 * k, oy = pad - y0 * k;
   // paint on one shared scratch context: the brush's grain patterns are cached per context
   const sc = scratch(cw, ch);
   const g = sc.g;
@@ -90,6 +92,14 @@ export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
   f.fillStyle = '#fffdf6';
   f.fillRect(0, 0, cw, ch);
   return { img: out, flash, w: cw / k, h: ch / k, ax: ox / cw, ay: oy / ch };
+}
+
+/** Warm the brush's grain patterns on the shared scratch context for these colours (the pattern
+ *  cache is per context and colour; building a tile is the slow part of a sprite's first paint). */
+export function warmGrain(colors: Iterable<string>, wash: Iterable<string>): void {
+  const g = scratch(256, 256).g;
+  for (const c of colors) grainPattern(g, c, 'fine');
+  for (const c of wash) grainPattern(g, c, 'wash');
 }
 
 let scr: { c: HTMLCanvasElement; g: CanvasRenderingContext2D } | null = null;
@@ -140,32 +150,48 @@ function ghostify(c: HTMLCanvasElement): void {
   g.putImageData(img, 0, 0);
 }
 
-/** Shelf-packed pages. */
+/** Shelf-packed pages. Several shelves stay open at once, and a sprite goes on the first shelf of a
+ *  similar height with room left, so a tall zone effect never wastes a row of little coins. */
+interface Shelf { page: HTMLCanvasElement; y: number; h: number; x: number }
 export class Pages {
   pages: HTMLCanvasElement[] = [];
-  private x = 0;
-  private y = 0;
-  private rowH = 0;
+  private shelves: Shelf[] = [];
+  /** The next free row of the newest page. */
+  private top = 0;
   /** Copy `src` into a page; returns the page and the rect. Oversized images keep their own canvas. */
   put(src: HTMLCanvasElement): { img: HTMLCanvasElement; sx: number; sy: number } {
     const w = src.width, h = src.height;
     if (w > PAGE / 2 || h > PAGE / 2) return { img: src, sx: 0, sy: 0 };
-    let page = this.pages[this.pages.length - 1];
-    if (!page || this.x + w > PAGE) { this.x = 0; this.y += this.rowH + 1; this.rowH = 0; }
-    if (!page || this.y + h > PAGE) {
-      page = canvas(PAGE, PAGE);
-      this.pages.push(page);
-      this.x = 0; this.y = 0; this.rowH = 0;
+    let best: Shelf | null = null;
+    for (const sh of this.shelves) {
+      if (sh.h < h || sh.h > h * 1.4 + 8 || sh.x + w > PAGE) continue;
+      if (!best || sh.h < best.h) best = sh;
     }
-    const sx = this.x, sy = this.y;
-    ctx2d(page).drawImage(src, sx, sy);
-    this.x += w + 1;
-    this.rowH = Math.max(this.rowH, h);
-    return { img: page, sx, sy };
+    if (!best) {
+      let page = this.pages[this.pages.length - 1];
+      if (!page || this.top + h > PAGE) {
+        page = canvas(PAGE, PAGE);
+        this.pages.push(page);
+        this.top = 0;
+        // shelves of full pages that are nearly full are dropped from the search
+        this.shelves = this.shelves.filter((sh) => sh.x < PAGE - 48);
+      }
+      // round the shelf height up a little so the next similar sprites fit too
+      const sh = Math.min(PAGE - this.top, Math.ceil(h * 1.1) + 2);
+      best = { page, y: this.top, h: sh, x: 0 };
+      this.shelves.push(best);
+      this.top += sh + 1;
+    }
+    const sx = best.x, sy = best.y;
+    ctx2d(best.page).drawImage(src, sx, sy);
+    best.x += w + 1;
+    return { img: best.page, sx, sy };
   }
   dispose() {
     for (const p of this.pages) { p.width = 1; p.height = 1; }
     this.pages = [];
+    this.shelves = [];
+    this.top = 0;
   }
 }
 

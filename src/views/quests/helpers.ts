@@ -239,6 +239,7 @@ export const SOURCE_NAMES: Record<string, [string, string]> = {
   mail: ['书信', 'Letters'],
   taoyuan: ['桃源', 'Peach Spring'],
   npcs: ['乡邻', 'Neighbours'],
+  mirror: ['幻镜', 'Mirror'],
 };
 
 /**

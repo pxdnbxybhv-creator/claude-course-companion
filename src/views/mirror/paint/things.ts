@@ -67,11 +67,11 @@ export const FX_SPECS: Record<FxName, Spec> = {
     for (let i = 1; i < 6; i++) pts.push([i * 6.4, (h01(v + 3, i) - 0.5) * 11]);
     pts.push([32, 0]);
     b.flat((g) => {
-      g.lineJoin = 'miter'; g.lineCap = 'round';
+      g.lineJoin = 'miter'; g.miterLimit = 2; g.lineCap = 'round';
       for (const [w, c] of [[4.4, 'rgba(217,166,46,0.35)'], [1.8, '#f6e27a'], [0.7, '#ffffff']] as [number, string][]) {
         g.strokeStyle = c; g.lineWidth = w; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (const [x, y] of pts.slice(1)) g.lineTo(x, y); g.stroke();
       }
-    });
+    }, [-2.4, -10.2, 34.4, 10.2]);
   } },
   lightningStrike: fx(30, (b) => { ringOf(b, 20, 2, GOLD, 0.7); b.brush([[2, -30, 2.4], [-3, -18, 2], [4, -10, 2.2], [-2, 0, 1.2]], 0.95, '#f6e27a'); b.brush([[2, -30, 5], [-3, -18, 4], [4, -10, 4], [-2, 0, 2]], 0.3, GOLD); }),
   burnMark: fx(8, (b) => { b.fill('#e0683a', [[-5, 5], [-4, -1], [-1, -3], [0, -8], [2, -2], [5, 0], [4, 5]], 0.85, 0.6); b.fill('#f6d27a', [[-2, 4], [0, -2], [2, 4]], 0.9, 0.3); }),

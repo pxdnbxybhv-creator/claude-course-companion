@@ -10,6 +10,7 @@ import {
   activeHeart, allUnlocked, buyHeart, dailySpec, deedProgress, endWave, heartCost, masteryLevel, migrateRun, newRun, pickHeartFace,
   settleMeta, unlocksOf, validateRun, beginWave, foldKills,
 } from '../src/views/mirror/logic';
+import { MS_AT_30 } from '../src/views/mirror/logic/run';
 import { STARTER_ITEMS, STARTER_WEAPONS } from '../src/views/mirror/ids';
 
 const DAY = '2026-09-27';
@@ -183,6 +184,28 @@ describe('settlement into meta', () => {
     m = pickHeartFace(m, 1, 'B');
     expect(activeHeart(m)).toEqual({});
     expect(activeHeart({ heart: { ...m.heart, pick: {}, plain: true } })).toEqual({});
+  });
+  it('墨龙图: 照破 as 画师, or any companion holding 4 墨宝 weapons', () => {
+    const ink = [{ id: 'brush', t: 1 }, { id: 'inkstone', t: 1 }, { id: 'crane', t: 1 }, { id: 'brush', t: 2 }] as RunSave['weapons'];
+    const g = settleMeta(m0(), run({ char: 'gardener' }, { wave: 12, weapons: ink, runStats: { peakInkWeapons: 4 } }), 'death', DAY);
+    expect(g.meta.deeds.painterClear).toBe(1);
+    expect(g.report.unlocks).toContain('inkdragon');
+    const three = settleMeta(m0(), run({ char: 'gardener' }, { wave: 31, runStats: { peakInkWeapons: 3 } }), 'death', DAY);
+    expect(three.meta.deeds.painterClear ?? 0).toBe(0); // 照破, but not as 画师 and only 3 墨宝
+    expect(settleMeta(m0(), run({ char: 'painter' }, { wave: 30 }), 'death', DAY).meta.deeds.painterClear).toBe(1);
+  });
+  it('fastest 照破 counts wave time up to wave 30, not the endless waves after', () => {
+    let r = run({ char: 'scholar' }, { wave: 29, ms: 29 * 60_000 });
+    r = endWave(beginWave(r), { wave: 30, moon: 0, xp: 0, field: 0, storeLeft: 0, levels: 0, crates: 0, hearts: [], sleeve: [], lives: 0, once: [], drunk: 0, stats: {}, killsBy: {}, byWeapon: {}, bosses: [], ms: 60_000 });
+    expect(r.runStats[MS_AT_30]).toBe(30 * 60_000);
+    const deep = { ...r, wave: 45, ms: 45 * 60_000 };
+    expect(settleMeta(m0(), deep, 'death', DAY).meta.records.fastestClear).toBe(30);
+    expect(settleMeta(m0(), { ...r, runStats: {} }, 'death', DAY).meta.records.fastestClear).toBe(30); // W = 30 exactly
+  });
+  it('a run saved by a newer build survives sanitize untouched', () => {
+    const newer = { ver: RUN_VER + 1, somethingNew: [1, 2], wave: 7 };
+    expect(sanitizeMirror({ ...defaultMeta(DAY), active: newer }, DAY).active).toEqual(newer);
+    expect(migrateRun({ ...run(), ver: RUN_VER })).not.toBeNull();
   });
   it('folds kills into tallies and codex stages', () => {
     const m = foldKills(foldKills(m0(), { blot: 9, turtle: 1, carp: 1, nope: 3 }), { blot: 95 });

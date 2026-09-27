@@ -2,12 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import type { NewRunOpts, RunSave, WaveResult } from '../src/views/mirror/types';
 import { COMPANION_REG } from '../src/views/mirror/ids';
-import { COMPANIONS } from '../src/views/mirror/data';
+import { COMPANIONS, F, MAPS, MONSTERS } from '../src/views/mirror/data';
 import {
   allUnlocked, armorMult, arenaGeom, beginWave, bossHp, budget, budgetBase, cardOdds, cardsView, computeStats, cooldown, crateItem,
   dmgMul, dodgeCapOf, dodgeChance, endWave, fmtBig, harvestNext, heartOffer, hpMul, insideShape, nextScreen, newRun, pickCard,
   pickHeart, pickStart, procCoef, rerollCards, resolveCrate, screenOf, starterUnlocks, waveLen, wavePlan, xpNext, xpTotal, rngFor,
   enemyHit, weaponHit, playerHit, critMult, heatOf, activeMutators, spdX, isEliteWave, affixCount,
+  isBossWave, isHordeWave, maxHp, summonCapOf, stonesOf,
 } from '../src/views/mirror/logic';
 
 export function opts(o: Partial<NewRunOpts> = {}): NewRunOpts {
@@ -295,3 +296,72 @@ describe('the run', () => {
 });
 
 export type { RunSave };
+
+describe('QA fixes', () => {
+  it('a spawn plan spends the whole threat budget B(w) (≈1.2·B on horde waves), every map, waves 1–60', () => {
+    for (const map of ['lake', 'forest', 'palace'] as const) {
+      for (let w = 1; w <= 60; w++) {
+        let spent = 0, B = 0;
+        for (let k = 0; k < 8; k++) {
+          const r = newRun(opts({ seed: 500 + k * 31, map, char: 'scholar' }));
+          for (const g of wavePlan(r, w).groups) spent += g.n * MONSTERS[g.id].cost;
+          B += budget(w, r) * (isBossWave(w) ? F.bossAddsFrac : 1);
+        }
+        const f = spent / B;
+        const [lo, hi] = !isBossWave(w) && isHordeWave(w) ? [1.1, 1.35] : [0.9, 1.1];
+        expect(f, `${map} w${w}`).toBeGreaterThanOrEqual(lo);
+        expect(f, `${map} w${w}`).toBeLessThanOrEqual(hi);
+      }
+    }
+  });
+  it('a spawn group stays a crowd of one type (≤ 3 packs); late ticks bring more types at once', () => {
+    const r = newRun(opts({ seed: 77 }));
+    const p = wavePlan(r, 29);
+    for (const g of p.groups) expect(g.n).toBeLessThanOrEqual(3 * MONSTERS[g.id].pack);
+    const ticks = new Set(p.groups.map((g) => g.t)).size;
+    expect(p.groups.length).toBeGreaterThan(ticks);
+    expect([...p.groups].map((g) => g.t)).toEqual([...p.groups].map((g) => g.t).sort((a, b) => a - b));
+  });
+  it('墨宝 crit only with 画龙点睛, at ×2.0', () => {
+    const r = { ...newRun(opts({ char: 'painter' })), stats: { crit: 20, critDmg: 10 } };
+    for (const id of ['brush', 'inkstone', 'crane'] as const) {
+      const plain = weaponHit(r, computeStats(r), id, 1);
+      expect(plain.crit, id).toBe(0);
+      const dot = { ...r, items: { dotting: 1 } };
+      const h = weaponHit(dot, computeStats(dot), id, 1);
+      expect(h.crit, id).toBeCloseTo(computeStats(dot).crit / 100);
+      expect(h.critM, id).toBeCloseTo(2.0 + computeStats(dot).critDmg / 100);
+    }
+    expect(weaponHit(r, computeStats(r), 'hoe', 1).crit).toBeGreaterThan(0); // other weapons as before
+  });
+  it('the §4.1 limits: 气血 ≥ 1, 墨宝上限 ≤ 12, 棋子 ≤ 14', () => {
+    const r = { ...newRun(opts({ char: 'painter' })), stats: { hp: -500, summonCap: 30, stones: 40 } };
+    const s = computeStats(r);
+    expect([s.hp, s.summonCap, s.stones]).toEqual([1, 12, 14]);
+    expect([maxHp({ ...s, hp: -3 }), summonCapOf({ ...s, summonCap: 13.5 }), stonesOf({ ...s, stones: 99 })]).toEqual([1, 12, 14]);
+  });
+  it('fmtBig moves up a unit when rounding reaches it', () => {
+    expect(fmtBig(999_999, 'en')).toBe('1m');
+    expect(fmtBig(999_499, 'en')).toBe('999k');
+    expect(fmtBig(99_999_999, 'zh')).toBe('1亿');
+    expect(fmtBig(99_999, 'zh')).toBe('10万');
+    expect(fmtBig(9_999.6, 'zh')).toBe('1万');
+    expect(fmtBig(999_999_999, 'en')).toBe('1b');
+    expect(fmtBig(-999_999, 'en')).toBe('-1m');
+    expect(fmtBig(1.5e13, 'zh')).toBe('150000亿');
+  });
+  it('墨林 always has its 14 bamboo clumps, apart and inside', () => {
+    const want = MAPS.forest.obstacles.reduce((a, o) => a + (o.kind === 'tree' ? 1 : o.n), 0);
+    for (let seed = 0; seed < 400; seed++) {
+      const g = arenaGeom('forest', seed * 7919 + 13);
+      expect(g.obstacles.length, `seed ${seed}`).toBe(want);
+      for (const o of g.obstacles) expect(insideShape(g.shape, o.x, o.y, o.r)).toBe(true);
+    }
+  });
+  it('endWave folds only the wave in play, once', () => {
+    const r = beginWave(newRun(opts()));
+    const once = endWave(r, result(1));
+    expect(endWave(once, result(1))).toBe(once);
+    expect(endWave(r, result(4))).toBe(r);
+  });
+});

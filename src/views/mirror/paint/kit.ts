@@ -10,7 +10,10 @@ export type WPt = [number, number, number];
 
 export type Op =
   | { k: 'stroke'; s: Stroke }
-  | { k: 'fn'; f: (g: CanvasRenderingContext2D) => void };
+  /** A crisp canvas mark; `bb` is its extent in u when known (else it must stay inside the box). */
+  | { k: 'fn'; f: (g: CanvasRenderingContext2D) => void; bb?: Box };
+
+export type Box = [number, number, number, number];
 
 /** Collects strokes (u, relative to the sprite's anchor). */
 export class B {
@@ -44,18 +47,19 @@ export class B {
   dot(x: number, y: number, d: number, tone = 0.9, color?: string) {
     return this.push('dot', [{ x, y, w: d }], tone, color);
   }
-  /** Crisp canvas marks in u space (eyes, glints, glyphs). */
-  flat(f: (g: CanvasRenderingContext2D) => void) {
-    this.ops.push({ k: 'fn', f });
+  /** Crisp canvas marks in u space (eyes, glints, glyphs). Pass `bb` when a mark may leave the box. */
+  flat(f: (g: CanvasRenderingContext2D) => void, bb?: Box) {
+    this.ops.push(bb ? { k: 'fn', f, bb } : { k: 'fn', f });
     return this;
   }
   /** A crisp filled circle. */
   disc(x: number, y: number, r: number, color: string, a = 1) {
-    return this.flat((g) => { g.globalAlpha = a; g.fillStyle = color; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; });
+    return this.flat((g) => { g.globalAlpha = a; g.fillStyle = color; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1; }, [x - r, y - r, x + r, y + r]);
   }
   /** A crisp circle outline. */
   ring(x: number, y: number, r: number, w: number, color: string, a = 1) {
-    return this.flat((g) => { g.globalAlpha = a; g.strokeStyle = color; g.lineWidth = w; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; });
+    const R = r + w / 2;
+    return this.flat((g) => { g.globalAlpha = a; g.strokeStyle = color; g.lineWidth = w; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.stroke(); g.globalAlpha = 1; }, [x - R, y - R, x + R, y + R]);
   }
   /** Two pale eyes with ink pupils (enemies read by their eyes). */
   eyes(x: number, y: number, gap: number, r: number, look = 0.3, white = '#f4efe4', pupil = '#111') {
@@ -64,7 +68,7 @@ export class B {
         g.fillStyle = white; g.beginPath(); g.arc(x + sx * gap, y, r, 0, Math.PI * 2); g.fill();
         g.fillStyle = pupil; g.beginPath(); g.arc(x + sx * gap + r * look, y + r * 0.1, r * 0.55, 0, Math.PI * 2); g.fill();
       }
-    });
+    }, [x - gap - r, y - r, x + gap + r, y + r]);
   }
   /** A glyph in a face (the font must be loaded before baking). */
   glyph(ch: string, x: number, y: number, size: number, color: string, font = BRUSH_FONT, a = 1, rot = 0) {
@@ -75,7 +79,7 @@ export class B {
       g.font = `${size}px ${font}`;
       g.fillText(ch, 0, size * 0.04);
       g.restore();
-    });
+    }, [x - size * 0.72, y - size * 0.72, x + size * 0.72, y + size * 0.72]);
   }
 }
 
@@ -92,6 +96,62 @@ export interface Spec {
   halo?: 'paper' | 'dark' | 'none';
   paint(b: B, v: number): void;
 }
+
+/** How far each stroke kind may paint past its spine / outline, in u (the brush wobbles, swells at
+ *  the press, feathers its edge; a wash bleeds). Measured against the pixel check (tests + lab). */
+function reach(kind: string, w: number): number {
+  switch (kind) {
+    case 'wash': return Math.max(1, w) * 1.4 + 1.5;
+    case 'fill': return Math.max(0.5, w) + 0.6;
+    case 'dot': return w * 0.75 + 0.6;
+    default: return w * 0.7 + 0.8; // brush, dry, line
+  }
+}
+
+/** The real extent of a variant's marks in u (strokes ± their reach, known flat marks), unioned
+ *  with the box: renderSpec grows the canvas to it so nothing is cut at the edge. */
+export function extentOf(spec: Spec, v: number, seed = 1): Box {
+  const b = new B(seed);
+  spec.paint(b, v);
+  return extentOps(b.ops, spec.box);
+}
+export function extentOps(ops: readonly Op[], box: readonly [number, number, number, number]): Box {
+  let [x0, y0, x1, y1] = box;
+  for (const op of ops) {
+    if (op.k === 'fn') {
+      if (op.bb) { x0 = Math.min(x0, op.bb[0]); y0 = Math.min(y0, op.bb[1]); x1 = Math.max(x1, op.bb[2]); y1 = Math.max(y1, op.bb[3]); }
+      continue;
+    }
+    const s = op.s, P = s.pts, n = P.length;
+    if (!n) continue;
+    // the brush smooths outlines and spines with Catmull-Rom, which bulges past sharp corners (a
+    // square's sides swell by 1/8 of their length): sample the curve, not just the vertices
+    const closed = s.kind === 'fill' || s.kind === 'wash';
+    const soft = P[0].w ?? 1;
+    const at = (i: number) => P[closed ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i))];
+    const add = (x: number, y: number, w: number) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      const m = closed ? reach(s.kind, soft) : reach(s.kind, w);
+      x0 = Math.min(x0, x - m); y0 = Math.min(y0, y - m); x1 = Math.max(x1, x + m); y1 = Math.max(y1, y + m);
+    };
+    const segs = closed ? n : n - 1;
+    for (let i = 0; i < segs; i++) {
+      const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2);
+      for (const t of CR_T) {
+        const t2 = t * t, t3 = t2 * t;
+        add(
+          0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+          0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+          p1.w + (p2.w - p1.w) * t,
+        );
+      }
+    }
+    const last = P[n - 1];
+    add(last.x, last.y, last.w);
+  }
+  return [x0, y0, x1, y1];
+}
+const CR_T = [0, 0.2, 0.4, 0.5, 0.6, 0.8];
 
 // ───────────────────────────────────────────── geometry
 

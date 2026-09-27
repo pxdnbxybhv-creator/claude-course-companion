@@ -8,28 +8,28 @@ import { effect } from '@preact/signals';
 import { audio } from '../../../audio/engine';
 import { Mixer } from '../../../audio/graph';
 import { music } from '../../../audio/music';
-import { setMirrorColour } from '../../../audio/music-themes';
+import { getMirrorColour, setMirrorColour } from '../../../audio/music-themes';
 import { state } from '../../../app/store';
 import type { MapId } from '../ids';
 import type { CreateMirrorAudio, MirrorAudio, MusicPhase, SfxName } from '../types';
-import { renderPickup, renderVoice, SFX_MIX, SFX_NAMES } from './voices';
+import { Limiter } from './limiter';
+import { JITTER, PITCHED_JITTER, renderPickup, renderVoice, SFX_MIX, SFX_NAMES } from './voices';
 
-/** At most this many sounds start in any 50 ms window (GDD §22). */
-const WINDOW = 0.05;
-const MAX_PER_WINDOW = 4;
-const JITTER = 0.06;
+/** A map change while the theme id stays the same restarts the music after this pause (ms): longer
+ *  than music.ts's 450 ms debounce, so the silence request is honoured and a new Composer picks up
+ *  the map's tempo and modes. */
+const RECOLOUR_MS = 520;
 
 class MirrorSound implements MirrorAudio {
   private mix: Mixer | null = null;
   private bufs = new Map<string, AudioBuffer>();
   private picks: AudioBuffer[] = [];
-  /** Start times of recent sounds (ring buffer) and per-kind. */
-  private recent = new Float64Array(MAX_PER_WINDOW);
-  private ri = 0;
-  private kinds = new Map<string, Float64Array>();
+  private limiter = new Limiter();
   private stopSettings: (() => void) | null = null;
   private priming: Promise<void> | null = null;
   private phase: MusicPhase = null;
+  private colour: MapId | null = null;
+  private recolour: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
   prime(): Promise<void> {
@@ -62,30 +62,15 @@ class MirrorSound implements MirrorAudio {
     }
   }
 
-  /** The limiter: global 4 per 50 ms, and each kind's own cap. */
-  private allow(kind: string, cap: number, now: number): boolean {
-    const oldest = this.recent[this.ri];
-    if (now - oldest < WINDOW) return false;
-    let k = this.kinds.get(kind);
-    if (!k) { k = new Float64Array(Math.max(1, cap)).fill(-1); this.kinds.set(kind, k); }
-    let slot = -1, n = 0;
-    for (let i = 0; i < k.length; i++) { if (now - k[i] < WINDOW) n++; else if (slot < 0) slot = i; }
-    if (n >= cap || slot < 0) return false;
-    k[slot] = now;
-    this.recent[this.ri] = now;
-    this.ri = (this.ri + 1) % MAX_PER_WINDOW;
-    return true;
-  }
-
   sfx(name: SfxName, o: { gain?: number; rate?: number } = {}): void {
     const mix = this.mix, buf = this.bufs.get(name);
     if (!mix || !buf || this.disposed) return;
     const ctx = mix.ctx;
     const now = ctx.currentTime;
     const m = SFX_MIX[name];
-    if (!this.allow(name, m.cap, now)) return;
+    if (!this.limiter.allow(name, m.cap, !!m.spam, now)) return;
     try {
-      const rate = (o.rate ?? 1) * (1 + (Math.random() * 2 - 1) * JITTER);
+      const rate = (o.rate ?? 1) * (1 + (Math.random() * 2 - 1) * (m.pitched ? PITCHED_JITTER : JITTER));
       mix.play(buf, now + 0.005, { gain: m.gain * (o.gain ?? 1), send: m.send, rate, pan: (Math.random() - 0.5) * 0.3 });
       if (m.duck) music.duck(m.duck, 700);
     } catch { /* a closed context */ }
@@ -95,7 +80,7 @@ class MirrorSound implements MirrorAudio {
     const mix = this.mix;
     if (!mix || !this.picks.length || this.disposed) return;
     const now = mix.ctx.currentTime;
-    if (!this.allow('pickup', SFX_MIX.pickup.cap, now)) return;
+    if (!this.limiter.allow('pickup', SFX_MIX.pickup.cap, true, now)) return;
     // 宫商角徵羽 climbing, wrapping back down after two octaves
     const d = Math.max(0, combo | 0) % this.picks.length;
     try { mix.play(this.picks[d], now + 0.005, { gain: SFX_MIX.pickup.gain, send: SFX_MIX.pickup.send, rate: 1 + (Math.random() - 0.5) * 0.01 }); } catch { /* closed */ }
@@ -103,14 +88,29 @@ class MirrorSound implements MirrorAudio {
 
   music(phase: MusicPhase, map: MapId): void {
     if (this.disposed) return;
-    if (phase === this.phase && phase !== null) return;
+    const recoloured = phase !== null && map !== (this.colour ?? getMirrorColour());
+    if (phase === this.phase && phase !== null && !recoloured) return;
     this.phase = phase;
+    if (phase !== null) this.colour = map;
     setMirrorColour(map);
-    music.setTheme(phase === null ? null : phase === 'boss' ? 'mirror-boss' : 'mirror');
+    if (this.recolour) { clearTimeout(this.recolour); this.recolour = null; }
+    const id = phase === null ? null : phase === 'boss' ? 'mirror-boss' : 'mirror';
+    if (recoloured && id !== null && music.theme === id) {
+      // the Composer fixed its tempo and modes when it was built: a new map needs a new one, so
+      // hand over through a breath of silence (the entry ritual covers it)
+      music.setTheme(null);
+      this.recolour = setTimeout(() => {
+        this.recolour = null;
+        if (!this.disposed && this.phase === phase) music.setTheme(id);
+      }, RECOLOUR_MS);
+      return;
+    }
+    music.setTheme(id);
   }
 
   dispose(): void {
     this.disposed = true;
+    if (this.recolour) { clearTimeout(this.recolour); this.recolour = null; }
     this.stopSettings?.();
     this.stopSettings = null;
     try { this.mix?.master.disconnect(); } catch { /* already */ }

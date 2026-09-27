@@ -109,6 +109,12 @@ function foldStats(into: RunStats, add: RunStats): RunStats {
 const SHOOTER = (id: WeaponId) => WEAPONS[id].classes.some((c) => c === 'bow' || c === 'hidden');
 const INKW = (id: WeaponId) => WEAPONS[id].classes.includes('ink');
 
+/**
+ * Wave time at 照破 (ms), so the fastest-照破 record leaves endless out. CHANGE REQUEST pending: add
+ * 'msAt30' to RunStatKey in types.ts, then this cast goes.
+ */
+export const MS_AT_30 = 'msAt30' as string as RunStatKey;
+
 /** Logic-side run counters after a won wave (deeds read them). */
 function logicStats(run: RunSave, r: WaveResult): RunStats {
   const s = computeStats(run);
@@ -129,7 +135,7 @@ function logicStats(run: RunSave, r: WaveResult): RunStats {
     set.swordsAtW20 = s.swords;
     if (rs.soloW20 !== -1 && run.weapons.length <= 1) set.soloW20 = 1;
   }
-  if (r.wave === 30) set.cleared30 = 1;
+  if (r.wave === 30) { set.cleared30 = 1; set[MS_AT_30] = run.ms; }
   return { ...next, ...set };
 }
 
@@ -139,6 +145,7 @@ function logicStats(run: RunSave, r: WaveResult): RunStats {
  * then wave = r.wave and inWave = null. Coins are banked by economy.bankSleeve in the same write.
  */
 export function endWave(run: RunSave, r: WaveResult): RunSave {
+  if (run.inWave === null || r.wave !== run.inWave) return run; // only the wave in play folds (never twice)
   const w = r.wave;
   let moon = run.moon + Math.max(0, r.moon);
   let xp = run.xp + Math.max(0, r.xp);
@@ -178,7 +185,7 @@ export function endWave(run: RunSave, r: WaveResult): RunSave {
 }
 function pickSet(s: RunStats): RunStats {
   const out: RunStats = {};
-  for (const k of ['noHitNow', 'soloW20', 'swordsAtW20', 'cleared30'] as const) if (s[k] !== undefined) out[k] = s[k];
+  for (const k of ['noHitNow', 'soloW20', 'swordsAtW20', 'cleared30', MS_AT_30] as const) if (s[k] !== undefined) out[k] = s[k];
   return out;
 }
 

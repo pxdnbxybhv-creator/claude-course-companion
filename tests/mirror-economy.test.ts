@@ -187,7 +187,7 @@ describe('the session moves money exactly once', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 8, 27, 10, 0, 0));
     state.value = emptyState();
-    play.value = { ...emptyPlay(), coins: 100 };
+    play.value = { ...emptyPlay(), coins: 100, flags: { 'char:gardener': true } }; // 园丁 earned in the main game
     celebrations.value = [];
     mirror.value = defaultMeta(DAY);
   });
@@ -242,7 +242,7 @@ describe('the session moves money exactly once', () => {
     void r1;
     const { run: r2 } = S.startWave(mirror.value.active!);
     expect(r2.inWave).toBe(2);
-    const rep = S.died({ wave: 2, cause: 'blot', partial: result(2, { sleeve: [coin(10)] }) });
+    const rep = S.died({ wave: 2, cause: 'blot', partial: result(2, { sleeve: [coin(10)] }) })!;
     // W = 1: base 1.5 → gross 2 → ×1; the sleeve of the fatal wave sinks
     expect(rep.pay).toMatchObject({ W: 1, income: 2, back: 0, coins: 1, fee: 20 });
     expect(coins()).toBe(81 + 2);
@@ -308,6 +308,57 @@ describe('the session moves money exactly once', () => {
     expect(coins()).toBe(100);
     expect(counter('earned')).toBe(earned);
     expect(counter('src:mirror')).toBe(0);
+  });
+  it('takes only the wave in play: a duplicate, a late hook after 暂离 or a wrong wave changes nothing', () => {
+    S.enter(opts);
+    const { run: r1 } = S.startWave(mirror.value.active!);
+    const res = result(1, { moon: 30, sleeve: [coin(1)] });
+    const won = S.waveWon(res)!;
+    const moon = won.moon;
+    expect(coins()).toBe(101);
+    expect(S.waveWon(res)).toEqual(won); // the same hook twice
+    expect(mirror.value.active!.moon).toBe(moon);
+    expect(coins()).toBe(101);
+    expect(mirror.value.active!.coins).toBe(1);
+    // 暂离 during the wave's 1.2 s end, then the late waveEnd arrives: the wave replays, nothing is banked
+    S.startWave(mirror.value.active!);
+    expect(S.leaveMidWave().interruptions).toBe(1);
+    expect(S.waveWon(result(2, { sleeve: [coin(1)] }))!.wave).toBe(1);
+    expect(coins()).toBe(101);
+    // a stale death after 暂离 is ignored too
+    expect(S.died({ wave: 2, cause: 'blot', partial: result(2) })).toBeNull();
+    expect(mirror.value.active).not.toBeNull();
+    // a result for another wave than the one started
+    S.startWave(mirror.value.active!);
+    expect(S.waveWon(result(9))!.wave).toBe(1);
+    expect(mirror.value.active!.inWave).toBe(2);
+    expect(S.abandon().pay.W).toBe(1);
+    // no run at all
+    expect(S.waveWon(result(3))).toBeNull();
+    expect(S.died({ wave: 3, cause: 'blot', partial: result(3) })).toBeNull();
+    void r1;
+  });
+  it('enters only with a companion earned in the main game', () => {
+    play.value = { ...play.value, flags: {} };
+    const e = S.enter(opts); // 园丁 not earned: 书生 goes in
+    expect(e.ok && e.run.char).toBe('scholar');
+    S.abandon();
+    mirror.value = { ...mirror.value, lobby: { ...mirror.value.lobby, char: 'cat' } }; // a stale lobby (older backup)
+    S.lobbyVisit();
+    expect(mirror.value.lobby.char).toBe('scholar');
+    play.value = { ...play.value, flags: { 'char:cat': true } };
+    const c = S.enter({ ...opts, char: 'cat' });
+    expect(c.ok && c.run.char).toBe('cat');
+  });
+  it('leaves a run saved by a newer build alone', () => {
+    S.enter(opts);
+    const newer = { ...mirror.value.active!, ver: 999, weapons: [{ id: 'future-blade', t: 1 }] } as unknown as RunSave;
+    mirror.value = { ...mirror.value, active: newer };
+    expect(S.newerSave()).toBe(true);
+    expect(S.resumeCheck()).toBeNull();
+    expect(mirror.value.active).toBe(newer);
+    expect(counter('mirror:runs')).toBe(0);
+    expect(S.enter(opts)).toEqual({ ok: false, reason: 'paused' });
   });
   it('reconciles on load after the tab died between the purse and meta', () => {
     mirror.value = { ...defaultMeta(DAY), coinsPaid: 5, owed: 0 };

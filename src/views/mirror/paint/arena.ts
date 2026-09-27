@@ -4,7 +4,13 @@
 // lightness of everything while keeping its hues: white ink on black paper.
 //
 // Memory: the base layer is sized to a pixel budget by quality (≈ 2× a phone screen), whatever the
-// arena's size in u; the stain layer is a quarter of that.
+// arena's size in u; the stain layer is a quarter of that. The obstacles (they block movement and
+// shots, so they must read crisply) are painted as their own sprites at sprite resolution on mid and
+// high quality, and drawn over the base when in view.
+//
+// 倒影 inverts only the arena and its rim; beyond the rim the surround stays dark (a void), and the
+// camera's fill past the layer matches it, so there is no seam. Turning an already painted arena
+// into 倒影 (the endless stage) inverts what is there instead of repainting it.
 import { paintStroke } from '../../../ink/brush';
 import { fillPaper } from '../../../ink/paper';
 import type { Stroke } from '../../../ink/types';
@@ -16,6 +22,15 @@ import { CINNABAR, GOLD, INK, MAP_PAL, MOON, rgba, type MapPalette } from './pal
 
 const BUDGET: Record<Quality, number> = { low: 1.5e6, mid: 2.4e6, high: 3.6e6 };
 const MARGIN = 150;
+/** The bronze rim's width (u), outside the arena's shape. */
+const RIM_W = 34;
+/** Obstacle sprites: px per u (× the capped dpr) by quality; low paints them into the base. */
+const OBST_K: Record<Quality, number> = { low: 0, mid: 0.9, high: 1.1 };
+/** 倒影's surround: the map's outside darkened toward the void. */
+const VOID = '#08090c';
+const VOID_A = 0.55;
+
+interface ObstSprite { img: HTMLCanvasElement; x0: number; y0: number; w: number; h: number }
 
 export class ArenaLayer {
   inverted = false;
@@ -29,6 +44,8 @@ export class ArenaLayer {
   private geom: ArenaGeom | null = null;
   private stampImgs = new Map<StampKind, HTMLCanvasElement[]>();
   private stampK = 1;
+  private seed = 0;
+  private obst: ObstSprite[] = [];
   private pal: MapPalette;
   /** ms the last paint took (lab). */
   lastMs = 0;
@@ -39,7 +56,18 @@ export class ArenaLayer {
 
   paint(geom: ArenaGeom, seed: number, inverted: boolean): void {
     const t0 = performance.now();
+    if (inverted && !this.inverted && this.base && this.geom === geom && this.seed === seed) {
+      // the endless stage: invert what is painted (base, stains, obstacles) — no repaint
+      this.inverted = true;
+      invertLayer(this.base, geom, this.k, this.x0, this.y0, this.pal);
+      if (this.stains) invertLightness(this.stains);
+      for (const o of this.obst) invertLightness(o.img);
+      this.bakeStamps(true);
+      this.lastMs = performance.now() - t0;
+      return;
+    }
     this.geom = geom;
+    this.seed = seed;
     this.inverted = inverted;
     const x0 = geom.minX - MARGIN, y0 = geom.minY - MARGIN, x1 = geom.maxX + MARGIN, y1 = geom.maxY + MARGIN;
     const W = x1 - x0, H = y1 - y0;
@@ -73,15 +101,42 @@ export class ArenaLayer {
     const bg = new B(seed);
     ground(bg, this.map, geom, P, seed);
     strokes(bg);
-    const ob = new B(seed ^ 0x77);
-    for (const o of geom.obstacles) obstacle(ob, o, P, seed);
-    strokes(ob);
+    this.obst = [];
+    const ks = OBST_K[this.quality] * Math.min(2, this.dpr);
+    if (ks > k * 1.15) {
+      // crisp obstacles: each its own sprite (a shadow wash under it stays in the base)
+      for (const o of geom.obstacles) {
+        const R = o.r * 1.35 + 12;
+        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => obstacle(b, o, P, seed) };
+        try {
+          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0 });
+          if (inverted) invertLightness(p.img);
+          // the spec's anchor (0, 0) is the world origin: the canvas's corner sits at −anchor × size
+          this.obst.push({ img: p.img, x0: -p.ax * p.w, y0: -p.ay * p.h, w: p.w, h: p.h });
+        } catch (e) { console.warn('[mirror paint] obstacle', e); }
+      }
+    }
+    if (!this.obst.length) {
+      const ob = new B(seed ^ 0x77);
+      for (const o of geom.obstacles) obstacle(ob, o, P, seed);
+      strokes(ob);
+    }
     g.restore();
-    const rim = new B(seed ^ 0x99);
-    rimOf(rim, this.map, geom, P);
-    strokes(rim);
+    const rim = new B(seed ^ 0x99), deco = new B(seed ^ 0x9b);
+    rimOf(rim, deco, this.map, geom, P);
+    if (geom.shape.kind === 'circle') strokes(rim);
+    else {
+      // a polygon's rim: one stroke per edge, clipped to the band so the corners are mitred (the
+      // brush's ends would otherwise stick out past each corner)
+      g.save();
+      toL(); shapePath(g, geom, RIM_W + 1); shapePath(g, geom, -1, true); g.clip('evenodd');
+      strokes(rim);
+      g.restore();
+    }
+    strokes(deco);
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (inverted) invertLayer(this.base);
+    if (inverted) invertLayer(this.base, geom, k, x0, y0, P);
+    feather(g, pw, ph, k, inverted ? voidOf(P) : P.outside);
     // the stain layer
     const sw = Math.ceil(pw / 2), sh = Math.ceil(ph / 2);
     if (!this.stains || this.stains.width !== sw || this.stains.height !== sh) { this.stains = canvas(sw, sh); this.sg = ctx2d(this.stains); }
@@ -105,7 +160,7 @@ export class ArenaLayer {
   draw(ctx: CanvasRenderingContext2D, cam: Camera): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = this.inverted ? '#0e0f12' : this.pal.outside;
+    ctx.fillStyle = this.inverted ? voidOf(this.pal) : this.pal.outside;
     ctx.fillRect(0, 0, cam.w, cam.h);
     const base = this.base;
     if (!base) return;
@@ -120,6 +175,10 @@ export class ArenaLayer {
     ctx.drawImage(base, (lx0 - this.x0) * k, (ly0 - this.y0) * k, (lx1 - lx0) * k, (ly1 - ly0) * k, dx, dy, dw, dh);
     const st = this.stains;
     if (st) ctx.drawImage(st, (lx0 - this.x0) * k / 2, (ly0 - this.y0) * k / 2, (lx1 - lx0) * k / 2, (ly1 - ly0) * k / 2, dx, dy, dw, dh);
+    for (const o of this.obst) {
+      if (o.x0 > wx1 || o.y0 > wy1 || o.x0 + o.w < wx0 || o.y0 + o.h < wy0) continue;
+      ctx.drawImage(o.img, (o.x0 - wx0) * s, (o.y0 - wy0) * s, o.w * s, o.h * s);
+    }
   }
 
   stamp(kind: StampKind, x: number, y: number, r: number, seed: number, _tint?: string): void {
@@ -162,11 +221,15 @@ export class ArenaLayer {
     const cx = sx + (sw - cw) / 2, cy = sy + (sh - ch) / 2;
     g.drawImage(base, cx, cy, cw, ch, 0, 0, w, h);
     if (this.stains) g.drawImage(this.stains, cx / 2, cy / 2, cw / 2, ch / 2, 0, 0, w, h);
+    // obstacles: layer px → out px
+    const f = w / cw;
+    for (const o of this.obst) g.drawImage(o.img, ((o.x0 - this.x0) * k - cx) * f, ((o.y0 - this.y0) * k - cy) * f, o.w * k * f, o.h * k * f);
     return out;
   }
 
   dispose(): void {
-    for (const c of [this.base, this.stains]) if (c) { c.width = 1; c.height = 1; }
+    for (const c of [this.base, this.stains, ...this.obst.map((o) => o.img)]) if (c) { c.width = 1; c.height = 1; }
+    this.obst = [];
     this.base = this.stains = null;
     this.sg = null;
     this.stampImgs.clear();
@@ -178,9 +241,11 @@ export class ArenaLayer {
 function octagon(r: number): Pt[] {
   return Array.from({ length: 8 }, (_, i) => { const a = Math.PI / 8 + (i * Math.PI) / 4; return [Math.cos(a) * r, Math.sin(a) * r] as Pt; });
 }
-function shapePath(g: CanvasRenderingContext2D, geom: ArenaGeom, grow: number) {
+/** The arena's outline grown by `grow` u; `append` adds it to the current path (for a band). */
+function shapePath(g: CanvasRenderingContext2D, geom: ArenaGeom, grow: number, append = false) {
   const s = geom.shape;
-  g.beginPath();
+  if (!append) g.beginPath();
+  else if (s.kind === 'circle') g.moveTo(s.r + grow, 0);
   if (s.kind === 'circle') g.arc(0, 0, s.r + grow, 0, Math.PI * 2);
   else if (s.kind === 'rect') g.rect(-s.w / 2 - grow, -s.h / 2 - grow, s.w + grow * 2, s.h + grow * 2);
   else { const p = octagon(s.r + grow); g.moveTo(p[0][0], p[0][1]); for (const q of p.slice(1)) g.lineTo(q[0], q[1]); g.closePath(); }
@@ -338,16 +403,17 @@ function surround(b: B, map: MapId, geom: ArenaGeom, P: MapPalette, seed: number
 }
 
 /** The bronze mirror rim (海兽葡萄镜 / 规矩镜 / 透光镜) around the shape. */
-function rimOf(b: B, map: MapId, geom: ArenaGeom, P: MapPalette) {
+function rimOf(b: B, deco: B, map: MapId, geom: ArenaGeom, P: MapPalette) {
   const s = geom.shape;
-  const w = 34;
+  const w = RIM_W;
   const bronze = P.rim, dark = '#3a2c1c', light = map === 'palace' ? '#eef2f6' : '#d6b87a';
-  // a circle is one smooth stroke; a polygon is one straight stroke per edge (the brush smooths corners)
+  // a circle is one smooth stroke; a polygon is one straight stroke per edge (the brush smooths
+  // corners), run long past each corner — paint() clips them to the band, which mitres the joints
   const ring = (pts: Pt[], width: number, color: string, tone: number) => {
     if (s.kind === 'circle') { b.brush([...pts, pts[0], pts[1]].map(([x, y]) => [x, y, width] as [number, number, number]), tone, color); return; }
     for (let i = 0; i < pts.length; i++) {
       const [ax, ay] = pts[i], [bx, by] = pts[(i + 1) % pts.length];
-      const L = Math.hypot(bx - ax, by - ay), ex = ((bx - ax) / L) * width * 0.5, ey = ((by - ay) / L) * width * 0.5;
+      const L = Math.hypot(bx - ax, by - ay), ex = ((bx - ax) / L) * (width + 6), ey = ((by - ay) / L) * (width + 6);
       b.brush([[ax - ex, ay - ey, width], [(ax + bx) / 2, (ay + by) / 2, width], [bx + ex, by + ey, width]], tone, color);
     }
   };
@@ -369,6 +435,8 @@ function rimOf(b: B, map: MapId, geom: ArenaGeom, P: MapPalette) {
     const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 60));
     for (let j = 0; j < n; j++) per.push([ax + ((bx - ax) * j) / n, ay + ((by - ay) * j) / n]);
   }
+  {
+    const b = deco;
   per.forEach(([x, y], i) => {
     if (map === 'lake') {
       // grape clusters and little sea beasts: dots in threes, a curl between
@@ -386,21 +454,66 @@ function rimOf(b: B, map: MapId, geom: ArenaGeom, P: MapPalette) {
     // cinnabar pillars at the octagon's corners
     for (const [x, y] of octagon((s.kind === 'octagon' ? s.r : 800) + w + 22)) { b.disc(x, y, 18, CINNABAR); b.ring(x, y, 18, 3, '#7a2418', 0.9); b.disc(x - 5, y - 5, 4, '#e8765e', 0.8); }
   }
+  }
 }
 
-/** 倒影: lightness inverted, hues kept (difference with white, then the original's hue). */
-function invertLayer(c: HTMLCanvasElement) {
+/** 倒影: lightness inverted, hues kept (difference with white, then the original's hue) — inside the
+ *  rim only. Beyond it the surround is darkened toward the void rather than turned pale. */
+function invertLayer(c: HTMLCanvasElement, geom: ArenaGeom, k: number, x0: number, y0: number, P: MapPalette) {
   const g = ctx2d(c);
   const copy = canvas(c.width, c.height);
   ctx2d(copy).drawImage(c, 0, 0);
+  const toL = () => g.setTransform(k, 0, 0, k, -x0 * k, -y0 * k);
+  g.save();
+  toL(); shapePath(g, geom, RIM_W + 3); g.clip();
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.globalCompositeOperation = 'difference';
   g.fillStyle = '#ffffff';
   g.fillRect(0, 0, c.width, c.height);
   g.globalCompositeOperation = 'hue';
   g.drawImage(copy, 0, 0);
+  g.restore();
+  // the surround: the map's dark, pressed further toward the void
+  g.save();
+  toL(); g.beginPath(); g.rect(x0, y0, c.width / k, c.height / k); shapePath(g, geom, RIM_W + 3, true); g.clip('evenodd');
+  g.setTransform(1, 0, 0, 1, 0, 0);
   g.globalCompositeOperation = 'source-over';
+  g.fillStyle = hexA(VOID, VOID_A);
+  g.fillRect(0, 0, c.width, c.height);
+  g.restore();
   copy.width = copy.height = 1;
+  void P;
+}
+
+/** The camera's fill beyond the layer in 倒影: pal.outside under the void's veil. */
+function voidOf(P: MapPalette): string {
+  const a = rgbOf(P.outside), b = rgbOf(VOID);
+  return `rgb(${a.map((v, i) => Math.round(v * (1 - VOID_A) + b[i] * VOID_A)).join(',')})`;
+}
+function rgbOf(c: string): [number, number, number] {
+  if (c.startsWith('#')) { const n = parseInt(c.slice(1, 7), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+  const m = c.match(/[\d.]+/g) ?? ['0', '0', '0'];
+  return [Number(m[0]), Number(m[1]), Number(m[2])];
+}
+function hexA(hex: string, a: number): string {
+  return `rgba(${rgbOf(hex).join(',')},${a})`;
+}
+
+/** Fade the layer's outer 60 u into the camera's fill colour, so its edge never shows. */
+function feather(g: CanvasRenderingContext2D, pw: number, ph: number, k: number, color: string) {
+  const d = Math.min(60 * k, pw / 4, ph / 4);
+  const rgb = rgbOf(color).join(',');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalCompositeOperation = 'source-over';
+  const side = (x0: number, y0: number, x1: number, y1: number, rx: number, ry: number, rw: number, rh: number) => {
+    const gr = g.createLinearGradient(x0, y0, x1, y1);
+    gr.addColorStop(0, `rgba(${rgb},1)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr; g.fillRect(rx, ry, rw, rh);
+  };
+  side(0, 0, d, 0, 0, 0, d, ph);
+  side(pw, 0, pw - d, 0, pw - d, 0, d, ph);
+  side(0, 0, 0, d, 0, 0, pw, d);
+  side(0, ph, 0, ph - d, 0, ph - d, pw, d);
 }
 
 // ───────────────────────────────────────────── stamps (±20 u discs)

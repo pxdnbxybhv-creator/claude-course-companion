@@ -252,8 +252,26 @@ export function computeStats(run: RunSave): Stats {
   s.heal += vowSum(run, 'heal') + (DIFFS[run.diff].heal ?? 0);
   // static converts (their sources are fixed between waves)
   applyConverts(run, s);
+  return clampSheet(s);
+}
+
+/**
+ * §4.1's hard limits on the sheet: 气血 ≥ 1, 墨宝上限 ≤ 12, 棋子上限 ≤ 14 (暴击 over 100 is not cut: it
+ * becomes 暴伤 in critMult). computeStats applies them; a consumer that adds live conds to a sheet
+ * reads through maxHp / summonCapOf / stonesOf.
+ */
+export function clampSheet(s: Stats): Stats {
+  s.hp = Math.max(CLAMP.hpMin, s.hp);
+  s.summonCap = Math.min(CLAMP.summonCapMax, s.summonCap);
+  s.stones = Math.min(CLAMP.stonesMax, s.stones);
   return s;
 }
+/** Max HP from a sheet (≥ 1, whole). */
+export const maxHp = (s: Stats) => Math.max(CLAMP.hpMin, Math.round(s.hp));
+/** 墨宝 alive at once (≤ 12). */
+export const summonCapOf = (s: Stats) => Math.max(0, Math.min(CLAMP.summonCapMax, Math.floor(s.summonCap)));
+/** 棋子 on the board at once (≤ 14). */
+export const stonesOf = (s: Stats) => Math.max(0, Math.min(CLAMP.stonesMax, Math.floor(s.stones)));
 
 function convertSource(from: ConvertFrom, s: Stats, run: RunSave): number | null {
   switch (from) {
@@ -376,12 +394,19 @@ export function weaponHit(run: RunSave, stats: Stats, id: WeaponId, t: Tier, ite
   const def = WEAPONS[id];
   const tier4Crit = t === 4 ? def.p.critT4 : undefined;
   const wc = def.crit + (typeof tier4Crit === 'number' ? tier4Crit : 0);
+  // 墨宝 (critX 0) crit only with 画龙点睛, at its ×2.0 (§4.5)
+  const critX = def.critX > 0 ? def.critX : def.classes.includes('ink') ? dottingX(run) : 0;
   return {
     raw: rawDamage(def, t, stats),
     mult: dmgMult(stats) * charMult(run, def) * itemMult,
-    crit: def.critX > 0 ? critChance(wc, stats) : 0,
-    critM: critMult(def.critX, wc, stats),
+    crit: critX > 0 ? critChance(wc, stats) : 0,
+    critM: critX > 0 ? critMult(critX, wc, stats) : 1,
   };
+}
+/** 画龙点睛's crit multiplier for 墨宝 (0 without it: they cannot crit). */
+export function dottingX(run: Pick<RunSave, 'items' | 'char'>): number {
+  for (const { e } of effectsOf(run)) if (e.hook === 'summon' && e.do === 'crit') return e.x;
+  return 0;
 }
 /**
  * One enemy hit on the player (§4.3), after dodge and i-frames: `scaled` is E.dmg × dmgX(w) (and any
@@ -497,14 +522,14 @@ export const cardRerollCost = (w: number, k: number) => 2 + Math.ceil(w / 2) + k
 /** Abbreviate big numbers: 1.2万 / 12k (below 10,000 as is). */
 export function fmtBig(n: number, lang: 'zh' | 'en'): string {
   const a = Math.abs(n), s = n < 0 ? '-' : '';
-  const r = (x: number) => (x >= 100 ? String(Math.round(x)) : String(Math.round(x * 10) / 10));
-  if (lang === 'zh') {
-    if (a >= 1e8) return s + r(a / 1e8) + '亿';
-    if (a >= 1e4) return s + r(a / 1e4) + '万';
-    return s + String(Math.round(a));
-  }
-  if (a >= 1e9) return s + r(a / 1e9) + 'b';
-  if (a >= 1e6) return s + r(a / 1e6) + 'm';
-  if (a >= 1e4) return s + r(a / 1e3) + 'k';
-  return s + String(Math.round(a));
+  if (Math.round(a) < 1e4) return s + String(Math.round(a));
+  const units = lang === 'zh' ? ZH_UNITS : EN_UNITS;
+  const r = (x: number) => (x >= 100 ? Math.round(x) : Math.round(x * 10) / 10);
+  let i = 0;
+  while (i + 1 < units.length && a >= units[i + 1][0]) i++;
+  // a value that rounds up to the next unit's size moves up: 999,999 → 1m, not 1000k; 99,999,999 → 1亿
+  if (i + 1 < units.length && r(a / units[i][0]) >= units[i + 1][0] / units[i][0]) i++;
+  return s + String(r(a / units[i][0])) + units[i][1];
 }
+const ZH_UNITS: readonly (readonly [number, string])[] = [[1e4, '万'], [1e8, '亿']];
+const EN_UNITS: readonly (readonly [number, string])[] = [[1e3, 'k'], [1e6, 'm'], [1e9, 'b']];

@@ -11,7 +11,8 @@
 // Frames and variants (what `sprite(id, v)` means):
 //   char:<id>        v 0 idle · 1, 2 walk steps · 3 hurt. All face right: flip x when facing left.
 //   mon/elite:<id>   v 0, 1 walk (alternate ~5 Hz) · 2 tell / attack pose. Face right.
-//   boss:<id>:<p>    v 0, 1 idle breathing. Face right.
+//   boss:<id>:<p>    v 0, 1 idle breathing. Face right. p 3 (倒悬) is baked when the vow is taken;
+//                    sprite/flash/has fall back from :3 to :2 when it is not.
 //   drop:cashCoin    v 0–3 spin frames (edge-on at 2); the glint is v 0.
 //   wpn / proj       point along +x (rotate to the aim); weapons are anchored at the grip.
 //   everything else  v 0.
@@ -24,13 +25,13 @@ import {
 import type {
   ArenaGeom, AtlasId, BakeStage, Camera, NumStyle, Painter, Quality, RunSave, Sprite, StampKind, TeleShape,
 } from '../types';
-import { canvas, ctx2d, pack, Pages, renderSpec } from './atlas';
+import { canvas, ctx2d, pack, Pages, renderSpec, warmGrain } from './atlas';
 import { ArenaLayer } from './arena';
 import { BOSS_SPEC } from './bosses';
 import { CHAR_SPECS } from './figures';
 import { PROJ_SPECS, SUM_SPECS, WPN_SPECS } from './gear';
 import { ITEM_SPECS } from './items';
-import type { Spec } from './kit';
+import { B, extentOf, type Spec } from './kit';
 import { MON_SPECS } from './monsters';
 import { Numbers } from './numbers';
 import { Tele } from './tele';
@@ -42,7 +43,10 @@ export { abbrev } from './numbers';
 /** Sprite resolution: CSS px per u at bake time, by quality (× the capped dpr). */
 const PX_PER_U: Record<Quality, number> = { low: 0.85, mid: 1, high: 1.15 };
 const FONT_WAIT_MS = 1500;
-const SLICE_MS = 8;
+/** Bake budget per frame (GDD §21: 6 ms). One job always runs, so a single big sprite can exceed it. */
+const SLICE_MS = 6;
+/** Icons kept painted (≈ 48–96 px each: a few MB at most). */
+const ICON_CACHE = 260;
 
 type Kind = 'char' | 'mon' | 'elite' | 'boss' | 'wpn' | 'item' | 'sum' | 'proj' | 'drop' | 'fx';
 
@@ -88,7 +92,7 @@ function scaleOps(b: import('./kit').B, k: number, paint: () => void) {
   for (let i = from; i < b.ops.length; i++) {
     const op = b.ops[i];
     if (op.k === 'stroke') op.s = { ...op.s, pts: op.s.pts.map((q) => ({ x: q.x * k, y: q.y * k, w: op.s.kind === 'fill' || op.s.kind === 'wash' ? q.w : q.w * k })) };
-    else { const f = op.f; op.f = (g) => { g.scale(k, k); f(g); }; }
+    else { const f = op.f; op.f = (g) => { g.scale(k, k); f(g); }; if (op.bb) op.bb = [op.bb[0] * k, op.bb[1] * k, op.bb[2] * k, op.bb[3] * k]; }
   }
 }
 
@@ -99,8 +103,8 @@ export function allAtlasIds(): AtlasId[] {
   for (const m of MONSTER_REG) out.push(`mon:${m.id}`);
   for (const t of TREASURE_REG) out.push(`mon:${t.id}`);
   for (const e of ELITE_REG) out.push(`elite:${e.id}`);
-  for (const bo of BOSS_REG) for (let p = 0; p < 3; p++) out.push(`boss:${bo.id}:${p}`);
-  for (let p = 0; p < 3; p++) out.push(`boss:mirrorself:${p}`);
+  for (const bo of BOSS_REG) for (let p = 0; p < 4; p++) out.push(`boss:${bo.id}:${p}`);
+  for (let p = 0; p < 4; p++) out.push(`boss:mirrorself:${p}`);
   for (const w of WEAPON_REG) out.push(`wpn:${w.id}`);
   for (const i of ITEM_REG) out.push(`item:${i.id}`);
   for (const s of SUMMON_REG) out.push(`sum:${s.id}`);
@@ -121,20 +125,30 @@ function rosterOf(map: MapId): AtlasId[] {
   for (const e of ELITE_REG) if (e.map === map) out.push(`elite:${e.id}`);
   return out as AtlasId[];
 }
-function bossIds(id: BossId | 'mirrorself'): AtlasId[] {
-  return [0, 1, 2].map((p) => `boss:${id}:${p}` as AtlasId);
+/** A boss's phases: 0–2, and 3 when 倒悬 gives every boss a 4th phase. */
+function bossIds(id: BossId | 'mirrorself', daoxuan: boolean): AtlasId[] {
+  return (daoxuan ? [0, 1, 2, 3] : [0, 1, 2]).map((p) => `boss:${id}:${p}` as AtlasId);
+}
+/** `boss:X:3` → `boss:X:2` (the 倒悬 phase reuses the last one when it was not baked). */
+function fallbackOf(id: string): string | null {
+  return id.startsWith('boss:') && id.endsWith(':3') ? id.slice(0, -1) + '2' : null;
 }
 
 /** Wait for the faces that sprites and numbers are drawn in (never bake fallback glyphs). */
 async function fontsReady(): Promise<void> {
   const f = typeof document !== 'undefined' ? document.fonts : undefined;
   if (!f || typeof f.load !== 'function') return;
-  const sample = '0123456789.+-kMB万亿镇月雷火当令杜玉十';
+  const sample = '0123456789.+-kmb万亿镇月雷火当令杜玉十';
   const loads = Promise.all([
     f.load(`32px 'Ma Shan Zheng'`, sample),
     f.load(`32px 'LXGW WenKai'`, sample),
   ]).then(() => undefined, () => undefined);
   await Promise.race([loads, new Promise<void>((r) => setTimeout(r, FONT_WAIT_MS))]);
+}
+
+function fontsLoaded(): boolean {
+  const f = typeof document !== 'undefined' ? document.fonts : undefined;
+  try { return !f || typeof f.check !== 'function' || f.check(`16px 'Ma Shan Zheng'`, '月'); } catch { return true; }
 }
 
 const nextFrame = () => new Promise<void>((r) => {
@@ -152,6 +166,9 @@ class InkPainter implements Painter {
   private normal = new Map<string, Entry>();
   private inv = new Map<string, Entry>();
   private self: CharacterId = 'scholar';
+  /** Painted icons, least recently used first. */
+  private icons = new Map<string, HTMLCanvasElement>();
+  private warmed = new Set<string>();
   /** Bake enemies as 倒影 (the endless stage). */
   private wantInv = false;
   private arena: ArenaLayer;
@@ -169,6 +186,7 @@ class InkPainter implements Painter {
 
   plan(run: RunSave, stage: BakeStage): AtlasId[] {
     this.self = run.char;
+    const dx = !!run.vows?.daoxuan;
     const out = new Set<AtlasId>();
     const next = run.wave + 1;
     const bosses = bossesOf(run.map);
@@ -188,16 +206,16 @@ class InkPainter implements Painter {
       for (const d of DROP_REG) out.add(`drop:${d.id}` as AtlasId);
       for (const f of FX_REG) out.add(`fx:${f.id}` as AtlasId);
       // a resumed run near a boss, or deep in endless, needs those too
-      if (next % 10 === 0 || next % 10 === 9) for (const b of bossFor(next % 10 === 0 ? next : next + 1)) for (const id of bossIds(b)) out.add(id);
+      if (next % 10 === 0 || next % 10 === 9) for (const b of bossFor(next % 10 === 0 ? next : next + 1)) for (const id of bossIds(b, dx)) out.add(id);
       if (run.wave >= 30) for (const id of this.plan(run, 'endless')) out.add(id);
     } else if (stage === 'boss') {
       const w = next % 10 === 0 ? next : Math.ceil(next / 10) * 10;
-      for (const b of bossFor(w)) for (const id of bossIds(b)) out.add(id);
+      for (const b of bossFor(w)) for (const id of bossIds(b, dx)) out.add(id);
     } else {
       this.wantInv = true;
       for (const m of ['lake', 'forest', 'palace'] as MapId[]) for (const id of rosterOf(m)) out.add(id);
-      for (const b of bosses) for (const id of bossIds(b)) out.add(id);
-      for (const id of bossIds('mirrorself')) out.add(id);
+      for (const b of bosses) for (const id of bossIds(b, dx)) out.add(id);
+      for (const id of bossIds('mirrorself', dx)) out.add(id);
     }
     return [...out];
   }
@@ -218,6 +236,24 @@ class InkPainter implements Painter {
     const total = jobs.length;
     let done = 0;
     onProgress?.(0, total);
+    // warm the grain tiles of every colour the jobs use, a slice at a time, before the first sprite
+    for (let i = 0; i < jobs.length;) {
+      const t0 = performance.now();
+      do {
+        const j = jobs[i++];
+        const b = new B(1);
+        try { specOf(j.id, this.self)?.spec.paint(b, j.v); } catch { continue; }
+        const fine: string[] = [], wet: string[] = [];
+        for (const op of b.ops) {
+          if (op.k !== 'stroke' || !op.s.color || this.warmed.has(op.s.color + op.s.kind)) continue;
+          this.warmed.add(op.s.color + op.s.kind);
+          (op.s.kind === 'wash' ? wet : fine).push(op.s.color);
+        }
+        if (fine.length || wet.length) warmGrain(fine, wet);
+      } while (i < jobs.length && performance.now() - t0 < SLICE_MS);
+      if (i < jobs.length) await nextFrame();
+      if (this.disposed) return;
+    }
     const pending = new Map<string, Entry>();
     while (done < total) {
       const t0 = performance.now();
@@ -257,9 +293,12 @@ class InkPainter implements Painter {
   }
 
   private entry(id: AtlasId): Entry | undefined {
-    if (this.arena.inverted) return this.inv.get(id) ?? this.normal.get(id);
-    return this.normal.get(id) ?? this.inv.get(id);
+    const e = this.inverted() ? this.inv.get(id) ?? this.normal.get(id) : this.normal.get(id) ?? this.inv.get(id);
+    if (e) return e;
+    const fb = fallbackOf(id);
+    return fb ? this.entry(fb as AtlasId) : undefined;
   }
+  private inverted(): boolean { return this.arena.inverted; }
   has(id: AtlasId): boolean { return !!this.entry(id); }
   sprite(id: AtlasId, v = 0): Sprite | null {
     const e = this.entry(id);
@@ -292,16 +331,34 @@ class InkPainter implements Painter {
     this.nums.draw(ctx, value, sx, sy, style, a, lang);
   }
 
+  /** A fresh canvas each call (the UI may keep or mutate it), copied from a painted icon cached by
+   *  id, size and dpr: the codex's 185 pages or a shop reroll never repaint the brush work. */
   icon(id: AtlasId, px: number): HTMLCanvasElement {
     const d = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1;
     const size = Math.max(8, Math.round(px * d));
+    const key = `${id}|${size}|${id.startsWith('boss:mirrorself') ? this.self : ''}`;
+    let src = this.icons.get(key);
+    if (!src) {
+      src = this.paintIcon(id, size);
+      // never keep an icon painted in a fallback face (glyph icons before the brush font has loaded)
+      if (fontsLoaded()) {
+        if (this.icons.size >= ICON_CACHE) this.icons.delete(this.icons.keys().next().value as string);
+        this.icons.set(key, src);
+      }
+    } else { this.icons.delete(key); this.icons.set(key, src); }
     const c = canvas(size, size);
     c.style.width = c.style.height = px + 'px';
+    try { ctx2d(c).drawImage(src, 0, 0); } catch { /* a lost context: an empty icon */ }
+    return c;
+  }
+
+  private paintIcon(id: AtlasId, size: number): HTMLCanvasElement {
+    const c = canvas(size, size);
     if (id.startsWith('char:')) { paintPortrait(c, id.slice(5), false); return c; }
     const sp = specOf(id, this.self);
     if (!sp) return c;
     try {
-      const [x0, y0, x1, y1] = sp.spec.box;
+      const [x0, y0, x1, y1] = extentOf(sp.spec, 0, seedOf(id));
       const k = (size * 0.86) / Math.max(x1 - x0, y1 - y0);
       const p = renderSpec(sp.spec, 0, { k, seed: seedOf(id), halo: Math.max(1, Math.round(size / 40)), ghost: sp.ghost });
       const g = ctx2d(c);
@@ -321,6 +378,8 @@ class InkPainter implements Painter {
     this.normal.clear();
     this.inv.clear();
     this.arena.dispose();
+    for (const c of this.icons.values()) { c.width = 1; c.height = 1; }
+    this.icons.clear();
   }
 }
 

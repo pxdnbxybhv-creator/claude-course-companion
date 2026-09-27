@@ -2,7 +2,7 @@
 // Every other logic module is pure; the UI calls these at the moments GDD §16 and §23 name, and each
 // money move is one batch with its counter, then meta is written, then payOwed() settles the purse.
 import { batch } from '@preact/signals';
-import { mirror, payOwed, saveMetaNow, updateMeta } from '../../../app/mirror';
+import { flushPlay, mirror, payOwed, saveMetaNow, updateMeta } from '../../../app/mirror';
 import { play, record, recordMax, refund, spend, unlocked } from '../../../app/play';
 import { hashString } from '../../../core/rng';
 import { todayKey } from '../../../core/date';
@@ -11,6 +11,7 @@ import type {
   CharacterId, CodexKey, DeathResult, DiffIndex, EndCause, MirrorMeta, MirrorSettings, RunReport, RunSave, TitleId, VowRanks,
   WaveResult, WaveSetup,
 } from '../types';
+import { RUN_VER } from '../types';
 import { PAY, VOWS, HEAT_MAX, rateOf } from '../data';
 import { heatOf } from './formulas';
 import { bankSleeve, nextRun, reconcileTicket, releaseHeld, rollDay, settlePay, withDay } from './economy';
@@ -72,11 +73,14 @@ export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; r
     let ok = false;
     batch(() => { ok = spend(PAY.FEE); if (ok) record('mirror:paid'); });
     if (!ok) return { ok: false, reason: 'short' };
+    flushPlay(); // the purse and its ticket land before meta records the run (a hard kill never leaves it unpaid)
     ticket = play.value.counters['mirror:paid'] ?? paidBefore + 1;
     runIndex = Math.max(2, d.runs + 1);
   }
   const unlocks = unlocksOf(m);
   let { char, map, diff, vows } = o;
+  // a companion still locked in the main game (a stale lobby, an older backup) can't be taken in (§11)
+  if (!unlocked.value.includes(char)) char = 'scholar';
   let term = null, mutator = null, boon = null, seed = freshSeed();
   if (o.daily) {
     const spec = dailySpec(today, m, unlocked.value);
@@ -112,7 +116,8 @@ export function commit(run: RunSave): void {
 /** The lobby opens: roll the day, pay first-time bonuses an earlier full day held back, pay what is owed. */
 export function lobbyVisit(): void {
   const today = todayKey();
-  set(releaseHeld(withDay(mirror.value, today), today));
+  const m = releaseHeld(withDay(mirror.value, today), today);
+  set(unlocked.value.includes(m.lobby.char) ? m : { ...m, lobby: { ...m.lobby, char: 'scholar' } });
   payOwed();
 }
 
@@ -124,6 +129,7 @@ export function lobbyVisit(): void {
 export function resumeCheck(): RunReport | null {
   const m = mirror.value;
   if (!m.active) return null;
+  if (newerSave()) return null; // a later build's run: left alone for that build (the lobby asks for a reload)
   const valid = validateRun(m.active);
   if (!valid) { set({ ...m, active: null }); return null; }
   const run = migrateRun(valid);
@@ -138,6 +144,15 @@ export function resumeCheck(): RunReport | null {
   return null;
 }
 
+/**
+ * Is the paused run from a newer build (an old tab or a stale service worker after an update)? Then
+ * this build must not play, migrate or settle it: 续镜 is replaced by 「此局存于新版，请刷新」.
+ */
+export function newerSave(): boolean {
+  const run = mirror.value.active;
+  return !!run && typeof run.ver === 'number' && run.ver > RUN_VER;
+}
+
 /** Start the next wave: inWave is saved before the engine runs. */
 export function startWave(run: RunSave): { run: RunSave; setup: WaveSetup } {
   const r = beginWave(run);
@@ -146,10 +161,14 @@ export function startWave(run: RunSave): { run: RunSave; setup: WaveSetup } {
   return { run: r, setup };
 }
 
-/** A won wave: fold it, bank its sleeve and tallies in the same write, then pay the purse. */
-export function waveWon(res: WaveResult): RunSave {
+/**
+ * A won wave: fold it, bank its sleeve and tallies in the same write, then pay the purse. Only the wave
+ * in play counts: a duplicate, a late hook after 暂离 or a settle, or a wrong wave number changes
+ * nothing and returns the run as it is (null when there is none).
+ */
+export function waveWon(res: WaveResult): RunSave | null {
   const m0 = mirror.value;
-  if (!m0.active) throw new Error('mirror: no active run');
+  if (!m0.active || m0.active.inWave === null || m0.active.inWave !== res.wave) return m0.active;
   const today = todayKey();
   const run = endWave(m0.active, res);
   const b = bankSleeve(m0, run, res.sleeve, today);
@@ -163,21 +182,25 @@ function settle(run: RunSave, cause: EndCause): RunReport {
   const today = todayKey();
   const s = settleMeta(mirror.value, run, cause, today);
   const p = settlePay(s.meta, run, today);
-  set({ ...p.meta, active: null });
   batch(() => {
     if (p.pay.back > 0) refund(p.pay.back);
     record('mirror:runs');
     recordMax('mirror:best', run.wave);
     if (run.wave >= 30) record('mirror:clear');
   });
+  flushPlay(); // the refund and counters land before meta forgets the run
+  set({ ...p.meta, active: null });
   payOwed();
   return { ...s.report, pay: p.pay };
 }
 
-/** 镜碎 during a wave: the partial counts for deeds and tallies; its sleeve sinks with the glass. */
-export function died(d: DeathResult): RunReport {
+/**
+ * 镜碎 during a wave: the partial counts for deeds and tallies; its sleeve sinks with the glass. A death
+ * that is not the wave in play (after 暂离, a settle, or twice) is ignored: null.
+ */
+export function died(d: DeathResult): RunReport | null {
   const m = mirror.value;
-  if (!m.active) throw new Error('mirror: no active run');
+  if (!m.active || m.active.inWave === null || m.active.inWave !== d.wave) return null;
   const run = foldPartial(m.active, d.partial);
   mirror.value = foldKills(m, d.partial.killsBy);
   return settle(run, 'death');
@@ -215,8 +238,8 @@ export function voidRun(): void {
     d.refunded = true;
   }
   if (sameDay) d.runs = Math.max(0, d.runs - 1);
+  if (back) { refund(back); flushPlay(); } // the refund lands before meta drops the run
   set({ ...m, payDay: d, active: null });
-  if (back) refund(back);
 }
 /** The engine gave up (a second throw within 5 s): void before wave 2, else settle as 镜碎 ('error'). */
 export function engineFailed(): RunReport | null {
