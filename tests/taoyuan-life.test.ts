@@ -2,7 +2,9 @@
 // goods in kind, the one idempotent restore — and the owner's code opening none of it; then the board,
 // the hours of 歇一歇, the festival override, the quest rows, the absence letter, the echoes and the lines.
 import { beforeEach, describe, expect, it } from 'vitest';
-import { play, emptyPlay, redeemCode, _acceptCodeForTests } from '../src/app/play';
+import { play, emptyPlay, questValue, redeemCode, _acceptCodeForTests } from '../src/app/play';
+import { emptyState } from '../src/app/store';
+import { zhiweiCount } from '../src/views/walk/shidan/ShidanSheet';
 import { CHARACTERS, type CharacterId } from '../src/data/characters';
 import { BEATS, beatFlag, phaseOf, type Beat } from '../src/views/walk/features/taoyuan/text';
 import { canTravelToValley, lifeOpen } from '../src/views/walk/features/taoyuan/life/gate';
@@ -155,7 +157,7 @@ import {
   CUP_GUESTS, KING_CODES, NEXT_PART, REST_HOURS, SEASON_DISH, SONG_NAMES, boardFor, cnThousands, festivalChoices, festivalDish,
   newsOf, petalsOfDay, seatsOfDay, songOfDay, yueFor, yueOfDay,
 } from '../src/views/walk/features/taoyuan/life/daily';
-import { EAT_PREFIX, SEAL_PREFIX, SEASON_EAT_PREFIX, BACK, LAST_DAY, dayNumber, eatKey } from '../src/views/walk/features/taoyuan/life/keys';
+import { EAT_PREFIX, SEAL_PREFIX, SEASON_EAT_PREFIX, ZHIWEI_NOT, BACK, LAST_DAY, dayNumber, eatKey } from '../src/views/walk/features/taoyuan/life/keys';
 import { NEWS, GEGU_LINES, SHIGU_DISH, SHIGU_GAME, FIRST_RETURN } from '../src/views/walk/features/taoyuan/life/life-text';
 import * as LIFE_TEXT from '../src/views/walk/features/taoyuan/life/life-text';
 import { moodOfTaste, shiguEcho } from '../src/views/walk/features/taoyuan/life/moods';
@@ -255,8 +257,19 @@ describe('外头的节 (the festival 席)', () => {
 
 describe('the quests (知味, 乐土, 四时)', () => {
   const q = (id: string) => QUESTS.find((x) => x.id === id)!;
+  it('知味 counts the twelve year-round dishes: not 桃花茶, not the seasonal ones', () => {
+    const p = emptyPlay();
+    for (const k of ['tyl:eat:zhou', 'tyl:eat:taocha', 'tyl:eat:s-aigao', 'tyl:eat:s-guiyu']) p.flags[k] = true;
+    expect(questValue(q('q-zhiwei'), p, emptyState())).toBe(1);
+    expect(zhiweiCount(p.flags)).toBe(1);
+    // the twelve are all within reach without 桃花茶 or a season
+    const year = YEAR_DISHES.filter((d) => d !== 'taocha');
+    expect(year.length).toBeGreaterThanOrEqual(ZHIWEI_TARGET);
+    for (const d of year) p.flags[eatKey(d)] = true;
+    expect(questValue(q('q-zhiwei'), p, emptyState())).toBe(year.length);
+  });
   it('count the life flags by their keys.ts prefixes', () => {
-    expect(q('q-zhiwei').goal).toEqual({ kind: 'flags', prefix: EAT_PREFIX, target: ZHIWEI_TARGET });
+    expect(q('q-zhiwei').goal).toEqual({ kind: 'flags', prefix: EAT_PREFIX, target: ZHIWEI_TARGET, not: ZHIWEI_NOT });
     expect(q('q-letu').goal).toEqual({ kind: 'flags', prefix: SEAL_PREFIX, target: 6 });
     expect(q('q-sishi').goal).toEqual({ kind: 'flags', prefix: SEASON_EAT_PREFIX, target: 4 });
     for (const id of ['q-zhiwei', 'q-letu', 'q-sishi']) expect('seal' in q(id).reward).toBe(true);

@@ -19,7 +19,7 @@ import { pickDaily } from '../features/npcs/logic';
 import { VILLAGERS } from '../features/taoyuan/folk';
 import { COOKS, DISHES, GAME_SEAL, SHIDAN, seasonHint, seasonWait } from '../features/taoyuan/life/food';
 import {
-  EAT_PREFIX, GAME_IDS, SEASON_DISHES, YEAR_DISHES, ZHIWEI_TARGET, ateKey, bestGentleKey, bestKey, eatKey, sealKey,
+  EAT_PREFIX, GAME_IDS, SEASON_DISHES, YEAR_DISHES, ZHIWEI_NOT, ZHIWEI_TARGET, ateKey, bestGentleKey, bestKey, eatKey, sealKey,
 } from '../features/taoyuan/life/keys';
 import { seasonAt } from '../features/taoyuan/life/table-logic';
 import { thumbCached, thumbOf } from '../features/taoyuan/life/paint';
@@ -32,9 +32,9 @@ type Flags = Readonly<Record<string, true | undefined>>;
 const L = (t: T, l: Line) => t(l.zh, l.en);
 const COLS = 4;
 
-/** 知味: every dish tasted counts (the quest counts the same flags), shown up to 12. */
+/** 知味: the year-round dishes tasted, 桃花茶 aside (the quest counts the same flags), shown up to 12. */
 export function zhiweiCount(f: Flags): number {
-  return Object.keys(f).filter((k) => k.startsWith(EAT_PREFIX) && f[k]).length;
+  return Object.keys(f).filter((k) => k.startsWith(EAT_PREFIX) && f[k] && !ZHIWEI_NOT.some((n) => k.startsWith(n))).length;
 }
 
 // ───────────────────────────── the chip (WalkView shows it in the 案卷 chip's slot)

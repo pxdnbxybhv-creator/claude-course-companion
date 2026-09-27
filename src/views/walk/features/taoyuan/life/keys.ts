@@ -74,6 +74,8 @@ export const PV_OFF = 'tyl:pv:off';
 export const EAT_PREFIX = 'tyl:eat:';
 export const SEAL_PREFIX = 'tyl:seal:';
 export const SEASON_EAT_PREFIX = 'tyl:eat:s-';
+/** 知味 leaves these out: 桃花茶 (only after the case) and the seasonal dishes (四时 counts those). */
+export const ZHIWEI_NOT: readonly string[] = ['tyl:eat:taocha', SEASON_EAT_PREFIX];
 
 // ───────────────────────────── counters (lifetime; record() also counts them today)
 

@@ -70,7 +70,8 @@ src/
       features/      festivals, everyday life, mini-games and NPCs (features/minigames/); the folk
                      (features/npcs/: crowd.ts, folk.ts names, folk-lines.ts / folk-arcs.ts talk and
                      stories, talk.ts); 桃源 (features/taoyuan/: valley, fx, door, story, villagers, the
-                     case 落花为证 — see features/taoyuan/API.md)
+                     case 落花为证, and life/: food and the 食单, the tasting close-up, six games, everyday life
+                     — see features/taoyuan/API.md)
       characters/    the thirteen companions (models, portraits, the picker)
   data/        also characters.ts (the cast) and quests.ts; app/play.ts keeps play progress
   lab/         visual test bench: /lab.html?scene=<name> (scenes in src/lab/scenes/*.ts)

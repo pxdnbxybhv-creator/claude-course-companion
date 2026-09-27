@@ -10,8 +10,8 @@ export type QuestGoal =
   | { kind: 'best'; key: string; target: number }
   /** A one-off flag being set (flag()). */
   | { kind: 'flag'; key: string }
-  /** Several flags with a common prefix (e.g. every region visited). */
-  | { kind: 'flags'; prefix: string; target: number }
+  /** Several flags with a common prefix (e.g. every region visited), leaving out any that start with one of `not`. */
+  | { kind: 'flags'; prefix: string; target: number; not?: readonly string[] }
   /** Real life: the longest current streak of any habit. */
   | { kind: 'streak'; target: number }
   /** Real life: sticks of incense burned to the end. */
@@ -62,7 +62,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'q-photo', zh: '取景', en: 'Framing', descZh: '在画中拍下五张照片。', descEn: 'Take five photographs inside the painting.', hintZh: '入画里的「影」，自由走位，找个好角度。', hintEn: 'The camera in the painting: roam free and find an angle.', goal: { kind: 'counter', key: 'photo', target: 5 }, reward: { seal: '取景', sealEn: 'Framing' } },
   { id: 'q-taoyuan', zh: '桃源记', en: 'The Peach Blossom Record', descZh: '循着瀑后的光，走进桃源，又走出来。', descEn: 'Follow the light behind the waterfall into the Peach Spring — and out again.', hintZh: '山寺的瀑布后面，仿佛有光。先读一读拾得的信。', hintEn: 'Behind the mountain temple\'s waterfall there seems to be light. Read Shide\'s letter first.', goal: { kind: 'flag', key: 'ty:b8' }, reward: { seal: '桃源', sealEn: 'Peach Spring' } },
   { id: 'q-mingcha', zh: '落花为证', en: 'The Petals Bear Witness', descZh: '断明桃源花朝失印一案。', descEn: 'Solve the case of the seal lost on Flower-Festival night in the Peach Spring.', hintZh: '香会说谎，花不会。', hintEn: 'Incense can lie. Petals cannot.', goal: { kind: 'flag', key: 'case:hz:solved' }, reward: { seal: '明察', sealEn: 'Clear-Sighted' } },
-  { id: 'q-zhiwei', zh: '知味', en: 'Knowing the Taste', descZh: '在桃源尝遍十二样吃食。', descEn: 'Taste twelve dishes in the Peach Spring.', hintZh: '桃源里吃遍十二样。有三样，得自己带东西去换。', hintEn: "Taste twelve dishes in the Peach Spring. Three of them you'll have to trade for.", goal: { kind: 'flags', prefix: 'tyl:eat:', target: 12 }, reward: { seal: '知味', sealEn: 'Knowing the Taste' } },
+  { id: 'q-zhiwei', zh: '知味', en: 'Knowing the Taste', descZh: '在桃源尝遍十二样吃食。', descEn: 'Taste twelve dishes in the Peach Spring.', hintZh: '桃源里吃遍十二样。有三样，得自己带东西去换。', hintEn: "Taste twelve dishes in the Peach Spring. Three of them you'll have to trade for.", goal: { kind: 'flags', prefix: 'tyl:eat:', target: 12, not: ['tyl:eat:taocha', 'tyl:eat:s-'] }, reward: { seal: '知味', sealEn: 'Knowing the Taste' } },
   { id: 'q-letu', zh: '乐土', en: 'The Happy Land', descZh: '谷中六戏，各得一枚印。', descEn: "Earn the seal of each of the valley's six games.", hintZh: '谷中六戏，每样都玩出个样子来。', hintEn: "Master all six of the valley's games.", goal: { kind: 'flags', prefix: 'tyl:seal:', target: 6 }, reward: { seal: '乐土', sealEn: 'The Happy Land' } },
   { id: 'q-sishi', zh: '四时', en: 'Four Seasons', descZh: '尝遍桂娘的四样时令菜。', descEn: "Taste all four of Gui Niang's seasonal dishes.", hintZh: '山外换季的时候，去尝桂娘的新菜。', hintEn: "When the seasons turn outside, try Gui Niang's new dish.", goal: { kind: 'flags', prefix: 'tyl:eat:s-', target: 4 }, reward: { seal: '四时', sealEn: 'Four Seasons' } },
   { id: 'q-pet', zh: '爱物', en: 'Beloved', descZh: '抚摸家园里的小动物十次。', descEn: 'Stroke your homestead\'s animals ten times.', hintZh: '先在家园里安一个窝，再领养。', hintEn: 'Place a pet home at your homestead, then adopt.', goal: { kind: 'counter', key: 'home-pet', target: 10 }, reward: { seal: '爱物', sealEn: 'Beloved' } },
