@@ -100,7 +100,7 @@ describe('fair play (bible §10)', () => {
     }
     // the bible's answers
     expect(K.QUESTIONS.map((q) => q.options[q.answer].zh)).toEqual([
-      '戌正前后', '桑三娘', '先揭泥封，以酒湿透亥正一段香路；香行至此自灭；再摔坛作乱', '不让阮郎今夜出谷：丈夫一去未归，她怕女儿也跟着走，或苦等一生', '覆花四分的补齿屐痕',
+      '戌正前后', '桑三娘', '先把酒倒在亥正往后的香上，再摔坛子做样子', '不让阮郎今夜走，怕桃叶跟他走，或是等他一辈子', '覆花四分的补齿屐痕',
     ]);
   });
 
@@ -170,7 +170,7 @@ describe('confronting a witness (对质)', () => {
     expect(K.confront('liupo', 'beiyin', all)).toBeNull();
     expect(K.confront('ruan', 'menxiang', all)).toBeNull();
     expect(K.confront('xiaoman', 'tan', all)).toBeNull();
-    expect(K.NOT_MINE.zh).toBe('这与我何干？');
+    for (const w of K.WITNESS_KEYS) expect(K.NOT_MINE[w].zh, w).toBeTruthy();
   });
 
   it('桃叶 gives way to 阮郎\'s testimony only once his lie is broken', () => {
@@ -201,7 +201,7 @@ describe('confronting a witness (对质)', () => {
     expect(K.statementNow('duer', F(K.brokeFlag('duer')))[0].zh).toContain('三娘往西去了');
     expect(K.statementNow('xiaoman', {})[0].zh).toContain('没偷印');
     expect(K.statementNow('xiaoman', F(K.CASE_FLAGS.found))[0].zh).toContain('一只齿响');
-    expect(K.T6.testimony.zh).toContain('香烟还是直直地往上冒');
+    expect(K.T6.testimony.map((l) => l.zh).join('')).toContain('香烟还是直直地往上冒');
   });
 });
 
@@ -229,12 +229,12 @@ describe('the judgement (bible §4.8)', () => {
     for (let i = 0; i < 5; i++) {
       const a = K.answer(q1, 0, tally);
       expect(a.right).toBe(false);
-      expect(a.lines[0].zh).toBe('香会说谎，花不会。');
+      expect(a.lines[0].zh).toBe('慢着。花落了几分？你看的是哪双脚印？');
       tally = a.tally;
       seen.push(a.hint?.zh ?? null);
     }
     expect(tally.miss).toBe(5);
-    expect(seen.slice(0, 3)).toEqual(Array(3).fill(null)); // (the elder's retort is the first note itself: not said twice)
+    expect(seen.slice(0, 3)).toEqual(Array(3).fill(K.HINT_STEP.when.tiers[0].zh)); // (the elder asks about the petals; the bluebird adds its first note)
     expect(seen.slice(3)).toEqual(Array(2).fill(K.HINT_STEP.when.tiers[1].zh));
     const r = K.answer(q1, 1, tally);
     expect(r.right).toBe(true);
@@ -264,7 +264,7 @@ describe('the judgement (bible §4.8)', () => {
       tally = a.tally;
       if (k === 4) expect(a.confessed).toBe(true); else expect(a.confessed).toBe(false);
     }
-    expect(retorts).toEqual(['……是我看错了。', '那时她同我在一处！', '一个孩子，揭得开泥封？']);
+    expect(retorts).toEqual(['亥初柳婆也在门口……是我嘴快。', '不是她！她那会儿跟我在一块儿，真的！', '我家小满？他连腌菜坛子的泥封都揭不开，回回喊我！']);
     expect(K.grade(tally.miss, 0, tally.q2miss >= 3)).toBe('zibai');
     expect(K.JUDGE.confess.zh).toBe('不必问了，是我。');
   });
@@ -407,7 +407,7 @@ describe("the owner's code", () => {
 describe('the fix round: words that read right', () => {
   it("杜二's lie is its own line: breaking it strikes only 「祭前我没碰过供桌」, not his true alibi", () => {
     const d = K.WITNESS.duer;
-    expect(d.opening).toHaveLength(2);
+    expect(d.opening).toHaveLength(3);
     expect(d.opening[0].zh).toBe('祭前我没碰过供桌！');
     expect(d.opening[1].zh).toContain('戌正我同阿黍');
     // (a return visit restates the lie itself, and the choices hang on it)

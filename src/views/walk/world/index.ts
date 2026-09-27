@@ -121,8 +121,11 @@ export interface WorldHandle {
   dispose(): void;
 }
 
-/** A waypoint for the map screen. */
-export interface WaypointInfo { id: RegionId; x: number; z: number; zh: string; en: string; lit: boolean }
+/**
+ * A waypoint for the map screen. `kind: 'petal'` (二期 · 桃源): 小满's pressed petal over the waterfall,
+ * a door rather than a stele — never counted among the steles lit.
+ */
+export interface WaypointInfo { id: RegionId; x: number; z: number; zh: string; en: string; lit: boolean; kind?: 'petal' }
 
 export class WebGLUnavailable extends Error {}
 
@@ -158,6 +161,16 @@ export interface WorldExtras {
   followLimit(fn: ((target: { x: number; y: number; z: number }, yaw: number) => { dist: number; pitch: number } | null) | null): void;
   /** The pocket region the walker is in now (pocket mode), or null. */
   pocket(): RegionId | null;
+  /**
+   * 二期 (桃源's 特写): hold the camera's field of view at `fov` degrees — honoured on resize, by the run
+   * kick and when the photo camera ends — or null to give back the walk's own lens (base + kick).
+   */
+  lens(fov: number | null): void;
+  /**
+   * 二期: a pocket region's door for fast travel. After travel(id)'s curtain lifts at the region's
+   * arrival point, the core calls `fn` (for 桃源, the story's door()). null: none.
+   */
+  pocketDoor(id: RegionId, fn: (() => void | Promise<void>) | null): void;
 }
 
 /** Where the ray from t to c first enters an upright cylinder, as a fraction of the way (null = never). */
@@ -948,6 +961,12 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   };
 
   let pocketFence: ((p: { x: number; y: number; z: number }, walker: { x: number; y: number; z: number }) => void) | null = null;
+  /** A feature's lens (the 特写's telephoto), or null for the walk's own (see WorldExtras.lens). */
+  let lensFov: number | null = null;
+  /** (set once the camera's lens and the photo camera exist, below) apply the lens now. */
+  let applyLens: () => void = () => {};
+  /** Pocket regions' doors for fast travel (WorldExtras.pocketDoor): travel() calls the one for its id once its curtain lifts. */
+  const pocketDoors = new Map<RegionId, () => void | Promise<void>>();
   const ctx: WorldCtxCore & WorldExtras = {
     THREE, scene, camera, renderer,
     groundY: floorY,
@@ -1003,6 +1022,14 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     photoFence(fn) { pocketFence = fn; },
     followLimit(fn) { controls.followLimit = fn; },
     pocket: () => pocket,
+    lens(fov: number | null) {
+      lensFov = fov !== null && Number.isFinite(fov) ? Math.max(10, Math.min(90, fov)) : null;
+      applyLens();
+    },
+    pocketDoor(id: RegionId, fn: (() => void | Promise<void>) | null) {
+      if (fn) pocketDoors.set(id, fn);
+      else pocketDoors.delete(id);
+    },
   };
 
   let playerMirrored = true;
@@ -1093,6 +1120,8 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
   /** Scene children that always stay: the sky, the walker, the bursts and dust, the gifts that follow the walker. */
   const pocketKeep = (o: THREE.Object3D) => skyTop.has(o) || o === player.root || o === player.shadowMesh || o === bursts.points || o === dust.points || o === verses.group || o === songBirds.mesh;
   /** Hide (or give back) what features put straight into the scene, by where it stands: far from the pocket, or far below it. */
+  /** Pools at the origin that belong to the open country, hidden in a pocket valley all the same. */
+  const POCKET_DROP = new Set(['parkour-coins']);
   const pocketScene = () => {
     if (!pocket) return;
     const r = REGION[pocket], P = r.pocket!;
@@ -1100,8 +1129,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       if (c.name.startsWith('region:') || pocketKeep(c) || c.userData.pocket) continue;
       if (coreLayers().includes(c)) continue;
       const p = c.position;
-      // (a pool of effects that follows the walker sits at the origin, never culled: it stays)
-      const follows = !c.frustumCulled && Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z) < 1e-3;
+      // (a pool of effects that follows the walker sits at the origin, never culled: it stays — but not the
+      //  parkour coins, a world-wide pool also at the origin whose every coin is out in the open country:
+      //  2 draws and 15k triangles in every valley frame)
+      const follows = !c.frustumCulled && Math.abs(p.x) + Math.abs(p.y) + Math.abs(p.z) < 1e-3 && !POCKET_DROP.has(c.name);
       const far = !follows && (Math.hypot(p.x - r.center.x, p.z - r.center.z) > P.ring + 6 || p.y < P.y - 25);
       if (far && c.visible) { c.visible = false; pocketHidden.add(c); }
       else if (!far && pocketHidden.has(c)) { c.visible = true; pocketHidden.delete(c); }
@@ -1297,11 +1328,19 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     place: () => { const r = REGION[region ?? lastPlace]; return { zh: r.zh, en: r.en }; },
     fovChanged: () => {
       // back from the photo camera: the lens the walk uses now (the screen may have turned meanwhile)
-      if (!photo.active) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+      if (!photo.active) { camera.fov = lensFov ?? baseFov + fovKick; camera.updateProjectionMatrix(); }
       setPx();
     },
     entered: () => stream(),
   });
+  applyLens = () => {
+    if (photo.active) return;
+    const f = lensFov ?? baseFov + fovKick;
+    if (Math.abs(camera.fov - f) < 1e-3) return;
+    camera.fov = f;
+    camera.updateProjectionMatrix();
+    setPx();
+  };
   // 身临其境 and the photo camera: the shadows' square goes round the ground the view centre falls on
   // (marched along the view), not below the camera — which may hang 40 m up — and widens a little
   // with the camera's height, so a bird's-eye frame keeps its shadows under a low sun as well
@@ -1424,7 +1463,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       const kick = !reduced && player.running && player.speed > 3.4 && !player.isFrozen ? 5 : 0;
       const f0 = fovKick;
       fovKick += (kick - fovKick) * Math.min(1, rawDt * (kick > fovKick ? 2.2 : 3.5));
-      if (Math.abs(fovKick - f0) > 0.01) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
+      if (Math.abs(fovKick - f0) > 0.01 && lensFov === null) { camera.fov = baseFov + fovKick; camera.updateProjectionMatrix(); }
     }
     dust.update(dt);
     // (the hour of a photograph turns at its own pace, even with the world's clock stopped)
@@ -1550,7 +1589,7 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     grade.setSize(w, h);
     camera.aspect = w / h;
     baseFov = w / h < 0.8 ? 62 : 50;
-    camera.fov = baseFov + fovKick;
+    camera.fov = lensFov ?? baseFov + fovKick;
     camera.updateProjectionMatrix();
     pond.setSize(w * pr, h * pr);
     setPx();
@@ -1610,9 +1649,14 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     // (on a skill's mount — 关公's 赤兔 — he simply swings down: the ride(null) below sets him on
     // his feet, and the skill sees he is off and lets the horse go)
     if (player.isFrozen && !player.heldBySkill) { hud.toast('此刻不便远行，先把手头的事做完。', 'Not now — finish what you are doing here first.'); return; }
-    // a pocket valley is on no map, and no road leads there (「不复得路」)
-    if (REGION[id]?.pocket) { hud.toast('此中之地，不在舆图。', 'That place is on no map.'); return; }
-    if (!isLit(id)) { hud.toast('那处驿站尚未到访：循路走到驿碑前，点亮它的灯。', 'Not yet visited: walk to its waypoint stele and light the lantern first.'); return; }
+    // a pocket valley is on no map, and no road leads there (「不复得路」) — except 桃源 once 小满's petal
+    // is in hand (ty:way): the curtain sets you down at its door, and the door (the story's) takes you in
+    const pocketed = !!REGION[id]?.pocket;
+    const door = pocketed ? pocketDoors.get(id) : undefined;
+    if (pocketed) {
+      if (!(id === 'taoyuan' && play.peek().flags['ty:way'] && door)) { hud.toast('此中之地，不在舆图。', 'That place is on no map.'); return; }
+      if (region === id || pocket === id) { hud.toast('此刻就在桃源。', "You're already in the Peach Spring."); return; }
+    } else if (!isLit(id)) { hud.toast('那处驿站尚未到访：循路走到驿碑前，点亮它的灯。', 'Not yet visited: walk to its waypoint stele and light the lantern first.'); return; }
     traveling = true;
     try {
       hud.curtain(true);
@@ -1642,6 +1686,10 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
       hud.curtain(false);
     } finally {
       traveling = false;
+    }
+    // (a pocket's door, once the curtain is up: the walk is the walker's again, and the door frames the falls)
+    if (door && running) {
+      try { await door(); } catch (err) { console.error('[walk] pocket door', err); }
     }
   };
 
@@ -1855,8 +1903,13 @@ export async function createWorld(o: WorldOptions): Promise<WorldHandle> {
     setPaused: (p: boolean) => { paused = p; controls.paused = p; },
     where: () => ({ x: player.position.x, z: player.position.z, heading: player.heading, region }),
     travel,
-    waypoints: () => (placed.length ? placed.map((w) => ({ id: w.id, x: w.sx, z: w.sz, zh: w.zh, en: w.en, lit: isLit(w.id) }))
-      : WAYPOINTS.map((w) => ({ id: w.id, x: w.x, z: w.z, zh: w.zh, en: w.en, lit: isLit(w.id) }))),
+    waypoints: (): WaypointInfo[] => {
+      const out: WaypointInfo[] = placed.length ? placed.map((w) => ({ id: w.id, x: w.sx, z: w.sz, zh: w.zh, en: w.en, lit: isLit(w.id) }))
+        : WAYPOINTS.map((w) => ({ id: w.id, x: w.x, z: w.z, zh: w.zh, en: w.en, lit: isLit(w.id) }));
+      // 二期: 小满's petal over the waterfall, once his letter is claimed (the valley itself is never drawn)
+      if (play.peek().flags['ty:way']) out.push({ id: 'taoyuan', kind: 'petal', x: ANCHORS.waterfall.x, z: ANCHORS.waterfall.z, zh: '持花入光', en: 'Enter with the petal', lit: true });
+      return out;
+    },
     setRun: (on: boolean) => { controls.runToggle = on; },
     setView: (v: ViewMode) => { controls.setView(v === 'first' ? 'first' : 'third'); },
     photo,

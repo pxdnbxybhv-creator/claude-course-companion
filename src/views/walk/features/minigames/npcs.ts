@@ -319,7 +319,7 @@ export const poet = feature('npc-poet', (bag, ctx) => {
 // ───────────────────────────── 放风筝的孩子, the child and the lost kite ─────────────────────────────
 
 /** A swallow kite (沙燕): a painted paper diamond with wings and two tails. */
-function kiteMesh(ctx: WorldCtx, body: string, wing: string): T.Mesh {
+export function kiteMesh(ctx: WorldCtx, body: string, wing: string): T.Mesh {
   const { THREE, palette: P } = ctx;
   const shape = new THREE.Shape();
   shape.moveTo(0, 0.42); shape.lineTo(0.12, 0.1); shape.lineTo(0.55, 0.12); shape.lineTo(0.14, -0.08); shape.lineTo(0.2, -0.5);

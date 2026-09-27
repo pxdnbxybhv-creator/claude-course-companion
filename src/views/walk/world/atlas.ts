@@ -12,8 +12,8 @@ export interface AtlasOpts {
   /** Where the walker stands (with the region: inside a pocket valley there is no mark, only a line). */
   player: { x: number; z: number; heading: number; region?: RegionId | null } | null;
   lang: 'zh' | 'en';
-  /** The waypoint steles and whether each is lit. */
-  waypoints?: readonly { id: RegionId; x: number; z: number; lit: boolean }[];
+  /** The waypoint steles and whether each is lit (`kind: 'petal'`: 小满's pressed petal, 桃源's door). */
+  waypoints?: readonly { id: RegionId; x: number; z: number; lit: boolean; kind?: 'petal' }[];
   /** The one picked on the map (drawn with a ring). */
   picked?: RegionId | null;
   /** Canvas pixels per CSS pixel (small screens: the steles are drawn big enough to tap). */
@@ -212,6 +212,7 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
     const x = X(w.x), z = Z(w.z);
     const u = Math.max(u0, (o.ui ?? 1) * 1.15);
     const picked = o.picked === w.id;
+    if (w.kind === 'petal') { paintPetal(g, x, z, u, picked, o.lang); continue; }
     if (w.lit) {
       const grd = g.createRadialGradient(x, z - 4 * u, 0, x, z - 4 * u, 16 * u);
       grd.addColorStop(0, 'rgba(255,184,107,0.75)');
@@ -276,6 +277,54 @@ export function paintAtlas(canvas: HTMLCanvasElement, o: AtlasOpts): void {
   g.strokeStyle = 'rgba(27,25,22,0.5)';
   g.lineWidth = 1.2 * u;
   g.beginPath(); g.moveTo(S - 34 * u, 48 * u); g.lineTo(S - 34 * u, 70 * u); g.stroke();
+}
+
+/**
+ * 二期 · 小满's pressed petal over the waterfall (桃源's door): five soft lobes of faded pink, a vein,
+ * a little torn at one edge, and 「持花入光」 beside it. No stele, no "you are here", no valley.
+ */
+function paintPetal(g: CanvasRenderingContext2D, x: number, z: number, u: number, picked: boolean, lang: 'zh' | 'en'): void {
+  const cy = z - 4 * u;
+  g.save();
+  const grd = g.createRadialGradient(x, cy, 0, x, cy, 15 * u);
+  grd.addColorStop(0, 'rgba(255,214,224,0.7)');
+  grd.addColorStop(1, 'rgba(255,214,224,0)');
+  g.fillStyle = grd;
+  g.beginPath(); g.arc(x, cy, 15 * u, 0, Math.PI * 2); g.fill();
+  if (picked) {
+    g.strokeStyle = 'rgba(185,58,43,0.9)';
+    g.lineWidth = 1.6 * u;
+    g.beginPath(); g.arc(x, cy, 14 * u, 0, Math.PI * 2); g.stroke();
+  }
+  // one pressed petal: a heart-notched teardrop, tilted, flattened into the paper
+  g.translate(x, cy);
+  g.rotate(-0.5);
+  g.beginPath();
+  g.moveTo(0, 8 * u);
+  g.bezierCurveTo(-8 * u, 3 * u, -7.5 * u, -6 * u, -2.2 * u, -7.5 * u);
+  g.quadraticCurveTo(0, -5.2 * u, 2.2 * u, -7.5 * u);
+  g.bezierCurveTo(7.5 * u, -6 * u, 8 * u, 3 * u, 0, 8 * u);
+  g.closePath();
+  g.fillStyle = 'rgba(236,160,178,0.92)';
+  g.fill();
+  g.strokeStyle = 'rgba(150,70,86,0.75)';
+  g.lineWidth = 0.9 * u;
+  g.stroke();
+  g.strokeStyle = 'rgba(150,70,86,0.45)';
+  g.beginPath(); g.moveTo(0, 7 * u); g.lineTo(0, -4.5 * u); g.stroke();
+  g.restore();
+  g.save();
+  g.textAlign = 'center';
+  g.textBaseline = 'top';
+  const fs = (lang === 'zh' ? 13 : 11) * u;
+  g.font = lang === 'zh' ? `${fs}px "LXGW WenKai", serif` : `italic ${fs}px "Cormorant Garamond", Georgia, serif`;
+  const text = lang === 'zh' ? '持花入光' : 'Enter with the petal';
+  const tw = g.measureText(text).width;
+  g.fillStyle = 'rgba(241,233,216,0.78)';
+  g.fillRect(x - tw / 2 - 3 * u, z + 6 * u, tw + 6 * u, fs * 1.3);
+  g.fillStyle = 'rgba(120,52,66,0.92)';
+  g.fillText(text, x, z + 6.5 * u);
+  g.restore();
 }
 
 /** Which place a tap (canvas pixels) lands on: a waypoint stele first (they are small), else a place's name. */

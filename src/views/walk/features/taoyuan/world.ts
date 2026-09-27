@@ -26,6 +26,8 @@ export class TaoyuanWorld {
   private offs: (() => void)[] = [];
   private exitOffs: (() => void)[] = [];
   private clockNow: ValleyClock = 'chang';
+  /** 二期 · 歇一歇: the valley's own hour for this visit (null: the world's). Cleared on the way out. */
+  private hourOverride: number | null = null;
   /** The valley's hush (the music held at 'quiet' through the narrow way) is on. */
   private quietHeld = false;
   private builtFns = new Set<(v: Valley) => void>();
@@ -140,6 +142,7 @@ export class TaoyuanWorld {
     if (!this.inside) return;
     this.inside = false;
     this.cleft = null;
+    this.hourOverride = null;
     this.hush(false);
     this.fx?.fireflies(false);
     this.fx?.holdPetals(false);
@@ -173,17 +176,25 @@ export class TaoyuanWorld {
    * Turn the valley's hour (bible §1.3): the sky, the light and the fog, and the things of each hour —
    * god rays at 申 and 卯, fireflies from 酉, the lane lanterns lit one by one at 戌, petals glowing in
    * lamplight at 亥 and 子, petals held and a knee-high mist at 案. 'chang' follows the world's hour.
-   * `secs`: how long the sky takes to turn (default 2.5).
+   * `secs`: how long the sky takes to turn (default 2.5). `hour` (二期 · 歇一歇): the valley's own hour
+   * for the rest of this visit, which 常 then paints (the way out gives the world's hour back).
    */
-  setClock(state: ValleyClock, o: { secs?: number } = {}): void {
+  setClock(state: ValleyClock, o: { secs?: number; hour?: number } = {}): void {
     this.clockNow = state;
+    if (o.hour !== undefined && Number.isFinite(o.hour)) this.hourOverride = ((o.hour % 24) + 24) % 24;
     if (this.inside) this.applyClock(o.secs ?? 2.5);
   }
+  /** The valley's hour now: 歇一歇's for this visit, or the world's. */
+  hour(): number {
+    return this.hourOverride ?? this.ctx.env.hour;
+  }
+  /** 歇一歇 has turned the valley's hour this visit. */
+  get hourHeld(): boolean { return this.hourOverride !== null; }
   private applyClock(secs: number): void {
     const fx = this.fx;
     const eng = engine(this.ctx);
     const s = this.clockNow;
-    eng.setMood(s, { secs });
+    eng.setMood(s, { secs, hour: s === 'chang' && this.hourOverride !== null ? this.hourOverride : undefined });
     if (!fx) return;
     // (常 is the world's own hour, as the sky resolved it: the walk's 时辰, a feature's night)
     const tod = s === 'chang' ? eng.moodTod() ?? 'day' : null;

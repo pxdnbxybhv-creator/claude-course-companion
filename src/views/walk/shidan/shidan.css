@@ -1,0 +1,98 @@
+/* 食单 · the valley's menu book: the chip on the walk (it borrows the 案卷 chip's place: case.css
+   .walk-case-chip), the sheet's pages in a grid of four, the 六戏 tab, the 设 tab. The sheet follows the
+   app's theme (tokens); the chip over the painting is always paper, like the walk's own. */
+
+/* ---------- the chip (in the 案卷 chip's slot) */
+.sd-chip .brush { background: #5f8a6e; }
+
+/* ---------- the sheet */
+.sd-sheet { display: flex; flex-direction: column; gap: 12px; padding-bottom: 6px; }
+.sd-count { margin: -4px 0 0; font-size: 13.5px; letter-spacing: 0.08em; color: var(--ink-3); }
+.sd-sheet .seg { align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.sd-dishes { display: flex; flex-direction: column; gap: 14px; }
+.sd-sec-h { margin: 0 0 6px; font-size: 13px; font-weight: 500; letter-spacing: 0.14em; color: var(--ink-3); }
+
+/* a grid of four: the tiles, and the open page spanning the row under its tile */
+.sd-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.sd-tile { position: relative; min-width: 0; }
+.sd-tile-btn {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px 7px;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink);
+  font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform 0.12s var(--ease), border-color 0.2s;
+}
+.sd-tile-btn:active { transform: scale(0.97); }
+.sd-tile.is-open .sd-tile-btn { border-color: var(--line-strong); background: var(--paper-3); }
+.sd-tile.is-blank .sd-tile-btn { border-style: dashed; background: transparent; }
+.sd-thumb { display: block; width: min(72px, 100%); aspect-ratio: 1; }
+.sd-thumb img, .sd-page-thumb img { display: block; width: 100%; height: 100%; }
+/* an untasted page: the dish's ink silhouette, nothing more */
+.sd-tile.is-blank img, .sd-page.is-blank img { filter: grayscale(1) brightness(0) opacity(0.22); }
+.sd-tile-name {
+  max-width: 100%; font-size: 12.5px; line-height: 1.25; text-align: center; letter-spacing: 0.04em;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.sd-tile.is-blank .sd-tile-name { color: var(--ink-3); }
+.sd-tile-seal {
+  position: absolute; top: 5px; right: 5px; display: inline-grid; place-items: center; width: 18px; height: 18px;
+  border-radius: 28% 40% 34% 38%; background: var(--cinnabar); color: #fbf5ea; font-size: 12px; transform: rotate(-6deg);
+}
+
+.sd-page {
+  grid-column: 1 / -1; display: flex; gap: 14px; align-items: flex-start; padding: 12px; border-radius: 12px;
+  border: 1px solid var(--line-strong); background: var(--paper-2); animation: sd-open 0.28s var(--ease) both;
+}
+.sd-page.is-blank { border-style: dashed; background: transparent; }
+@keyframes sd-open { from { opacity: 0; transform: translateY(-4px); } }
+.sd-page-thumb { flex: none; width: 112px; aspect-ratio: 1; }
+.sd-page-body { min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+.sd-page-body h4 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 21px; font-weight: 400; letter-spacing: 0.06em; }
+.sd-seal {
+  display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 28% 40% 34% 38%;
+  background: var(--cinnabar); color: #fbf5ea; font-size: 15px; transform: rotate(-5deg);
+}
+.sd-page-meta { margin: 0; font-size: 12.5px; letter-spacing: 0.06em; color: var(--ink-3); }
+.sd-note { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); }
+.sd-hint { margin: 2px 0 0; padding: 0; font-size: 14.5px; line-height: 1.6; color: var(--ink-2); }
+.sd-hint b { font-weight: 500; margin-right: 2px; color: var(--ink); }
+.sd-hint b::after { content: '：'; }
+:lang(en) .sd-hint b::after, .sd-hint:lang(en) b::after { content: ': '; }
+.sd-page-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 2px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.sd-with { display: inline-flex; align-items: center; gap: 5px; }
+.sd-with-face { border-radius: 50%; background: var(--paper-3); }
+@media (max-width: 420px) {
+  .sd-grid { gap: 6px; }
+  .sd-page { flex-direction: column; align-items: center; text-align: center; }
+  .sd-page-body { align-items: center; }
+  .sd-page-foot { justify-content: center; }
+}
+
+/* ---------- 六戏 */
+.sd-games { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sd-game { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); }
+.sd-game-seal {
+  flex: none; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 30% 42% 36% 40%;
+  background: var(--cinnabar); color: #fbf5ea; font-size: 21px; transform: rotate(-5deg);
+}
+.sd-game-seal.is-empty { background: transparent; border: 1.5px dashed var(--line-strong); border-radius: 50%; transform: none; }
+.sd-game-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sd-game-body b { font-weight: 500; font-size: 15.5px; letter-spacing: 0.06em; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sd-game-body small { font-size: 12.5px; color: var(--ink-3); }
+.sd-yue { font-size: 11.5px; font-weight: 400; padding: 1px 7px; border-radius: 999px; background: var(--cinnabar-soft); color: var(--cinnabar); letter-spacing: 0.06em; }
+.sd-twist { color: var(--ink-2) !important; }
+
+/* ---------- 设 */
+.sd-set { margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
+.sd-set legend { padding: 0; margin-bottom: 6px; font-size: 13px; letter-spacing: 0.14em; color: var(--ink-3); }
+.sd-opt {
+  display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; align-items: center;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); cursor: pointer;
+}
+.sd-opt.is-on { border-color: var(--cinnabar); background: var(--cinnabar-soft); }
+.sd-opt input { grid-row: 1 / span 2; accent-color: var(--cinnabar); width: 18px; height: 18px; margin: 0; }
+.sd-opt-name { font-size: 15px; letter-spacing: 0.06em; }
+.sd-opt small { font-size: 12.5px; color: var(--ink-3); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-page { animation: none; }
+}
+.sd-thumb-wait { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--paper-3); opacity: 0.5; }

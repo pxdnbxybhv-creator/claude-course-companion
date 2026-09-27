@@ -23,7 +23,9 @@ import { merge, part } from '../geo';
 import { taoyuan, type TaoyuanWorld } from './world';
 import { engine } from './engine';
 import { ANCHORS, CAVE, G, L, W, Y_T, standAt } from './places';
-import { taoyuanHooks, type VillagerKey } from './hooks';
+import { taoyuanHooks, type StoryHooks, type VillagerKey, type VillagerPrompt } from './hooks';
+import { BACK } from './life/keys';
+import { FIRST_RETURN } from './life/life-text';
 import { Cast, StoryStage, talkCount, worldAt } from './stagehand';
 import { B3_SEATS, VILLAGERS, VILLAGER_KEYS, metFlag, partOf, spotOf, talkKey, talkPlan, STAGING, type Part } from './folk';
 import {
@@ -79,13 +81,14 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 
   // ───────────── where everyone is
 
+  // (the valley's hour: 歇一歇's for this visit, else the world's — tv.hour())
   const partNow = (): Part => {
     const tod = eng.moodTod();
-    return tod === 'dawn' || tod === 'day' || tod === 'dusk' || tod === 'night' ? tod : partOf(ctx.env.hour);
+    return tod === 'dawn' || tod === 'day' || tod === 'dusk' || tod === 'night' ? tod : partOf(tv.hour());
   };
   const spotNow = (k: VillagerKey) => {
     if (k === 'yaoyao' && cast.yaoyaoGone) return null;
-    return spotOf(k, phaseOf(flags()), partNow(), flags(), ctx.env.hour);
+    return spotOf(k, phaseOf(flags()), partNow(), flags(), tv.hour());
   };
   /** Put everyone where the story (or the hour) says. */
   function refresh(instant = false): void {
@@ -129,7 +132,9 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 
   tv.setDoorHandler(() => door());
   tv.setLeaveHandler(() => leave());
-  bag.onDispose(() => { tv.setDoorHandler(null); tv.setLeaveHandler(null); });
+  // 二期: the atlas's petal (travel('taoyuan') once ty:way is set) lands at the pool and comes in by this door
+  eng.pocketDoor('taoyuan', () => door());
+  bag.onDispose(() => { tv.setDoorHandler(null); tv.setLeaveHandler(null); eng.pocketDoor('taoyuan', null); });
 
   /** 「入光」 at the pool: B1 the first time, the plain way in after (the story resumes inside). */
   async function door(): Promise<void> {
@@ -141,17 +146,22 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const who = ctx.player.character;
     const first = !f['ty:b1'];
     if (first && f['qy:taohua']) flag(OLD_GUEST);
+    // 二期: once 小满 has met you back at the mouth (tyl:back), every way in — the pool's 「持花入光」 or
+    // the atlas's petal — sets you down at the inner mouth; the cleft is walked on the first return only
+    const short = !!f['ty:way'] && !!f[BACK];
     tv.setClock(storyClock(f), { secs: 0 });
     running = 'b1';
     runEpoch = epoch;
     try {
       if (first) await st.variant(B1.before, who);
-      await tv.enter({ line: first ? B1.veil : undefined, onMouth: () => mouth() });
+      await tv.enter(short ? { line: null, atMouth: true } : { line: first ? B1.veil : undefined, onMouth: () => mouth() });
       if (!tv.isInside()) return;
       if (first) flag('ty:b1');
     } finally {
       running = null;
     }
+    // (atMouth skips the cleft's watch, and with it onMouth: the mouth is ours to call)
+    if (short) { await mouth(true); return; }
     // the cleft: the companions' asides by the words on the rock; 嫦娥's light on the walls
     void cleft(who);
   }
@@ -182,18 +192,49 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   }
 
   /** At the inner mouth: B2 the first time; afterwards the valley just opens out. */
-  async function mouth(): Promise<void> {
+  async function mouth(short = false): Promise<void> {
     if (!has('ty:b2')) { await run('b2', b2); return; }
     tv.hush(false);
     eng.arrive('taoyuan');
     const m = ANCHORS.mouth;
-    // (low over the valley, clear of the place banner and the HUD's title at the top of the screen)
-    tv.fx?.words(LATER.mouth, { x: m.x, y: m.y + 2.3, z: m.z - 9 }, { size: 1.0, life: 5, rise: 0.4 });
+    // (low over the valley, clear of the place banner and the HUD's title at the top of the screen.
+    //  Set down at the mouth — no cleft walked — the camera stands closer and the words would cross the
+    //  banner: they are brushed once it has gone)
+    const words = () => { if (tv.isInside() && !tv.moving) tv.fx?.words(LATER.mouth, { x: m.x, y: m.y + 2.3, z: m.z - 9 }, { size: 1.0, life: 5, rise: 0.4 }); };
+    if (short) bag.later(4800, words);
+    else words();
+    // 二期: the first return with the petal — 小满 is there before you are
+    if (has('ty:way') && !has(BACK) && phaseOf(flags()) === 'chang') await run('back', firstReturn);
+  }
+
+  /** 二期 · the first return (tyl:back): 小满 runs up to the mouth, 2 m in front of you. */
+  async function firstReturn(): Promise<void> {
+    const who = st.who;
+    const p = ctx.player.position;
+    const h = ctx.player.heading;
+    const l = L(p.x, p.z);
+    // (2 m ahead, a half step to the side: a child straight ahead hides behind the walker)
+    cast.script('xiaoman', true);
+    cast.stand('xiaoman', l.x + Math.sin(h) * 2 + Math.cos(h) * 0.5, l.z + Math.cos(h) * 2 - Math.sin(h) * 0.5, { x: l.x, z: l.z });
+    st.hold(true);
+    void st.shotOn('xiaoman', 1.0);
+    await st.wait(350);
+    if (!alive()) return;
+    await st.line({ by: 'xiaoman', ...FIRST_RETURN }, who);
+    // (said, or the card closed: either way he has met you back)
+    if (st.alive && tv.isInside()) flag(BACK);
   }
 
   /** 「出谷」: B8's way out once the farewell is due; the plain way out otherwise. */
   async function leave(): Promise<void> {
     if (tv.moving) return;
+    // 二期: a game or a 特写 under way settles first (「这局不玩了？」; a 特写 runs to its end)
+    const life = taoyuanHooks.life;
+    if (life?.busy()) {
+      let go = false;
+      try { go = await life.leaving(); } catch (e) { console.error('[walk] taoyuan life leaving', e); }
+      if (!go || tv.moving || !tv.isInside()) return;
+    }
     if (nextBeat(flags()) === 'b8' && !running) {
       if (!farewellSaid) await run('b8', b8talk);
       if (farewellSaid) { await b8exit(); return; }
@@ -920,7 +961,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
   // ───────────── the prompts on people, the triggers by place
 
   /** The story's own prompt on someone now (the next beat's), or null for their chat. */
-  function storyPrompt(k: VillagerKey): { label: { zh: string; en: string }; action: { zh: string; en: string }; act(): void | Promise<void> } | null {
+  function storyPrompt(k: VillagerKey): VillagerPrompt | null {
     const f = flags();
     const n = nextBeat(f);
     const met = !!f[metFlag(k)];
@@ -943,6 +984,10 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       if (f['ty:b8'] && f['case:hz:parked'] && !f['case:hz:solved'] && !f['case:hz:open'] && taoyuanHooks.case) {
         return { label, action: LATER.oldCase, act: () => run('oldcase', oldCase) };
       }
+    }
+    // 二期: everyday life's prompt (「吃点什么」…), asked last, at 常 with the case closed and nothing under way
+    if (!running && phaseOf(f) === 'chang' && !caseOpen(f)) {
+      try { return taoyuanHooks.life?.prompt(k) ?? null; } catch (e) { console.error('[walk] taoyuan life prompt', e); }
     }
     return null;
   }
@@ -1020,20 +1065,25 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
     const prev = running;
     // (between beats; or while the jar is carried to the shrine)
     if (prev && !(prev === 'b4a' && !st.holding)) return;
+    // the case's first (a testimony, a confrontation): asked before life's prefix, which marks its line
+    // as said — a case talk would never say it
+    let ct: (() => Promise<void>) | null = null;
+    try { ct = taoyuanHooks.case?.talk(k, st.who) ?? null; } catch (e) { console.error('[walk] taoyuan case talk', e); }
+    // 二期: a line life puts before the chat (石瞽 reading your step, 夭夭's congee) — asked while life is open
+    let pre: { zh: string; en: string } | null = null;
+    if (!prev && !ct) { try { pre = taoyuanHooks.life?.talkPrefix(k, st.who) ?? null; } catch (e) { console.error('[walk] taoyuan life talk prefix', e); } }
     if (!st.claim()) return;
     running = prev ?? 'talk';
     if (!prev) runEpoch = epoch;
     const who = st.who;
     try {
-      // the case's first (a testimony, a confrontation)
-      let ct: (() => Promise<void>) | null = null;
-      try { ct = taoyuanHooks.case?.talk(k, who) ?? null; } catch (e) { console.error('[walk] taoyuan case talk', e); }
       if (ct) { cast.face(k); record(talkKey(k)); await ct(); return; }
       const c = talkCount(k);
       const plan = talkPlan(k, who, { flags: flags(), total: c.total, today: c.today, day });
       if (plan.meet) flag(metFlag(k));
       record(talkKey(k));
       cast.face(k);
+      if (pre && !plan.meet) await st.line({ by: k, zh: pre.zh, en: pre.en }, who);
       for (const l of plan.lines) {
         if (!alive()) return;
         const sl: SLine = l.by === 'me' ? { by: 'me', zh: l.zh, en: l.en } : { by: k, zh: l.zh, en: l.en };
@@ -1048,10 +1098,14 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
 
   // ───────────── the hooks the case uses
 
-  const hooks = {
+  const hooks: StoryHooks = {
     // (the judgement may still be letting go of its claim: B6 waits for it)
     solved: (grade: Grade) => { void run('b6', () => b6(grade), { patient: true }); },
     villager: (k: VillagerKey) => cast.handle(k),
+    // (二期: the life layer's seams — a chat from the menu card, everyone placed for a new hour)
+    talk: (k: VillagerKey) => talkTo(k),
+    refresh: () => refresh(true),
+    running: () => running !== null,
   };
   taoyuanHooks.story = hooks;
   bag.onDispose(() => { if (taoyuanHooks.story === hooks) taoyuanHooks.story = null; });

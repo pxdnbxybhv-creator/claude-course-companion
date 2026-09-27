@@ -77,19 +77,19 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     look: { robe: '#6b5a44', trim: '#c9b58e', hat: 'bun', hair: '#e8e4dc', beard: '#e8e4dc' }, prop: 'staff',
     routine: { dawn: at(0.7, -16.2, 0.7, -10), day: at(3.3, -2.6, 5, -2.6, true), dusk: at(8, -11.2, 8, -6, true), night: at(8.6, -11.2, 8.6, -6, true) },
     chat: [
-      t('老朽秦守拙，忝为里正。谷里的事，大到修渠，小到丢鸡，都来找我。', 'I am Qin Shouzhuo, the humble headman. Everything in the valley comes to me, from mending the channel to a lost hen.'),
+      t('老朽秦守拙，是这谷里的里正。大到修渠，小到丢鸡，都来找我。', 'I\'m Qin Shouzhuo, headman here. Everything comes to me, from mending the channel to a lost hen.'),
       t('先祖避秦时乱，率妻子邑人来此绝境。算来花开花落，六百回了。', 'Our forebears fled the troubles of Qin with wives, children and neighbours to this cut-off place. The blossom has come and gone six hundred times since.'),
-      t('外头的事，你讲，我听。听完了，我还是不出去。', "Tell me of the world outside and I'll listen. When you're done, I still shan't go."),
+      t('外头如今还种粟吗？……种就好，种就好。', "Do they still grow millet out there? …Good. That's good."),
       { ...t('那一行朱印，我补上了。晚了二十年。', "I've set the red seal on that line now. Twenty years late."), after: 'solved' },
     ],
     companion: {
       any: null,
       scholar: [t('先生写得一手好字，明年的花朝簿，劳你来誊。', 'You write a fine hand, sir. Next year, would you copy out the register?')],
-      guan: [t('将军的胡子，比老朽的还长。', 'The general\'s beard is longer even than mine.')],
+      guan: [t('将军的胡子，比我的还长。', 'The general\'s beard is longer even than mine.')],
       fisher: [t('当年那个打鱼的，也坐在你这个位子上。他问得多，吃得少。', 'The fisherman long ago sat just where you sit. He asked a great deal and ate very little.')],
     },
     regular: t('{名}来了，坐。', '{名}, welcome. Sit.'),
-    caseLine: t('老朽只求一个实话。', 'All I ask is the truth.'),
+    caseLine: t('还不够。你再去看看、问问，人我先不叫。', 'Not yet. Go and look, go and ask. I won\'t call everyone just yet.'),
   },
   xiaoman: {
     key: 'xiaoman', zh: '秦小满', en: 'Xiaoman', title: t('放纸鸢的孩子', 'The kite boy'), epithet: t('放纸鸢的孩子', 'The kite boy'), mark: '鸢',
@@ -117,7 +117,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     chat: [
       t('我是小满他娘，今晚的菜都归我管。饿了就说，别客气。', "I'm Xiaoman's mother, and tonight's food is my business. If you're hungry, say so."),
       t('杀鸡设酒，是祖上的规矩。可那只鸡是我养大的。', "Killing a hen for a guest is our forebears' custom. I raised that hen, mind."),
-      t('年轻时我也想过出去。后来有了小满——也不是不想了，是想不过来了。', 'When I was young I thought of going out too. Then Xiaoman came — not that I stopped wanting; I just ran out of time to.'),
+      t('年轻时我也想过出去。后来有了小满。（她往锅里撒了把盐。）……你吃姜不吃？', 'When I was young I thought about going out too. Then Xiaoman came. (She throws salt in the pot.) …Do you take ginger?'),
       t('小满要是缠着你，拿块糕打发他。', 'If Xiaoman pesters you, bribe him with a cake.'),
     ],
     companion: {
@@ -128,7 +128,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     },
     regular: t('{名}，锅里给你留了一碗。', '{名}, I saved you a bowl.'),
     caseLine: t('小满……谁看见我的小满了？', 'Xiaoman… has anyone seen my Xiaoman?'),
-    caseFound: t('谢谢你。', 'Thank you.'),
+    caseFound: t('谢谢你。……锅里有粥，你喝一碗再走。', 'Thank you. …There\'s congee in the pot. Have a bowl before you go.'),
   },
   sang: {
     key: 'sang', zh: '桑三娘', en: 'Sang Sanniang', title: t('管蚕的', 'Keeper of the silkworms'), epithet: t('挎桑篮的妇人', 'A woman with a basket of mulberry leaves'), mark: '蚕',
@@ -144,7 +144,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     companion: {
       any: null,
       change: [t('你也等过人吗？', 'Have you ever waited for someone?'), me('等过。所以不劝你。', "I have. That's why I won't lecture you.")],
-      fisher: [t('桑远走的时候，说要去学打鱼。外头的水，是什么样的？', 'When Sang Yuan left, he said he\'d learn to fish. What is the water like out there?')],
+      fisher: [t('桑远走那年说，要去学打鱼……你们外头的水，什么样？', 'The year Sang Yuan left, he said he\'d learn to fish… What\'s the water like, out where you are?')],
     },
     regular: t('{名}，蚕刚醒，小声些。', '{名} — the worms have just woken; softly.'),
     witness: true,
@@ -161,7 +161,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     ],
     companion: {
       any: null,
-      musician: [t('（她哼起一支没人教过的曲子。）这是我爹走前唱的，我只记得半句。', '(She hums a tune nobody taught her.) My father sang this before he left. I only remember half.')],
+      musician: [t('（她哼起一支曲子。）我娘夜里哼的。她说是我爹教的，我只学会半句。', '(She hums a tune.) Mother hums it at night. She says Father taught it to her. I only know half.')],
       swordsman: [t('外头……会有人欺负他吗？', 'Out there… will anyone bully him?'), me('有我在，不会。', "Not while I'm around.")],
       painter: [t('你能画一座外头的桥给我看吗？', 'Could you paint me a bridge from outside?')],
     },
@@ -193,7 +193,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     routine: { dawn: at(20.3, 7.4, 22, 7.4), day: at(20.3, 4.6, 18, 4.6), dusk: at(5.5, -2.2, 4.6, -2.2), night: at(20.4, 5.8, 17, 5.8, true) },
     chat: [
       t('杜二，酿酒的！谷里的酒，都过我这双手！', 'Du Er, brewer! Every drop in the valley came through these two hands!'),
-      t('新醅淡，陈酿香。人也一样。', 'New brew is thin, aged wine is fragrant. People are the same.'),
+      t('新醅今早刚滤的，淡是淡，管够。（他已经给你倒上了。）', 'Filtered this morning. Thin, but there\'s plenty. (He\'s already poured you one.)'),
       t('我婆娘泡的桃花茶，比我的酒好喝。……不说了，喝酒。', "My wife's peach-blossom tea was better than my wine. …Never mind. Drink."),
       { ...t('那晚冤枉了你，这坛我请。', "I wronged you that night. This jar's on me."), after: 'solved' },
     ],
@@ -231,17 +231,17 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     routine: { dawn: at(0.4, -24.3, 0.4, -26), day: at(1, -18.6, 1, -14, true), dusk: at(-6.4, -9.6, -3, -9), night: at(-1, -16.2, -1, -12) },
     chat: [
       t('柳婆，看香的。祠堂的香，六十年没断过。', "Liu Po. I keep the incense. The shrine's incense hasn't gone out once in sixty years."),
-      t('香篆一格一个时辰。香走到哪儿，日子就到哪儿。', "One section of the incense seal per double-hour. Wherever the ember is, that's where the day is."),
-      t('眼睛不中用了，鼻子还中用。', 'My eyes are no use any more, but my nose still is.'),
+      t('香篆一格一个时辰。到了祠堂你站远点，碰歪了我还得重压。', "One section a double-hour. At the shrine, you stand well back. Knock it crooked and I'll have to press the lot again."),
+      t('这光不好。……不用看，闻闻就知道，你今天吃过葱。', 'This light\'s no good. …No need to look. I can smell you\'ve had scallions today.'),
       { ...t('如今压香，小满替我数针。那孩子，数得比我准。', 'These days Xiaoman counts the pins for me. He counts better than I ever did.'), after: 'solved' },
     ],
     companion: {
       any: null,
       taoist: [t('小道长身上是什么香？……哦，是符纸烧的味儿。', 'What incense is that on you, little master? …Ah, burnt talisman paper.')],
       cat: [t('猫儿，别上供桌！', 'Cat, off the altar!')],
-      scholar: [t('你念念这香谱，老婆子看不清了。', "Read me the incense book, would you? I can't make it out any more.")],
+      scholar: [t('你念念这香谱。……这字刻得也太小了。', "Read me this incense book. …They've cut the characters far too small.")],
     },
-    regular: t('是{名}吧？听脚步就知道。', "That's {名}, isn't it? I know your step."),
+    regular: t('是{名}吧？你身上这股山外头的味儿，我记得。', "That's {名}, isn't it? That outside smell on you. I remember it."),
     witness: true,
   },
   shigu: {
@@ -249,15 +249,15 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     look: { robe: '#e3ddd0', trim: '#7c8a8f', hat: 'bald', beard: '#f0ede6', sit: true }, prop: 'zither',
     routine: { dawn: at(-12.1, -13.8, -9, -11.5, true), day: at(5, -2.6, 3.3, -2.6, true), dusk: at(-6.6, -5.4, -4, -5, true), night: at(-12.1, -13.8, -9, -11.5, true) },
     chat: [
-      t('石瞽。瞎子弹琴，弹给看得见的人听。', 'Shi Gu. A blind man plays the zither for those who can see.'),
-      t('你的脚步，是山外的脚步——急。', 'Your footsteps are outside footsteps — hurried.'),
-      t('青鸟认得路，比人认得清。', 'The bluebirds know the way better than people do.'),
-      t('花落有声。你们听不见，是走得太快。', "Falling petals make a sound. You don't hear it because you walk too fast."),
+      t('石瞽，弹琴的。你喘气还没匀——坐，先歇口气。', 'Shi Gu. I play the zither. You\'re still out of breath. Sit, catch it first.'),
+      t('听，葫芦塞子响。杜二又在偷喝了。', 'Listen. A gourd stopper. Du Er\'s sneaking a drink again.'),
+      t('今早门口落了只青鸟，吃了我半块饼。它认得路，你信不信？', 'A bluebird landed at my door this morning and ate half my flatbread. It knows the way. Believe that?'),
+      t('你左脚鞋里有颗石子。硌了一路了吧？', "There's a pebble in your left shoe. It's been at you the whole way, hasn't it?"),
     ],
     companion: {
       any: null,
-      musician: [t('知音难得。来，《流水》你起头。', "A true listener is rare. Come — you begin 'Flowing Water'.")],
-      player: [t('你下棋，我听子。一步一声，便知输赢。', "You play; I'll listen to the stones. One click per move, and I'll know who wins.")],
+      musician: [t('你一走近，我的弦就跟着颤。也是弹琴的？来，《流水》你起头。', "When you came near, my strings hummed along. You play too? Go on, you start \"Flowing Water\".")],
+      player: [t('你下，我听子。一步一声，听到最后，我就知道谁赢。', "You play; I'll listen to the stones. One click a move. By the end I'll know who won.")],
       change: [t('这位的脚步没有声音。……是月亮上来的吧。', "This one's steps make no sound. …From the moon, I think.")],
     },
     regular: t('{名}，坐下听一曲。', '{名}, sit and hear a tune.'),
@@ -288,7 +288,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     routine: { dawn: at(26, -18.7, 26, -20), day: at(31, -7.6, 34, -8), dusk: at(24, -15.4, 24, -12, true), night: at(26.2, -18.7, 26, -20) },
     chat: [
       t('葛姑，种药的，顺带数花。', 'Ge Gu. I grow herbs — and count petals on the side.'),
-      t('花落得匀，是因为谷里没有风。没有风，是因为没有外头。', "The petals fall evenly because there's no wind here. There's no wind because there's no outside."),
+      t('谷里没风，花就这么直直地落。我数了十年了。没意思，还得数。', "No wind in here, so they come straight down. Ten years I've counted. Dull. Still counting."),
       t('这几年，花一年比一年落得慢。我还没想明白。', "These last years the petals fall a little slower each year. I haven't worked out why."),
       t('你身上沾着山外的草籽。别动——我要收起来。', "You've got seeds from outside on you. Hold still — I'm keeping them."),
     ],
@@ -298,8 +298,8 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
       taoist: [t('你们炼丹，用不用桃胶？', 'Do you use peach gum in your elixirs?')],
       rabbit: [t('捣药的兔子！来，帮我把这臼川芎捣了。', 'A medicine-pounding rabbit! Here, pound this mortar of lovage for me.')],
     },
-    regular: t('{名}，今天的花，比昨天快了一点。你来了的缘故。', '{名}, the petals are a touch faster today. Because you came.'),
-    caseLine: t('花不说谎。去我的石盆看看。', "Petals don't lie. Come and look at my stone basin."),
+    regular: t('{名}，今天比昨天落得快一点。跟你来没来，大概没关系。', '{名}. They\'re falling a bit faster than yesterday. Nothing to do with you turning up. Probably.'),
+    caseLine: t('石盆里的花我又数了一遍，还是那个数。', "I counted the basin again. Same number."),
   },
   yaoyao: {
     key: 'yaoyao', zh: '夭夭', en: 'Yaoyao', title: t('桃花之灵', 'Spirit of the peach'), epithet: t('花中的女子', 'A woman made of blossom'), mark: '桃',
@@ -308,7 +308,7 @@ export const VILLAGERS: Record<VillagerKey, Villager> = {
     chat: [
       t("桃之夭夭——这名字，是一个念诗的人给我起的。他后来也没再来。", "'The peach tree, young and lovely' — a man reciting poetry gave me that name. He never came back either."),
       t('你来了，花就落得快一点。', 'When you come, the petals fall a little faster.'),
-      t('此中之事，不足为外人道——可你已不是外人。', "What happens here is not for outsiders — but you aren't one any more."),
+      t('花落在你肩上了。它认得你了。', "A petal's landed on your shoulder. It knows you now."),
     ],
     companion: {
       any: null,

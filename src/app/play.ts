@@ -171,7 +171,7 @@ export function questValue(q: QuestDef, p: PlayState, a: AppState, day: DateKey 
     case 'counter': return p.counters[g.key] ?? 0;
     case 'best': return p.best[g.key] ?? 0;
     case 'flag': return p.flags[g.key] ? 1 : 0;
-    case 'flags': return Object.keys(p.flags).filter((k) => k.startsWith(g.prefix)).length;
+    case 'flags': return Object.keys(p.flags).filter((k) => k.startsWith(g.prefix) && !g.not?.some((n) => k.startsWith(n))).length;
     case 'streak': {
       let m = 0;
       for (const h of a.habits) if (!DEMO_HABIT.test(h.id)) m = Math.max(m, statsFor(h, a.checkins[h.id] ?? [], day).best);

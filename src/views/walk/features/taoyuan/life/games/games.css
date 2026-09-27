@@ -1,0 +1,254 @@
+/* 桃源 · 二期: the six valley games' overlays (谷中六戏): the start card, the top bar, the 踩曲 strip,
+   the 采桑 canvas, the 纸鸢 tension meter, the 捉萤 trail and reticle, the 流觞 飞花令. Paper and ink,
+   as the other mini-games (minigames.css). Owner: G. */
+
+/* the joystick and the chips step aside while a valley game is up (the panel's is-game) */
+.walk:has(.walk-layer > .mg.is-game.tyg) .walk-stick { visibility: hidden; pointer-events: none; }
+/* (the start card too: the chips, the 食单 chip, the errands chip and the phone's 视 · 影 rail would sit
+   over it or under its ✕) */
+.walk:has(.walk-layer > .mg.is-game.tyg) :is(.walk-chips, .walk-chip, .walk-case-chip, .mg-errands, .walk-rail, .walk-title) { visibility: hidden; pointer-events: none; }
+
+.tyg { --tyg-top: calc(env(safe-area-inset-top) + 12px); }
+.tyg .brush { font-family: var(--font-brush, "Ma Shan Zheng", "LXGW WenKai", serif); font-weight: normal; }
+
+/* ---------- a full-screen pad for taps and strokes (under the HUD) */
+.tyg-pad { position: absolute; inset: 0; pointer-events: auto; touch-action: none; z-index: 0; }
+.tyg .mg-x { z-index: 5; }
+
+/* ---------- the start card */
+.tyg-start { display: grid; place-items: center; z-index: 30; }
+.tyg-card {
+  position: relative;
+  pointer-events: auto;
+  width: min(92vw, 420px);
+  max-height: 84vh;
+  overflow: auto;
+  padding: 18px 20px 16px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 6px;
+  box-shadow: 0 18px 40px -22px rgba(40, 30, 10, 0.7);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tyg-card-head { display: flex; align-items: baseline; gap: 10px; padding-right: 36px; }
+.tyg-card > .mg-x.tyg-card-x { top: 10px; right: 10px; left: auto; width: 34px; height: 34px; font-size: 20px; }
+.tyg-card-title { font-size: 28px; letter-spacing: 0.08em; }
+.tyg-card-host { opacity: 0.7; }
+.tyg-mood { margin-left: auto; font-size: 18px; color: var(--mg-red); border: 1px solid currentColor; border-radius: 50%; width: 28px; height: 28px; display: grid; place-items: center; }
+.tyg-rules { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 15px; line-height: 1.5; }
+.tyg-who { font-weight: bold; margin-right: 4px; }
+.tyg-who::after { content: '：'; }
+:lang(en) .tyg-who::after { content: ': '; }
+.tyg-twist, .tyg-yue { margin: 0; font-size: 14px; line-height: 1.5; }
+.tyg-yue.is-done { opacity: 0.5; text-decoration: line-through; }
+.tyg-tag { display: inline-block; margin-right: 6px; padding: 0 6px; border: 1px solid var(--mg-line); border-radius: 3px; font-size: 12px; }
+.tyg-tag.is-red { color: var(--mg-red); border-color: currentColor; }
+.tyg-opts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tyg-opt { padding: 4px 10px !important; border: 1px solid var(--mg-line) !important; border-radius: 999px; font-size: 14px; }
+.tyg-opt.is-on { background: var(--mg-ink) !important; color: #f4eee2 !important; }
+.tyg-opt:disabled { opacity: 0.35; cursor: default; }
+.tyg-card-foot { display: flex; align-items: center; justify-content: space-between; }
+.tyg-best { opacity: 0.75; }
+.tyg-seal { width: 34px; height: 34px; display: grid; place-items: center; font-size: 22px; color: #f7efe2; background: var(--mg-red); border-radius: 4px; }
+.tyg-seal.is-empty { background: none; border: 1px dashed var(--mg-line); }
+.tyg-card-btns { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.tyg-gentle { display: flex; align-items: center; gap: 6px; font-size: 15px; pointer-events: auto; cursor: pointer; }
+.tyg-go {
+  padding: 8px 22px !important;
+  background: var(--mg-ink) !important;
+  color: #f4eee2 !important;
+  border-radius: 999px;
+  font-size: 18px;
+  letter-spacing: 0.2em;
+}
+.tyg-eat { display: grid; place-items: end center; padding-bottom: calc(env(safe-area-inset-bottom) + 120px); }
+.tyg-eat .tyg-go { pointer-events: auto; }
+
+/* ---------- the top bar, the hint, a line said */
+.tyg-top {
+  position: absolute;
+  top: var(--tyg-top);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 16px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 999px;
+  white-space: nowrap;
+  z-index: 3;
+}
+.tyg-top b { font-size: 20px; }
+.tyg-num { font-size: 22px; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+.tyg-clock { opacity: 0.6; font-variant-numeric: tabular-nums; }
+.tyg-hint {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--tyg-top) + 50px);
+  transform: translateX(-50%);
+  max-width: 88vw;
+  padding: 4px 12px;
+  font-size: 13px;
+  text-align: center;
+  background: rgba(244, 238, 226, 0.75);
+  border-radius: 6px;
+  transition: opacity 0.8s;
+  z-index: 3;
+}
+.tyg-hint.is-fade { opacity: 0; }
+.tyg-say {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--tyg-top) + 90px);
+  transform: translateX(-50%);
+  max-width: min(88vw, 460px);
+  padding: 8px 14px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  z-index: 4;
+  animation: tyg-say 0.3s ease-out both;
+}
+.tyg-say b { margin-right: 6px; }
+@keyframes tyg-say { from { opacity: 0; transform: translate(-50%, 6px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* ---------- 踩曲: the strip */
+.tyg-strip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+  width: min(86vw, 320px);
+  z-index: 2;
+}
+.tyg-ghost { display: flex; justify-content: center; gap: 30%; height: 26px; margin-bottom: 4px; }
+.tyg-ghost i { font-style: normal; opacity: 0.18; font-size: 18px; transition: opacity 0.2s; }
+.tyg-ghost i.is-on { opacity: 1; color: var(--mg-red); animation: tyg-ghost 0.45s ease-out both; }
+@keyframes tyg-ghost { from { transform: scale(1.35); } to { transform: scale(1); } }
+.tyg-lanes {
+  position: relative;
+  height: 230px;
+  display: flex;
+  overflow: hidden;
+  background: linear-gradient(to bottom, rgba(244, 238, 226, 0.92), rgba(244, 238, 226, 0.55));
+  border: 1px solid var(--mg-line);
+  border-radius: 6px;
+}
+.tyg-lane { position: relative; flex: 1; border-right: 1px dashed var(--mg-line); }
+.tyg-lane:last-of-type { border-right: 0; }
+.tyg-hitline { position: absolute; left: 0; right: 0; top: 34px; height: 3px; background: var(--mg-ink); opacity: 0.7; }
+.tyg-flash { position: absolute; left: 10%; right: 10%; top: 22px; height: 26px; border-radius: 50%; background: rgba(185, 58, 43, 0.35); opacity: 0; }
+.tyg-flash.is-on { animation: tyg-flash 0.25s ease-out both; }
+@keyframes tyg-flash { from { opacity: 1; } to { opacity: 0; } }
+.tyg-note {
+  position: absolute;
+  top: 0;
+  width: 42%;
+  height: 20px;
+  margin-top: -10px;
+  border-radius: 50% 50% 46% 54%;
+  background: #2b2a26;
+  will-change: transform;
+}
+.tyg-note.is-l { left: 4%; }
+.tyg-note.is-r { left: 54%; }
+.tyg-note.is-b { left: 8%; width: 84%; background: #6b2e24; border-radius: 10px; }
+.tyg-note.is-hold::after { content: ''; position: absolute; left: 35%; width: 30%; top: 10px; height: var(--tail, 30px); background: rgba(43, 42, 38, 0.45); border-radius: 0 0 6px 6px; }
+.tyg-note.is-echo { left: 28%; width: 44%; background: rgba(43, 42, 38, 0.35); border: 1px dashed #2b2a26; }
+.tyg-note.is-hit { opacity: 0.25; }
+.tyg-note.is-miss { opacity: 0.12; background: #8a7a6a; }
+.tyg-note.is-holding { background: var(--mg-red); }
+.tyg-judge { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); font-size: 26px; font-family: var(--font-brush, serif); opacity: 0; pointer-events: none; }
+.tyg-judge.is-on { animation: tyg-judge 0.5s ease-out both; }
+.tyg-judge.is-zheng { color: var(--mg-red); }
+.tyg-judge.is-miss { color: #8a7a6a; }
+@keyframes tyg-judge { 0% { opacity: 1; transform: translate(-50%, 6px) scale(1.2); } 100% { opacity: 0; transform: translate(-50%, -10px) scale(1); } }
+.tyg-calib {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  padding: 14px 20px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 4;
+}
+.tyg-calib b { font-size: 22px; white-space: nowrap; }
+.tyg-calib span { max-width: 70vw; text-align: center; }
+/* (a set width: shrink-to-fit at left 50% would leave it half the screen, and a nowrap title overflowed at 320 px) */
+.tyg-calib { width: min(360px, calc(100vw - 24px)); box-sizing: border-box; }
+.tyg-calib b { white-space: normal; text-align: center; }
+
+/* ---------- 摸鱼 */
+.tyg-tap { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); font-size: 30px; color: var(--mg-red); font-family: var(--font-brush, serif); animation: tyg-judge 0.8s ease-out infinite; z-index: 3; pointer-events: none; }
+
+/* ---------- 采桑 */
+.tyg-dim { position: absolute; inset: 0; background: rgba(20, 16, 12, 0.45); }
+.tyg-can-box { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); z-index: 2; }
+.tyg-can-cv { display: block; pointer-events: auto; touch-action: none; background: rgba(244, 238, 226, 0.96); border-radius: 8px; box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.7); }
+
+/* ---------- 纸鸢 */
+.tyg-tension {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 26px);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 999px;
+  z-index: 3;
+}
+.tyg-tension-bar { position: relative; width: min(52vw, 220px); height: 8px; background: rgba(0, 0, 0, 0.1); border-radius: 4px; overflow: hidden; }
+.tyg-tension-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: #6f8f55; transition: background 0.2s; }
+.tyg-tension-bar i.is-hot { background: var(--mg-red); }
+.tyg-tension-bar b { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--mg-ink); }
+.tyg-sing { position: absolute; right: calc(env(safe-area-inset-right) + 18px); top: calc(var(--tyg-top) + 50px); font-size: 20px; font-family: var(--font-brush, serif); opacity: 0.15; transition: opacity 0.3s; z-index: 3; }
+.tyg-sing.is-on { opacity: 1; color: var(--mg-red); }
+
+/* ---------- 捉萤 */
+.tyg-trail { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.tyg-reticle { position: absolute; left: -14px; top: -14px; width: 28px; height: 28px; border: 1px solid rgba(246, 240, 220, 0.8); border-radius: 50%; opacity: 0; pointer-events: none; z-index: 2; }
+.tyg-reticle.is-on { opacity: 1; }
+.tyg-ying .tyg-pad.is-sync { box-shadow: inset 0 0 60px rgba(232, 245, 154, 0.18); }
+
+/* ---------- 流觞 */
+.tyg-feihua {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 400px);
+  padding: 14px 16px;
+  background: var(--mg-paper);
+  border: 1px solid var(--mg-line);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 6;
+  pointer-events: auto;
+}
+.tyg-feihua p { margin: 0; line-height: 1.5; }
+.tyg-poet { font-size: 18px; text-align: center; }
+.tyg-feihua .tyg-opt { text-align: left; font-size: 16px; padding: 6px 12px !important; }
+.tyg-feihua-bar { display: block; height: 3px; background: var(--mg-red); transform-origin: left; animation: tyg-bar linear both; }
+@keyframes tyg-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tyg-say, .tyg-judge.is-on, .tyg-ghost i.is-on, .tyg-tap { animation-duration: 0.01s; }
+}

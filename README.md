@@ -162,6 +162,20 @@ twelve clues, six witnesses who each hide something, a case book (案卷) with h
 judgement of five questions. Every clue can be found by anyone; companions only find some of
 them faster. The way in closes behind you when you leave — but a pressed petal may open it again.
 
+**住在桃源 Living in the valley.** Once the story is over, 小满's pressed petal appears on the map
+(持花入光) and takes you straight back. Nobody there sells food for coins: 桂娘, 杜二 and their
+neighbours cook for you, and the three dishes that need ingredients are paid in kind, with fish,
+mulberries, yeast cake or a goose egg that you earn in the valley's games. There are seventeen
+dishes, four of them seasonal, and every first taste plays a short close-up (特写): the dish is
+lifted, steam rises, the cook says a line or two about how it was made, and your companion
+reacts. The 食单 (menu book) keeps a page for each dish you have tasted. Six valley games (谷中六戏)
+pay in those goods (and a few coins): 踩曲 (a rhythm game, treading yeast cake to a work song), 摸鱼 (catching fish
+by hand), 采桑喂蚕 (picking mulberry leaves for the silkworms), 纸鸢 (a singing kite in the wind),
+捉萤 (fireflies at dusk) and 流觞 (steering a wine cup down the stream while capping verses). Each
+has a gentle mode (慢些). The rest is everyday life: rest a while (歇一歇) and the hour turns to
+dusk or night, find a bowl left covered for you, read the day's board, and on festival days
+share the long table.
+
 **家园 The homestead.** West of the garden is a plot that is yours. Build mode (营造) looks down on
 it: pick from about thirty things (a thatched cottage, a tiled house, a study, a pavilion, a
 pond and a little bridge, fruit trees, flower beds and vegetable plots, a swing, a well,
