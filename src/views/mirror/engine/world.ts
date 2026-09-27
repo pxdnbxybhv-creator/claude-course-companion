@@ -96,7 +96,14 @@ export class World implements WorldApi {
   t = 0;
   dt = 1 / 60;
   wave = 0;
+  /** The beat ticked this step: the core's 2 Hz clock, or a boss's own tempo while one keeps it (夔). */
   beat = false;
+  /** A boss keeps the beat (content reports each of its ticks through beatLatch; 夔 at 80 BPM). */
+  beatOwn = false;
+  beatLatch = false;
+  /** Beats so far, and the count the HUD last saw (its ≈8 Hz push flags every beat once). */
+  beatN = 0;
+  private hudBeatN = 0;
   moonPhase = 0;
   rng: () => number = Math.random;
   erng!: Rng;
@@ -242,7 +249,7 @@ export class World implements WorldApi {
   // ── HUD
   hud: HudState = {
     hp: 0, hpMax: 0, shield: 0, moon: 0, sleeve: 0, showSleeve: false, level: 1, xp: 0, xpNext: 16, wave: 0, time: null, boss: null,
-    skillCd: 0, skillActive: false, drunk: null, moonPhase: null, lives: null, curse: 0, lowHp: false, beat: false, fps: 60,
+    skillCd: 0, skillActive: false, drunk: null, moonPhase: null, lives: null, curse: 0, lowHp: false, beat: false, dark: false, fps: 60,
   };
   hudT = 0;
   fps = 60;
@@ -314,6 +321,7 @@ export class World implements WorldApi {
     this.erng = rngFor(run.seed, this.wave, 'engine');
     for (const p of [this.E, this.PS, this.ES, this.D, this.S, this.ST, this.Z, this.T, this.P, this.N, this.TM]) p.clear();
     this.t = 0; this.tWave = 0; this.len = setup.plan.len; this.endingT = 0; this.hitstopMs = 0; this.shakePx = 0; this.lightR = null;
+    this.beat = false; this.beatOwn = false; this.beatLatch = false; this.beatN = 0; this.hudBeatN = 0;
     this.feel.begin();
     this.pauseRequest = false; this.titles.length = 0;
     this.base = { ...setup.stats };
@@ -396,7 +404,10 @@ export class World implements WorldApi {
     this.dt = dt;
     this.t += dt;
     const beatBefore = Math.floor((this.t - dt) * 2);
-    this.beat = Math.floor(this.t * 2) !== beatBefore;
+    // while a boss keeps the beat, the core's follows the ticks it reported last step
+    this.beat = this.beatOwn ? this.beatLatch : Math.floor(this.t * 2) !== beatBefore;
+    this.beatLatch = false;
+    if (this.beat) this.beatN++;
     if (this.run.char === 'change') this.moonPhase = Math.floor(((this.t + this.moonT0) / (PASSIVES.yinqing.p.cycle / 8))) % 8;
     if (this.phase === 'ending') { this.stepEnding(dt); this.feel.step(dt); return; }
     this.tWave += dt;
@@ -409,7 +420,8 @@ export class World implements WorldApi {
       try { r.b.tick(this, r.s, dt); } catch (e) { r.failed = true; this.curWhat = 'none'; this.hooks.error(e, false); }
     }
     this.curWhat = 'none';
-    if (this.beat && (this.run.char === 'musician' || this.bossBeat)) this.sfx('beatTick');
+    // (a boss that keeps the beat sounds its own tick)
+    if (this.beat && !this.beatOwn && (this.run.char === 'musician' || this.bossBeat)) this.sfx('beatTick');
     this.tickSkill(dt);
     this.tickPlayer(dt);
     this.recomputeStats();
@@ -2328,7 +2340,10 @@ export class World implements WorldApi {
     h.lives = this.run?.char === 'cat' ? this.lives : null;
     h.curse = Math.round(this.stats?.curse ?? 0);
     h.lowHp = this.hp < this.hpMax * 0.3;
-    h.beat = this.beat;
+    // a beat since the last push (the push runs at ≈8 Hz, a beat lasts one step)
+    h.beat = this.beatN !== this.hudBeatN;
+    this.hudBeatN = this.beatN;
+    h.dark = this.lightR !== null;
     h.fps = Math.round(this.fps);
     if (force || this.phase === 'wave' || this.phase === 'ending') this.hooks.hud(h);
     // the band: the wave clock, danger (HP, the crowd against the cap), the boss phase, the clear

@@ -217,6 +217,9 @@ export class Feel {
     this.trauma = 0; this.kickX = this.kickY = 0; this.zoom = 0; this.offX = this.offY = 0;
     this.bank = STOP_CAP; this.hitBank = HIT_TRAUMA_CAP; this.hurtAge = 9; this.hurtK = 0;
     this.slotT.fill(9);
+    // the world clock restarts at 0 every wave, so every rate gate starts fresh too
+    this.lastHitKick = this.lastWeighty = this.lastCritStop = this.lastHeavyStop = this.lastSkill = -9;
+    this.lastCrack = this.lastThump = this.lastZip = this.lastVib = -9;
     this.busReset();
     try { this.sprites.warm(WARM); } catch { /* no canvas */ }
   }
@@ -664,7 +667,8 @@ export class Feel {
     let v = 0;
     // first what happened to you, then the 镜技's boom (it stands in for the skill class's colour),
     // then a level-up's thump (it stands in for the hits' thump)
-    if (this.busHurt > 0) { this.voice('grunt', this.busHurt, 1); v++; }
+    // (the heartbeat already sounded outside the bus in hurt(), so a hurt step counts two voices)
+    if (this.busHurt > 0) { this.voice('grunt', this.busHurt, 1); v += 2; }
     if (this.busSkill) { this.voice('skillHit', 1, 1); v++; if (best === FC.skill) best = -1; }
     if (this.busLevel) { this.voice('thump', 0.8, 1); v++; this.lastThump = t; }
     if (best >= 0 && v < 4) {

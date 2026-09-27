@@ -1,7 +1,9 @@
 // 水月幻镜 · the frame's drawing (GDD §20, §24.3): setTransform + drawImage from the painter's
-// atlases, in the contract's order: arena → telegraphs → zones → drops → enemies → summons → player
-// → effects → player shots → numbers → enemy shots → light, low-HP edge and titles (the vermilion
-// enemy shots stay on top of everything the player's side makes, numbers included). No shadowBlur,
+// atlases, in the contract's order (drawOrder): arena → telegraphs → zones → drops → enemies → summons
+// → player → effects → player shots → numbers → enemy shots → low-HP edge and titles (the vermilion
+// enemy shots stay on top of everything the player's side makes, numbers included). In the dark
+// (暗月, 大雪, 天狗食月) the darkness goes over the field but under the danger: the enemy's ground,
+// telegraphs and enemy shots are drawn after it. No shadowBlur,
 // filters or per-frame gradients (the two overlay masks are baked once). A null sprite draws as a
 // plain ink circle, so the game is playable before (or without) the art.
 import type { AtlasId, Camera, NumStyle, Painter, Sprite } from '../types';
@@ -29,6 +31,8 @@ export class Renderer {
   private edge: HTMLCanvasElement | null = null;
   private hurtEdge: HTMLCanvasElement | null = null;
   private edgeKey = '';
+  /** The darkness's hole and its four rects, reused every frame (holeRects). */
+  private readonly hole = new Float64Array(20);
   private atlasCache = new Map<string, AtlasId>();
 
   constructor(private painter: Painter) {}
@@ -40,21 +44,55 @@ export class Renderer {
   }
 
   draw(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    const P = this.painter;
-    const lang = W.settings.lang;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    P.drawArena(ctx, cam);
+    const order = drawOrder(W.lightR !== null);
+    for (let k = 0; k < order.length; k++) this.layer(order[k], W, ctx, cam);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
+  /** One layer of the frame (draw() walks drawOrder). */
+  layer(L: Layer, W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    switch (L) {
+      case 'arena': this.painter.drawArena(ctx, cam); break;
+      case 'telegraphs': this.drawTeles(W, ctx, cam); break;
+      // in the dark the player's washes stay under it and the enemy's ground (webs, clouds, puddles) rises above
+      case 'zones': this.drawZones(W, ctx, cam, W.lightR !== null ? 1 : -1); break;
+      case 'dangerZones': this.drawZones(W, ctx, cam, 0); break;
+      case 'ground': this.drawGround(W, ctx, cam); break;
+      case 'drops': this.drawDrops(W, ctx, cam); break;
+      case 'enemies': this.drawEnemies(W, ctx, cam); break;
+      case 'summons': this.drawSummons(W, ctx, cam); break;
+      case 'player': this.drawSwords(W, ctx, cam); this.drawPlayer(W, ctx, cam); break;
+      case 'effects': this.drawEffects(W, ctx, cam); break;
+      case 'playerShots': this.drawPlayerShots(W, ctx, cam); break;
+      case 'numbers': this.drawNumbers(W, ctx, cam); break;
+      case 'darkness': this.drawDarkness(W, ctx, cam); break;
+      case 'enemyShots': this.drawEnemyShots(W, ctx, cam); break;
+      case 'reticle': this.drawReticle(W, ctx, cam); break;
+      case 'overlays': this.overlays(W, ctx, cam); break;
+    }
+  }
+
+  private drawTeles(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // telegraphs: wet ink filling (fullness = time spent)
-    const T = W.T;
+    const P = this.painter, T = W.T;
     for (let i = 0; i < T.n; i++) if (T.alive[i]) P.drawTele(ctx, cam, T.shape[i], Math.min(1, T.t[i] / T.dur[i]));
-    // zones (washes)
-    const Z = W.Z;
+  }
+
+  /** Zones (washes) of one side: 0 the enemy's, 1 the player's, −1 both. */
+  private drawZones(W: World, ctx: CanvasRenderingContext2D, cam: Camera, side: number): void {
+    const P = this.painter, Z = W.Z;
     for (let i = 0; i < Z.n; i++) {
-      if (!Z.alive[i] || !Z.look[i]) continue;
-      const fade = Math.min(1, Z.life[i] / 0.4, (Z.life0[i] - Z.life[i]) / 0.2 + 0.2);
+      if (!Z.alive[i] || !Z.look[i] || (side >= 0 && Z.side[i] !== side)) continue;
+      const fade = zoneFade(Z.life[i], Z.age[i]);
       P.drawZone(ctx, cam, Z.look[i] as never, Z.x[i], Z.y[i], Z.r[i], (Z.side[i] ? 0.6 : 0.7) * fade * (W.degrade ? 0.6 : 1));
     }
+  }
+
+  /** Spawn blooms and go stones. */
+  private drawGround(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // blooms
     const E = W.E;
     for (let i = 0; i < E.n; i++) {
@@ -72,6 +110,9 @@ export class Renderer {
       const a = STN.arm[i] > 0 ? 0.5 : 1;
       if (s) blit(ctx, cam, s, STN.x[i], STN.y[i], 12 / 32, false, a); else circle(ctx, cam, STN.x[i], STN.y[i], 10, STN.white[i] ? '#f4f1e8' : '#161616', a);
     }
+  }
+
+  private drawDrops(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // drops
     const D = W.D;
     const tt = W.t;
@@ -91,7 +132,11 @@ export class Renderer {
       if (s) blit(ctx, cam, s, D.x[i], D.y[i] - bob, D.worth[i] >= 5 && k === 0 ? 1.4 : 1);
       else circle(ctx, cam, D.x[i], D.y[i] - bob, k <= 1 ? 4 : 7, k >= 7 ? '#b8862b' : '#e8eef2');
     }
+  }
+
+  private drawEnemies(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // enemies
+    const E = W.E;
     for (let i = 0; i < E.n; i++) {
       if (!E.alive[i] || E.hidden[i]) {
         if (E.alive[i] && E.hidden[i] && E.st[i] !== ST.bloom && (E.id[i] === 'rat' || E.id[i] === 'drowned')) {
@@ -102,7 +147,11 @@ export class Renderer {
       }
       this.drawEnemy(W, ctx, cam, i);
     }
+  }
+
+  private drawSummons(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // summons
+    const tt = W.t;
     const S = W.S;
     for (let i = 0; i < S.n; i++) {
       if (!S.alive[i]) continue;
@@ -115,10 +164,9 @@ export class Renderer {
       if (s) blit(ctx, cam, s, S.x[i], S.y[i] + bob, S.dragon[i] ? 1.4 : 1, Math.cos(S.face[i]) < 0, fade);
       else circle(ctx, cam, S.x[i], S.y[i], S.r[i], kind === SK.flowerSprout ? '#d98c9a' : '#3a4a6a', fade);
     }
-    // swords: 剑匣 blades, 残剑 and the idle ring
-    this.drawSwords(W, ctx, cam);
-    // the player
-    this.drawPlayer(W, ctx, cam);
+  }
+
+  private drawEffects(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // effects (kill bursts, rings, slashes, sparks) go under both kinds of shot: the vermilion
     // enemy shots that decide whether you get hit stay the brightest thing on screen (API.md §3)
     const FX = W.P;
@@ -136,7 +184,11 @@ export class Renderer {
     }
     // 打击感: spatter, rings, flares, swipes, crowns (under both kinds of shot)
     this.drawSparks(W, ctx, cam, pa);
+  }
+
+  private drawPlayerShots(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // player shots
+    const tt = W.t, pa = W.degrade ? 0.6 : 1;
     const PS = W.PS;
     const FS = W.feel.sprites;
     // brush trails: the raster cost of one per shot adds up at phone DPR, so fewer on mid, none on low
@@ -168,6 +220,10 @@ export class Renderer {
       if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
       else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
     }
+  }
+
+  private drawNumbers(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    const P = this.painter, lang = W.settings.lang;
     // numbers pop (overshoot to 1.15×, settle), size by damage (≤ 1.2×), fly an arc, then fade — under
     // the enemy shots, so a crit never hides the danger
     const N = W.N;
@@ -186,6 +242,9 @@ export class Renderer {
       const sx = (N.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (N.y[i] - cam.y) * cam.scale + cam.h / 2;
       dn.call(P, ctx, N.v[i], sx, sy, NUM_STYLE[N.style[i]] ?? 'hit', a, lang, sc);
     }
+  }
+
+  private drawEnemyShots(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // enemy shots: 1.5× the player's, the brightest thing on screen
     const ES = W.ES;
     for (let i = 0; i < ES.n; i++) {
@@ -199,6 +258,9 @@ export class Renderer {
       if (s) blitRot(ctx, cam, s, ES.x[i], y, Math.atan2(ES.vy[i], ES.vx[i]), 1.5);
       else { circle(ctx, cam, ES.x[i], y, ES.r[i], '#c0412f'); circle(ctx, cam, ES.x[i], y, ES.r[i] * 0.55, '#fff'); }
     }
+  }
+
+  private drawReticle(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // skill reticle
     if (W.skillPreview) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -207,9 +269,6 @@ export class Renderer {
       ctx.lineWidth = 2 * cam.dpr;
       ctx.beginPath(); ctx.arc(sx, sy, 26 * cam.dpr, 0, TAU); ctx.stroke();
     }
-    this.overlays(W, ctx, cam);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
   }
 
   private fxId(name: string): AtlasId {
@@ -398,18 +457,25 @@ export class Renderer {
     ctx.fillRect(sx - 1.5 * cam.dpr, sy - 1.5 * cam.dpr, 3 * cam.dpr, 3 * cam.dpr);
   }
 
+  /**
+   * Darkness (暗月, 大雪, 天狗食月): a baked soft hole around you, the rest near-black. The four rects and
+   * the hole share whole-pixel edges (no seam of light between them). Telegraphs, the enemy's ground
+   * and enemy shots are drawn over it (drawOrder), so danger stays readable in the dark.
+   */
+  private drawDarkness(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    if (W.lightR === null) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    const R = W.lightR * cam.scale;
+    if (!this.light) this.light = makeLight();
+    const h = holeRects(this.hole, cam.w, cam.h, (W.px - cam.x) * cam.scale + cam.w / 2, (W.py - cam.y) * cam.scale + cam.h / 2, R);
+    ctx.fillStyle = 'rgba(8,8,12,0.92)';
+    for (let k = 4; k < 20; k += 4) if (h[k + 2] > 0 && h[k + 3] > 0) ctx.fillRect(h[k], h[k + 1], h[k + 2], h[k + 3]);
+    if (this.light) ctx.drawImage(this.light, h[0], h[1], h[2] - h[0], h[3] - h[1]);
+  }
+
   private overlays(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // darkness (暗月, 天狗食月): a baked soft hole around you
-    if (W.lightR !== null) {
-      const R = W.lightR * cam.scale;
-      if (!this.light) this.light = makeLight();
-      const sx = (W.px - cam.x) * cam.scale + cam.w / 2, sy = (W.py - cam.y) * cam.scale + cam.h / 2;
-      ctx.fillStyle = 'rgba(8,8,12,0.92)';
-      ctx.fillRect(0, 0, cam.w, Math.max(0, sy - R)); ctx.fillRect(0, sy + R, cam.w, Math.max(0, cam.h - sy - R));
-      ctx.fillRect(0, sy - R, Math.max(0, sx - R), 2 * R); ctx.fillRect(sx + R, sy - R, Math.max(0, cam.w - sx - R), 2 * R);
-      if (this.light) ctx.drawImage(this.light, sx - R, sy - R, 2 * R, 2 * R);
-    }
     const key = `${cam.w}x${cam.h}`;
     const F = W.feel;
     const calm = W.settings.reduceMotion;
@@ -445,6 +511,47 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+/** The frame's layers (Renderer.layer draws one). */
+export type Layer =
+  | 'arena' | 'telegraphs' | 'zones' | 'dangerZones' | 'ground' | 'drops' | 'enemies' | 'summons' | 'player' | 'effects'
+  | 'playerShots' | 'numbers' | 'darkness' | 'enemyShots' | 'reticle' | 'overlays';
+/** The contract's order (API.md §3): the vermilion enemy shots on top of everything the player's side makes. */
+const LIT: readonly Layer[] = [
+  'arena', 'telegraphs', 'zones', 'ground', 'drops', 'enemies', 'summons', 'player', 'effects', 'playerShots', 'numbers', 'enemyShots', 'reticle', 'overlays',
+];
+/** In the dark the field goes under the darkness; the danger (the enemy's ground, telegraphs, enemy
+ *  shots) and your aim stay above it, readable wherever they are. */
+const DARK: readonly Layer[] = [
+  'arena', 'zones', 'ground', 'drops', 'enemies', 'summons', 'player', 'effects', 'playerShots', 'numbers',
+  'darkness', 'dangerZones', 'telegraphs', 'enemyShots', 'reticle', 'overlays',
+];
+/** The render order list: what draw() walks, lit or in the dark. */
+export function drawOrder(dark: boolean): readonly Layer[] { return dark ? DARK : LIT; }
+
+/** A zone's wash alpha: fading in over its first 0.2 s (from its age, never from a float32 life, which
+ *  at 1e9 never counts down) and out over its last 0.4 s. */
+export function zoneFade(life: number, age: number): number {
+  return Math.max(0, Math.min(1, life / 0.4, age / 0.2 + 0.2));
+}
+
+/**
+ * The darkness around a hole of radius R at (sx, sy) on a w × h screen, in whole pixels, into `out`:
+ * [x0, y0, x1, y1] the hole's square (the soft light mask fills it), then four rects (x, y, w, h) —
+ * above, below, left, right — that tile the rest edge to edge.
+ */
+export function holeRects(out: Float64Array | number[], w: number, h: number, sx: number, sy: number, R: number): Float64Array | number[] {
+  const W = Math.round(w), H = Math.round(h);
+  const x0 = Math.floor(sx - R), x1 = Math.ceil(sx + R), y0 = Math.floor(sy - R), y1 = Math.ceil(sy + R);
+  const cx0 = Math.max(0, Math.min(W, x0)), cx1 = Math.max(cx0, Math.min(W, x1));
+  const cy0 = Math.max(0, Math.min(H, y0)), cy1 = Math.max(cy0, Math.min(H, y1));
+  out[0] = x0; out[1] = y0; out[2] = x1; out[3] = y1;
+  out[4] = 0; out[5] = 0; out[6] = W; out[7] = cy0; // above
+  out[8] = 0; out[9] = cy1; out[10] = W; out[11] = H - cy1; // below
+  out[12] = 0; out[13] = cy0; out[14] = cx0; out[15] = cy1 - cy0; // left
+  out[16] = cx1; out[17] = cy0; out[18] = W - cx1; out[19] = cy1 - cy0; // right
+  return out;
 }
 
 /** A sprite rotated by `ang` and scaled kx along it, ky across it (ky < 0 mirrors), about its anchor. */

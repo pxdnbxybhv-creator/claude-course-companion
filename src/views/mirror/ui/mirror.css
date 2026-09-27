@@ -159,8 +159,11 @@
   --hud-track: rgba(27, 25, 22, 0.18); --hud-edge: rgba(27, 25, 22, 0.5); --hud-xp: #3d5a73; --hud-curse: #6a3d7a; --hud-alarm: #c0412f;
   --hud-pill: rgba(241, 233, 216, 0.8); --hud-veil: rgba(241, 233, 216, 0.62);
 }
-.mj-run.is-inverted {
+/* darkness (暗月, 天狗食月) blacks out the arena too: the HUD takes the same light words (.mj-dark) */
+.mj-run.is-inverted, .mj-hud.mj-dark {
   --hud-ink: #f3ecdd; --hud-ink-2: #ddd3c1; --hud-halo: rgba(14, 12, 10, 0.92);
+  /* redeclared: --hud-glow resolves where it is declared, so it must be restated with the dark halo */
+  --hud-glow: 0 0 2px var(--hud-halo), 0 0 5px var(--hud-halo), 0 0 9px var(--hud-halo);
   --hud-track: rgba(243, 236, 221, 0.2); --hud-edge: rgba(243, 236, 221, 0.6); --hud-xp: #a9c3d6; --hud-curse: #d2aee0; --hud-alarm: #ef7a62;
   --hud-pill: rgba(20, 18, 14, 0.72); --hud-veil: rgba(14, 12, 10, 0.5);
 }

@@ -290,6 +290,7 @@ engine.skill(target?); engine.skillPreview(target | null); engine.setSettings(p)
 - **Numbers and budgets.**
   - Caps by quality (GDD §24.3).
   - Draw order: arena → telegraphs → drops → enemies → summons → player → effects and impact sparks → player shots → numbers → enemy shots → overlays. The vermilion enemy shots stay on top of everything the player's side makes, numbers included.
+  - In the dark (暗月, 大雪, 天狗食月: `light(r)`), the darkness is drawn after the field (numbers included) and before the danger: the enemy's zones, telegraphs, enemy shots, the skill reticle, then the overlays (`drawOrder(dark)` in `engine/render.ts`). The HUD gets `HudState.dark` (`.mj-dark`: light words).
   - No `shadowBlur`, `filter` or per-frame gradients.
   - 打击感 (`engine/feel.ts`): the camera offset (trauma shake + kicks) never exceeds 6 px (GDD §20.3). `shake(px)` keeps its meaning (trauma that alone gives about px, now capped at 6), and `hitstop(ms)` still pays from the feel layer's bucket. Ordinary hits spend trauma and kicks from their own per-second budget; the big jolts are elite kills, the 镜技, boss phases and deaths, and blows you take. Zoom punches halve with shake off; reduced motion removes shake, kicks, zoom, hitstop, flashes and squash. A blow you take never moves you in the simulation (the knock-back is drawn only). `navigator.vibrate`: 8 ms when you are hurt, elite kills and the 镜技 at most once a second, boss blows; never ordinary crits.
   - Simulation ≤ 4 ms and draw ≤ 6 ms on a mid phone.
@@ -385,12 +386,13 @@ A missing entry is a no-op, so the core runs before content is finished.
 | `mon:<MonsterId \| TreasureId>` | 2–3 variants each |
 | `elite:<EliteId>` | |
 | `boss:<BossId \| 'mirrorself'>:<0-3>` | phase looks from `BOSS_REG[].phases`; phase 3 = 倒悬 (may reuse 2); `mirrorself` is `run.char` in white on black |
+| `boss:moonwater:1:m<0-7>` | 水中月's second phase wearing a moon phase (`MoonLook`: 0 full … 4 new), for its split reflections |
 | `wpn:<WeaponId>` | |
 | `item:<ItemId>` | |
 | `sum:<SummonKind>` | |
 | `proj:<ProjKind>` | |
 | `drop:<DropKind>` | `cashCoin` has 4 spin frames |
-| `fx:<FxName>` | |
+| `fx:<FxName>` | `bossShadow` is the true boss's ground shadow (a zone look; decoys cast none) |
 
 The look of each is the `look` line in `ids.ts`.
 
@@ -428,7 +430,7 @@ The look of each is the `look` line in `ids.ts`.
   - a wave starts with a 0.3 s cut and a drum fill; a boss with a 大鼓 roll into the 大锣; results (镜碎) drop out fast;
   - it switches only when the phase or the map changes (a new map restarts the band after a 0.52 s breath). The map colours the instruments and tempo. The themes must pass `tests/music.test.ts` (bounded layers, 宫 on F).
 - `hud?(s, crowd)` (optional): the engine calls it from `pushHud` (≈ 8 Hz, and once more when the wave ends) with the HUD state and the crowd (living capped enemies / the cap). The director feeds the band the wave clock (layers enter over the wave, the last 10 s tighten), danger (HP under 55 %, a crowd over 55 % of the cap; ≥ 0.5 pushes a layer up) and the boss phase, and plays the clear — 钹 + 大鼓, choked — when the timer reaches 0 or the last boss falls, then drops to calm. Test audios may leave it out.
-- The 2 Hz beat (琴师's passive, 夔) comes from the simulation clock. The engine calls `sfx('beatTick')` when either is active.
+- The 2 Hz beat (琴师's passive) comes from the simulation clock; the engine calls `sfx('beatTick')` on it. While 夔 is the boss it keeps the beat itself (80 BPM on its fight clock, content plays the tick), and `WorldApi.beat` and `HudState.beat` follow its tempo; the 2 Hz clock returns when it falls.
 
 ---
 

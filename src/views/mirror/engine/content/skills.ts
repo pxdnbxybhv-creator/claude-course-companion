@@ -532,7 +532,7 @@ const qinghui: SkillImpl = {
       }
       // she lands in a moonlight pool: impact, then −30% damage and 20% slower for foes inside, +5 回气 for her
       const w = c.w, x = w.player.x, y = w.player.y;
-      w.hitArea(x, y, p.r, hit(p.base, { elem: p.k }, { knock: 30 }));
+      const landed = w.hitArea(x, y, p.r, hit(p.base, { elem: p.k }, { knock: 30 }));
       w.fx('shockRing', x, y, { r: p.r, life: 0.4 });
       shared(w).pools.push({ x, y, r: p.r, until: w.t + p.pool, dr: p.poolDr / 100 });
       w.zone({
@@ -541,7 +541,7 @@ const qinghui: SkillImpl = {
       });
       setMoon(w, 0);
       w.shake(3);
-      w.sfx('bell');
+      if (!landed) w.sfx('bell'); // a landing on foes gets the feel layer's boom instead
     });
   },
 };

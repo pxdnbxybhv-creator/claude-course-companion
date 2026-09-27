@@ -702,7 +702,10 @@ export interface HudState {
   lives: number | null;
   curse: number;
   lowHp: boolean;
+  /** A beat since the last push: 2 Hz, or 夔's own 80 BPM while it is the boss. */
   beat: boolean;
+  /** Darkness is down (暗月, 天狗食月): the HUD turns to light words (.mj-dark). */
+  dark: boolean;
   fps: number;
 }
 
@@ -961,7 +964,7 @@ export interface WorldApi {
   readonly diff: Readonly<DifficultyDef>;
   readonly quality: Quality;
   readonly player: PlayerView;
-  /** 嫦娥's cycle 0..7 (0 full, 4 new) and whether the 2 Hz beat ticked this step. */
+  /** 嫦娥's cycle 0..7 (0 full, 4 new) and whether the beat ticked this step (2 Hz; 夔's own tempo while it is the boss). */
   readonly moonPhase: number;
   readonly beat: boolean;
 
@@ -1092,9 +1095,13 @@ export interface ContentRegistry {
 // ═════════════════════════════════════════════════════════════ 7 · painter (paint/*: createPainter)
 
 export type BossPhase = 0 | 1 | 2 | 3;
-/** Atlas keys. `boss:mirrorself:0` is baked from run.char in white-on-black ink. */
+/** 水中月's moon phases for its reflections: 0 full … 4 new (1–3 waning, 5–7 waxing). */
+export type MoonLook = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+/** Atlas keys. `boss:mirrorself:0` is baked from run.char in white-on-black ink; `boss:moonwater:1:m0` … `m7`
+ *  are 水中月's second phase wearing a moon phase (its split reflections). */
 export type AtlasId =
   | `char:${CharacterId}` | `mon:${MonsterId}` | `mon:${TreasureId}` | `elite:${EliteId}` | `boss:${BossId | 'mirrorself'}:${BossPhase}`
+  | `boss:moonwater:1:m${MoonLook}`
   | `wpn:${WeaponId}` | `item:${ItemId}` | `sum:${SummonKind}` | `proj:${ProjKind}` | `drop:${DropKind}` | `fx:${FxName}`;
 
 /** A baked sprite: a source rect in an atlas canvas, its size in world u and its anchor (0..1). */

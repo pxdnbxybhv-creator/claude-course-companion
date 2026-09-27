@@ -23,7 +23,7 @@ import {
   COMPANION_REG, type BossId, type FxName, type MapId,
 } from '../ids';
 import type {
-  ArenaGeom, AtlasId, BakeStage, Camera, NumStyle, Painter, Quality, RunSave, Sprite, StampKind, TeleShape,
+  ArenaGeom, AtlasId, BakeStage, Camera, MoonLook, NumStyle, Painter, Quality, RunSave, Sprite, StampKind, TeleShape,
 } from '../types';
 import { canvas, ctx2d, pack, Pages, renderSpec, warmGrain } from './atlas';
 import { ArenaLayer } from './arena';
@@ -35,7 +35,7 @@ import { B, extentOf, type Spec } from './kit';
 import { MON_SPECS } from './monsters';
 import { Numbers } from './numbers';
 import { Tele } from './tele';
-import { DROP_SPECS, EXTRA_FX, FX_SPECS } from './things';
+import { DROP_SPECS, FX_SPECS } from './things';
 
 export { blit, blitRot } from './draw';
 export { abbrev } from './numbers';
@@ -51,6 +51,8 @@ const ICON_CACHE = 260;
 type Kind = 'char' | 'mon' | 'elite' | 'boss' | 'wpn' | 'item' | 'sum' | 'proj' | 'drop' | 'fx';
 
 const TREASURE_IDS = new Set<string>(TREASURE_REG.map((t) => t.id));
+/** 水中月's reflections: boss:moonwater:1:m0 … m7. */
+const MOON_LOOKS: readonly MoonLook[] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /** Which spec paints an atlas id (null: unknown id). `self` is the run's companion for 镜主. */
 export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec; ghost?: boolean; invertible: boolean } | null {
@@ -80,7 +82,7 @@ export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec;
     case 'sum': return lookup(SUM_SPECS, name);
     case 'proj': return lookup(PROJ_SPECS, name);
     case 'drop': return lookup(DROP_SPECS, name);
-    case 'fx': return lookup(FX_SPECS, name) ?? lookup(EXTRA_FX, name);
+    case 'fx': return lookup(FX_SPECS, name);
     default: return null;
   }
 }
@@ -106,7 +108,7 @@ export function allAtlasIds(): AtlasId[] {
   for (const t of TREASURE_REG) out.push(`mon:${t.id}`);
   for (const e of ELITE_REG) out.push(`elite:${e.id}`);
   for (const bo of BOSS_REG) for (let p = 0; p < 4; p++) out.push(`boss:${bo.id}:${p}`);
-  for (let m = 0; m < 8; m++) out.push(`boss:moonwater:1:m${m}`);
+  for (const m of MOON_LOOKS) out.push(`boss:moonwater:1:m${m}`);
   for (let p = 0; p < 4; p++) out.push(`boss:mirrorself:${p}`);
   for (const w of WEAPON_REG) out.push(`wpn:${w.id}`);
   for (const i of ITEM_REG) out.push(`item:${i.id}`);
@@ -114,7 +116,6 @@ export function allAtlasIds(): AtlasId[] {
   for (const p of PROJ_REG) out.push(`proj:${p.id}`);
   for (const d of DROP_REG) out.push(`drop:${d.id}`);
   for (const f of FX_REG) out.push(`fx:${f.id}`);
-  for (const f of Object.keys(EXTRA_FX)) out.push(`fx:${f}`);
   return out as AtlasId[];
 }
 
@@ -133,7 +134,7 @@ function rosterOf(map: MapId): AtlasId[] {
 function bossIds(id: BossId | 'mirrorself', daoxuan: boolean): AtlasId[] {
   const out = (daoxuan ? [0, 1, 2, 3] : [0, 1, 2]).map((p) => `boss:${id}:${p}` as AtlasId);
   // 水中月's split: each reflection shows its own moon phase
-  if (id === 'moonwater') for (let m = 0; m < 8; m++) out.push(`boss:moonwater:1:m${m}` as AtlasId);
+  if (id === 'moonwater') for (const m of MOON_LOOKS) out.push(`boss:moonwater:1:m${m}`);
   return out;
 }
 /**
@@ -218,7 +219,6 @@ class InkPainter implements Painter {
       for (const p of PROJ_REG) out.add(`proj:${p.id}` as AtlasId);
       for (const d of DROP_REG) out.add(`drop:${d.id}` as AtlasId);
       for (const f of FX_REG) out.add(`fx:${f.id}` as AtlasId);
-      for (const f of Object.keys(EXTRA_FX)) out.add(`fx:${f}` as AtlasId);
       // a resumed run near a boss, or deep in endless, needs those too
       if (next % 10 === 0 || next % 10 === 9) for (const b of bossFor(next % 10 === 0 ? next : next + 1)) for (const id of bossIds(b, dx)) out.add(id);
       if (run.wave >= 30) for (const id of this.plan(run, 'endless')) out.add(id);

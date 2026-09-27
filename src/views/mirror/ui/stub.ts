@@ -39,7 +39,7 @@ class StubEngine implements Engine {
     this.hud = {
       hp: 1, hpMax: 1, shield: 0, moon: run.moon, sleeve: 0, showSleeve: run.coins > 0, level: run.lvl, xp: run.xp, xpNext: xpNext(run.lvl),
       wave: run.wave + 1, time: null, boss: null, skillCd: 0, skillActive: false, drunk: null, moonPhase: null, lives: run.char === 'cat' ? run.lives : null,
-      curse: 0, lowHp: false, beat: false, fps: 60,
+      curse: 0, lowHp: false, beat: false, dark: false, fps: 60,
     };
     if (import.meta.env.DEV && typeof window !== 'undefined') {
       (window as unknown as { __mirrorStub?: unknown }).__mirrorStub = { die: (o?: { sleeve?: boolean }) => this.finish(true, !!o?.sleeve), win: () => this.finish(false), engine: this };

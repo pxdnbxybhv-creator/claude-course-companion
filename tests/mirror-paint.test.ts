@@ -20,8 +20,7 @@ describe('atlas coverage', () => {
   it('lists every entity the arena draws', () => {
     const n = COMPANION_REG.length + MONSTER_REG.length + TREASURE_REG.length + ELITE_REG.length + BOSS_REG.length * 4 + 4
       + WEAPON_REG.length + ITEM_REG.length + SUMMON_REG.length + PROJ_REG.length + DROP_REG.length + FX_REG.length
-      + 8 // 水中月's reflections: boss:moonwater:1:m0 … m7
-      + 1; // fx:bossShadow
+      + 8; // 水中月's reflections: boss:moonwater:1:m0 … m7
     expect(ids.length).toBe(n);
     expect(new Set(ids).size).toBe(ids.length);
   });

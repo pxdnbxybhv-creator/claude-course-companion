@@ -6,14 +6,14 @@
 // every 10 s. 幽镜 and up add one pattern per phase. Every attack is telegraphed in wet vermilion.
 // Damage is written at the boss's home wave on 照影 (data/bosses.ts) and scaled here to the wave,
 // 镜境, vows and 劫 — an endless boss keeps its own home, so it hits like the wave it is fought on.
-import type { BossId } from '../../ids';
-import type { ActorImpl, BossDef, BossPatternId, PatternCall, PatternImpl, TeleShape, Vec, WorldApi } from '../../types';
+import type { BossId, FxName } from '../../ids';
+import type { ActorImpl, AtlasId, BossDef, BossPatternId, MoonLook, PatternCall, PatternImpl, TeleShape, Vec, WorldApi } from '../../types';
 import { BOSSES, ENDLESS_BOSS } from '../../data';
 import { dmgMul, dmx, hpMul } from '../../logic/formulas';
 import {
   core, eatMoon, setDecoy, endShot, endTele, enemyShot, expire, fxLine, fxSprite, lightNow, liveTele, moveInput, moveShot, moveZone,
   pullPlayer, reduceMotion, setAir, setActor, setKind, setLook, setMoveInput, setResist, shotIs, sky, slowPlayer, tagShot,
-  teleFill, teleShape, dropMoon, dropGold, setHp, setBossBeat,
+  teleFill, teleShape, dropMoon, dropGold, setHp, setBossBeat, ownBeat, beatNow,
 } from './bridge';
 import { shotSpeedX } from './field';
 import {
@@ -299,10 +299,9 @@ function phantomVolley(w: WorldApi, h: number, st: BossState, s: Phantom): void 
 }
 /**
  * 水中月's second-phase look wearing moon phase k (0 full … 4 new; 1–3 waning, dark on the right;
- * 5–7 waxing, dark on the left). An id beyond the contract's AtlasId (CHANGE REQUEST); the painter
- * bakes these with the boss and falls back to the plain phase look.
+ * 5–7 waxing, dark on the left); the painter bakes these with the boss.
  */
-const moonLook = (k: number) => `boss:moonwater:1:m${((k % 8) + 8) % 8}`;
+const moonLook = (k: number): AtlasId => `boss:moonwater:1:m${(((Math.round(k) % 8) + 8) % 8) as MoonLook}`;
 
 // ═════════════════════════════════════════════ 吴刚's trees
 
@@ -556,7 +555,7 @@ const PATS: Record<BossPatternId, PatFn> = {
     w.sfx('bell');
     // the true one holds still and wears tonight's moon while the split lasts
     c.st.busy++;
-    setLook(w, c.h, moonLook(tonight) as never);
+    setLook(w, c.h, moonLook(tonight));
     try {
       for (let t = 0; t < 10; t += c.w.dt) {
         faceRight(c.w, c.h, c.w.dt);
@@ -1153,20 +1152,18 @@ function move(w: WorldApi, st: BossState, dt: number): void {
   }
 }
 
-/**
- * The true body's shadow, under its feet and wider than it (dx, dy, r in body radii): the painter's
- * `bossShadow`, a look beyond the contract's FxName (CHANGE REQUEST), so it is cast here.
- */
+/** The true body's shadow, under its feet and wider than it (dx, dy, r in body radii): fx `bossShadow`. */
 const SHADOW: readonly [number, number, number][] = [[0, 0.8, 1.05]];
-const SHADOW_LOOK = 'bossShadow' as never;
+const SHADOW_LOOK: FxName = 'bossShadow';
 /** 夔's beat: 80 BPM on the fight's clock (the stomps land on it). */
 const beatOf = (st: BossState) => 60 / (st.def.p.bpm || 80);
 /** Per-boss touches every step: tails, growth, the shadow, the reversal, 夔's beat. */
 function special(w: WorldApi, st: BossState, dt: number): void {
   const e = w.enemy(st.h);
-  if (st.id === 'kui' && st.crackT <= 0) {
+  if (st.id === 'kui') {
+    // the beat keeps time through the crack (广陵散 and the 乐器 still ride it); only the drum falls silent
     const P = beatOf(st);
-    if (Math.floor(st.fightT / P + 1e-6) !== Math.floor((st.fightT - dt) / P + 1e-6)) w.sfx('beatTick');
+    if (Math.floor(st.fightT / P + 1e-6) !== Math.floor((st.fightT - dt) / P + 1e-6)) { if (st.crackT <= 0) w.sfx('beatTick'); beatNow(w); }
   }
   // below the body and wide, where the sprite doesn't cover it; decoys cast none
   for (let k = 0; k < st.shadow.length; k++) { const o = SHADOW[k]; moveZone(w, st.shadow[k], e.x + o[0] * e.r, e.y + o[1] * e.r, o[2] * e.r); }
@@ -1204,7 +1201,7 @@ const RUNNER: ActorImpl<BossState> = {
     if (id === 'mirage' || id === 'fox' || id === 'moonwater') for (const o of SHADOW) st.shadow.push(w.zone({ side: 'player', look: SHADOW_LOOK, x: e.x + o[0] * e.r, y: e.y + o[1] * e.r, r: o[2] * e.r, life: FOREVER }));
     shared(w).bosses.set(h, st);
     // 夔 keeps its own tempo: the core's 2 Hz tick would fall off its 80 BPM stomps
-    if (id === 'kui') setBossBeat(w, false);
+    if (id === 'kui') { setBossBeat(w, false); ownBeat(w, true); }
     if (id === 'wugang' && w.arena.obstacles.some((o) => o.kind === 'tree') && !st.trees.length) {
       const c: PatCtx = { w, h, st, call: def.phases[0].script[0], p: {}, teles: [], ended: false };
       spawnTree(c, 0, 0, true);
@@ -1279,6 +1276,8 @@ const RUNNER: ActorImpl<BossState> = {
     for (const z of st.shadow) w.endZone(z);
     unreverse(w, st);
     if (st.id === 'eclipse') liftDark(w);
+    // the drum falls silent: the core's 2 Hz beat returns (unless another 夔 still keeps it)
+    if (st.id === 'kui' && ![...shared(w).bosses.values()].some((o) => o !== st && (o as BossState).id === 'kui' && !(o as BossState).dead)) ownBeat(w, false);
     // 蜃's wall resets when the clam dies (the pattern's finally ends it); 金蟾王 returns what it ate ×1.5
     if (st.id === 'goldtoad' && st.eaten > 0) {
       const e = w.enemy(h);

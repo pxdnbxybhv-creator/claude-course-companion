@@ -676,6 +676,7 @@ export const FX_REG = [
   { id: 'dustPuff', zh: '尘', en: 'Dust', look: 'small dust puff (rolls, landings)' },
   { id: 'petalBurst', zh: '花瓣', en: 'Petals', look: 'burst of petals (flowers, 桂花精)' },
   { id: 'teleInk', zh: '预兆', en: 'Telegraph Ink', look: 'wet-ink fill texture for telegraphs; fill level = time left' },
+  { id: 'bossShadow', zh: '身影', en: 'Boss Shadow', look: 'wide, flat, dark ellipse under a true boss (蜃, 九尾狐, 水中月); its decoys cast none' },
 ] as const satisfies readonly Named[];
 export type FxName = (typeof FX_REG)[number]['id'];
 

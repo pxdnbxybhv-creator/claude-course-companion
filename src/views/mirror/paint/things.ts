@@ -53,17 +53,6 @@ const zone = (paint: (b: B, v: number) => void, n = 1): Spec => ({ box: [-Z - 2,
 const fx = (r: number, paint: (b: B, v: number) => void, n = 1, halo: Spec['halo'] = 'none'): Spec => ({ box: [-r, -r, r, r], n, halo, paint });
 const ringOf = (b: B, r: number, w: number, c: string, tone: number, n = 28) => b.brush(arcW(0, 0, r, r, 0, Math.PI * 2, w, w, n), tone, c);
 
-/**
- * Looks beyond the contract's FxName (CHANGE REQUEST to add them to FX_REG), drawn by id like any fx.
- * `bossShadow`: the ground shadow only a true boss casts (蜃, 九尾狐, 水中月's decoys have none): a
- * wide, flat, dark ellipse the engine lays under its feet as a zone.
- */
-export const EXTRA_FX: Record<string, Spec> = {
-  bossShadow: zone((b) => {
-    b.wash(INK, ell(0, 0, 31, 14, 0, Math.PI * 2, 32), 0.45, 3);
-    b.fill(INK, ell(0, 1, 26, 10, 0, Math.PI * 2, 32), 0.9, 2.5);
-  }),
-};
 export const FX_SPECS: Record<FxName, Spec> = {
   hitSpark: fx(10, (b) => { for (let i = 0; i < 4; i++) { const a = i * 1.7 + 0.3; b.brush(rotW([[2, 0, 1.8], [9, 0, 0.3]], a), 0.9, INK); } b.dot(0, 0, 3, 0.9, INK); }),
   critSpark: fx(14, (b) => { b.fill(DANGER, star(0, 0, 13, 3.4, 6), 0.9, 0.4); b.fill('#fff4e0', star(0, 0, 6, 1.8, 6), 0.95, 0.2); }),
@@ -120,6 +109,12 @@ export const FX_SPECS: Record<FxName, Spec> = {
   shockRing: zone((b) => { ringOf(b, 28, 4, INK, 0.6); b.dry(arcW(0, 0, 30, 30, 0.3, 2.8, 2, 0.6, 10), 0.5, INK); b.dry(arcW(0, 0, 30, 30, 3.5, 5.9, 2, 0.6, 10), 0.5, INK); }),
   dustPuff: fx(14, (b) => { for (let i = 0; i < 4; i++) b.wash('#a89a80', blob((i - 1.5) * 6, (i % 2) * 3, 6, 5, i + 3, 0.2), 0.4, 2); }),
   petalBurst: fx(18, (b) => { for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2, r = 8 + h01(12, i) * 8; b.fill(i % 2 ? '#e7a3b3' : GOLD, rot(ell(Math.cos(a) * r, Math.sin(a) * r, 2.6, 1.5, 0, Math.PI * 2, 8), a, Math.cos(a) * r, Math.sin(a) * r), 0.9, 0.2); } }),
+  /** The ground shadow only a true boss casts (蜃, 九尾狐, 水中月's decoys have none): a wide, flat,
+   *  dark ellipse the engine lays under its feet as a zone. */
+  bossShadow: zone((b) => {
+    b.wash(INK, ell(0, 0, 31, 14, 0, Math.PI * 2, 32), 0.45, 3);
+    b.fill(INK, ell(0, 1, 26, 10, 0, Math.PI * 2, 32), 0.9, 2.5);
+  }),
   teleInk: zone((b) => { b.wash(DANGER, blob(0, 0, 30, 29, 19, 0.06), 0.55, 3); b.wash(CINNABAR, blob(-4, 3, 16, 14, 5, 0.15), 0.3, 2); }),
 };
 void spine; void JADE; void PAPER; void GOLD;

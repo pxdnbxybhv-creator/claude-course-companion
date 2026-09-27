@@ -90,6 +90,7 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
         }
         root.current?.classList.toggle('is-low', s.lowHp);
         root.current?.classList.toggle('is-beat', s.beat);
+        root.current?.classList.toggle('mj-dark', !!s.dark);
         const ring = root.current?.parentElement?.querySelector<SVGCircleElement>('.mj-skill-ring');
         if (ring) ring.style.strokeDashoffset = String(RING * Math.max(0, Math.min(1, s.skillCd)));
         const btn = root.current?.parentElement?.querySelector<HTMLElement>('.mj-skill');

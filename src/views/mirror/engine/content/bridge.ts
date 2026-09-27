@@ -97,6 +97,11 @@ export function isChild(w: WorldApi, h: number): boolean { const i = slot(w, h);
 export function markChild(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.child[i] = 1; }
 /** 夔 drives its own beat tick (on its stomps' tempo) instead of the core's 2 Hz one. */
 export function setBossBeat(w: WorldApi, on: boolean): void { core(w).bossBeat = on; }
+/** A boss keeps the beat (夔): the core's beat — W.beat, the HUD's pulse, 琴师's timing — follows the
+ *  ticks reported with beatNow until released (the core's 2 Hz clock returns). */
+export function ownBeat(w: WorldApi, on: boolean): void { const W = core(w); W.beatOwn = on; W.beatLatch = false; }
+/** The owning boss's beat ticked this step (the core flags it from the next step). */
+export function beatNow(w: WorldApi): void { core(w).beatLatch = true; }
 /** Mark body h as a boss's decoy (the core's 灯笼鬼 never heals one). */
 export function setDecoy(w: WorldApi, h: number, on = true): void { const i = slot(w, h); if (i >= 0) core(w).E.decoy[i] = on ? 1 : 0; }
 export function setNoDrops(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.noDrops[i] = 1; }
