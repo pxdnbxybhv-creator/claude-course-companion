@@ -103,6 +103,8 @@ export class Enemies extends Pool {
   readonly phase: Uint8Array;
   /** A splitter's child (never splits again). */
   readonly child: Uint8Array;
+  /** A boss's decoy (mirage, illusion, false moon, monkey, tree): never healed, never counts as a foe of note. */
+  readonly decoy: Uint8Array;
   readonly age: Float32Array;
   /** Content scratch: 8 floats per body, and a subarray view per slot made once. */
   readonly memAll: Float32Array;
@@ -135,7 +137,7 @@ export class Enemies extends Pool {
     this.heavy = F(); this.lastSlot = new Int16Array(cap); this.lastSrc = new Uint8Array(cap);
     this.numAcc = F(); this.numT = F(); this.numCrit = new Uint8Array(cap); this.numIdx = new Int16Array(cap).fill(-1);
     this.hitV = F(); this.hitA = F(); this.hitAge = F();
-    this.partner = new Int32Array(cap); this.eaten = F(); this.phase = new Uint8Array(cap); this.child = new Uint8Array(cap); this.age = F();
+    this.partner = new Int32Array(cap); this.eaten = F(); this.phase = new Uint8Array(cap); this.child = new Uint8Array(cap); this.decoy = new Uint8Array(cap); this.age = F();
     this.memAll = new Float32Array(cap * 8);
     this.mem = [];
     for (let i = 0; i < cap; i++) this.mem.push(this.memAll.subarray(i * 8, i * 8 + 8));
@@ -170,7 +172,7 @@ export class Enemies extends Pool {
     this.tags[i] = 0; this.cost[i] = 0; this.noDrops[i] = 0; this.capped[i] = 1; this.heavy[i] = 1;
     this.lastSlot[i] = -1; this.lastSrc[i] = 0; this.numAcc[i] = 0; this.numT[i] = 0; this.numCrit[i] = 0; this.numIdx[i] = -1;
     this.hitV[i] = 0; this.hitA[i] = 0; this.hitAge[i] = 9;
-    this.partner[i] = -1; this.eaten[i] = 0; this.phase[i] = 0; this.child[i] = 0; this.age[i] = 0;
+    this.partner[i] = -1; this.eaten[i] = 0; this.phase[i] = 0; this.child[i] = 0; this.decoy[i] = 0; this.age[i] = 0;
     this.mem[i].fill(0);
     this.actor[i] = null; this.actorS[i] = null; this.affixes[i] = null;
     this.affixImpl[i].length = 0; this.affixS[i].length = 0;
@@ -318,6 +320,8 @@ export interface ZoneFn { (w: WorldApi, zone: number): void }
 export class Zones extends Pool {
   readonly side: Uint8Array; readonly look: string[];
   readonly x: Float32Array; readonly y: Float32Array; readonly r: Float32Array; readonly life: Float32Array; readonly life0: Float32Array;
+  /** Seconds since the zone opened, kept apart from `life` (a float32 life of 1e9 never counts down). */
+  readonly age: Float64Array;
   readonly tick: Float32Array; readonly tickT: Float32Array; readonly fn: (ZoneFn | null)[];
   readonly slow: Float32Array; readonly dps: Float32Array; readonly undodge: Uint8Array; readonly follow: Uint8Array;
   /** Core zone code (web, spore, fire, flower, trail …) with its numbers. */
@@ -326,7 +330,7 @@ export class Zones extends Pool {
     super(cap);
     const F = () => new Float32Array(cap);
     this.side = new Uint8Array(cap); this.look = new Array(cap).fill('');
-    this.x = F(); this.y = F(); this.r = F(); this.life = F(); this.life0 = F(); this.tick = F(); this.tickT = F();
+    this.x = F(); this.y = F(); this.r = F(); this.life = F(); this.life0 = F(); this.age = new Float64Array(cap); this.tick = F(); this.tickT = F();
     this.fn = new Array(cap).fill(null); this.slow = F(); this.dps = F(); this.undodge = new Uint8Array(cap); this.follow = new Uint8Array(cap);
     this.code = new Uint8Array(cap); this.v = F(); this.gen = new Uint32Array(cap);
   }

@@ -97,6 +97,8 @@ export function isChild(w: WorldApi, h: number): boolean { const i = slot(w, h);
 export function markChild(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.child[i] = 1; }
 /** 夔 drives its own beat tick (on its stomps' tempo) instead of the core's 2 Hz one. */
 export function setBossBeat(w: WorldApi, on: boolean): void { core(w).bossBeat = on; }
+/** Mark body h as a boss's decoy (the core's 灯笼鬼 never heals one). */
+export function setDecoy(w: WorldApi, h: number, on = true): void { const i = slot(w, h); if (i >= 0) core(w).E.decoy[i] = on ? 1 : 0; }
 export function setNoDrops(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.noDrops[i] = 1; }
 /** A body leaves without being killed: no tallies, drops or kill events. */
 export function expire(w: WorldApi, h: number, look: FxName = 'inkBurst'): void {

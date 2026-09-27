@@ -966,7 +966,7 @@ export class World implements WorldApi {
     if (i < 0) return -1;
     Z.gen[i] = (Z.gen[i] + 1) % 0x100000;
     Z.side[i] = z.side === 'player' ? 1 : 0; Z.look[i] = z.look; Z.x[i] = z.x; Z.y[i] = z.y; Z.r[i] = z.r;
-    Z.life[i] = Z.life0[i] = z.life; Z.tick[i] = z.tick ?? 0; Z.tickT[i] = z.tick ?? 0; Z.fn[i] = z.onTick ?? null;
+    Z.life[i] = Z.life0[i] = z.life; Z.age[i] = 0; Z.tick[i] = z.tick ?? 0; Z.tickT[i] = z.tick ?? 0; Z.fn[i] = z.onTick ?? null;
     Z.slow[i] = z.slow ?? 0; Z.dps[i] = z.dmgPerSec ?? 0; Z.undodge[i] = z.undodgeable ? 1 : 0; Z.follow[i] = z.follow === 'player' ? 1 : 0;
     Z.code[i] = 0; Z.v[i] = 0;
     return Z.gen[i] * 1024 + i;
@@ -2049,6 +2049,7 @@ export class World implements WorldApi {
     for (let i = 0; i < Z.n; i++) {
       if (!Z.alive[i]) continue;
       Z.life[i] -= dt;
+      Z.age[i] += dt;
       if (Z.life[i] <= 0) { this.zoneEnd(i); continue; }
       if (Z.follow[i]) { Z.x[i] = this.px; Z.y[i] = this.py; }
       if (Z.fn[i] && Z.tick[i] > 0) {

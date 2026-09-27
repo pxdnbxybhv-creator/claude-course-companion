@@ -11,7 +11,7 @@ import type { ActorImpl, BossDef, BossPatternId, PatternCall, PatternImpl, TeleS
 import { BOSSES, ENDLESS_BOSS } from '../../data';
 import { dmgMul, dmx, hpMul } from '../../logic/formulas';
 import {
-  core, eatMoon, endShot, endTele, enemyShot, expire, fxLine, fxSprite, lightNow, liveTele, moveInput, moveShot, moveZone,
+  core, eatMoon, setDecoy, endShot, endTele, enemyShot, expire, fxLine, fxSprite, lightNow, liveTele, moveInput, moveShot, moveZone,
   pullPlayer, reduceMotion, setAir, setActor, setKind, setLook, setMoveInput, setResist, shotIs, sky, slowPlayer, tagShot,
   teleFill, teleShape, dropMoon, dropGold, setHp, setBossBeat,
 } from './bridge';
@@ -274,6 +274,7 @@ function phantom(c: PatCtx, x: number, y: number, o: Partial<Phantom> & { look?:
   Object.assign(s, { owner: c.h, call: c.call }, rest);
   setActor(w, h, PHANTOM, s);
   shared(w).phantoms.add(h);
+  setDecoy(w, h);
   if (o.kind !== 'monkey' && o.kind !== 'tree') c.st.phantoms.push(h);
   w.fx('inkBurst', x, y, { r: r * 1.2, life: 0.4 });
   return h;

@@ -2,6 +2,8 @@
 // each skill here gives its auto-target and, when cast, a SkillRun ticked until it returns false (the
 // cooldown starts then). Every number comes from SKILLS[id].p. A skill changes how you move or
 // where you stand: you pin, net, dash, pounce, root, lure or rise.
+// Sound: the feel layer voices every hit a skill lands (its boom counted in the step's ≤ 4 voices),
+// so a skill's strike calls w.sfx only when it catches nothing (a miss still sounds).
 import type { SkillId, WeaponId } from '../../ids';
 import type { GameEvent, HitPacket, SkillImpl, SkillRun, StatId, StatMods, Vec, WorldApi } from '../../types';
 import { WEAPONS } from '../../data';
@@ -63,10 +65,10 @@ const yizi: SkillImpl = {
       c.w.fx('inkBurst', at.x, at.y, { r: p.r * 0.5, life: p.draw });
       yield p.draw;
       const w = c.w;
-      w.hitArea(at.x, at.y, p.r, hit(p.base, { [bestStat(w)]: p.k }, { knock: 30 }));
+      const n = w.hitArea(at.x, at.y, p.r, hit(p.base, { [bestStat(w)]: p.k }, { knock: 30 }));
       w.fx('shockRing', at.x, at.y, { r: p.r, life: 0.4 });
       w.shake(5);
-      w.sfx('bossDrum');
+      if (!n) w.sfx('bossDrum');
       // the lingering 镇: slow 40%, and +20% damage taken from every source
       w.zone({
         side: 'player', look: 'zhenGlyph', x: at.x, y: at.y, r: p.r, life: p.zone, slow: p.slow, tick: 0.25,
@@ -189,7 +191,7 @@ const yijian: SkillImpl = {
     const dx = dir.x / d, dy = dir.y / d;
     const dur = 0.22;
     w0.dash(dx, dy, p.len, dur, p.iframe);
-    w0.sfx('hitShot');
+    w0.sfx('dodge');
     let killed = false;
     const sw = swordHits(w0);
     return coSkill(w0, function* (c) {
@@ -198,7 +200,7 @@ const yijian: SkillImpl = {
       // every sword streaks along the path you cut
       const ex = w.player.x, ey = w.player.y, len = Math.hypot(ex - sx, ey - sy), ang = Math.atan2(ey - sy, ex - sx);
       const pk = sw.n > 0 ? hit(sw.sum * p.streak, undefined, { knock: 20 }) : hit(10 * p.streak, { ranged: p.streak }, { knock: 20 });
-      w.hitLine(sx, sy, ang, Math.max(40, len), 56, pk);
+      if (!w.hitLine(sx, sy, ang, Math.max(40, len), 56, pk)) w.sfx('hitShot');
       const nS = Math.max(1, Math.min(6, sw.n));
       for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; fxLine(w, 'swordStreak', sx - dy * o, sy + dx * o, ang, Math.max(40, len), 0.45, 1.8); }
       w.fx('critSpark', ex, ey, { r: 40, life: 0.3 });
@@ -228,9 +230,8 @@ const jiji: SkillImpl = {
   cast(w0, def, at0) {
     const p = def.p, at = within(w0, at0, def.reach ?? 420);
     w0.zone({ side: 'player', look: 'vortex', x: at.x, y: at.y, r: p.r, life: p.dur });
-    w0.sfx('hitTalisman');
     return coSkill(w0, function* (c) {
-      let t = 0, tick = 0;
+      let t = 0, tick = 0, first = true;
       while (t < p.dur) {
         const w = c.w, dt = w.dt;
         // the vortex pulls non-bosses in (elites at half strength)
@@ -253,7 +254,9 @@ const jiji: SkillImpl = {
             w.hit(h, hit(p.base, { elem: p.k }, { status: { kind: 'burn', dur: 3, v: 3 + 0.5 * Math.max(0, w.stats.elem) }, proc: 0.6 }));
             w.fx('lightningStrike', ex, ey, { r: 30, life: 0.3 });
           }
-          if (hs.length) w.sfx('hitTalisman');
+          // the first volley's strikes sound through the feel layer; an empty vortex still crackles
+          if (first && !hs.length) w.sfx('hitTalisman');
+          first = false;
         }
         t += dt;
         yield 0;
@@ -368,7 +371,8 @@ const wei: SkillImpl = {
       }
       w.fx('shockRing', cx, cy, { r: p.r * 0.6, life: 0.4 });
       if (n >= 6) w.title({ zh: '提子', en: 'Captured' }, 'edge');
-      w.sfx(n ? 'kill' : 'merge');
+      // captures pop through the feel layer; an empty 围 only clacks its stones
+      if (!n) w.sfx('merge');
       w.shake(3);
     });
   },
@@ -396,11 +400,11 @@ const pudie: SkillImpl = {
       yield p.air;
       const w = c.w, x = w.player.x, y = w.player.y;
       landed = true;
-      w.hitArea(x, y, p.r, hit(p.base, { melee: p.k }, { status: { kind: 'stun', dur: p.stun }, knock: 40 }));
+      const n = w.hitArea(x, y, p.r, hit(p.base, { melee: p.k }, { status: { kind: 'stun', dur: p.stun }, knock: 40 }));
       w.fx('shockRing', x, y, { r: p.r, life: 0.3 });
       w.fx('dustPuff', x, y, { r: 30, life: 0.3 });
       w.shake(3);
-      w.sfx('hitMelee');
+      if (!n) w.sfx('hitMelee');
     }, {
       // only the landing's own kills count (weapons firing through the leap don't chain it)
       on: (_w, ev) => { if (ev.type === 'kill' && ev.src === 'skill' && landed) killed = true; },
@@ -421,10 +425,10 @@ const daoyao: SkillImpl = {
       for (let k = 0; k < p.pounds; k++) {
         yield step * 0.75;
         const w = c.w, x = w.player.x, y = w.player.y;
-        w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock }));
+        const n = w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock }));
         w.fx('shockRing', x, y, { r: p.r, life: 0.35 });
         w.shake(2);
-        w.sfx('bossDrum');
+        if (!n) w.sfx('bossDrum');
         yield step * 0.25;
       }
       // the elixir: heal 15% of max HP, +20% 伤害 for 6 s
@@ -499,12 +503,11 @@ const tuodao: SkillImpl = {
     return coSkill(w0, function* (c) {
       yield 0.22;
       const w = c.w, x = w.player.x, y = w.player.y;
-      w.hitArea(x, y, p.r, hit(p.kWeapon * best, { melee: p.kMelee }, { knock: p.knock, status: { kind: 'stun', dur: p.stun } }));
+      const n = w.hitArea(x, y, p.r, hit(p.kWeapon * best, { melee: p.kMelee }, { knock: p.knock, status: { kind: 'stun', dur: p.stun } }));
       for (let k = 0; k < 4; k++) w.fx('slashArc', x + Math.cos(k * TAU / 4) * 120, y + Math.sin(k * TAU / 4) * 120, { r: 110, dir: k * TAU / 4 + Math.PI / 2, life: 0.35 });
       w.fx('shockRing', x, y, { r: p.r, life: 0.4 });
       w.shake(6);
-      w.sfx('hitMelee');
-      w.sfx('bossDrum');
+      if (!n) w.sfx('bossDrum');
     });
   },
 };

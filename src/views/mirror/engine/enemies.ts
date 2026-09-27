@@ -546,7 +546,8 @@ function healAura(W: World, i: number, dt: number, p: Readonly<Record<string, nu
   let healed = false;
   for (let k = 0; k < n; k++) {
     const j = buf[k];
-    if (j === i || !E.alive[j] || E.kind[j] === EKind.Ally || E.hp[j] >= E.hpMax[j]) continue;
+    // bosses and their decoys are beyond a lamp's care (a healed tree could never be felled)
+    if (j === i || !E.alive[j] || E.kind[j] === EKind.Ally || E.kind[j] === EKind.Boss || E.decoy[j] || E.hp[j] >= E.hpMax[j]) continue;
     const dx = E.x[j] - E.x[i], dy = E.y[j] - E.y[i];
     if (dx * dx + dy * dy > R * R) continue;
     E.hp[j] = Math.min(E.hpMax[j], E.hp[j] + E.hpMax[j] * (p.healPct ?? 0.04) * dt);
