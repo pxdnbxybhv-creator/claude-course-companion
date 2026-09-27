@@ -12,6 +12,19 @@ import { setMirrorSettings } from '../logic/session';
 import type { MirrorSettings, RunSave } from '../types';
 import { BuildRow } from './Shop';
 import { calmPref, osReduced, setCalm } from './prefs';
+import { signal } from '@preact/signals';
+import { setVibrate } from '../engine/feel';
+
+/** 震动 (this device's haptic ticks: an 8 ms tick when you are hurt, elite kills and the 镜技 at most once a
+ *  second, boss blows — never ordinary crits): a per-device convenience, on by default. */
+const VIBE_KEY = 'banmu.mirror.vibe';
+const vibePref = signal<boolean>((() => { try { return localStorage.getItem(VIBE_KEY) !== '0'; } catch { return true; } })());
+setVibrate(vibePref.value);
+function setVibe(on: boolean): void {
+  vibePref.value = on;
+  setVibrate(on);
+  try { localStorage.setItem(VIBE_KEY, on ? '1' : '0'); } catch { /* storage unavailable */ }
+}
 
 /** A yes / no question in a sheet. */
 export function Confirm(props: {
@@ -83,6 +96,10 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
       <div class="row">
         <div class="row-main"><div class="row-title">{t('震屏', 'Screen shake')}</div><div class="row-sub">{t('减少动态时总是关闭', 'Always off with reduced motion')}</div></div>
         <Switch checked={s.shake && !calm} disabled={calm} onChange={(v) => set({ shake: v })} label={t('震屏', 'Screen shake')} />
+      </div>
+      <div class="row">
+        <div class="row-main"><div class="row-title">{t('震动', 'Vibration')}</div><div class="row-sub">{t('受击、击破精英与首领时手机轻震', 'A light buzz when you are hit, and on elite kills and boss blows (phones)')}</div></div>
+        <Toggle checked={vibePref.value} onChange={setVibe} label={t('震动', 'Vibration')} />
       </div>
       <div class="row">
         <div class="row-main">

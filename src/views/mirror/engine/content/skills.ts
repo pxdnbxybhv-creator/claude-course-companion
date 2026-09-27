@@ -48,6 +48,8 @@ function handles(w: WorldApi, x: number, y: number, r: number, f: Parameters<Wor
   w.query(x, y, r, out, f);
   return out;
 }
+/** A boss's decoy (mirage, illusion, false moon, tree): never captured, converted, charmed or dragged. */
+const decoy = (w: WorldApi, h: number) => shared(w).phantoms.has(h);
 
 // ─────────────────────────────────────────────── 书生 · 一字千钧 (镇)
 const yizi: SkillImpl = {
@@ -153,7 +155,7 @@ const guangling: SkillImpl = {
           // each second, every non-elite in range may become a 知音 for 6 s
           charmT -= 1;
           const chance = p.charm * luckMult(w.stats.luck);
-          for (const h of handles(w, w.player.x, w.player.y, p.r, 'normal')) if (w.rng() < chance) w.status(h, 'charm', p.charmDur);
+          for (const h of handles(w, w.player.x, w.player.y, p.r, 'normal')) if (!decoy(w, h) && w.rng() < chance) w.status(h, 'charm', p.charmDur);
         }
         t += w.dt;
         yield 0;
@@ -213,8 +215,8 @@ const yijian: SkillImpl = {
         });
       }
     }, {
-      on: (_w, ev) => { if (ev.type === 'kill') killed = true; },
-      // a kill in the dash refunds 1 s (after the core has set the cooldown)
+      on: (_w, ev) => { if (ev.type === 'kill' && ev.src === 'skill') killed = true; },
+      // a kill by the streak refunds 1 s (after the core has set the cooldown)
       end: (w) => { if (killed) w.after(0.02, (ww) => ww.refundSkill(p.refund)); },
     });
   },
@@ -234,7 +236,7 @@ const jiji: SkillImpl = {
         // the vortex pulls non-bosses in (elites at half strength)
         for (const h of handles(w, at.x, at.y, p.r * 1.25)) {
           const e = w.enemy(h);
-          if (e.kind === 'boss') continue;
+          if (e.kind === 'boss' || decoy(w, h)) continue;
           const dx = at.x - e.x, dy = at.y - e.y, d = Math.hypot(dx, dy);
           if (d < 12) continue;
           const v = 110 * (e.kind === 'elite' ? p.pullElite : 1) * dt;
@@ -275,7 +277,7 @@ const dianhua: SkillImpl = {
       return d < e.r + 4 || Math.abs(angDiff(Math.atan2(e.y - y, e.x - x), dir)) <= half + Math.asin(Math.min(1, e.r / Math.max(1, d)));
     };
     // the nearest non-elites in the arc turn to ink allies for 10 s
-    const mons = handles(w, x, y, p.r, 'normal').filter(inArc);
+    const mons = handles(w, x, y, p.r, 'normal').filter((h) => !decoy(w, h) && inArc(h));
     mons.sort((a, c) => { const ea = w.enemy(a), da = (ea.x - x) ** 2 + (ea.y - y) ** 2; const ec = w.enemy(c); return da - ((ec.x - x) ** 2 + (ec.y - y) ** 2); });
     for (const h of mons.slice(0, p.n)) {
       const e = w.enemy(h);
@@ -310,7 +312,7 @@ const wei: SkillImpl = {
         }
         for (const h of handles(w, cx, cy, p.r)) {
           const e = w.enemy(h);
-          if (e.kind !== 'mon') continue;
+          if (e.kind !== 'mon' || decoy(w, h)) continue;
           const d = Math.hypot(e.x - cx, e.y - cy);
           if (d > R - 10) { e.x += ((cx - e.x) / d) * (d - R + 10); e.y += ((cy - e.y) / d) * (d - R + 10); }
         }
@@ -325,6 +327,8 @@ const wei: SkillImpl = {
       for (const h of inside) {
         if (n >= p.cap) break;
         if (!w.alive(h)) continue;
+        // a decoy takes a plain hit (its own rules: a mirage pops after 3, a false moon ripples)
+        if (decoy(w, h)) { w.hit(h, hit(1, undefined, { crit: false })); continue; }
         const e = w.enemy(h);
         w.fx('inkBurst', e.x, e.y, { r: 22, life: 0.4 });
         w.kill(h, true);
@@ -362,17 +366,19 @@ const pudie: SkillImpl = {
     else if (Math.hypot(to.x - w0.player.x, to.y - w0.player.y) < 30) to = vec(w0.player.x + dir.x * 200, w0.player.y + dir.y * 200);
     w0.leap(to, p.air, true);
     w0.sfx('dodge');
-    let killed = false;
+    let killed = false, landed = false;
     return coSkill(w0, function* (c) {
       yield p.air;
       const w = c.w, x = w.player.x, y = w.player.y;
+      landed = true;
       w.hitArea(x, y, p.r, hit(p.base, { melee: p.k }, { status: { kind: 'stun', dur: p.stun }, knock: 40 }));
       w.fx('shockRing', x, y, { r: p.r, life: 0.3 });
       w.fx('dustPuff', x, y, { r: 30, life: 0.3 });
       w.shake(3);
       w.sfx('hitMelee');
     }, {
-      on: (_w, ev) => { if (ev.type === 'kill') killed = true; },
+      // only the landing's own kills count (weapons firing through the leap don't chain it)
+      on: (_w, ev) => { if (ev.type === 'kill' && ev.src === 'skill' && landed) killed = true; },
       // a kill resets the cooldown
       end: (w) => { if (killed && p.reset) w.after(0.02, (ww) => ww.refundSkill(99)); },
     });

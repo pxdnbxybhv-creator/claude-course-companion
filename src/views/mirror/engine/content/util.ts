@@ -202,6 +202,17 @@ export function sayOnce(w: WorldApi, key: string, text: Bilingual): void {
   w.title(text, 'edge');
 }
 export const sfx = (w: WorldApi, n: SfxName) => w.sfx(n);
+/**
+ * A zone that lasts the wave. Zone lives are float32: 1e6 − dt rounds back to 1e6, so such a zone
+ * never ages, and the renderer, which fades a zone in over its first 0.2 s of age, drew it at 20%
+ * forever. An hour still ticks down.
+ */
+export const FOREVER = 3600;
+/**
+ * A telegraph's real length on this 镜境: the core stretches every telegraph by 闲游's teleX, so a
+ * content wait that mirrors one (a hop, a pause, a yield before the strike) must stretch with it.
+ */
+export const teleT = (w: WorldApi, d: number) => d * (core(w).diff.teleX ?? 1);
 
 // ─────────────────────────────────────────────── coroutines
 

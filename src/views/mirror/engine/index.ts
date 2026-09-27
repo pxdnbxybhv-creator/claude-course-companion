@@ -37,7 +37,6 @@ class MirrorEngine implements Engine {
   private fastFor = 0;
   private fpsAcc = 0;
   private fpsN = 0;
-  private shakeN = 7;
 
   constructor(canvas: HTMLCanvasElement, run: RunSave, private deps: EngineDeps) {
     this.canvas = canvas;
@@ -201,8 +200,10 @@ class MirrorEngine implements Engine {
     dt = Math.min(DT_CLAMP, Math.max(0, dt));
     const w = this.world;
     const t0 = performanceNow();
-    // hitstop holds the simulation (the frame still draws)
+    // hitstop holds the simulation (the frame still draws; the camera and the feel clock run on)
+    const frozen = w.hitstopMs > 0 ? Math.min(dt * 1000, w.hitstopMs) : 0;
     if (w.hitstopMs > 0) { w.hitstopMs -= dt * 1000; if (w.hitstopMs > 0) dt = 0; else dt = Math.min(dt, -w.hitstopMs / 1000); }
+    const real = Math.min(DT_CLAMP * 1000, interval > 0 ? interval : STEP * 1000);
     this.acc += dt;
     let steps = 0;
     while (this.acc >= STEP && steps < MAX_STEPS) {
@@ -214,6 +215,7 @@ class MirrorEngine implements Engine {
     }
     if (this.acc > STEP * MAX_STEPS) this.acc = 0;
     const t1 = performanceNow();
+    try { w.feel.frame(real, frozen); } catch { /* cosmetic */ }
     this.drawFrame(dt);
     w.perf.canvasMs = w.perf.canvasMs * 0.95 + (performanceNow() - t1) * 0.05;
     // perf: EMA of simulation ms per step; the draw figure is the whole frame interval (the raster
@@ -290,17 +292,15 @@ class MirrorEngine implements Engine {
       const mx = Math.max(0, (A.maxX - A.minX) / 2 + 120 - hw), my = Math.max(0, (A.maxY - A.minY) / 2 + 120 - hh);
       c.x = Math.max(-mx, Math.min(mx, c.x)); c.y = Math.max(-my, Math.min(my, c.y));
     }
-    let sx = 0, sy = 0;
-    if (w.shakePx > 0 && w.settings.shake && !w.settings.reduceMotion) {
-      // cosmetic jitter from a hash of the frame count (no Math.random in the engine)
-      this.shakeN = (this.shakeN * 1103515245 + 12345) >>> 0;
-      const u = (this.shakeN >>> 8) / 16777216, v = ((this.shakeN * 69069) >>> 8 & 0xffffff) / 16777216;
-      sx = (u - 0.5) * 2 * w.shakePx * c.dpr / c.scale; sy = (v - 0.5) * 2 * w.shakePx * c.dpr / c.scale;
-    }
-    c.x += sx; c.y += sy;
+    // 打击感: trauma shake and directional kicks (CSS px → world), a zoom punch on big impacts;
+    // the feel layer zeroes them under reduced motion (and shake / kicks with the shake setting off)
+    const F = w.feel;
+    const zp = 1 + F.zoom;
+    const sx = (F.offX * c.dpr) / (c.scale * zp), sy = (F.offY * c.dpr) / (c.scale * zp);
+    c.x += sx; c.y += sy; c.scale *= zp;
     w.cam = c;
     try { this.renderer.draw(w, ctx, c); } catch (e) { console.warn('[mirror engine] draw', e); }
-    c.x -= sx; c.y -= sy;
+    c.x -= sx; c.y -= sy; c.scale /= zp;
   }
 
   // ─────────────────────────────────────────────── dev and tests

@@ -695,6 +695,230 @@ describe('engine-content: 镜蚀 and 今日镜 节气', () => {
   }
 });
 
+// ═════════════════════════════════════════════ QA fix round
+
+describe('engine-content: QA fixes', () => {
+  it('碎镜 never chains with the native splitters: bodies stay near the quality cap', () => {
+    const WEAP = [{ id: 'qingfeng', t: 2 }, { id: 'dart', t: 2 }, { id: 'thunder', t: 2 }, { id: 'sunbow', t: 2 }] as never;
+    const res: { peak: number; cap: number; kids: number }[] = [];
+    for (const muts of [[], [{ id: 'suijing', x: 0.5 }]] as { id: MutatorId; x: number }[][]) {
+      const { run, setup } = at(12, { map: 'palace', daily: true }, { weapons: WEAP });
+      const { eng, log } = make(run, { settings: { quality: 'low' } });
+      eng.start(run, { ...setup, mutators: muts });
+      const W = eng.world;
+      W.godmode = true;
+      let kids = 0;
+      const os = W.spawn.bind(W);
+      (W as { spawn: typeof W.spawn }).spawn = ((id: string, x: number, y: number, o: { noDrops?: boolean } = {}) => { const h = os(id as never, x, y, o as never); if (h >= 0 && id === 'guihua' && o.noDrops) kids++; return h; }) as typeof W.spawn;
+      let peak = 0;
+      for (let k = 0; k < 60 * 60 && W.phase === 'wave'; k++) {
+        W.moveX = Math.cos(k / 90) * 0.6; W.moveY = Math.sin(k / 90) * 0.6;
+        step(eng, 1);
+        peak = Math.max(peak, W.E.count);
+      }
+      expect(errs(log)).toEqual([]);
+      res.push({ peak, cap: W.capEnemies, kids });
+      eng.dispose();
+    }
+    expect(res[1].peak).toBeLessThanOrEqual(res[1].cap + 30);
+    expect(res[1].kids).toBeLessThan(Math.max(10, res[0].kids * 3));
+  });
+
+  it('闲游 stretches every telegraph by 1.3, and content strikes wait for the ink to fill', async () => {
+    const hitsVsTeles = (eng: MirrorEngine, src: string) => {
+      const W = eng.world as unknown as { t: number; T: { dur: Float32Array | number[] }; coreTele: (...a: unknown[]) => number; hurtFrom: (...a: unknown[]) => number };
+      const ends: number[] = [], hits: number[] = [];
+      const oc = W.coreTele.bind(W);
+      W.coreTele = (shape: unknown, dur: unknown, ...rest: unknown[]) => { const id = oc(shape, dur, ...rest); if (id >= 0 && (shape as { kind: string }).kind === 'line') ends.push(W.t + W.T.dur[id % 1024]); return id; };
+      const oh = W.hurtFrom.bind(W);
+      W.hurtFrom = (n: unknown, att: unknown, ...rest: unknown[]) => { if (att === -1 && rest[2] === src) hits.push(W.t); return oh(n, att, ...rest); };
+      return { ends, hits };
+    };
+    {
+      const { run, setup } = at(12, { map: 'palace', diff: 0 });
+      const { eng, log } = make(run);
+      eng.start(run, setup);
+      const W = eng.world;
+      for (let i = 0; i < W.E.n; i++) if (W.E.alive[i]) W.E.release(i);
+      (W as unknown as { spawnTick: () => void }).spawnTick = () => {};
+      W.godmode = true;
+      const rec = hitsVsTeles(eng, 'hound');
+      W.spawn('hound', W.px + 300, W.py, { bloom: false });
+      step(eng, 60 * 12);
+      expect(rec.hits.length).toBeGreaterThan(2);
+      for (const t of rec.hits) expect(rec.ends.some((e) => Math.abs(e - t) < 0.02), `hound hit at ${t.toFixed(3)}`).toBe(true);
+      expect(errs(log)).toEqual([]);
+      eng.dispose();
+    }
+    {
+      const { run, setup } = at(12, { map: 'lake', diff: 0 });
+      const { eng, log } = make(run);
+      eng.start(run, setup);
+      (globalThis as { __mirror?: unknown }).__mirror = { engine: eng };
+      await contentDev(() => eng).boss('eclipse', 0, { diff: 0 });
+      const W = eng.world;
+      (W as unknown as { spawnTick: () => void }).spawnTick = () => {};
+      W.godmode = true;
+      const rec = hitsVsTeles(eng, 'eclipse');
+      const lunge = bossState(W, W.bossH[0])!.calls.find((c) => c.pat === 'lunge')!;
+      step(eng, 60 * 12);
+      const lungeHits = rec.hits.filter((t) => rec.ends.some((e) => Math.abs(e - t) < 0.02));
+      expect(lunge.tele).toBeGreaterThan(0);
+      expect(lungeHits.length).toBeGreaterThan(0);
+      // no content hit lands while a line telegraph is still filling
+      for (const t of rec.hits) expect(rec.ends.some((e) => t > e - (lunge.tele * 1.3) + 0.02 && t < e - 0.02), `eclipse hit at ${t.toFixed(3)}`).toBe(false);
+      expect(errs(log)).toEqual([]);
+      eng.dispose();
+    }
+  });
+
+  it('吴刚\'s 桂树 is known by its handle and never moves: a vortex can\'t drag it, felling it still stuns', () => {
+    const f = fight('wugang', { char: 'taoist' });
+    const W = f.eng.world;
+    const st = bossState(W, f.h[0])!;
+    const tree = st.trees[0];
+    expect(st.central).toBe(tree);
+    // two vortices beside it (cast directly, their runs driven by hand)
+    W.px = 120; W.py = 0;
+    for (let c = 0; c < 2; c++) {
+      const r = CONTENT.skills.jiji!.cast(W, SKILLS.jiji, { x: 170, y: 0 }, { x: 1, y: 0 });
+      for (let k = 0; k < 60 * 4; k++) { r.tick(W, W.dt); step(f.eng, 1); }
+    }
+    expect(Math.hypot(W.enemy(tree).x, W.enemy(tree).y)).toBeLessThan(1);
+    W.hit(tree, { base: 5000, src: 'weapon', noArmor: true, crit: false });
+    step(f.eng, 3);
+    expect(st.felled).toBe(true);
+    expect(st.stunT).toBeGreaterThan(3.5);
+    f.eng.dispose();
+  });
+
+  it('大橘 扑蝶: a weapon kill during the leap does not reset the cooldown', () => {
+    const { run, setup } = at(5, { char: 'cat' }, { weapons: [] });
+    const { eng } = make(run);
+    eng.start(run, setup); eng.world.godmode = true; step(eng, 5);
+    const W = eng.world;
+    const far = W.spawn('blot', W.px + 300, W.py, { bloom: false });
+    const aside = W.spawn('blot', W.px - 300, W.py, { bloom: false });
+    W.E.hp[W.E.slotOf(far)] = W.E.hpMax[W.E.slotOf(far)] = 1e7;
+    step(eng, 1);
+    eng.skill();
+    step(eng, 3);
+    // a weapon kill elsewhere while the cat is in the air
+    W.hit(aside, { base: 1e6, src: 'weapon', noArmor: true, crit: false });
+    expect(W.alive(aside)).toBe(false);
+    step(eng, 60);
+    expect(W.skillCd).toBeGreaterThan(1);
+    eng.dispose();
+  });
+
+  it('夔 keeps its own 80 BPM beat: every stomp lands on a tick, in double time too', () => {
+    const f = fight('kui');
+    const W = f.eng.world;
+    const ticks: number[] = [], stomps: number[] = [];
+    const os = W.sfx.bind(W);
+    (W as { sfx: typeof W.sfx }).sfx = ((n: string) => { if (n === 'beatTick') ticks.push(W.t); if (n === 'bossDrum') stomps.push(W.t); os(n as never); }) as typeof W.sfx;
+    runPhase(f, 8);
+    forcePhase(W, f.h[0], 1);
+    const t1 = W.t;
+    runPhase(f, 8);
+    const late = stomps.filter((t) => t > t1 + 1.3);
+    expect(late.length).toBeGreaterThan(4);
+    for (const t of stomps) expect(ticks.some((k) => Math.abs(k - t) < 0.04), `stomp at ${t.toFixed(2)}`).toBe(true);
+    // no 2 Hz ticks from the core in between: one tick per 0.75 s
+    const gaps = ticks.slice(1).map((t, i) => t - ticks[i]);
+    for (const g of gaps) expect(g).toBeGreaterThan(0.7);
+    f.eng.dispose();
+  });
+
+  it('幽镜: phases with nothing to borrow (蜃, 夔 P3) attack 20% faster instead; the drum-crack watcher never piles up', () => {
+    const f = fight('mirage', { diff: 3 });
+    const W = f.eng.world;
+    expect(W.diff.bossExtraPattern).toBeTruthy();
+    const st = bossState(W, f.h[0])!;
+    const fan = st.calls.find((c) => c.pat === 'pearlFan')!;
+    const data = BOSSES.mirage.phases[0].script.find((c) => c.pat === 'pearlFan')!;
+    expect(fan.every).toBeCloseTo(data.every / 1.2, 5);
+    f.eng.dispose();
+    const k = fight('kui', { diff: 3 });
+    forcePhase(k.eng.world, k.h[0], 2);
+    const ks = bossState(k.eng.world, k.h[0])!;
+    const stomp = ks.calls.find((c) => c.pat === 'stomp')!;
+    expect(stomp.every).toBe(BOSSES.kui.phases[2].script.find((c) => c.pat === 'stomp')!.every);
+    expect(ks.calls.find((c) => c.pat === 'lightningRing')!.every).toBeLessThan(3);
+    runPhase(k, 60);
+    expect(ks.running.length).toBeLessThanOrEqual(5);
+    expect(errs(k.log)).toEqual([]);
+    k.eng.dispose();
+  });
+
+  it('画皮 is silent and barless while disguised, and names itself on the reveal', () => {
+    const { run, setup } = at(9, { map: 'forest' });
+    const { eng, log } = make(run);
+    eng.start(run, setup);
+    const W = eng.world;
+    W.godmode = true;
+    step(eng, 2);
+    const n0 = W.titles.length;
+    const h = W.spawn('painted', W.px + 500, W.py, { bloom: false });
+    expect(W.E.atlas[W.E.slotOf(h)]).toBe('mon:paperman');
+    step(eng, 2);
+    expect(W.titles.slice(n0).map((t) => t.text.zh)).not.toContain('画皮');
+    const max = W.enemy(h).hpMax;
+    W.hit(h, { base: max * 0.1, src: 'weapon', noArmor: true, crit: false });
+    step(eng, 1);
+    // the renderer draws an elite bar when hp < hpMax: never while disguised
+    expect(W.enemy(h).hp).toBeGreaterThanOrEqual(W.enemy(h).hpMax);
+    W.hit(h, { base: max * 0.2, src: 'weapon', noArmor: true, crit: false });
+    step(eng, 2);
+    expect(W.E.atlas[W.E.slotOf(h)]).toBe('elite:painted');
+    expect(W.enemy(h).hpMax).toBeCloseTo(max, 5);
+    expect(W.titles.slice(n0).some((t) => t.text.zh.startsWith('画皮'))).toBe(true);
+    expect(errs(log)).toEqual([]);
+    eng.dispose();
+  });
+
+  it('棋士 围 and 画师 点化 never capture or convert a boss\'s decoys', () => {
+    for (const char of ['player', 'painter'] as CharacterId[]) {
+      const f = fight('mirage', { char });
+      const W = f.eng.world;
+      forcePhase(W, f.h[0], 1);
+      runPhase(f, 5);
+      const st = bossState(W, f.h[0])!;
+      const decoys = st.phantoms.filter((h) => W.alive(h));
+      expect(decoys.length).toBeGreaterThan(0);
+      const d = W.enemy(decoys[0]);
+      W.px = d.x - 40; W.py = d.y;
+      const r = CONTENT.skills[char === 'player' ? 'wei' : 'dianhua']!.cast(W, SKILLS[char === 'player' ? 'wei' : 'dianhua'], { x: d.x, y: d.y }, { x: 1, y: 0 });
+      for (let k = 0; k < 90; k++) { r.tick(W, W.dt); step(f.eng, 1); }
+      // still there (a mirage pops only after its 3 hits), still a decoy, never an ally
+      expect(W.alive(decoys[0]), char).toBe(true);
+      expect(st.phantoms, char).toContain(decoys[0]);
+      for (const h of decoys) if (W.alive(h)) expect(W.enemy(h).kind, char).not.toBe('ally');
+      expect(errs(f.log)).toEqual([]);
+      f.eng.dispose();
+    }
+  });
+
+  it('水中月\'s reflections each wear their own moon; the true one wears tonight\'s, and only the true bodies cast a shadow', () => {
+    const f = fight('moonwater');
+    const W = f.eng.world;
+    forcePhase(W, f.h[0], 1);
+    runPhase(f, 4);
+    const st = bossState(W, f.h[0])!;
+    const refl = st.phantoms.filter((h) => W.alive(h));
+    expect(refl.length).toBe(3);
+    const looks = [f.h[0], ...refl].map((h) => W.E.atlas[W.E.slotOf(h)]);
+    for (const l of looks) expect(l).toMatch(/^boss:moonwater:1:m[0-7]$/);
+    expect(new Set(looks).size).toBe(4);
+    expect(st.shadow.length).toBe(1);
+    runPhase(f, 9);
+    expect(st.phantoms.filter((h) => W.alive(h))).toHaveLength(0);
+    expect(W.E.atlas[W.E.slotOf(f.h[0])]).toBe('boss:moonwater:1');
+    expect(errs(f.log)).toEqual([]);
+    f.eng.dispose();
+  });
+});
+
 // ═════════════════════════════════════════════ the dev hooks
 
 describe('engine-content: DEV hooks', () => {

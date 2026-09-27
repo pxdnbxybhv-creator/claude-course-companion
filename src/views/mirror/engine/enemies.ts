@@ -98,6 +98,8 @@ function targetOf(W: World, i: number): number {
 // ─────────────────────────────────────────────────────────────── the tick
 
 const ENEMY_SEP = 6;
+/** Stride kept while a knockback carries a body (the short stagger of a blow). */
+const KNOCK_STAGGER = 0.5;
 
 export function tickEnemies(W: World, dt: number): void {
   const E = W.E;
@@ -107,6 +109,7 @@ export function tickEnemies(W: World, dt: number): void {
     W.cur = i; W.curWhat = 'enemy';
     E.age[i] += dt;
     if (E.flash[i] > 0) E.flash[i] -= dt;
+    if (E.hitAge[i] < 9) E.hitAge[i] += dt;
     if (E.contactT[i] > 0) E.contactT[i] -= dt;
     // bloom: hidden until it lands; waits while you stand on it
     if (E.st[i] === ST.bloom) {
@@ -143,9 +146,15 @@ export function tickEnemies(W: World, dt: number): void {
     let mul = 1 - E.slowV[i];
     if (E.rootT[i] > 0 || stunned) mul = 0;
     if (E.staggerT[i] > 0) { E.vx[i] += Math.cos(E.age[i] * 9 + i) * 90; E.vy[i] += Math.sin(E.age[i] * 7 + i) * 90; }
+    // a knocked-back body staggers: its own stride is halved while the blow carries it (打击感)
+    if (E.kT[i] > 0 && E.kind[i] !== EKind.Boss) mul *= KNOCK_STAGGER;
     // content bodies set vx/vy (or write x/y); the core integrates both with slow, root and knockback
     E.x[i] += E.vx[i] * mul * dt; E.y[i] += E.vy[i] * mul * dt;
-    if (E.kT[i] > 0) { E.kT[i] -= dt; E.x[i] += E.kx[i] * dt; E.y[i] += E.ky[i] * dt; }
+    if (E.kT[i] > 0) {
+      // ease-out: the blow lands at twice the mean speed and dies away (same distance overall)
+      const f = Math.min(2, (2 * E.kT[i]) / F.knockDur);
+      E.kT[i] -= dt; E.x[i] += E.kx[i] * f * dt; E.y[i] += E.ky[i] * f * dt;
+    }
     if (E.vx[i] * E.vx[i] + E.vy[i] * E.vy[i] > 100 && E.st[i] !== ST.tell) E.face[i] = Math.atan2(E.vy[i], E.vx[i]);
     else if (E.st[i] !== ST.act) E.face[i] = Math.atan2(W.py - E.y[i], W.px - E.x[i]);
     if (!E.air[i] && !E.hidden[i]) separate(W, i);

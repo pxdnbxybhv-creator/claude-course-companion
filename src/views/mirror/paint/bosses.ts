@@ -24,6 +24,43 @@ function wrath(b: B, p: P, pts: Pt[]) {
   for (const [x, y] of pts) { b.dot(x, y, 7, 0.8, DANGER); b.disc(x, y, 1.6, '#fff4e0'); }
 }
 
+/**
+ * 水中月. `moon`: −1 the plain half-dark moon of its second phase; 0–7 a reflection's moon phase
+ * (0 full … 4 new; 1–3 waning, dark on the right; 5–7 waxing, dark on the left); null: none.
+ */
+function moonwater(b: B, p: P, moon: number | null) {
+  for (const r of [62, 76, 90]) b.line(ell(0, 0, r, r * 0.9, 0, Math.PI * 2, 30), 1.1, 0.35, '#51708a');
+  b.fill('#f3f4f6', ell(0, 0, 50, 50, 0, Math.PI * 2, 28), 0.97, 1.4);
+  b.wash('#c9d3dc', blob(-12, -8, 16, 12, 5), 0.35);
+  b.wash('#c9d3dc', blob(16, 14, 10, 8, 9), 0.3);
+  if (moon === -1) b.fill('#1d2430', ell(18, 0, 44, 50, -Math.PI / 2, Math.PI / 2, 16), 0.85, 1.2);
+  else if (moon !== null) {
+    // the dark part: from the limb on the dark side back along the terminator (x = cos α · limb)
+    const k = ((moon % 8) + 8) % 8, R = 50, c = Math.cos((k / 8) * Math.PI * 2), side = k >= 1 && k <= 3 ? 1 : -1;
+    if (k !== 0) {
+      const pts: Pt[] = [];
+      for (let i = 0; i <= 16; i++) { const t = -Math.PI / 2 + (i / 16) * Math.PI; pts.push([side * R * Math.cos(t), R * Math.sin(t)]); }
+      for (let i = 16; i >= 0; i--) { const t = -Math.PI / 2 + (i / 16) * Math.PI; pts.push([side * c * R * Math.cos(t), R * Math.sin(t)]); }
+      b.fill('#1d2430', pts, 0.9, 1);
+    }
+  }
+  if (p >= 2) {
+    // a chain of ink monkeys hanging toward you
+    for (let i = 0; i < 4; i++) {
+      const x = -40 + i * 26, y = -64 + i * 10;
+      b.fill(INK, ell(x, y, 6, 7), 0.95, 0.4); b.dot(x + 2, y - 7, 7, 0.95, INK);
+      b.brush([[x + 4, y - 2, 1.6], [x + 18, y + 6, 1.2]], 0.95, INK);
+      b.brush([[x - 4, y + 4, 1.4], [x - 10, y + 12, 1], [x - 6, y + 16, 0.3]], 0.9, INK);
+      b.disc(x + 3.4, y - 8, 1, PAPER);
+    }
+  }
+  b.line(ell(0, 0, 50, 50, 0, Math.PI * 2, 28), 1.4, 0.8, '#51708a');
+  b.eyes(0, -2, 12, 4.5, 0.2, '#ffffff', '#1d2430');
+  wrath(b, p, [[-12, -2], [12, -2]]);
+}
+/** 水中月's reflections: its second-phase look wearing moon phase k (0–7). */
+export const MOON_SPEC = (k: number): Spec => big(62, (b, p) => moonwater(b, p, k))(1);
+
 export const BOSS_SPEC: Record<BossId, (p: number) => Spec> = {
   carp: big(60, (b, p) => {
     const gold = '#c98a2a', arch = p === 1 ? -14 : 0;
@@ -63,26 +100,7 @@ export const BOSS_SPEC: Record<BossId, (p: number) => Spec> = {
     b.wash(SILVER, blob(40, -30, 26, 12, 3), 0.25);
     wrath(b, p, [[-26, 10 - open / 2], [26, 10 - open / 2]]);
   }),
-  moonwater: big(62, (b, p) => {
-    for (const r of [62, 76, 90]) b.line(ell(0, 0, r, r * 0.9, 0, Math.PI * 2, 30), 1.1, 0.35, '#51708a');
-    b.fill('#f3f4f6', ell(0, 0, 50, 50, 0, Math.PI * 2, 28), 0.97, 1.4);
-    b.wash('#c9d3dc', blob(-12, -8, 16, 12, 5), 0.35);
-    b.wash('#c9d3dc', blob(16, 14, 10, 8, 9), 0.3);
-    if (p === 1) b.fill('#1d2430', ell(18, 0, 44, 50, -Math.PI / 2, Math.PI / 2, 16), 0.85, 1.2);
-    if (p >= 2) {
-      // a chain of ink monkeys hanging toward you
-      for (let i = 0; i < 4; i++) {
-        const x = -40 + i * 26, y = -64 + i * 10;
-        b.fill(INK, ell(x, y, 6, 7), 0.95, 0.4); b.dot(x + 2, y - 7, 7, 0.95, INK);
-        b.brush([[x + 4, y - 2, 1.6], [x + 18, y + 6, 1.2]], 0.95, INK);
-        b.brush([[x - 4, y + 4, 1.4], [x - 10, y + 12, 1], [x - 6, y + 16, 0.3]], 0.9, INK);
-        b.disc(x + 3.4, y - 8, 1, PAPER);
-      }
-    }
-    b.line(ell(0, 0, 50, 50, 0, Math.PI * 2, 28), 1.4, 0.8, '#51708a');
-    b.eyes(0, -2, 12, 4.5, 0.2, '#ffffff', '#1d2430');
-    wrath(b, p, [[-12, -2], [12, -2]]);
-  }),
+  moonwater: big(62, (b, p) => moonwater(b, p, p === 1 ? -1 : null)),
   kui: big(56, (b, p) => {
     const hide = '#6e737a';
     b.brush(spine(4, 20, 6, 70, 18, 14), 0.97, INK);
@@ -116,7 +134,6 @@ export const BOSS_SPEC: Record<BossId, (p: number) => Spec> = {
     b.fill(CINNABAR, [[44, -34], [45, -40], [49, -30]], 0.7, 0.3);
     b.brush([[54, -20, 1.4], [60, -18, 0.6]], 0.95, INK); b.disc(56, -19, 1.4, '#e9c46a');
     b.dot(73, -12, 3, 0.95, INK);
-    if (p === 1) b.wash(SILVER, blob(0, 44, 50, 8, 2), 0.3);
     wrath(b, p, [[56, -19]]);
   }, 'dark', [-100, -86, 84, 56]),
   xingtian: big(68, (b, p) => {

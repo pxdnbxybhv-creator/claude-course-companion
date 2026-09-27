@@ -1,5 +1,6 @@
 // 水月幻镜 · the mirror's audio (API.md §7): cached voices on the app's Web Audio context, a limiter,
-// the pickup scale, and the two music themes coloured by map.
+// the pickup scale, and the music (handed to the director in music.ts: calm / wave / boss themes
+// coloured by map, the wave clock and danger fed from the HUD).
 //
 // The voices render once in prime() (behind 研墨) on the SAME AudioContext as the app's sounds and
 // music (audio.context), through their own Mixer so a hundred hits never touch audio.pluck. Volume
@@ -8,28 +9,23 @@ import { effect } from '@preact/signals';
 import { audio } from '../../../audio/engine';
 import { Mixer } from '../../../audio/graph';
 import { music } from '../../../audio/music';
-import { getMirrorColour, setMirrorColour } from '../../../audio/music-themes';
 import { state } from '../../../app/store';
 import type { MapId } from '../ids';
-import type { CreateMirrorAudio, MirrorAudio, MusicPhase, SfxName } from '../types';
+import type { CreateMirrorAudio, HudState, MirrorAudio, MusicPhase, SfxName } from '../types';
 import { Limiter } from './limiter';
-import { JITTER, PITCHED_JITTER, renderPickup, renderVoice, SFX_MIX, SFX_NAMES } from './voices';
+import { mirrorMusic } from './music';
+import { FEEL_MIX, FEEL_NAMES, JITTER, PITCHED_JITTER, renderFeel, renderPickup, renderVoice, SFX_MIX, SFX_NAMES, type FeelVoice } from './voices';
 
-/** A map change while the theme id stays the same restarts the music after this pause (ms): longer
- *  than music.ts's 450 ms debounce, so the silence request is honoured and a new Composer picks up
- *  the map's tempo and modes. */
-const RECOLOUR_MS = 520;
+/** The impact layer on top of the contract's MirrorAudio (the engine's feel bus duck-types it). */
+export interface FeelAudio { feel(name: FeelVoice, gain?: number, rate?: number): void }
 
-class MirrorSound implements MirrorAudio {
+class MirrorSound implements MirrorAudio, FeelAudio {
   private mix: Mixer | null = null;
   private bufs = new Map<string, AudioBuffer>();
   private picks: AudioBuffer[] = [];
   private limiter = new Limiter();
   private stopSettings: (() => void) | null = null;
   private priming: Promise<void> | null = null;
-  private phase: MusicPhase = null;
-  private colour: MapId | null = null;
-  private recolour: ReturnType<typeof setTimeout> | null = null;
   private disposed = false;
 
   prime(): Promise<void> {
@@ -60,6 +56,11 @@ class MirrorSound implements MirrorAudio {
     for (let d = 0; d < 10; d++) {
       try { this.picks.push(mix.buffer([renderPickup(sr, d)])); } catch { /* skip */ }
     }
+    for (const name of FEEL_NAMES) {
+      if (this.disposed) return;
+      try { this.bufs.set('~' + name, mix.buffer(renderFeel(name, sr))); } catch (e) { console.warn('[mirror audio] impact', name, e); }
+      if (performance.now() - t0 > 12) { await new Promise((r) => setTimeout(r, 0)); t0 = performance.now(); }
+    }
   }
 
   sfx(name: SfxName, o: { gain?: number; rate?: number } = {}): void {
@@ -76,6 +77,22 @@ class MirrorSound implements MirrorAudio {
     } catch { /* a closed context */ }
   }
 
+  /** An impact voice (打击感), started now: the engine calls it on the step the hit lands, so the
+   *  sound meets the flash on the same frame. Gain and rate multiply the voice's mix and jitter. */
+  feel(name: FeelVoice, gain = 1, rate = 1): void {
+    const mix = this.mix, buf = this.bufs.get('~' + name);
+    if (!mix || !buf || this.disposed) return;
+    const now = mix.ctx.currentTime;
+    const m = FEEL_MIX[name];
+    if (!m || !this.limiter.allow('~' + name, m.cap, !!m.spam, now)) return;
+    try {
+      const r = rate * (1 + (Math.random() * 2 - 1) * (m.pitched ? PITCHED_JITTER : JITTER));
+      const g = m.gain * gain * (0.88 + Math.random() * 0.24);
+      mix.play(buf, now + 0.002, { gain: g, send: m.send, rate: r, pan: (Math.random() - 0.5) * 0.25 });
+      if (m.duck) music.duck(m.duck, 500);
+    } catch { /* a closed context */ }
+  }
+
   pickup(combo: number): void {
     const mix = this.mix;
     if (!mix || !this.picks.length || this.disposed) return;
@@ -86,31 +103,22 @@ class MirrorSound implements MirrorAudio {
     try { mix.play(this.picks[d], now + 0.005, { gain: SFX_MIX.pickup.gain, send: SFX_MIX.pickup.send, rate: 1 + (Math.random() - 0.5) * 0.01 }); } catch { /* closed */ }
   }
 
+  /** The theme for a phase (the director: lobby / shop / results calm, a wave, a boss; transitions). */
   music(phase: MusicPhase, map: MapId): void {
     if (this.disposed) return;
-    const recoloured = phase !== null && map !== (this.colour ?? getMirrorColour());
-    if (phase === this.phase && phase !== null && !recoloured) return;
-    this.phase = phase;
-    if (phase !== null) this.colour = map;
-    setMirrorColour(map);
-    if (this.recolour) { clearTimeout(this.recolour); this.recolour = null; }
-    const id = phase === null ? null : phase === 'boss' ? 'mirror-boss' : 'mirror';
-    if (recoloured && id !== null && music.theme === id) {
-      // the Composer fixed its tempo and modes when it was built: a new map needs a new one, so
-      // hand over through a breath of silence (the entry ritual covers it)
-      music.setTheme(null);
-      this.recolour = setTimeout(() => {
-        this.recolour = null;
-        if (!this.disposed && this.phase === phase) music.setTheme(id);
-      }, RECOLOUR_MS);
-      return;
-    }
-    music.setTheme(id);
+    mirrorMusic.phase(phase, map);
+  }
+
+  /** The engine's ≈ 8 Hz HUD feed (crowd = living capped enemies / the cap): the wave clock, danger,
+   *  the boss phase and the clear, for the band. */
+  hud(s: HudState, crowd: number): void {
+    if (this.disposed) return;
+    mirrorMusic.hud(s, crowd);
   }
 
   dispose(): void {
     this.disposed = true;
-    if (this.recolour) { clearTimeout(this.recolour); this.recolour = null; }
+    mirrorMusic.dispose();
     this.stopSettings?.();
     this.stopSettings = null;
     try { this.mix?.master.disconnect(); } catch { /* already */ }

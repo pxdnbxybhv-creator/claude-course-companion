@@ -53,7 +53,7 @@ describe('sanitizeMirror', () => {
     expect(m.codex).toEqual({ 'mon:blot': 2 });
     expect(m.seals).toEqual({ 'painter|1': true });
     expect(m.lobby).toEqual({ char: 'scholar', map: 'lake', diff: 2, vows: { qunmo: 2 } });
-    expect(m.settings).toEqual({ aim: 'manual', nums: 1, shake: false, left: false, quality: 'auto' });
+    expect(m.settings).toEqual({ aim: 'manual', nums: 1, shake: true, left: false, quality: 'auto' });
     expect(m.titles).toEqual(['migrant']);
     expect(m.title).toBeNull();
     const r = run();

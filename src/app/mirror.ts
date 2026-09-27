@@ -26,7 +26,7 @@ export function defaultMeta(today: DateKey = todayKey()): MirrorMeta {
     payDay: { day: today, runs: 0, free: false, paid: 0, drops: 0, refunded: false },
     coinsPaid: 0, owed: 0, firstsHeld: 0, lastDay: today,
     lobby: { char: 'scholar', map: 'lake', diff: 1, vows: {} },
-    settings: { aim: 'auto', nums: 1, shake: false, left: false, quality: 'auto' },
+    settings: { aim: 'auto', nums: 1, shake: true, left: false, quality: 'auto' },
     records: {}, titles: [], title: null, rims: [], rim: null,
   };
 }
@@ -90,7 +90,7 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
     const settings: MirrorSettings = {
       aim: st.aim === 'manual' ? 'manual' : 'auto',
       nums: st.nums === 0 || st.nums === 2 ? st.nums : 1,
-      shake: st.shake === true,
+      shake: st.shake !== false, // on unless turned off (capped at 6 px; reduced motion still removes it)
       left: st.left === true,
       quality: st.quality === 'low' || st.quality === 'mid' || st.quality === 'high' ? st.quality : 'auto',
     };

@@ -16,12 +16,27 @@
 import type { MusicTheme } from '../views/walk/map';
 import { audio } from './engine';
 import { Conductor, MusicBus } from './music-player';
+import type { MusicEvent } from './music-themes';
 import { daySeed } from './music-theory';
 import MusicWorker from './music-worker.ts?worker&inline';
 
+/** A quicker handover than the default (the sounding phrase reaching its cadence, then ≈ 3 s). */
+export interface ThemeCut {
+  /** Seconds until the old theme is cut (≥ 0.05); the new one starts right after. Skips the debounce. */
+  cut: number;
+  /** Fade-out of the old theme (s; default 3). */
+  fade?: number;
+}
+
 export interface MusicEngine {
   /** Crossfade to a theme (≈3 s); null fades to silence. Safe to call repeatedly with the same theme. */
-  setTheme(theme: MusicTheme | null): void;
+  setTheme(theme: MusicTheme | null, o?: ThemeCut): void;
+  /**
+   * One-shots on the music bus now, outside any theme (a stinger: a 钹 choke, a 锣). They follow the
+   * volume, the switch and the duck, and ring through a handover; `choke` damps them after that many
+   * seconds. A no-op until the music is running.
+   */
+  cue(events: readonly MusicEvent[], o?: { choke?: number }): void;
   /** Master switch (settings.music). Starting is deferred until audio.unlock() has run. */
   setEnabled(on: boolean): void;
   /** 0..1 (settings.musicVolume). */
@@ -76,6 +91,7 @@ class WebMusic implements MusicEngine {
   private listening = false;
   private suspendTimer: ReturnType<typeof setTimeout> | null = null;
   private debounce: ReturnType<typeof setTimeout> | null = null;
+  private cutNext: ThemeCut | null = null;
 
   constructor() {
     if (typeof window === 'undefined') return;
@@ -86,12 +102,13 @@ class WebMusic implements MusicEngine {
 
   get theme() { return this.want; }
 
-  setTheme(theme: MusicTheme | null) {
+  setTheme(theme: MusicTheme | null, o?: ThemeCut) {
     if (theme === this.want) return;
     this.want = theme ?? null;
-    // coalesce quick flips (walking along a region border) into one handover
+    this.cutNext = o && Number.isFinite(o.cut) ? { cut: Math.max(0.05, Math.min(5, o.cut)), fade: o.fade } : null;
+    // coalesce quick flips (walking along a region border) into one handover; a cut is meant now
     if (this.debounce) clearTimeout(this.debounce);
-    if (!this.cur) { this.debounce = null; this.sync(); return; }
+    if (!this.cur || this.cutNext) { this.debounce = null; this.sync(); return; }
     this.debounce = setTimeout(() => { this.debounce = null; this.sync(); }, DEBOUNCE_MS);
   }
 
@@ -120,6 +137,32 @@ class WebMusic implements MusicEngine {
     g.cancelScheduledValues(t);
     g.setTargetAtTime(keep, t, 0.04);
     g.setTargetAtTime(1, t + Math.max(0.05, (Number.isFinite(ms) ? ms : 900) / 1000), 0.35);
+  }
+
+  cue(events: readonly MusicEvent[], o: { choke?: number } = {}) {
+    const bus = this.bus, ctx = this.ctx;
+    if (!bus || !ctx || ctx.state !== 'running' || !this.enabled || this.hidden || !events.length) return;
+    const t0 = ctx.currentTime + 0.02;
+    const dry = ctx.createGain(), wet = ctx.createGain();
+    dry.connect(bus.input);
+    wet.connect(bus.verbIn);
+    const choke = o.choke && Number.isFinite(o.choke) ? Math.max(0.02, o.choke) : 0;
+    if (choke) for (const g of [dry, wet]) { g.gain.setValueAtTime(1, t0 + choke); g.gain.setTargetAtTime(0, t0 + choke, 0.018); }
+    let left = events.length;
+    const done = () => { if (--left <= 0) { dry.disconnect(); wet.disconnect(); } };
+    for (const ev of events) {
+      const play = (buf: AudioBuffer) => {
+        try {
+          const at = Math.max(t0 + ev.t, ctx.currentTime + 0.005);
+          const src = bus.play(buf, at, { gain: ev.gain, pan: ev.pan, send: ev.send, echo: 0, rate: ev.rate, dry, wet, echoDest: bus.echoIn });
+          const prev = src.onended;
+          src.onended = (e) => { if (prev) (prev as (e: Event) => void).call(src, e); done(); };
+          if (choke) src.stop(at + choke + 0.15);
+        } catch { done(); }
+      };
+      if (ev.key) bus.cached(ev.key, ev.job, play);
+      else bus.render(ev.job, (chans) => play(bus.buffer(chans)));
+    }
   }
 
   stats(): MusicStats {
@@ -229,13 +272,16 @@ class WebMusic implements MusicEngine {
     if ((this.cur?.theme ?? null) === target) return;
     const now = ctx.currentTime;
     let start = now + 0.8; // time for the first renders to come back from the worker
+    const cut = this.cutNext;
+    this.cutNext = null;
     if (this.cur) {
-      // musical handover: let the phrase that is sounding reach its cadence (at most ~5 s), then fade
-      const end = fastFade || !target ? now + 0.05 : Math.min(now + 5, Math.max(now + 0.3, this.cur.phraseEnd(now)));
-      this.cur.finish(end, fastFade || (target ? CROSSFADE : 2.2));
+      // musical handover: let the phrase that is sounding reach its cadence (at most ~5 s), then fade;
+      // a cut (the mirror's wave start / clear) hands over at once
+      const end = fastFade || !target ? now + 0.05 : cut ? now + cut.cut : Math.min(now + 5, Math.max(now + 0.3, this.cur.phraseEnd(now)));
+      this.cur.finish(end, fastFade || (cut?.fade ?? (target ? CROSSFADE : 2.2)));
       this.old.push(this.cur);
       this.cur = null;
-      start = end + 0.35;
+      start = cut ? Math.max(end + 0.05, now + 0.45) : end + 0.35;
     }
     if (target) {
       const visit = this.visits.get(target) ?? 0;

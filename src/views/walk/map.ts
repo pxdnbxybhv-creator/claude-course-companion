@@ -6,7 +6,7 @@
 export type RegionId = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'home' | 'taoyuan';
 
 /** Background-music themes (see src/audio/music.ts). */
-export type MusicTheme = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'night' | 'festival' | 'hall' | 'quiet' | 'taoyuan' | 'mirror' | 'mirror-boss';
+export type MusicTheme = 'garden' | 'village' | 'lake' | 'bamboo' | 'plum' | 'mountain' | 'night' | 'festival' | 'hall' | 'quiet' | 'taoyuan' | 'mirror' | 'mirror-calm' | 'mirror-boss';
 
 export interface XZ { x: number; z: number }
 

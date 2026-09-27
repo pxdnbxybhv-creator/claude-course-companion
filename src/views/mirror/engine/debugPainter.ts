@@ -73,13 +73,13 @@ export class DebugPainter implements Painter {
     ctx.beginPath(); ctx.arc(P.x, P.y, r * cam.scale, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   }
-  drawNumber(ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en'): void {
+  drawNumber(ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale = 1): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = a;
     ctx.fillStyle = NUM_COLOUR[style];
-    ctx.font = `${(style === 'crit' ? 18 : 13) * this.dpr}px sans-serif`;
+    ctx.font = `${Math.round((style === 'crit' ? 18 : 13) * this.dpr * scale)}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillText(fmtBig(value, lang), sx, sy);
+    ctx.fillText(fmtBig(value, lang) + (style === 'crit' ? '!' : ''), sx, sy);
     ctx.globalAlpha = 1;
   }
   icon(id: AtlasId, px: number): HTMLCanvasElement {

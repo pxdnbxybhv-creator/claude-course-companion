@@ -27,7 +27,7 @@ import type {
 } from '../types';
 import { canvas, ctx2d, pack, Pages, renderSpec, warmGrain } from './atlas';
 import { ArenaLayer } from './arena';
-import { BOSS_SPEC } from './bosses';
+import { BOSS_SPEC, MOON_SPEC } from './bosses';
 import { CHAR_SPECS } from './figures';
 import { PROJ_SPECS, SUM_SPECS, WPN_SPECS } from './gear';
 import { ITEM_SPECS } from './items';
@@ -35,7 +35,7 @@ import { B, extentOf, type Spec } from './kit';
 import { MON_SPECS } from './monsters';
 import { Numbers } from './numbers';
 import { Tele } from './tele';
-import { DROP_SPECS, FX_SPECS } from './things';
+import { DROP_SPECS, EXTRA_FX, FX_SPECS } from './things';
 
 export { blit, blitRot } from './draw';
 export { abbrev } from './numbers';
@@ -54,7 +54,7 @@ const TREASURE_IDS = new Set<string>(TREASURE_REG.map((t) => t.id));
 
 /** Which spec paints an atlas id (null: unknown id). `self` is the run's companion for 镜主. */
 export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec; ghost?: boolean; invertible: boolean } | null {
-  const [kind, name, ph] = id.split(':') as [Kind, string, string?];
+  const [kind, name, ph, sub] = id.split(':') as [Kind, string, string?, string?];
   switch (kind) {
     case 'char': return CHAR_SPECS[name as CharacterId] ? { spec: CHAR_SPECS[name as CharacterId], invertible: false } : null;
     // treasures keep their gold in 倒影: they are gifts, not threats
@@ -70,6 +70,8 @@ export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec;
           spec: { box: [c.box[0] * k, c.box[1] * k, c.box[2] * k, c.box[3] * k], n: 2, halo: 'dark', paint: (b, v) => { scaleOps(b, k, () => c.paint(b, v % 2)); if (p >= 1) b.disc(3 * k, -17 * k, 1.1 * k, '#d63a22'); } },
         };
       }
+      // 水中月's reflections wear their own moon phase: boss:moonwater:1:m0 … m7
+      if (sub !== undefined) return name === 'moonwater' && p === 1 && /^m[0-7]$/.test(sub) ? { spec: MOON_SPEC(Number(sub.slice(1))), invertible: true } : null;
       const f = BOSS_SPEC[name as BossId];
       return f ? { spec: f(p), invertible: true } : null;
     }
@@ -78,7 +80,7 @@ export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec;
     case 'sum': return lookup(SUM_SPECS, name);
     case 'proj': return lookup(PROJ_SPECS, name);
     case 'drop': return lookup(DROP_SPECS, name);
-    case 'fx': return lookup(FX_SPECS, name);
+    case 'fx': return lookup(FX_SPECS, name) ?? lookup(EXTRA_FX, name);
     default: return null;
   }
 }
@@ -104,6 +106,7 @@ export function allAtlasIds(): AtlasId[] {
   for (const t of TREASURE_REG) out.push(`mon:${t.id}`);
   for (const e of ELITE_REG) out.push(`elite:${e.id}`);
   for (const bo of BOSS_REG) for (let p = 0; p < 4; p++) out.push(`boss:${bo.id}:${p}`);
+  for (let m = 0; m < 8; m++) out.push(`boss:moonwater:1:m${m}`);
   for (let p = 0; p < 4; p++) out.push(`boss:mirrorself:${p}`);
   for (const w of WEAPON_REG) out.push(`wpn:${w.id}`);
   for (const i of ITEM_REG) out.push(`item:${i.id}`);
@@ -111,6 +114,7 @@ export function allAtlasIds(): AtlasId[] {
   for (const p of PROJ_REG) out.push(`proj:${p.id}`);
   for (const d of DROP_REG) out.push(`drop:${d.id}`);
   for (const f of FX_REG) out.push(`fx:${f.id}`);
+  for (const f of Object.keys(EXTRA_FX)) out.push(`fx:${f}`);
   return out as AtlasId[];
 }
 
@@ -127,11 +131,20 @@ function rosterOf(map: MapId): AtlasId[] {
 }
 /** A boss's phases: 0–2, and 3 when 倒悬 gives every boss a 4th phase. */
 function bossIds(id: BossId | 'mirrorself', daoxuan: boolean): AtlasId[] {
-  return (daoxuan ? [0, 1, 2, 3] : [0, 1, 2]).map((p) => `boss:${id}:${p}` as AtlasId);
+  const out = (daoxuan ? [0, 1, 2, 3] : [0, 1, 2]).map((p) => `boss:${id}:${p}` as AtlasId);
+  // 水中月's split: each reflection shows its own moon phase
+  if (id === 'moonwater') for (let m = 0; m < 8; m++) out.push(`boss:moonwater:1:m${m}` as AtlasId);
+  return out;
 }
-/** `boss:X:3` → `boss:X:2` (the 倒悬 phase reuses the last one when it was not baked). */
+/**
+ * `boss:X:3` → `boss:X:2` (the 倒悬 phase reuses the last one when it was not baked); a boss look's
+ * variant (`boss:X:P:v`) → its phase look.
+ */
 function fallbackOf(id: string): string | null {
-  return id.startsWith('boss:') && id.endsWith(':3') ? id.slice(0, -1) + '2' : null;
+  if (!id.startsWith('boss:')) return null;
+  const parts = id.split(':');
+  if (parts.length > 3) return parts.slice(0, 3).join(':');
+  return id.endsWith(':3') ? id.slice(0, -1) + '2' : null;
 }
 
 /** Wait for the faces that sprites and numbers are drawn in (never bake fallback glyphs). */
@@ -205,6 +218,7 @@ class InkPainter implements Painter {
       for (const p of PROJ_REG) out.add(`proj:${p.id}` as AtlasId);
       for (const d of DROP_REG) out.add(`drop:${d.id}` as AtlasId);
       for (const f of FX_REG) out.add(`fx:${f.id}` as AtlasId);
+      for (const f of Object.keys(EXTRA_FX)) out.add(`fx:${f}` as AtlasId);
       // a resumed run near a boss, or deep in endless, needs those too
       if (next % 10 === 0 || next % 10 === 9) for (const b of bossFor(next % 10 === 0 ? next : next + 1)) for (const id of bossIds(b, dx)) out.add(id);
       if (run.wave >= 30) for (const id of this.plan(run, 'endless')) out.add(id);
@@ -327,8 +341,9 @@ class InkPainter implements Painter {
     const s = this.sprite(`fx:${look}` as AtlasId);
     this.tele.zone(ctx, cam, s, look, x, y, r, a);
   }
-  drawNumber(ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en'): void {
-    this.nums.draw(ctx, value, sx, sy, style, a, lang);
+  /** `scale` (optional, beyond the contract): the engine's pop and size-by-damage. */
+  drawNumber(ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale = 1): void {
+    this.nums.draw(ctx, value, sx, sy, style, a, lang, scale);
   }
 
   /** A fresh canvas each call (the UI may keep or mutate it), copied from a painted icon cached by

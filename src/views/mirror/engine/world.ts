@@ -28,11 +28,16 @@ import {
 import { hasDrunk, hitboxOf, liveStats, readMods, type Live, type Mods } from './effects';
 import { initEnemy, tickEnemies, onEnemyDeath, strikeTele } from './enemies';
 import { fireWeapons, initWeapons, onWeaponKill, tickPlayerShots, tickSummons, tickStones, tickSwords, type WeaponSlot } from './weapons';
+import { FC, Feel } from './feel';
 
 export type Phase = 'idle' | 'wave' | 'ending' | 'dead';
 
 interface Buff { key: string; stats: StatMods; t: number; moveX: number }
 interface Running { b: Behaviour; s: unknown; failed: boolean }
+
+/** Damage numbers: seconds shown after their last pop, and the fall of their arc (u/s²). */
+const NUM_LIFE = 0.78;
+const NUM_GRAVITY = 380;
 
 /** A reusable scratch vector for queries that return a point. */
 const V: Vec = { x: 0, y: 0 };
@@ -104,7 +109,12 @@ export class World implements WorldApi {
   pauseRequest = false;
   /** ms of hitstop the loop should hold. */
   hitstopMs = 0;
+  /** The current shake amplitude (CSS px; set by the feel layer each frame). */
   shakePx = 0;
+  /** 打击感: hit reactions, spatter, hitstop budget, camera trauma, the impact sound bus. */
+  feel!: Feel;
+  /** Where the blow that is hurting you came from (a shot's tail); NaN when unknown. */
+  hurtSrcX = NaN; hurtSrcY = NaN;
   lightR: number | null = null;
   degrade = 0;
 
@@ -272,6 +282,7 @@ export class World implements WorldApi {
     this.N = new Numbers(96);
     this.TM = new Timers(96);
     this.eview = new EnemyViewImpl(this);
+    this.feel = new Feel(this);
     const w = this;
     this.player = {
       get hp() { return w.hp; }, get hpMax() { return w.hpMax; }, get r() { return w.pr; },
@@ -303,6 +314,7 @@ export class World implements WorldApi {
     this.erng = rngFor(run.seed, this.wave, 'engine');
     for (const p of [this.E, this.PS, this.ES, this.D, this.S, this.ST, this.Z, this.T, this.P, this.N, this.TM]) p.clear();
     this.t = 0; this.tWave = 0; this.len = setup.plan.len; this.endingT = 0; this.hitstopMs = 0; this.shakePx = 0; this.lightR = null;
+    this.feel.begin();
     this.pauseRequest = false; this.titles.length = 0;
     this.base = { ...setup.stats };
     this.stats = { ...setup.stats };
@@ -386,7 +398,7 @@ export class World implements WorldApi {
     const beatBefore = Math.floor((this.t - dt) * 2);
     this.beat = Math.floor(this.t * 2) !== beatBefore;
     if (this.run.char === 'change') this.moonPhase = Math.floor(((this.t + this.moonT0) / (PASSIVES.yinqing.p.cycle / 8))) % 8;
-    if (this.phase === 'ending') { this.stepEnding(dt); return; }
+    if (this.phase === 'ending') { this.stepEnding(dt); this.feel.step(dt); return; }
     this.tWave += dt;
     this.live.waveTime = this.tWave;
     // timers and content
@@ -416,6 +428,7 @@ export class World implements WorldApi {
     this.tickParticles(dt);
     this.tickNumbers(dt);
     this.tickVitals(dt);
+    this.feel.step(dt);
     this.checkWaveEnd();
     this.perf.steps++;
     this.hudT -= dt;
@@ -583,7 +596,6 @@ export class World implements WorldApi {
       this.maxStat('peakDrunk', this.drunk);
     }
     for (let k = 0; k < 4; k++) if (this.t - this.capWin[k] >= 1) { this.capWin[k] = this.t; this.capN[k] = 0; }
-    if (this.shakePx > 0) this.shakePx = Math.max(0, this.shakePx - 30 * dt);
     for (let i = this.titles.length - 1; i >= 0; i--) { this.titles[i].t -= dt; if (this.titles[i].t <= 0) this.titles.splice(i, 1); }
     this.titleGate = Math.max(0, this.titleGate - dt);
   }
@@ -859,8 +871,9 @@ export class World implements WorldApi {
     if (ph) this.title({ zh: ph.zh, en: ph.en }, 'centre');
     this.clearShots('enemy');
     this.sfx('phaseBreak');
-    this.hitstop(120);
+    this.feel.stopHard(120);
     this.shake(6);
+    this.feel.phase(E.x[i], E.y[i]);
   }
   private bossHudId(id: string): BossId | 'twins' | 'mirrorself' {
     if (id === 'mirrorself') return 'mirrorself';
@@ -1158,14 +1171,15 @@ export class World implements WorldApi {
     // DoT (burn, bleed, zones) is fractional per step: no armour, no rounding, no 1-point floor
     const d = flags & HF.dot ? dmg * front * vuln : playerHit(dmg, 1, crit, critM, { armor: E.armor[i], shred, noArmor, front, vuln });
     E.hp[i] -= d;
-    E.flash[i] = 0.06;
     E.lastSlot[i] = slot;
     E.lastSrc[i] = src;
     this.lastCrit = crit;
     if (crit) this.critN++;
-    // numbers merge per target every 0.25 s
+    // numbers: the first hit shows at once (in sync with the flash); later hits on the same body
+    // merge into its live number every 0.25 s
     E.numAcc[i] += d;
     if (crit) E.numCrit[i] = 1;
+    if (!(flags & HF.dot) && !this.liveNum(i)) this.flushNumber(i);
     this.addStat('dmgDealt', d);
     if (crit) this.addStat('crits', 1);
     this.maxStat('peakHit', d);
@@ -1192,9 +1206,8 @@ export class World implements WorldApi {
       this.hitstop(30);
     }
     const srcName = SRC[src];
-    if (!(flags & HF.quiet)) {
-      if (!(flags & HF.dot) && this.P.count < this.P.cap * 0.8) this.fx(crit ? 'critSpark' : 'hitSpark', E.x[i], E.y[i], { r: 10, life: 0.18 });
-    }
+    // 打击感: flash, squash, spatter by weapon class, the impact bus, crit stops (quiet DoT ticks: none)
+    if (!(flags & HF.quiet) || !(flags & HF.dot)) this.feel.hit(i, fx, fy, d, crit, this.fcOf(slot, src, flags), (flags & HF.dot) !== 0, src, slot);
     // on-hit: lifesteal (weapons only), items, content
     if (!(flags & HF.noProc)) {
       if (src === SRCI.weapon && this.stats.steal > 0 && this.erng() < (clamp(this.stats.steal, 0, 100) / 100) * proc) this.capHeal(0, 1, F.stealPerSec);
@@ -1215,6 +1228,15 @@ export class World implements WorldApi {
     this.emit(crit ? 'crit' : 'hit', h, d, crit, srcName, E.x[i], E.y[i], slot);
     if (E.alive[i] && E.hp[i] <= 0) this.killSlot(i, true, crit);
     return d;
+  }
+
+  /** The feel class of a strike: the weapon's own, else by source. */
+  fcOf(slot: number, src: number, flags: number): number {
+    if (slot >= 0 && slot < this.slots.length) return this.slots[slot].fc;
+    if (src === SRCI.summon) return FC.ink;
+    if (src === SRCI.skill) return FC.skill;
+    if (flags & HF.sword) return FC.flying;
+    return FC.generic;
   }
 
   /** Heal from a capped source (k: 0 lifesteal, 1 crit heal, 2 on-hit heal, 3 sword return). */
@@ -1394,7 +1416,7 @@ export class World implements WorldApi {
     const h = E.handle(i);
     const k = E.kind[i], id = E.id[i], x = E.x[i], y = E.y[i];
     // everything read after release is taken now: a splitter's first child reuses slot i
-    const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], role = E.role[i], r = E.r[i], burning = E.burnN[i] > 0;
+    const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], role = E.role[i], r = E.r[i], burning = E.burnN[i] > 0, hitA = E.hitA[i];
     E.hp[i] = Math.min(E.hp[i], 0);
     this.flushNumber(i);
     // content death hooks run while the body still exists
@@ -1435,10 +1457,10 @@ export class World implements WorldApi {
     // 60 ms of hitstop on crit kills of tanks (§4.2)
     if (crit && k === EKind.Mon && role === ROLE.tank) this.hitstop(60);
     this.emit('kill', h, 0, crit, SRC[lastSrc] ?? 'weapon', x, y, lastSlot);
-    // ink: a burst, then a stain stamped into the paper
+    // ink: a burst, a wet crown and flung drops (打击感), then a stain stamped into the paper
     this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
+    if (!ally) this.feel.kill(x, y, r, k, crit, hitA, this.fcOf(lastSlot, lastSrc, 0));
     try { this.painter?.stamp('splat', x, y, r * 1.2, (h * 2654435761) >>> 0); } catch { /* painter optional */ }
-    this.sfx('kill');
   }
 
   /** A body leaves without being killed (a wilted 水草缠, an expired summon): no tallies, drops or events. */
@@ -1489,8 +1511,9 @@ export class World implements WorldApi {
     this.addStat('bosses', 1);
     if (this.wave > 30) this.addStat('endlessBosses', 1);
     this.hooks.boss({ kind: 'dead', id: this.bossHudId(id) });
-    this.hitstop(160);
+    this.feel.stopHard(160);
     this.shake(6);
+    this.feel.bossDown(x, y);
     this.sfx('shatter');
     // the wave's boss reward waits for the last body of the fight
     let left = 0;
@@ -1562,10 +1585,11 @@ export class World implements WorldApi {
     if (!dot) {
       this.iframes = F.iframes;
       this.addStat('hitsTaken', 1);
-      this.hitstop(60);
-      this.shake(4);
-      this.sfx('hurt');
-      try { (globalThis.navigator as Navigator | undefined)?.vibrate?.(8); } catch { /* not allowed */ }
+      // 打击感: a dark edge pulse, a kick away from the blow, the heartbeat drum and a grunt, a stop,
+      // an 8 ms haptic tick, and your figure knocked back a few px — drawn only: the simulation never
+      // shoves you (GDD §20.1: no drift), so a blow can't push you into a telegraph
+      const sx = attacker >= 0 ? this.E.x[attacker] : this.hurtSrcX, sy = attacker >= 0 ? this.E.y[attacker] : this.hurtSrcY;
+      this.feel.hurt(sx, sy, attacker >= 0 && this.E.kind[attacker] === EKind.Boss);
       this.emit('hurt', attacker >= 0 ? this.E.handle(attacker) : -1, d, false, 'enemy', this.px, this.py, -1);
       if (attacker >= 0) this.thorns(attacker, n, melee);
     }
@@ -1739,13 +1763,13 @@ export class World implements WorldApi {
     this.titles.push({ text, where, t: where === 'centre' ? 1.4 : 0.6 });
     if (this.titles.length > 4) this.titles.shift();
   }
+  /** Screen shake as trauma (the feel layer: amplitude ∝ trauma², decays in real time). */
   shake(px: number): void {
-    if (!this.settings.shake || this.settings.reduceMotion) return;
-    this.shakePx = Math.min(6, Math.max(this.shakePx, px));
+    this.feel.shake(px);
   }
+  /** Micro-hitstop, paid from the feel layer's bucket (≤ ~14% of any second). */
   hitstop(ms: number): void {
-    if (this.settings.reduceMotion) return;
-    this.hitstopMs = Math.max(this.hitstopMs, ms);
+    this.feel.stop(ms);
   }
   sfx(name: SfxName): void {
     try { this.audio?.sfx(name); } catch { /* audio optional */ }
@@ -1873,7 +1897,7 @@ export class World implements WorldApi {
       if (D.age[i] < 0.25) { D.x[i] += D.vx[i] * dt; D.y[i] += D.vy[i] * dt; D.vx[i] *= 0.88; D.vy[i] *= 0.88; continue; }
       const dx = this.px - D.x[i], dy = this.py - D.y[i], d2 = dx * dx + dy * dy;
       const k = D.kind[i];
-      if (!D.magnet[i] && d2 < pr2) D.magnet[i] = 1;
+      if (!D.magnet[i] && d2 < pr2) { D.magnet[i] = 1; this.feel.zip(); }
       if (!D.magnet[i] && fetch > 0 && d2 < fetch * fetch && this.summonsAlive >= 0 && (k === DK.moonDrop || k === DK.moonThick)) D.magnet[i] = 1;
       if (D.magnet[i]) {
         const d = Math.sqrt(d2) || 1;
@@ -1887,6 +1911,7 @@ export class World implements WorldApi {
   private pickup(i: number): void {
     const D = this.D;
     const k = D.kind[i], worth = D.worth[i];
+    this.feel.pickup(D.x[i], D.y[i], k === DK.cashCoin || k === DK.cashString || k === DK.cashTen || k === DK.goldShard);
     D.release(i);
     switch (k) {
       case DK.moonDrop: case DK.moonThick: case DK.goldShard: case DK.carpGold:
@@ -1944,6 +1969,7 @@ export class World implements WorldApi {
     this.hp = Math.min(this.hpMax, this.hp + 1);
     this.fx('levelRing', this.px, this.py, { r: 120, life: 0.5 });
     this.sfx('levelUp');
+    this.feel.level(this.px, this.py);
     const E = this.E, buf = this.q0;
     const n = this.hash.gather(this.px, this.py, 160, buf);
     for (let k = 0; k < n; k++) {
@@ -2005,7 +2031,10 @@ export class World implements WorldApi {
   private shotHitsPlayer(i: number): boolean {
     const ES = this.ES;
     if (this.untargT > 0 || this.leapT > 0) return false;
+    const sp = Math.hypot(ES.vx[i], ES.vy[i]) || 1;
+    this.hurtSrcX = ES.x[i] - (ES.vx[i] / sp) * 40; this.hurtSrcY = ES.y[i] - (ES.vy[i] / sp) * 40;
     const dealt = this.hurtFrom(ES.dmg[i], -1, false, false, ES.owner[i] >= 0 ? this.E.id[ES.owner[i]] : 'shot', false, false);
+    this.hurtSrcX = NaN; this.hurtSrcY = NaN;
     if (dealt > 0 && ES.status[i]) {
       const kind = ES.status[i] - 1;
       if (kind === STI.slow) this.slowPlayer(ES.statusV[i] || 0.3, ES.statusDur[i]);
@@ -2093,7 +2122,7 @@ export class World implements WorldApi {
     }
   }
 
-  /** Numbers merge per target every 0.25 s (GDD §20). */
+  /** Numbers merge per target every 0.25 s (GDD §20); each flies a short arc (up, then settling). */
   private tickNumbers(dt: number): void {
     const E = this.E;
     for (let i = 0; i < E.n; i++) {
@@ -2105,8 +2134,10 @@ export class World implements WorldApi {
     for (let i = 0; i < N.n; i++) {
       if (!N.alive[i]) continue;
       N.t[i] += dt;
-      N.y[i] -= 26 * dt;
-      if (N.t[i] > 0.8) N.release(i);
+      N.age[i] += dt;
+      N.x[i] += N.vx[i] * dt; N.y[i] += N.vy[i] * dt;
+      N.vy[i] += NUM_GRAVITY * dt; N.vx[i] *= Math.exp(-3 * dt);
+      if (N.t[i] > NUM_LIFE) { N.release(i); continue; }
     }
   }
   flushNumber(i: number): void {
@@ -2114,17 +2145,64 @@ export class World implements WorldApi {
     const v = E.numAcc[i];
     if (v > 0) {
       const crit = E.numCrit[i] === 1;
-      if (this.settings.nums === 2 || (this.settings.nums === 1 && crit)) this.addNum(v, E.x[i], E.y[i] - E.r[i], crit ? 1 : 0);
+      if (this.settings.nums === 2 || (this.settings.nums === 1 && crit)) {
+        // many hits on one body stack into its live number (re-popping it) rather than a pile
+        const N = this.N, j = E.numIdx[i], h = E.handle(i);
+        if (this.liveNum(i)) {
+          N.v[j] += v;
+          if (crit) N.style[j] = 1;
+          N.t[j] = 0.02;
+          N.vy[j] = Math.min(N.vy[j], -90);
+          N.sz[j] = this.numSize(N.v[j], N.style[j] === 1);
+        } else {
+          const k = this.addNum(v, E.x[i], E.y[i] - E.r[i], crit ? 1 : 0);
+          if (k >= 0) { this.N.owner[k] = h; E.numIdx[i] = k; }
+        }
+      }
     }
     E.numAcc[i] = 0; E.numT[i] = 0; E.numCrit[i] = 0;
   }
-  /** style: 0 hit · 1 crit · 2 heal · 3 moon · 4 coin · 5 player. */
-  addNum(v: number, x: number, y: number, style: number): void {
-    if (this.settings.nums === 0 && style !== 4) return;
+  /** Does body i still show a number that later hits can merge into? */
+  private liveNum(i: number): boolean {
+    const N = this.N, j = this.E.numIdx[i];
+    return j >= 0 && N.alive[j] === 1 && N.owner[j] === this.E.handle(i) && N.t[j] < 0.45 && N.age[j] < 1.4;
+  }
+  /** Size of a number by damage against the running mean of hits (≤ 1.2×; crits a touch up): numbers
+   *  must never outshout the enemy shots (GDD §20). */
+  private numSize(v: number, crit: boolean): number {
+    const k = Math.log2(Math.max(0.1, v) / Math.max(1, this.feel.numRef));
+    return Math.max(0.85, Math.min(1.2, 1 + 0.12 * k)) * (crit ? 1.04 : 1);
+  }
+  /** style: 0 hit · 1 crit · 2 heal · 3 moon · 4 coin · 5 player. Returns the slot (−1 none). */
+  addNum(v: number, x: number, y: number, style: number): number {
+    if (this.settings.nums === 0 && style !== 4) return -1;
     const N = this.N;
-    const i = N.take();
-    if (i < 0) return;
-    N.v[i] = v; N.x[i] = x + (this.erng() - 0.5) * 10; N.y[i] = y; N.t[i] = 0; N.style[i] = style;
+    let i = N.take();
+    if (i < 0) {
+      // full: the oldest plain number gives way to a crit, a coin or your own wound
+      if (style === 0) return -1;
+      let old = -1, ot = -1;
+      for (let j = 0; j < N.n; j++) if (N.alive[j] && N.style[j] === 0 && N.t[j] > ot) { ot = N.t[j]; old = j; }
+      if (old < 0) return -1;
+      i = old;
+    }
+    const f = this.feel;
+    if (style === 0) f.numRef += (v - f.numRef) * 0.05;
+    // one blow on a packed crowd: the numbers born with this one stack upward (≤ 3), the rest stay
+    // quiet — a wall of numerals would hide the shots and telegraphs behind it
+    if (style <= 1) {
+      let over = 0;
+      for (let j = 0; j < N.n; j++) {
+        if (j === i || !N.alive[j] || N.age[j] > 0.06 || N.style[j] > 1) continue;
+        if (Math.abs(N.x[j] - x) < 36 && Math.abs(N.y[j] - y + over * 18) < 20) over++;
+      }
+      if (over >= 3) { N.release(i); return -1; }
+      y -= over * 18;
+    }
+    N.v[i] = v; N.x[i] = x + (f.rnd() - 0.5) * 10; N.y[i] = y; N.t[i] = 0; N.age[i] = 0; N.style[i] = style; N.owner[i] = -1;
+    N.vx[i] = (f.rnd() - 0.5) * 90; N.vy[i] = -(150 + 60 * f.rnd()) * (style === 1 ? 1.15 : 1);
+    N.sz[i] = style === 0 || style === 1 ? this.numSize(v, style === 1) : style === 5 ? 1.15 : 1;
+    return i;
   }
 
   // ═══════════════════════════════════════════════════════════ the wave's end (GDD §3)
@@ -2149,6 +2227,8 @@ export class World implements WorldApi {
     this.endingT = 1.2;
     this.title({ zh: `第 ${this.wave} 重 · 破`, en: `Wave ${this.wave} · Clear` }, 'centre');
     this.sfx('gong');
+    // the HUD (and the band's clear cue) hear the wave end now, with the 「破」, not 1.2 s later
+    this.pushHud(true);
     try { this.painter?.wash(0.08); } catch { /* optional */ }
     // enemies and their shots dissolve with no drops
     const E = this.E;
@@ -2250,6 +2330,10 @@ export class World implements WorldApi {
     h.beat = this.beat;
     h.fps = Math.round(this.fps);
     if (force || this.phase === 'wave' || this.phase === 'ending') this.hooks.hud(h);
+    // the band: the wave clock, danger (HP, the crowd against the cap), the boss phase, the clear
+    if (this.audio?.hud && (this.phase === 'wave' || this.phase === 'ending')) {
+      try { this.audio.hud(h, this.capEnemies > 0 ? this.cappedAlive() / this.capEnemies : 0); } catch { /* audio optional */ }
+    }
   }
 
   // ═══════════════════════════════════════════════════════════ recovery (GDD §23)

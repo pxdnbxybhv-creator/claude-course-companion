@@ -282,8 +282,9 @@ engine.skill(target?); engine.skillPreview(target | null); engine.setSettings(p)
 - **Stats.** `setup.stats` is `computeStats(run)`. The engine re-evaluates live conds (HP%, still, swords in air, 醉, moon phase, buffs) on top of it.
 - **Numbers and budgets.**
   - Caps by quality (GDD §24.3).
-  - Draw order: arena → telegraphs → drops → enemies → summons → player → player shots → enemy shots → numbers.
+  - Draw order: arena → telegraphs → drops → enemies → summons → player → effects and impact sparks → player shots → numbers → enemy shots → overlays. The vermilion enemy shots stay on top of everything the player's side makes, numbers included.
   - No `shadowBlur`, `filter` or per-frame gradients.
+  - 打击感 (`engine/feel.ts`): the camera offset (trauma shake + kicks) never exceeds 6 px (GDD §20.3). `shake(px)` keeps its meaning (trauma that alone gives about px, now capped at 6), and `hitstop(ms)` still pays from the feel layer's bucket. Ordinary hits spend trauma and kicks from their own per-second budget; the big jolts are elite kills, the 镜技, boss phases and deaths, and blows you take. Zoom punches halve with shake off; reduced motion removes shake, kicks, zoom, hitstop, flashes and squash. A blow you take never moves you in the simulation (the knock-back is drawn only). `navigator.vibrate`: 8 ms when you are hurt, elite kills and the 镜技 at most once a second, boss blows; never ordinary crits.
   - Simulation ≤ 4 ms and draw ≤ 6 ms on a mid phone.
 - **Item effects.** The engine interprets every in-wave `Effect` (types.ts §2) with one switch on `do`, and `special` with one switch on `key`.
 
@@ -415,7 +416,11 @@ The look of each is the `look` line in `ids.ts`.
   - at most 4 sounds per 50 ms, with per-kind caps;
   - never `audio.pluck` per hit.
 - `pickup(combo)` climbs 宫商角徵羽.
-- `music(phase, map)` switches between the `'mirror'` (wave, shop, lobby) and `'mirror-boss'` themes, only when the phase changes (the crossfade takes about 3 s). The map colours the instruments and tempo. Both themes must pass `tests/music.test.ts` (bounded layers, 宫 on F).
+- `music(phase, map)` hands the phase to the music director (`audio/music.ts`, `mirrorMusic`):
+  - `'mirror-calm'` for the lobby, the shop and the results; `'mirror'` for a wave; `'mirror-boss'` for a boss;
+  - a wave starts with a 0.3 s cut and a drum fill; a boss with a 大鼓 roll into the 大锣; results (镜碎) drop out fast;
+  - it switches only when the phase or the map changes (a new map restarts the band after a 0.52 s breath). The map colours the instruments and tempo. The themes must pass `tests/music.test.ts` (bounded layers, 宫 on F).
+- `hud?(s, crowd)` (optional): the engine calls it from `pushHud` (≈ 8 Hz, and once more when the wave ends) with the HUD state and the crowd (living capped enemies / the cap). The director feeds the band the wave clock (layers enter over the wave, the last 10 s tighten), danger (HP under 55 %, a crowd over 55 % of the cap; ≥ 0.5 pushes a layer up) and the boss phase, and plays the clear — 钹 + 大鼓, choked — when the timer reaches 0 or the last boss falls, then drops to calm. Test audios may leave it out.
 - The 2 Hz beat (琴师's passive, 夔) comes from the simulation clock. The engine calls `sfx('beatTick')` when either is active.
 
 ---

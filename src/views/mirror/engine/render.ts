@@ -1,6 +1,7 @@
 // 水月幻镜 · the frame's drawing (GDD §20, §24.3): setTransform + drawImage from the painter's
 // atlases, in the contract's order: arena → telegraphs → zones → drops → enemies → summons → player
-// → player shots → enemy shots → effects → numbers → light, low-HP edge and titles. No shadowBlur,
+// → effects → player shots → numbers → enemy shots → light, low-HP edge and titles (the vermilion
+// enemy shots stay on top of everything the player's side makes, numbers included). No shadowBlur,
 // filters or per-frame gradients (the two overlay masks are baked once). A null sprite draws as a
 // plain ink circle, so the game is playable before (or without) the art.
 import type { AtlasId, Camera, NumStyle, Painter, Sprite } from '../types';
@@ -8,7 +9,16 @@ import { blit, blitRot } from '../paint/draw';
 import { EKind, SMode } from './pools';
 import { DROP_ATLAS, PROJ_ATLAS, SK, SUMMON_ATLAS, SWORDS_ON_SCREEN, TAU } from './consts';
 import { ST } from './enemies';
+import { PF } from './feel';
+import { SH, SWIPE_FRAMES, TN } from '../paint/feel';
 import type { World } from './world';
+
+/** Trail tint of a player shot by its weapon's feel class. */
+const TRAIL_TINT: readonly number[] = [
+  TN.azure, TN.ink, TN.ink, TN.wine, TN.grey, TN.gold, TN.gamboge, TN.wine, TN.indigo, TN.jade, TN.ink, TN.green, TN.moon, TN.gold, TN.ink,
+];
+/** A drawNumber that also takes a scale (the painter's implementation accepts it). */
+type DrawNum = (ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale?: number) => void;
 
 const NUM_STYLE: readonly NumStyle[] = ['hit', 'crit', 'heal', 'moon', 'coin', 'player'];
 const FX_BASE: Record<string, number> = { beamRay: 64, boltChain: 32, swordStreak: 40, slashArc: 32 };
@@ -17,6 +27,7 @@ const FX_BASE: Record<string, number> = { beamRay: 64, boltChain: 32, swordStrea
 export class Renderer {
   private light: HTMLCanvasElement | null = null;
   private edge: HTMLCanvasElement | null = null;
+  private hurtEdge: HTMLCanvasElement | null = null;
   private edgeKey = '';
   private atlasCache = new Map<string, AtlasId>();
 
@@ -64,6 +75,7 @@ export class Renderer {
     // drops
     const D = W.D;
     const tt = W.t;
+    const zip = W.feel.sprites.ok && !W.degrade && D.count < 160 ? W.feel.sprites.get(SH.streak, TN.moon) : null;
     for (let i = 0; i < D.n; i++) {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
@@ -71,6 +83,11 @@ export class Renderer {
       const v = id === 'drop:cashCoin' ? Math.floor(tt * 8 + i) & 3 : 0;
       const s = this.sprite(id, v);
       const bob = D.age[i] < 0.25 ? Math.sin((D.age[i] / 0.25) * Math.PI) * 10 : 0;
+      if (zip && D.magnet[i] && D.age[i] >= 0.25) {
+        // 月华 streaming in leaves a thin moon-white streak
+        const dx = W.px - D.x[i], dy = W.py - D.y[i];
+        if (dx * dx + dy * dy > 900) blitAff(ctx, cam, zip, D.x[i], D.y[i], Math.atan2(dy, dx), 0.55, 0.55, 0.55);
+      }
       if (s) blit(ctx, cam, s, D.x[i], D.y[i] - bob, D.worth[i] >= 5 && k === 0 ? 1.4 : 1);
       else circle(ctx, cam, D.x[i], D.y[i] - bob, k <= 1 ? 4 : 7, k >= 7 ? '#b8862b' : '#e8eef2');
     }
@@ -117,8 +134,13 @@ export class Renderer {
       else if (name === 'slashArc') blitRot(ctx, cam, s, FX.x[i], FX.y[i], FX.dir[i], FX.r[i] / 32, k * pa);
       else blit(ctx, cam, s, FX.x[i], FX.y[i], FX.r[i] / 32, false, Math.min(1, k * 1.5) * pa);
     }
+    // 打击感: spatter, rings, flares, swipes, crowns (under both kinds of shot)
+    this.drawSparks(W, ctx, cam, pa);
     // player shots
     const PS = W.PS;
+    const FS = W.feel.sprites;
+    // brush trails: the raster cost of one per shot adds up at phone DPR, so fewer on mid, none on low
+    const trails = FS.ok && !W.degrade && PS.count < (W.quality === 'high' ? 200 : W.quality === 'mid' ? 90 : 0);
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) continue;
       const id = PROJ_ATLAS[PS.kind[i]];
@@ -132,8 +154,37 @@ export class Renderer {
         ang = tt * 9;
         sz = 1 + Math.sin(k * Math.PI) * 0.3;
       } else if (PS.mode[i] === SMode.BoomOut || PS.mode[i] === SMode.BoomBack) ang = tt * 16;
+      else if (trails && PS.life[i] < PS.life0[i] - 0.02) {
+        // a short brush trail behind the shot (its weapon's colour), longer the faster it flies
+        const sl = PS.slot[i];
+        const tint = sl >= 0 && sl < W.slots.length ? TRAIL_TINT[W.slots[sl].fc] ?? TN.ink : TN.moon;
+        const tr = FS.get(SH.streak, tint);
+        if (tr) {
+          const sp = Math.hypot(PS.vx[i], PS.vy[i]);
+          const len = Math.min(1.6, sp / 520) * (0.6 + PS.r[i] / 16);
+          if (len > 0.15) blitAff(ctx, cam, tr, PS.x[i], y, ang, len, 0.6 + PS.r[i] / 20, 0.5 * pa);
+        }
+      }
       if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
       else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
+    }
+    // numbers pop (overshoot to 1.15×, settle), size by damage (≤ 1.2×), fly an arc, then fade — under
+    // the enemy shots, so a crit never hides the danger
+    const N = W.N;
+    const dn = P.drawNumber as DrawNum;
+    const calm = W.settings.reduceMotion;
+    for (let i = 0; i < N.n; i++) {
+      if (!N.alive[i]) continue;
+      const t = N.t[i];
+      const a = t < 0.58 ? 1 : Math.max(0, 1 - (t - 0.58) / 0.2);
+      let pop = 1;
+      if (!calm) {
+        if (t < 0.06) pop = 0.6 + 0.55 * (t / 0.06);
+        else if (t < 0.18) { const u = (t - 0.06) / 0.12; pop = 1.15 - 0.15 * (1 - (1 - u) * (1 - u)); }
+      }
+      const sc = pop * (N.sz[i] || 1) * (t > 0.58 ? 0.85 + 0.15 * a : 1);
+      const sx = (N.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (N.y[i] - cam.y) * cam.scale + cam.h / 2;
+      dn.call(P, ctx, N.v[i], sx, sy, NUM_STYLE[N.style[i]] ?? 'hit', a, lang, sc);
     }
     // enemy shots: 1.5× the player's, the brightest thing on screen
     const ES = W.ES;
@@ -147,14 +198,6 @@ export class Renderer {
       }
       if (s) blitRot(ctx, cam, s, ES.x[i], y, Math.atan2(ES.vy[i], ES.vx[i]), 1.5);
       else { circle(ctx, cam, ES.x[i], y, ES.r[i], '#c0412f'); circle(ctx, cam, ES.x[i], y, ES.r[i] * 0.55, '#fff'); }
-    }
-    // numbers
-    const N = W.N;
-    for (let i = 0; i < N.n; i++) {
-      if (!N.alive[i]) continue;
-      const a = N.t[i] < 0.6 ? 1 : 1 - (N.t[i] - 0.6) / 0.2;
-      const sx = (N.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (N.y[i] - cam.y) * cam.scale + cam.h / 2;
-      P.drawNumber(ctx, N.v[i], sx, sy, NUM_STYLE[N.style[i]] ?? 'hit', Math.max(0, a), lang);
     }
     // skill reticle
     if (W.skillPreview) {
@@ -181,14 +224,25 @@ export class Renderer {
     const k = E.kind[i];
     const tell = E.st[i] === ST.tell;
     const v = k === EKind.Boss ? Math.floor(W.t * 2 + i) & 1 : tell ? 2 : (Math.floor(W.t * 5 + i * 0.37) & 1);
-    const flash = E.flash[i] > 0 && !W.settings.reduceMotion;
-    const s = id ? (flash ? this.painter.flash(id, v) : this.sprite(id, v)) : null;
+    const calm = W.settings.reduceMotion;
+    const flash = E.flash[i] > 0 && !calm;
+    const s = id ? (flash ? this.painter.flash(id, v) ?? this.sprite(id, v) : this.sprite(id, v)) : null;
     const flip = Math.cos(E.face[i]) < 0;
     const scale = E.r[i] / Math.max(1, E.r0[i]);
     const air = E.air[i] ? 10 : 0;
     const a = E.untarget[i] ? 0.45 : k === EKind.Ally || E.charmT[i] > 0 ? 0.85 : 1;
-    if (s) blit(ctx, cam, s, E.x[i], E.y[i] - air, scale, flip, a, 1 + (E.st[i] === ST.act ? 0.08 : 0), 1 - (tell ? 0.08 : 0));
-    else circle(ctx, cam, E.x[i], E.y[i] - air, E.r[i], flash ? '#ffffff' : k === EKind.Elite ? '#5a4012' : k === EKind.Boss ? '#12141a' : k === EKind.Treasure ? '#d9a62e' : '#1d2430', a);
+    // 打击感: the blow squashes the body (wide, then a springy stretch back) and nudges it away
+    let sqx = 1, sqy = 1, ox = 0, oy = 0;
+    const hv = E.hitV[i], ha = E.hitAge[i];
+    if (hv > 0 && ha < 0.35 && !calm) {
+      const env = hv * Math.exp(-ha / 0.085);
+      const osc = Math.cos(ha * 40);
+      sqx = 1 + 0.26 * env * osc; sqy = 1 - 0.22 * env * osc;
+      const push = hv * 6 * Math.exp(-ha / 0.05);
+      ox = Math.cos(E.hitA[i]) * push; oy = Math.sin(E.hitA[i]) * push;
+    }
+    if (s) blit(ctx, cam, s, E.x[i] + ox, E.y[i] - air + oy, scale, flip, a, (1 + (E.st[i] === ST.act ? 0.08 : 0)) * sqx, (1 - (tell ? 0.08 : 0)) * sqy);
+    else circle(ctx, cam, E.x[i] + ox, E.y[i] - air + oy, E.r[i] * (sqx + sqy) / 2, flash ? '#ffffff' : k === EKind.Elite ? '#5a4012' : k === EKind.Boss ? '#12141a' : k === EKind.Treasure ? '#d9a62e' : '#1d2430', a);
     // 伐桂人's three axes orbit it
     if (E.id[i] === 'axeshade') {
       const ax = this.sprite('proj:eAxe');
@@ -211,6 +265,40 @@ export class Renderer {
       const w = E.r[i] * 2 * cam.scale;
       ctx.fillStyle = 'rgba(20,20,20,0.5)'; ctx.fillRect(sx - w / 2, sy, w, 3 * cam.dpr);
       ctx.fillStyle = '#c0412f'; ctx.fillRect(sx - w / 2, sy, w * Math.max(0, E.hp[i] / E.hpMax[i]), 3 * cam.dpr);
+    }
+  }
+
+  /** The feel layer's sparks, each a drawImage from a baked sprite. */
+  private drawSparks(W: World, ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
+    const F = W.feel, P = F.sp, S = F.sprites;
+    if (!S.ok || !P.count) return;
+    for (let i = 0; i < P.n; i++) {
+      if (!P.alive[i]) continue;
+      const k = P.life[i] / P.life0[i], u = 1 - k;
+      const fl = P.flags[i];
+      let frame = 0, alpha: number, kx: number, ky: number, ang = P.rot[i];
+      if (fl & PF.swipe) {
+        // reveal over the first 45% (the head leads), then the dry follow-through fades
+        frame = u < 0.45 ? Math.min(SWIPE_FRAMES - 2, Math.floor((u / 0.45) * (SWIPE_FRAMES - 1))) : SWIPE_FRAMES - 1;
+        alpha = P.a0[i] * (u < 0.45 ? 1 : Math.max(0, (1 - u) / 0.55));
+        kx = P.s0[i]; ky = P.s0[i] * P.s1[i] * (fl & PF.flip ? -1 : 1);
+      } else if (fl & PF.ease) {
+        const e = 1 - k * k;
+        const sz = P.s0[i] + (P.s1[i] - P.s0[i]) * e;
+        alpha = P.a0[i] * k;
+        kx = sz; ky = sz;
+      } else {
+        const sz = P.s1[i] + (P.s0[i] - P.s1[i]) * k;
+        alpha = P.a0[i] * Math.min(1, k * 2.2);
+        kx = sz; ky = sz;
+        if (fl & PF.stretch) {
+          const sp = Math.hypot(P.vx[i], P.vy[i]);
+          ang = Math.atan2(P.vy[i], P.vx[i]);
+          kx = sz * (1 + Math.min(2.2, sp / 240));
+        }
+      }
+      const s = S.get(P.shape[i], P.tint[i], frame);
+      if (s) blitAff(ctx, cam, s, P.x[i], P.y[i], ang, kx, ky, alpha * pa);
     }
   }
 
@@ -259,9 +347,16 @@ export class Renderer {
     const a = W.untargT > 0 ? 0.5 : blink ? 0.45 : 1;
     const lift = W.leapT > 0 ? Math.sin((1 - W.leapT / W.leapDur) * Math.PI) * 30 : 0;
     const flip = Math.cos(W.face) < 0;
-    if (s) blit(ctx, cam, s, W.px, W.py - lift, 1, flip, a);
-    else circle(ctx, cam, W.px, W.py - lift, 14, '#f4f1e8', a);
-    // weapons held around you, pointing at the last attack
+    const F = W.feel;
+    const calm = W.settings.reduceMotion;
+    // a blow squashes you for a moment
+    const hs = !calm && F.hurtAge < 0.2 ? Math.exp(-F.hurtAge / 0.06) * F.hurtK : 0;
+    // … and knocks your figure back a few u (drawn only; the hitbox dot stays where you are)
+    const kb = 7 * hs;
+    if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.16 * hs, 1 - 0.14 * hs);
+    else circle(ctx, cam, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 14, '#f4f1e8', a);
+    // weapons held around you, pointing at the last attack: a wind-up as the cooldown ends
+    // (anticipation), a swing through the blow (follow-through), a kick back on a shot (recoil)
     const n = W.slots.length;
     const dir = W.lastDir < 1e8 ? W.lastDir : W.face;
     for (let k = 0; k < n; k++) {
@@ -270,7 +365,30 @@ export class Renderer {
       const ws = this.sprite(`wpn:${sl.id}` as AtlasId);
       if (!ws) continue;
       const a0 = (k / n) * TAU + W.t * 0.4;
-      blitRot(ctx, cam, ws, W.px + Math.cos(a0) * 24, W.py - lift + Math.sin(a0) * 18, dir, 0.55, 0.9);
+      let wx = W.px + Math.cos(a0) * 24, wy = W.py - lift + Math.sin(a0) * 18;
+      const ft = k < 8 ? F.slotT[k] : 9;
+      let wd = ft < 0.6 ? F.slotDir[k] : dir;
+      if (!calm && k < 8) {
+        if (ft < 0.3) {
+          if (F.slotMelee[k]) {
+            // follow-through: sweep −70° → +70° in 0.09 s, then drift home
+            const u = Math.min(1, ft / 0.09);
+            const back = ft > 0.09 ? Math.max(0, 1 - (ft - 0.09) / 0.2) : 1;
+            wd += (-1.2 + 2.4 * (1 - (1 - u) * (1 - u))) * back;
+            const out = 10 * Math.sin(Math.min(1, ft / 0.18) * Math.PI);
+            wx += Math.cos(wd) * out; wy += Math.sin(wd) * out;
+          } else {
+            const kb = 7 * Math.exp(-ft / 0.05);
+            wx -= Math.cos(wd) * kb; wy -= Math.sin(wd) * kb;
+          }
+        } else if (sl.cd > 0 && sl.cd < 0.14 && (sl.kind === 'combo' || sl.kind === 'sweep' || sl.kind === 'smash' || sl.kind === 'punch' || sl.kind === 'thrust' || sl.kind === 'slam')) {
+          // anticipation: draw back before the blow
+          const u = 1 - sl.cd / 0.14;
+          wd -= 0.7 * u;
+          wx -= Math.cos(wd) * 5 * u; wy -= Math.sin(wd) * 5 * u;
+        }
+      }
+      blitRot(ctx, cam, ws, wx, wy, wd, 0.55, 0.9);
     }
     if (W.shieldV > 0) this.mark(ctx, cam, 'fx:shieldBubble', W.px, W.py - lift, 0.9);
     // the hitbox: a small vermilion dot at the centre (GDD §20)
@@ -292,11 +410,23 @@ export class Renderer {
       ctx.fillRect(0, sy - R, Math.max(0, sx - R), 2 * R); ctx.fillRect(sx + R, sy - R, Math.max(0, cam.w - sx - R), 2 * R);
       if (this.light) ctx.drawImage(this.light, sx - R, sy - R, 2 * R, 2 * R);
     }
-    // low HP browns the paper's edge
-    if (W.hp < W.hpMax * 0.3 && W.phase === 'wave') {
-      const key = `${cam.w}x${cam.h}`;
-      if (!this.edge || this.edgeKey !== key) { this.edge = makeEdge(cam.w, cam.h); this.edgeKey = key; }
-      if (this.edge) { ctx.globalAlpha = 0.5 + 0.3 * Math.sin(W.t * 5); ctx.drawImage(this.edge, 0, 0); ctx.globalAlpha = 1; }
+    const key = `${cam.w}x${cam.h}`;
+    const F = W.feel;
+    const calm = W.settings.reduceMotion;
+    // the edge masks are baked small (≤ 128 px across: a soft gradient scales up cleanly, and a small
+    // canvas costs nothing to draw) and elliptical, so a portrait phone gets a thin rim on every side
+    if (this.edgeKey !== key) { this.edge = makeEdge(cam.w, cam.h, 'rgba(120,60,20,0.55)', 0.7); this.hurtEdge = makeEdge(cam.w, cam.h, 'rgba(46,22,14,1)', 0.8); this.edgeKey = key; }
+    // low HP browns the paper's edge, pulsing with a heartbeat (lub-dub) that quickens as you fade
+    if (W.hp < W.hpMax * 0.3 && W.phase === 'wave' && this.edge) {
+      const p = F.beat - Math.floor(F.beat);
+      const pulse = Math.max(Math.exp(-p / 0.08), p > 0.26 ? 0.65 * Math.exp(-(p - 0.26) / 0.07) : 0);
+      ctx.globalAlpha = calm ? 0.65 : 0.45 + 0.45 * pulse; ctx.drawImage(this.edge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1;
+    }
+    // a blow: a thin dark rim (ink, not the enemy's vermilion) closes in and drains; with reduced
+    // motion it holds still at a low alpha for the i-frames instead of pulsing
+    if (this.hurtEdge && W.phase !== 'idle') {
+      const ha = calm ? (F.hurtAge < 0.35 && F.hurtK > 0 ? 0.16 : 0) : Math.min(0.3, 0.3 * F.hurtK * Math.exp(-F.hurtAge / 0.18));
+      if (ha > 0.01) { ctx.globalAlpha = ha; ctx.drawImage(this.hurtEdge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1; }
     }
     // brush titles (synergies at the edge, boss phases and 「第 N 重 · 破」 in the centre)
     for (const t of W.titles) {
@@ -315,6 +445,17 @@ export class Renderer {
       ctx.globalAlpha = 1;
     }
   }
+}
+
+/** A sprite rotated by `ang` and scaled kx along it, ky across it (ky < 0 mirrors), about its anchor. */
+function blitAff(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, ang: number, kx: number, ky: number, a: number): void {
+  if (a <= 0.01) return;
+  const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
+  const c = Math.cos(ang) * cam.scale, n = Math.sin(ang) * cam.scale;
+  ctx.setTransform(c * kx, n * kx, -n * ky, c * ky, px, py);
+  ctx.globalAlpha = Math.min(1, a);
+  ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
+  ctx.globalAlpha = 1;
 }
 
 function circle(ctx: CanvasRenderingContext2D, cam: Camera, x: number, y: number, r: number, fill: string, a = 1): void {
@@ -345,16 +486,24 @@ function makeLight(): HTMLCanvasElement | null {
   g.fillRect(0, 0, 256, 256);
   return c;
 }
-/** The low-HP edge: brown at the rim (baked per screen size). */
-function makeEdge(w: number, h: number): HTMLCanvasElement | null {
-  const c = canvas(w, h);
+/**
+ * An edge vignette (baked per screen shape, small; drawn stretched to the screen): `rim` at the edge,
+ * clear inside `inner` of each half-axis — an ellipse, so the band is as thin at the top and bottom of
+ * a portrait phone as at its sides. Low-HP brown, the blow's ink.
+ */
+function makeEdge(w: number, h: number, rim: string, inner: number): HTMLCanvasElement | null {
+  const k = 128 / Math.max(w, h, 1);
+  const cw = Math.max(8, Math.round(w * k)), ch = Math.max(8, Math.round(h * k));
+  const c = canvas(cw, ch);
   const g = c?.getContext('2d');
   if (!c || !g) return null;
-  const r = Math.hypot(w, h) / 2;
-  const grad = g.createRadialGradient(w / 2, h / 2, r * 0.55, w / 2, h / 2, r);
-  grad.addColorStop(0, 'rgba(120,60,20,0)');
-  grad.addColorStop(1, 'rgba(120,60,20,0.55)');
+  g.translate(cw / 2, ch / 2);
+  g.scale(1, ch / cw);
+  const r = cw / 2;
+  const grad = g.createRadialGradient(0, 0, r * inner, 0, 0, r);
+  grad.addColorStop(0, rim.replace(/[\d.]+\)$/, '0)'));
+  grad.addColorStop(1, rim);
   g.fillStyle = grad;
-  g.fillRect(0, 0, w, h);
+  g.fillRect(-cw, -cw * 2, cw * 2, cw * 4);
   return c;
 }

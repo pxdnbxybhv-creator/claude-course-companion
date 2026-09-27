@@ -15,6 +15,7 @@ import { DEG, HF, PK, SK, SRCI, SWORDS_ON_SCREEN, TAG_BIT, TAU, ZC, angDiff, seg
 import { classExtras } from './effects';
 import { areaStrike } from './enemies';
 import type { World } from './world';
+import { fcOfWeapon } from './feel';
 
 export interface WeaponSlot {
   i: number;
@@ -43,6 +44,8 @@ export interface WeaponSlot {
   /** Per-enemy contact timers for orbit blades. */
   touch: Float32Array | null;
   swords: number;
+  /** Feel class (打击感): how this weapon's hits look and sound. */
+  fc: number;
 }
 
 const NO_DIR = 1e9;
@@ -60,7 +63,7 @@ export function initWeapons(W: World): void {
       music: def.classes.includes('music'), talisman: def.classes.includes('talisman'), heavy: def.classes.includes('heavy'),
       flying: def.classes.includes('flying'), ink: def.classes.includes('ink'), wine: def.classes.includes('wine'), sword: def.classes.includes('sword'),
       stack: 0, stackT: 0, queue: 0, queueT: 0, qDir: 0, qX: 1, familiar: -1, flareT: 0, echoT: 0, echoDir: 0, waitBeat: 0, resetCd: false, hit: 0,
-      touch: def.kind === 'orbit' ? new Float32Array(W.E.cap) : null, swords: 0,
+      touch: def.kind === 'orbit' ? new Float32Array(W.E.cap) : null, swords: 0, fc: fcOfWeapon(ow.id, def.classes),
     };
     return s;
   });
@@ -218,6 +221,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
         const pierce = perTier(p.pierce, t, 1) + st.pierce + (W.mods.flags.has('swordPierce') && s.sword ? 1 : 0);
         thrustHit(W, s, px, py, dir, range, (p.w as number) ?? 24, 1 + pierce, d, cp, cm, knock);
         W.fxLine('swordStreak', px + Math.cos(dir) * range, py + Math.sin(dir) * range, dir, range, 0.14, 1);
+        W.feel.swing(s.i, px, py, dir, range * 0.55, 40, s.fc);
       } else if (s.kind === 'combo') {
         const spin = t === 4 && s.id === 'longquan' && (s.n + 1) % ((p.spinEvery as number) ?? 3) === 0;
         s.queue = ((p.hits as number) ?? 2) - 1; s.queueT = 0.09; s.qDir = dir; s.qX = xm;
@@ -251,7 +255,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       W.fx('shockRing', tx, ty, { r, life: 0.3 });
       if (n && W.erng() < ((p.healChance as number) ?? 0.1) * s.proc) W.heal(1);
       if (n && t === 4) W.shield(n, (p.shieldMax as number) ?? 10);
-      W.sfx('hitMelee');
+      W.feel.swing(s.i, px, py, W.lastDir, 40, 90, s.fc);
       return true;
     }
     case 'projectile': case 'burst': case 'hook': {
@@ -275,7 +279,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       } else {
         projectile(W, s, dir, range, d, cp, cm, st);
       }
-      W.sfx('hitShot');
+      W.feel.fire(s.i, px, py, dir);
       return true;
     }
     case 'launch': return launch(W, s, dir, range, d, cp, cm, st);
@@ -340,7 +344,6 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       const jumps = perTier(p.jumps, t, 2) + W.mods.chainAdd + (W.mods.flags.has('chainPlus') ? 1 : 0);
       chain(W, s, target, jumps, d, cp, cm, (p.fall as number) ?? 0.85);
       W.lastDir = NO_DIR;
-      W.sfx('hitTalisman');
       return true;
     }
     case 'lob': {
@@ -379,7 +382,8 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       }
       W.fx('pulseRing', px, py, { r, life: 0.35 });
       if (res) { if (t === 4) W.heal((p.healT4 as number) ?? 1); W.title({ zh: '共鸣', en: 'Resonance' }, 'edge'); }
-      W.sfx('hitTalisman');
+      // the ring is the shot: its hits sound through the feel bus (pluck), so no cast sound or puff
+      W.feel.fire(s.i, px, py, W.face, true);
       return true;
     }
     case 'beam': {
@@ -394,7 +398,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       for (const off of beams) beam(W, s, dir + off, range, d, cp, cm);
       // after a dodge: one extra beam for 2 s
       if (W.dodgeWin > 0) beam(W, s, dir + 0.12, range, d, cp, cm);
-      W.sfx('hitShot');
+      W.feel.fire(s.i, px, py, dir);
       return true;
     }
     case 'boomerang': {
@@ -511,8 +515,9 @@ function swipe(W: World, s: WeaponSlot, dir: number, r: number, deg: number, d: 
     s.stack = Math.min((s.def.p.stackMax as number) ?? 10, s.stack + ((s.def.p.stack as number) ?? 2) * hits);
     s.stackT = (s.def.p.stackDur as number) ?? 3;
   }
-  W.fx('slashArc', px + Math.cos(dir) * r * 0.5, py + Math.sin(dir) * r * 0.5, { r: r * 0.6, dir, life: 0.16 });
-  if (hits) W.sfx('hitMelee');
+  // the brush-stroke swipe (and a whoosh); the impact's sound comes from the feel bus on the hit
+  if (W.feel.sprites.ok) W.feel.swing(s.i, px, py, dir, r, deg, s.fc);
+  else W.fx('slashArc', px + Math.cos(dir) * r * 0.5, py + Math.sin(dir) * r * 0.5, { r: r * 0.6, dir, life: 0.16 });
   return hits;
 }
 
@@ -539,7 +544,6 @@ function thrustHit(W: World, s: WeaponSlot, x: number, y: number, dir: number, l
     W.strike(best, d, cp, cm, knock, x, y, s.i, SRCI.weapon, HF.melee, s.proc);
     picked++;
   }
-  if (picked) W.sfx('hitMelee');
 }
 
 /** 偃月 IV: a crescent of blade qi that travels 400, piercing everything. */
@@ -611,7 +615,7 @@ function launch(W: World, s: WeaponSlot, dir: number, range: number, d: number, 
     PS.flags[i] |= SF.sword | (W.mods.swordTrail ? SF.trail : 0) | (s.t === 4 ? SF.splitSword : 0);
     W.swordsAir++;
   }
-  W.sfx('hitShot');
+  W.feel.fire(s.i, W.px, W.py, dir);
   return true;
 }
 
@@ -887,7 +891,7 @@ function landLob(W: World, i: number): void {
     if (hits) W.addDrunk(((s.def.p.drunk as number) ?? 2) * hits * s.proc);
     if (s.t === 4) W.coreZone(1, 'firePuddle', x, y, r * 0.8, (s.def.p.puddleT4 as number) ?? 3, ZC.fire, (s.def.p.puddleBurn as number) ?? 3);
   }
-  W.sfx('hitTalisman');
+  if (!hits) W.sfx('hitTalisman');
 }
 function stunNear(W: World, x: number, y: number, r: number, dur: number): void {
   const E = W.E, buf = W.q1;
@@ -1286,7 +1290,7 @@ function blast(W: World, i: number, x: number): void {
   }
   areaStrike(W, sx, sy, r, dmgOf(W, s, st) * x, slot, SRCI.weapon, HF.blast, s.def.knock, critPOf(s, st), critMOf(s, st));
   W.fx('shockRing', sx, sy, { r, life: 0.3 });
-  W.sfx('hitMelee');
+  W.shake(3);
   W.stoneChain++;
   W.maxStat('peakStoneChain', W.stoneChain);
   // chain-detonate stones within 120

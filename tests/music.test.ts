@@ -256,3 +256,172 @@ describe('桃源 · the valley theme', () => {
     expect(echo).toBeGreaterThan(0.1);
   });
 });
+
+describe('水月幻镜 · the mirror themes', () => {
+  // imported lazily so the module state (colour, wave clock) is reset per test
+  const load = async () => {
+    const T = await import('../src/audio/music-themes');
+    T.setMirrorMusic({ colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 });
+    return T;
+  };
+  const COLOURS = ['lake', 'forest', 'palace'] as const;
+  const PERC = new Set(['drum', 'wood', 'gong', 'bo', 'ling']);
+  /** Arrange `n` phrases; `before(i)` may set the state before each one is composed. */
+  const run = async (id: ThemeId, colour: (typeof COLOURS)[number], n: number, before?: (i: number) => void) => {
+    const T = await load();
+    T.setMirrorColour(colour);
+    const c = new Composer(T.THEMES[id].style, daySeed(id, '2026-09-27'));
+    const r = makeRng(11);
+    return Array.from({ length: n }, (_, i) => {
+      before?.(i);
+      const p = c.next();
+      const evs = arrange(id, p, r, 100 + i);
+      return { p, evs, secs: phraseSeconds(p), tier: T.mirrorTier(p) };
+    });
+  };
+
+  it('waves are 羽 or 商 at 118–138 bpm, bosses faster, the shop calm (≈ 88) — all 宫 on F', async () => {
+    const T = await load();
+    for (const colour of COLOURS) {
+      T.setMirrorColour(colour);
+      const wave = T.THEMES.mirror.style, boss = T.THEMES['mirror-boss'].style, calm = T.THEMES['mirror-calm'].style;
+      for (const m of wave.modes) expect([1, 4], `${colour} wave mode`).toContain(m.final);
+      expect(wave.bpm[0]).toBeGreaterThanOrEqual(118);
+      expect(wave.bpm[1] * 1.04).toBeLessThanOrEqual(138); // the tight last 10 s included
+      expect(boss.bpm[0]).toBeGreaterThan(wave.bpm[1]);
+      expect(calm.bpm[0]).toBeGreaterThanOrEqual(84);
+      expect(calm.bpm[1]).toBeLessThanOrEqual(92);
+      for (const s of [wave, boss, calm]) for (const m of s.modes) expect(gongPc(m)).toBe(5);
+    }
+    // three colours, three different bands
+    const styles = COLOURS.map((c) => { T.setMirrorColour(c); return T.THEMES.mirror.style; });
+    expect(new Set(styles).size).toBe(3);
+  });
+
+  it('phrases are squared to whole bars at the theme tempo, so the groove never skips across phrases', async () => {
+    for (const id of ['mirror', 'mirror-boss', 'mirror-calm'] as ThemeId[]) {
+      for (const colour of COLOURS) {
+        for (const { p, evs, secs } of await run(id, colour, 8)) {
+          expect(p.beats % 4, `${id} ${colour}`).toBe(0);
+          expect(p.beats).toBeGreaterThan(p.end);
+          for (const e of evs) expect(e.t).toBeLessThan(secs);
+          // the pulse runs through the breath: a drum on every bar
+          const spb = 60 / p.bpm;
+          for (let b = id === 'mirror-boss' && p.index === 0 ? 1 : 0; b < p.beats / 4; b++) {
+            expect(evs.some((e) => e.inst === 'drum' && Math.abs(e.t - b * 4 * spb) < 0.02), `${id} ${colour} bar ${b}`).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it('a wave builds: drums → bass → 琵琶 → lead, one layer per phrase until the clock is known', async () => {
+    for (const colour of COLOURS) {
+      const ph = await run('mirror', colour, 6);
+      expect(ph.map((x) => x.tier)).toEqual([0, 1, 2, 3, 3, 3]);
+      const insts = ph.map((x) => new Set(x.evs.map((e) => e.inst)));
+      const bass = colour === 'forest' ? 'pipa' : 'zheng';
+      expect([...insts[0]].every((i) => PERC.has(i)), `${colour} phrase 0: drums only`).toBe(true);
+      expect(insts[1].has(bass)).toBe(true);
+      expect(insts[2].has('pipa')).toBe(true);
+      expect(insts[3].has(colour === 'forest' ? 'suona' : 'dizi')).toBe(true);
+      // the first phrase opens with the fill: a rising 堂鼓 roll in bar 0, then 钹 + 大锣 on bar 1
+      const spb = 60 / ph[0].p.bpm;
+      const roll = ph[0].evs.filter((e) => e.key?.startsWith('drum:tang') && e.t >= 2 * spb - 0.02 && e.t < 4 * spb - 0.02);
+      expect(roll.length).toBe(8);
+      expect(roll[7].gain).toBeGreaterThan(roll[0].gain);
+      expect(ph[0].evs.some((e) => e.inst === 'bo' && Math.abs(e.t - 4 * spb) < 0.02)).toBe(true);
+      expect(ph[0].evs.some((e) => e.key?.startsWith('gong:daluo') && Math.abs(e.t - 4 * spb) < 0.02)).toBe(true);
+      // density climbs with the layers (events per second)
+      const rate = ph.map((x) => x.evs.length / x.secs);
+      expect(rate[3]).toBeGreaterThan(rate[0] * 1.5);
+    }
+  });
+
+  it('the wave clock drives the layers, the last 10 s tighten, danger pushes a layer up', async () => {
+    const T = await load();
+    const p = { index: 5 } as Parameters<typeof T.mirrorTier>[0];
+    const at = (left: number, danger = 0) => T.mirrorTier(p, { colour: 'lake', left, total: 60, danger, bossPhase: 0 });
+    expect(at(60)).toBe(1); // heard ≈ 7 s in
+    expect(at(40)).toBe(3);
+    expect(at(16)).toBe(4); // the phrase composed now is heard in the last 10 s
+    expect(at(40, 0.8)).toBe(4);
+    expect(at(60, 0.8)).toBe(2);
+    expect(T.mirrorTier({ index: 0 } as typeof p, { colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 })).toBe(0);
+    // tight: faster, 16th 板, 小锣 on the backbeat, the lead doubled
+    const base = await run('mirror', 'lake', 5, (i) => { if (i === 4) T.setMirrorMusic({ left: 40, total: 60 }); });
+    const tight = await run('mirror', 'lake', 5, (i) => { if (i === 4) T.setMirrorMusic({ left: 12, total: 60 }); });
+    const [b, t] = [base[4], tight[4]];
+    expect(b.tier).toBe(3);
+    expect(t.tier).toBe(4);
+    expect(t.p.bpm).toBeGreaterThan(b.p.bpm);
+    expect(t.evs.length / t.secs).toBeGreaterThan((b.evs.length / b.secs) * 1.2);
+    expect(t.evs.some((e) => e.key?.startsWith('gong:xiaoluo'))).toBe(true);
+    expect(t.evs.some((e) => e.inst === 'suona')).toBe(true);
+    // state is clamped and non-finite input ignored
+    T.setMirrorMusic({ danger: 7, left: -3, total: Number.NaN });
+    expect(T.getMirrorMusic().danger).toBe(1);
+    expect(T.getMirrorMusic().left).toBe(0);
+    expect(T.getMirrorMusic().total).toBe(60);
+  });
+
+  it('a boss opens with a 大鼓 roll into the 大锣, and each phase steps it up', async () => {
+    for (const colour of COLOURS) {
+      const T = await load();
+      const p0 = await run('mirror-boss', colour, 3);
+      const first = p0[0], spb = 60 / first.p.bpm;
+      expect(first.p.notes[0].beat).toBeGreaterThanOrEqual(4); // the tune waits for the roll
+      const roll = first.evs.filter((e) => e.key?.startsWith('drum:big') && e.t < 4 * spb - 0.02);
+      expect(roll.length).toBe(8);
+      expect(first.evs.some((e) => e.key?.startsWith('gong:daluo') && Math.abs(e.t - 4 * spb) < 0.02)).toBe(true);
+      expect(p0.every((x) => x.evs.some((e) => e.inst === 'suona' && e.prio === 0))).toBe(true);
+      const p2 = await run('mirror-boss', colour, 3, () => T.setMirrorMusic({ bossPhase: 2 }));
+      expect(p2[1].p.bpm).toBeGreaterThan(p0[1].p.bpm);
+      expect(p2[1].evs.length / p2[1].secs).toBeGreaterThan(p0[1].evs.length / p0[1].secs);
+      expect(p2[1].p.bpm).toBeLessThanOrEqual(152);
+    }
+  });
+
+  it('the shop keeps a pulse but stays light', async () => {
+    for (const colour of COLOURS) {
+      const calm = await run('mirror-calm', colour, 8);
+      const wave = await run('mirror', colour, 8);
+      const rate = (xs: typeof calm) => xs.reduce((a, x) => a + x.evs.length, 0) / xs.reduce((a, x) => a + x.secs, 0);
+      expect(rate(calm)).toBeLessThan(rate(wave) * 0.6);
+      for (const { evs } of calm) expect(evs.some((e) => e.key?.startsWith('drum:big'))).toBe(true);
+    }
+  });
+
+  it('stays inside the voice budget: at most 24 sounding at once, melodic layers never dropped', async () => {
+    const { runMusicJob } = await import('../src/audio/music-dsp');
+    const lens = new Map<string, number>();
+    const len = (e: import('../src/audio/music-themes').MusicEvent) => {
+      const k = e.key ?? JSON.stringify(e.job).slice(0, 200) + e.t;
+      if (!lens.has(k)) lens.set(k, runMusicJob(8000, e.job)[0].length / 8000);
+      return lens.get(k)! / (e.rate ?? 1);
+    };
+    const T = await load();
+    for (const [id, colour, set] of [['mirror', 'palace', { left: 12, total: 60 }], ['mirror', 'forest', { left: 12, total: 60 }], ['mirror-boss', 'lake', { bossPhase: 1 }]] as const) {
+      const ph = await run(id, colour, 6, () => T.setMirrorMusic(set));
+      const evs: { at: number; e: import('../src/audio/music-themes').MusicEvent }[] = [];
+      let t = 0;
+      for (const x of ph) { for (const e of x.evs) evs.push({ at: t + e.t, e }); t += x.secs; }
+      evs.sort((a, b) => a.at - b.at);
+      const spans: [number, number][] = [];
+      let dropped1 = 0;
+      for (const { at, e } of evs) {
+        const conc = spans.filter(([s, x]) => s <= at && at < x).length;
+        if (e.prio > 0 && conc >= 24 - (e.prio === 2 ? 4 : 0)) { if (e.prio === 1 && e.inst !== 'drum' && e.inst !== 'gong' && e.inst !== 'bo') dropped1++; continue; }
+        spans.push([at, at + len(e)]);
+      }
+      expect(dropped1, `${id} ${colour}`).toBe(0);
+    }
+  });
+
+  it('the clear cue is a 钹 and a 大鼓', async () => {
+    const T = await load();
+    const cue = T.mirrorCue('clear');
+    expect(cue.map((e) => e.inst).sort()).toEqual(['bo', 'drum']);
+    for (const e of cue) { expect(e.t).toBe(0); expect(e.key).toBeTruthy(); expect(e.gain).toBeLessThanOrEqual(1); }
+  });
+});

@@ -94,7 +94,7 @@ export function contentDev(getEngine: () => MirrorEngine | null = engine): Conte
         if (!world.alive(h)) continue;
         const e = world.enemy(h);
         const st = bossState(w(), h);
-        out.push({ id: e.id, phase: st?.phase ?? 0, hp: e.hp / e.hpMax, enrage: st?.enrage ?? 0, running: st?.running.length ?? 0, fx: st?.fx.length ?? 0 });
+        out.push({ id: e.id, phase: st?.phase ?? world.E.phase[world.E.slotOf(h)], hp: e.hp / e.hpMax, enrage: st?.enrage ?? 0, running: st?.running.length ?? 0, fx: st?.fx.length ?? 0 });
       }
       return out;
     },

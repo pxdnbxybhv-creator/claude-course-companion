@@ -1165,8 +1165,14 @@ export interface MirrorAudio {
   sfx(name: SfxName, o?: { gain?: number; rate?: number }): void;
   /** Pickups climb 宫商角徵羽 as a combo builds. */
   pickup(combo: number): void;
-  /** Theme by phase ('mirror' / 'mirror-boss'), coloured by map; ~3 s crossfade, switch per phase only. */
+  /** Theme by phase, through the director (audio/music.ts): 'mirror-calm' for the lobby, the shop and
+   *  the results, 'mirror' for a wave (a drum fill in, a 0.3 s cut), 'mirror-boss' for a boss; the
+   *  clear plays 钹 + 大鼓 and drops to calm. Coloured by map; switches only when the phase or map changes. */
   music(phase: MusicPhase, map: MapId): void;
+  /** Optional: the engine's ≈ 8 Hz HUD feed during a wave (crowd = living capped enemies / the cap,
+   *  0..1): the wave clock builds the band's layers, danger pushes one up, the boss phase steps the
+   *  boss theme, the timer reaching 0 (or the last boss falling) plays the clear. */
+  hud?(s: HudState, crowd: number): void;
   dispose(): void;
 }
 export type CreateMirrorAudio = () => MirrorAudio;

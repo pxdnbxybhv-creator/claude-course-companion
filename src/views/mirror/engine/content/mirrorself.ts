@@ -9,7 +9,7 @@ import { COMPANIONS, ENDLESS_BOSS, SKILLS, WEAPONS } from '../../data';
 import { dmgMul } from '../../logic/formulas';
 import { core, endTele, enemyShot, expire, fxLine, liveTele, pullPlayer, pushPlayer, setAir, teleShape } from './bridge';
 import { shotSpeedX } from './field';
-import { CoRun, DEG, TAU, b, clamp, dist, hurtPlayer, playerIn, shared, toPlayer, type Co } from './util';
+import { CoRun, DEG, TAU, b, clamp, dist, hurtPlayer, playerIn, shared, teleT, toPlayer, type Co } from './util';
 
 const MELEE: ReadonlySet<WeaponKind> = new Set(['thrust', 'combo', 'sweep', 'smash', 'punch']);
 const TIER_X = [1, 1.3, 1.7, 2.2] as const;
@@ -138,7 +138,7 @@ function* mirrorSkill(s: MS, char: CharacterId): Co {
       }
       const shape: TeleShape = { kind: 'line', x: e.x, y: e.y, dir, len: 520, w: 60 };
       tele(s, shape, 0.7);
-      yield 0.7;
+      yield teleT(s.w, 0.7);
       if (playerIn(s.w, shape)) hurtMe(s, S(s));
       s.busy++;
       try {
@@ -166,17 +166,17 @@ function* mirrorSkill(s: MS, char: CharacterId): Co {
     case 'player': {
       const at = P(), shape: TeleShape = { kind: 'circle', x: at.x, y: at.y, r: 200 };
       tele(s, shape, 1.2, (w) => { w.fx('shockRing', at.x, at.y, { r: 120, life: 0.35 }); if (playerIn(w, shape)) hurtMe(s, S(s, 1.2)); });
-      for (let t = 0; t < 1.2; t += s.w.dt) {
-        const R = 220 * (1 - 0.5 * t / 1.2);
+      for (let t = 0, T = teleT(s.w, 1.2); t < T; t += s.w.dt) {
+        const R = 220 * (1 - 0.5 * t / T);
         if (Math.floor(t / s.w.dt) % 2 === 0) for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU + t; s.w.fx(k % 2 ? 'stoneWhite' : 'stoneBlack', at.x + Math.cos(a) * R, at.y + Math.sin(a) * R, { r: 40, life: s.w.dt * 2.2 }); }
         yield 0;
       }
       return;
     }
     case 'cat': case 'change': {
-      const to = P(), r = char === 'cat' ? 90 : 220, air = char === 'cat' ? 0.7 : 1.4;
+      const to = P(), r = char === 'cat' ? 90 : 220, air0 = char === 'cat' ? 0.7 : 1.4, air = teleT(s.w, air0);
       const shape: TeleShape = { kind: 'circle', x: to.x, y: to.y, r };
-      tele(s, shape, air, (w) => {
+      tele(s, shape, air0, (w) => {
         w.fx('shockRing', to.x, to.y, { r, life: 0.35 }); w.shake(3);
         if (playerIn(w, shape)) hurtMe(s, S(s, char === 'cat' ? 0.8 : 1));
         if (char === 'change') w.zone({ side: 'enemy', look: 'moonPool', x: to.x, y: to.y, r, life: 5, slow: 20 });
@@ -197,7 +197,7 @@ function* mirrorSkill(s: MS, char: CharacterId): Co {
       for (let k = 0; k < 3; k++) {
         const e = me(), shape: TeleShape = { kind: 'circle', x: e.x, y: e.y, r: 150 };
         tele(s, shape, 0.5, (w) => { w.fx('shockRing', shape.x, shape.y, { r: 150, life: 0.3 }); if (playerIn(w, shape)) hurtMe(s, S(s, 0.5)); });
-        yield 0.55;
+        yield teleT(s.w, 0.5) + 0.05;
       }
       const e = me();
       e.hp = Math.min(e.hpMax, e.hp + e.hpMax * 0.05);

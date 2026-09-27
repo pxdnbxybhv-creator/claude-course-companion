@@ -4,7 +4,7 @@
 //   melee hit 木鱼 · shot hit bamboo flick · talisman small bell · summon 古琴 · crit 磬 · pickup 泛音 on
 //   宫商角徵羽 · 铜钱 「叮」 on 宫 · level-up 磬 · boss 锣 · 照破 bowl · the mirror cracking.
 // Every pitched voice sits on the app's 宫 F, so a chime never lands a semitone off the music.
-import { addMode, addNoiseBurst, bandpass, clamp, fadeTail, filter, highpass, lowpass, peakOf, renderBell, renderDrop, renderHarmonic, renderKnock, renderQin, scale, TAU } from '../../../audio/dsp';
+import { addMode, addNoiseBurst, bandpass, clamp, fadeTail, filter, highpass, lowpass, peakOf, peaking, renderBell, renderDrop, renderHarmonic, renderKnock, renderQin, scale, TAU } from '../../../audio/dsp';
 import { renderBo, renderDrum, renderGong, renderLing, renderPlucks } from '../../../audio/music-dsp';
 import { makeRng } from '../../../core/rng';
 import type { SfxName } from '../types';
@@ -43,11 +43,298 @@ function clink(sr: number, f: number, seed: number, dur = 0.35): Float32Array {
   return fadeTail(norm(out, 0.8), sr, 0.06);
 }
 
+// ─────────────────────────────────────────────────────────────── impact voices (打击感)
+// The hit layer the engine's feel bus plays in sync with the impact frame: a body (a pitch-dropping
+// sine: the thump you feel), a transient (noise or a struck mode: the crack you hear) and a class
+// colour (bamboo, bronze, jade, wine, ink, stone). Short, dry and loud-ish; the limiter and the
+// bus's per-frame cap keep a screen of hits from turning into mush.
+
+/** A sine whose pitch falls from f0 to f1 (time constant tf) under an exponential decay (ta). */
+function sweep(out: Float32Array, sr: number, f0: number, f1: number, tf: number, amp: number, ta: number, at = 0): void {
+  const n = Math.min(out.length - at, Math.ceil(ta * 7 * sr));
+  let ph = 0;
+  for (let i = 0; i < n; i++) {
+    const t = i / sr;
+    const f = f1 + (f0 - f1) * Math.exp(-t / tf);
+    ph += (TAU * f) / sr;
+    out[at + i] += Math.sin(ph) * amp * Math.exp(-t / ta) * Math.min(1, i / (0.0006 * sr));
+  }
+}
+/** Noise that swells and fades (sin² envelope) over dur: swishes and whooshes. */
+function swell(out: Float32Array, sr: number, rng: () => number, amp: number, dur: number, at = 0, peakAt = 0.5): void {
+  const n = Math.min(out.length - at, Math.ceil(dur * sr));
+  for (let i = 0; i < n; i++) {
+    const u = i / n;
+    const e = u < peakAt ? Math.sin((u / peakAt) * Math.PI / 2) : Math.cos(((u - peakAt) / (1 - peakAt)) * Math.PI / 2);
+    out[at + i] += (rng() * 2 - 1) * e * e * amp;
+  }
+}
+function soft(x: Float32Array, drive: number): Float32Array {
+  for (let i = 0; i < x.length; i++) x[i] = Math.tanh(x[i] * drive);
+  return x;
+}
+
+/** The impact voices (not in the contract's SfxName: MirrorSound.feel plays them). */
+export type FeelVoice =
+  | 'thump' | 'crack' | 'slash' | 'smash' | 'arrow' | 'dartHit' | 'spark' | 'splash' | 'blot' | 'jade' | 'clack' | 'pluckHit'
+  | 'moonHit' | 'clawHit' | 'pop' | 'popBig' | 'grunt' | 'whoosh' | 'release' | 'zip' | 'heart' | 'skillHit';
+export const FEEL_NAMES: readonly FeelVoice[] = [
+  'thump', 'crack', 'slash', 'smash', 'arrow', 'dartHit', 'spark', 'splash', 'blot', 'jade', 'clack', 'pluckHit',
+  'moonHit', 'clawHit', 'pop', 'popBig', 'grunt', 'whoosh', 'release', 'zip', 'heart', 'skillHit',
+];
+
+/** Render one impact voice (mono). Deterministic for a given (name, sr). */
+export function renderFeel(name: FeelVoice, sr: number): Chans {
+  const rng = makeRng(0x7e11 + name.length * 97 + name.charCodeAt(0) * 7 + name.charCodeAt(name.length - 1));
+  const buf = (sec: number) => new Float32Array(Math.ceil(sec * sr));
+  switch (name) {
+    case 'thump': {
+      // the body under crits and heavy hits: a kick-drum drop 150 → 48 Hz, a padded click
+      const out = buf(0.32);
+      sweep(out, sr, 150, 48, 0.03, 1, 0.075);
+      sweep(out, sr, 95, 40, 0.05, 0.5, 0.12);
+      addNoiseBurst(out, sr, rng, 0.5, 0.003, [lowpass(sr, 2200, 0.7)]);
+      soft(out, 1.6);
+      return mono(fadeTail(norm(out, 0.9), sr, 0.06));
+    }
+    case 'crack': {
+      // the crit: a whip-crack transient, a bright struck edge and a short bronze ring
+      const out = buf(0.3);
+      addNoiseBurst(out, sr, rng, 1, 0.0025, [highpass(sr, 1800), peaking(sr, 4200, 1.2, 6)]);
+      addNoiseBurst(out, sr, rng, 0.5, 0.012, [bandpass(sr, 2600, 1.4)], Math.round(0.002 * sr));
+      addMode(out, sr, 3120, 0.45, 0.09, 0, 0.3, 0.0002);
+      addMode(out, sr, 4870, 0.25, 0.05, 0, 1.1, 0.0002);
+      addMode(out, sr, gongHz(12), 0.2, 0.18, Math.round(0.004 * sr), 0, 0.0005);
+      sweep(out, sr, 260, 90, 0.015, 0.45, 0.03);
+      return mono(fadeTail(norm(out, 0.85), sr, 0.08));
+    }
+    case 'slash': {
+      // a blade biting: a fast swish into a cut, a thin steel ring, a little meat of a thud
+      const out = buf(0.3);
+      swell(out, sr, rng, 0.55, 0.05, 0, 0.8);
+      filter(out, bandpass(sr, 3200, 0.9));
+      addNoiseBurst(out, sr, rng, 0.9, 0.006, [highpass(sr, 1500), bandpass(sr, 5200, 1)], Math.round(0.035 * sr));
+      addMode(out, sr, 2480, 0.3, 0.12, Math.round(0.035 * sr), 0, 0.0003);
+      addMode(out, sr, 3770, 0.18, 0.07, Math.round(0.035 * sr), 1, 0.0003);
+      sweep(out, sr, 190, 80, 0.02, 0.7, 0.045, Math.round(0.035 * sr));
+      return mono(fadeTail(norm(out, 0.8), sr, 0.06));
+    }
+    case 'smash': {
+      // a heavy blow: a deep drop, crunch of wood and stone, dust
+      const out = buf(0.5);
+      sweep(out, sr, 120, 36, 0.045, 1, 0.13);
+      addNoiseBurst(out, sr, rng, 0.9, 0.02, [lowpass(sr, 1100, 0.8), highpass(sr, 90)]);
+      addNoiseBurst(out, sr, rng, 0.5, 0.004, [bandpass(sr, 1900, 1.1)]);
+      const k = renderKnock(sr, 17, 1);
+      mixInto(out, k.subarray(0, Math.min(k.length, Math.ceil(0.15 * sr))), 0, 0.35);
+      soft(out, 1.8);
+      return mono(fadeTail(norm(out, 0.9), sr, 0.1));
+    }
+    case 'arrow': {
+      // an arrow sinking in: a hollow bamboo thock, a fibre snap and a small thud
+      const out = buf(0.22);
+      addMode(out, sr, 820, 1, 0.045, 0, 0, 0.0003);
+      addMode(out, sr, 1930, 0.4, 0.025, 0, 1, 0.0003);
+      addNoiseBurst(out, sr, rng, 0.8, 0.003, [bandpass(sr, 3600, 1.2)]);
+      sweep(out, sr, 170, 85, 0.02, 0.55, 0.04);
+      return mono(fadeTail(norm(out, 0.7), sr, 0.04));
+    }
+    case 'dartHit': {
+      // steel on hide: a bright tink and a tick
+      const out = buf(0.2);
+      addMode(out, sr, 3520, 0.8, 0.06, 0, 0, 0.0002);
+      addMode(out, sr, 5310, 0.35, 0.035, 0, 1, 0.0002);
+      addNoiseBurst(out, sr, rng, 0.7, 0.0025, [highpass(sr, 2500)]);
+      sweep(out, sr, 210, 110, 0.015, 0.4, 0.03);
+      return mono(fadeTail(norm(out, 0.65), sr, 0.04));
+    }
+    case 'spark': {
+      // talisman fire: a crackle of little discharges over a falling zap
+      const out = buf(0.26);
+      for (let i = 0; i < 7; i++) addNoiseBurst(out, sr, rng, 0.9 - i * 0.09, 0.0012, [highpass(sr, 2200)], Math.round((i * 0.011 + rng() * 0.006) * sr));
+      let ph = 0;
+      const n = Math.ceil(0.09 * sr);
+      for (let i = 0; i < n; i++) { const t = i / sr; ph += (TAU * (1900 * Math.exp(-t / 0.03) + 500)) / sr; out[i] += (Math.sin(ph) > 0 ? 0.35 : -0.35) * Math.exp(-t / 0.025); }
+      filter(out, lowpass(sr, 7000));
+      return mono(fadeTail(norm(out, 0.62), sr, 0.05));
+    }
+    case 'splash': {
+      // wine: a wet slap and two drops
+      const out = buf(0.3);
+      addNoiseBurst(out, sr, rng, 1, 0.012, [lowpass(sr, 2400), highpass(sr, 200)]);
+      mixInto(out, renderDrop(sr, 700, 18, 0.018, 3), Math.round(0.02 * sr), 0.45);
+      mixInto(out, renderDrop(sr, 980, 14, 0.014, 4), Math.round(0.055 * sr), 0.3);
+      sweep(out, sr, 160, 90, 0.02, 0.4, 0.04);
+      return mono(fadeTail(norm(out, 0.65), sr, 0.06));
+    }
+    case 'blot': {
+      // ink landing: a soft, wet, low thud
+      const out = buf(0.26);
+      sweep(out, sr, 180, 70, 0.03, 1, 0.06);
+      addNoiseBurst(out, sr, rng, 0.6, 0.014, [lowpass(sr, 900), highpass(sr, 120)]);
+      return mono(fadeTail(norm(out, 0.62), sr, 0.06));
+    }
+    case 'jade': {
+      // a flying sword's edge: glassy inharmonic tink, a hiss
+      const out = buf(0.35);
+      addMode(out, sr, 2890, 0.8, 0.16, 0, 0, 0.0002);
+      addMode(out, sr, 4710, 0.45, 0.09, 0, 1, 0.0002);
+      addMode(out, sr, 7020, 0.2, 0.04, 0, 2, 0.0002);
+      addNoiseBurst(out, sr, rng, 0.5, 0.004, [highpass(sr, 4000)]);
+      sweep(out, sr, 200, 100, 0.015, 0.35, 0.03);
+      return mono(fadeTail(norm(out, 0.62), sr, 0.08));
+    }
+    case 'clack': {
+      // go stones: two quick hard clacks (Yunzi on the board)
+      const out = buf(0.22);
+      for (const [at, f, a] of [[0, 1480, 1], [0.028, 2130, 0.6]] as const) {
+        addMode(out, sr, f, a, 0.03, Math.round(at * sr), 0, 0.0002);
+        addMode(out, sr, f * 2.31, a * 0.4, 0.018, Math.round(at * sr), 1, 0.0002);
+        addNoiseBurst(out, sr, rng, a * 0.6, 0.0015, [highpass(sr, 3000)], Math.round(at * sr));
+      }
+      return mono(fadeTail(norm(out, 0.7), sr, 0.04));
+    }
+    case 'pluckHit': {
+      // a qin wave landing: a muted string slap on 宫
+      const out = buf(0.3);
+      addMode(out, sr, gongHz(0) / 2, 1, 0.09, 0, 0, 0.0004);
+      addMode(out, sr, gongHz(0), 0.45, 0.06, 0, 1, 0.0004);
+      addNoiseBurst(out, sr, rng, 0.5, 0.004, [bandpass(sr, 1400, 1)]);
+      sweep(out, sr, 150, 80, 0.02, 0.4, 0.04);
+      return mono(fadeTail(norm(out, 0.62), sr, 0.06));
+    }
+    case 'moonHit': {
+      // moonlight: a cool bell-glass tap on 徵
+      const out = buf(0.4);
+      addMode(out, sr, gongHz(8), 0.8, 0.2, 0, 0, 0.0003);
+      addMode(out, sr, gongHz(8) * 2.76, 0.3, 0.08, 0, 1, 0.0003);
+      addNoiseBurst(out, sr, rng, 0.4, 0.003, [highpass(sr, 3500)]);
+      sweep(out, sr, 170, 90, 0.02, 0.35, 0.03);
+      return mono(fadeTail(norm(out, 0.55), sr, 0.1));
+    }
+    case 'clawHit': {
+      // three quick rakes
+      const out = buf(0.24);
+      for (let k = 0; k < 3; k++) addNoiseBurst(out, sr, rng, 0.9 - k * 0.15, 0.007, [bandpass(sr, 2600 + k * 500, 1.3)], Math.round(k * 0.024 * sr));
+      sweep(out, sr, 190, 90, 0.02, 0.6, 0.04);
+      return mono(fadeTail(norm(out, 0.68), sr, 0.05));
+    }
+    case 'pop': {
+      // a kill: a crisp, round pop and a puff of ink
+      const out = buf(0.2);
+      sweep(out, sr, 520, 130, 0.012, 1, 0.03);
+      addNoiseBurst(out, sr, rng, 0.8, 0.0035, [bandpass(sr, 2400, 0.9)]);
+      addNoiseBurst(out, sr, rng, 0.35, 0.02, [lowpass(sr, 1500), highpass(sr, 200)], Math.round(0.008 * sr));
+      return mono(fadeTail(norm(out, 0.7), sr, 0.05));
+    }
+    case 'popBig': {
+      // an elite (or a boss) bursting: a deep pop, a wet splash, a stone-chime tail on 宫
+      const out = buf(1.1);
+      sweep(out, sr, 300, 55, 0.03, 1, 0.1);
+      addNoiseBurst(out, sr, rng, 0.9, 0.03, [lowpass(sr, 2000), highpass(sr, 120)]);
+      addNoiseBurst(out, sr, rng, 0.6, 0.004, [bandpass(sr, 2400, 1)]);
+      mixInto(out, qing(sr, gongHz(5), 0.9, 77), Math.round(0.02 * sr), 0.35);
+      soft(out, 1.5);
+      return mono(fadeTail(norm(out, 0.85), sr, 0.25));
+    }
+    case 'grunt': {
+      // you are hit: a body blow and a short, throaty buzz (a clenched 「嗯」)
+      const out = buf(0.36);
+      sweep(out, sr, 110, 45, 0.04, 1, 0.1);
+      const n = Math.ceil(0.12 * sr);
+      const v = new Float32Array(n);
+      let ph = 0;
+      for (let i = 0; i < n; i++) { const t = i / sr; ph += (TAU * (150 - 50 * t / 0.12)) / sr; const saw = (ph / TAU) % 1 * 2 - 1; v[i] = saw * Math.sin(Math.PI * Math.min(1, t / 0.12)) ** 0.6; }
+      filter(v, bandpass(sr, 620, 2.2)); filter(v, bandpass(sr, 1100, 1.2));
+      mixInto(out, norm(v, 1), Math.round(0.01 * sr), 0.45);
+      addNoiseBurst(out, sr, rng, 0.5, 0.006, [lowpass(sr, 1400)]);
+      soft(out, 1.4);
+      return mono(fadeTail(norm(out, 0.85), sr, 0.08));
+    }
+    case 'whoosh': {
+      // a melee swing cutting the air (plays at the swing, under the impact)
+      const out = buf(0.14);
+      swell(out, sr, rng, 1, 0.13, 0, 0.35);
+      filter(out, bandpass(sr, 1100, 0.7)); filter(out, highpass(sr, 400));
+      return mono(fadeTail(norm(out, 0.4), sr, 0.03));
+    }
+    case 'release': {
+      // a shot leaving: a string twang or a flick of the wrist, quiet
+      const out = buf(0.14);
+      addMode(out, sr, 330, 0.8, 0.05, 0, 0, 0.0003);
+      addMode(out, sr, 990, 0.3, 0.03, 0, 1, 0.0003);
+      addNoiseBurst(out, sr, rng, 0.5, 0.004, [bandpass(sr, 2400, 1)]);
+      return mono(fadeTail(norm(out, 0.4), sr, 0.03));
+    }
+    case 'zip': {
+      // 月华 streaming in: a rising airy zip with a glint at the end
+      const out = buf(0.22);
+      const n = Math.ceil(0.16 * sr);
+      const z = new Float32Array(n);
+      swell(z, sr, rng, 1, 0.16, 0, 0.75);
+      filter(z, bandpass(sr, 2600, 1.2)); filter(z, highpass(sr, 1200));
+      mixInto(out, z, 0, 0.8);
+      addMode(out, sr, gongHz(15), 0.35, 0.05, Math.round(0.14 * sr), 0, 0.0005);
+      return mono(fadeTail(norm(out, 0.4), sr, 0.04));
+    }
+    case 'heart': {
+      // low HP: a soft lub-dub under everything
+      const out = buf(0.5);
+      sweep(out, sr, 75, 42, 0.03, 1, 0.07);
+      sweep(out, sr, 70, 40, 0.03, 0.65, 0.06, Math.round(0.17 * sr));
+      filter(out, lowpass(sr, 300));
+      return mono(fadeTail(norm(out, 0.6), sr, 0.08));
+    }
+    case 'skillHit': {
+      // the 镜技 landing: a big low boom, a brush-slap and a bronze shimmer
+      const out = buf(1);
+      sweep(out, sr, 130, 38, 0.06, 1, 0.18);
+      addNoiseBurst(out, sr, rng, 0.8, 0.03, [lowpass(sr, 1600), highpass(sr, 70)]);
+      addNoiseBurst(out, sr, rng, 0.6, 0.004, [bandpass(sr, 3000, 1)]);
+      mixInto(out, qing(sr, gongHz(3), 0.8, 88), Math.round(0.015 * sr), 0.3);
+      soft(out, 1.6);
+      return mono(fadeTail(norm(out, 0.9), sr, 0.2));
+    }
+  }
+}
+
+/** Mixing of the impact voices (the same limiter as the contract's voices). */
+export const FEEL_MIX: Record<FeelVoice, SfxMix> = {
+  thump: { gain: 0.7, send: 0.03, cap: 1 },
+  crack: { gain: 0.42, send: 0.1, cap: 1 },
+  slash: { gain: 0.5, send: 0.05, cap: 2, spam: true },
+  smash: { gain: 0.62, send: 0.06, cap: 1, spam: true },
+  arrow: { gain: 0.45, send: 0.04, cap: 2, spam: true },
+  dartHit: { gain: 0.34, send: 0.05, cap: 2, spam: true },
+  spark: { gain: 0.36, send: 0.08, cap: 2, spam: true },
+  splash: { gain: 0.42, send: 0.06, cap: 2, spam: true },
+  blot: { gain: 0.45, send: 0.05, cap: 2, spam: true },
+  jade: { gain: 0.34, send: 0.12, cap: 2, spam: true },
+  clack: { gain: 0.45, send: 0.08, cap: 2, spam: true },
+  pluckHit: { gain: 0.4, send: 0.12, cap: 1, spam: true, pitched: true },
+  moonHit: { gain: 0.36, send: 0.15, cap: 1, spam: true, pitched: true },
+  clawHit: { gain: 0.45, send: 0.04, cap: 2, spam: true },
+  pop: { gain: 0.5, send: 0.05, cap: 2, spam: true },
+  popBig: { gain: 0.8, send: 0.2, cap: 1, duck: 0.6 },
+  grunt: { gain: 0.75, send: 0.04, cap: 1 },
+  whoosh: { gain: 0.22, send: 0.04, cap: 1, spam: true },
+  release: { gain: 0.2, send: 0.04, cap: 1, spam: true },
+  zip: { gain: 0.26, send: 0.1, cap: 1 },
+  heart: { gain: 0.55, send: 0.02, cap: 1 },
+  skillHit: { gain: 0.85, send: 0.2, cap: 1, duck: 0.5 },
+};
+
 /** Render one voice (channels; mono or stereo). Deterministic for a given (name, sr). */
 export function renderVoice(name: SfxName, sr: number): Chans {
   const rng = makeRng(0x6d31 + name.length * 131 + name.charCodeAt(0));
   switch (name) {
-    case 'hitMelee': return mono(norm(renderKnock(sr, 5, 0.75), 0.7));
+    case 'hitMelee': {
+      // 木鱼 with a body under it: the woodblock tok over a short kick
+      const out = new Float32Array(Math.ceil(0.4 * sr));
+      mixInto(out, renderKnock(sr, 5, 0.9), 0, 0.75);
+      sweep(out, sr, 150, 60, 0.025, 0.7, 0.06);
+      return mono(fadeTail(norm(out, 0.78), sr, 0.08));
+    }
     case 'hitShot': {
       // a bamboo flick: a hollow tick and a dry fibre snap
       const out = new Float32Array(Math.ceil(0.14 * sr));
@@ -105,11 +392,11 @@ export function renderVoice(name: SfxName, sr: number): Chans {
       return mono(norm(out, 0.35));
     }
     case 'kill': {
-      // ink bursting into the paper: a soft puff over a low pop
+      // ink bursting into the paper: a crisp pop over a puff
       const out = new Float32Array(Math.ceil(0.3 * sr));
-      addMode(out, sr, 150, 1, 0.09, 0, 0, 0.001);
-      addNoiseBurst(out, sr, rng, 1.2, 0.02, [lowpass(sr, 1800, 0.7), highpass(sr, 200)]);
-      return mono(fadeTail(norm(out, 0.5), sr, 0.08));
+      sweep(out, sr, 480, 120, 0.012, 1, 0.035);
+      addNoiseBurst(out, sr, rng, 0.9, 0.018, [lowpass(sr, 1800, 0.7), highpass(sr, 200)]);
+      return mono(fadeTail(norm(out, 0.6), sr, 0.08));
     }
     case 'bossDrum': {
       // the entrance: a drum roll that swells into one big stroke (≈1.5 s)

@@ -91,6 +91,12 @@ export function setHp(w: WorldApi, h: number, hp: number, max = hp): void {
   const E = core(w).E;
   E.hp[i] = hp; E.hpMax[i] = max;
 }
+/** A splitter's child (the core never splits it again; 碎镜 must not either). */
+export function isChild(w: WorldApi, h: number): boolean { const i = slot(w, h); return i >= 0 && core(w).E.child[i] === 1; }
+/** Mark body h as a splitter's child, so the core's splitter never splits it on death. */
+export function markChild(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.child[i] = 1; }
+/** 夔 drives its own beat tick (on its stomps' tempo) instead of the core's 2 Hz one. */
+export function setBossBeat(w: WorldApi, on: boolean): void { core(w).bossBeat = on; }
 export function setNoDrops(w: WorldApi, h: number): void { const i = slot(w, h); if (i >= 0) core(w).E.noDrops[i] = 1; }
 /** A body leaves without being killed: no tallies, drops or kill events. */
 export function expire(w: WorldApi, h: number, look: FxName = 'inkBurst'): void {

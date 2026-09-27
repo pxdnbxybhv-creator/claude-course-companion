@@ -13,12 +13,12 @@ import { dmgMul, dmx, hpMul } from '../../logic/formulas';
 import {
   core, eatMoon, endShot, endTele, enemyShot, expire, fxLine, fxSprite, lightNow, liveTele, moveInput, moveShot, moveZone,
   pullPlayer, reduceMotion, setAir, setActor, setKind, setLook, setMoveInput, setResist, shotIs, sky, slowPlayer, tagShot,
-  teleFill, teleShape, dropMoon, dropGold, setHp,
+  teleFill, teleShape, dropMoon, dropGold, setHp, setBossBeat,
 } from './bridge';
 import { shotSpeedX } from './field';
 import {
   CoRun, DEG, TAU, b, clamp, dist, homeOf, hurtPlayer, inGap, openPoint, playerIn, rayToWall, reflect, rimR,
-  shared, swarmOf, toPlayer, type Co,
+  FOREVER, shared, swarmOf, teleT, toPlayer, type Co,
 } from './util';
 
 // ═════════════════════════════════════════════ state
@@ -49,7 +49,8 @@ export interface BossState {
   anchor: Vec;
   rimA: number;
   rimDir: number;
-  shadow: number;
+  /** 蜃, 九尾狐, 水中月: the true body's shadow (decoys cast none). */
+  shadow: number[];
   /** 金蟾王: 月华 eaten. */
   eaten: number;
   /** 九尾狐: tails left. */
@@ -59,9 +60,12 @@ export interface BossState {
   crackT: number;
   beatN: number;
   gapA: number;
-  /** 吴刚: the tree bodies (the central 桂树, then the saplings). */
+  /** 吴刚: the tree bodies (the central 桂树, then the saplings), and the central one's handle. */
   trees: number[];
+  central: number;
   felled: boolean;
+  /** 夔: a drum-crack watcher is running. */
+  crackWatch: boolean;
   /** Decoys this boss raised (mirages, illusions, reflections). */
   phantoms: number[];
   /** The charm glyph's reversal is ours to undo. */
@@ -83,6 +87,8 @@ export interface PatCtx {
 }
 
 const enrageX = (st: BossState) => 1 + 0.1 * st.enrage;
+/** The call's telegraph as the core will draw it (闲游 stretches every telegraph by teleX). */
+const TL = (c: PatCtx, d = c.call.tele) => teleT(c.w, d);
 const growX = (st: BossState) => 1 + (BOSSES.goldtoad.p.dmgPer10 ?? 0.01) * Math.floor(st.eaten / 10);
 /** A pattern hit's final damage: home-wave number → this wave, enrage and growth. */
 function dmgOf(c: PatCtx, k = 1): number {
@@ -177,17 +183,18 @@ interface Phantom {
   owner: number; kind: 'mirage' | 'illusion' | 'reflection' | 'monkey' | 'tree';
   hits: number; maxHits: number; life: number; t: number; attack: number; k: number; a: number;
   moon: number; call: PatternCall | null; tree: boolean; felled: boolean; lastRipple: number;
+  /** Where a tree stands (trees never move: no vortex, net or knockback drags them). */
+  x0: number; y0: number;
 }
 const PHANTOM: ActorImpl<Phantom> = {
-  init() { return { owner: -1, kind: 'mirage', hits: 0, maxHits: 3, life: 1e9, t: 0, attack: 0, k: 1, a: 0, moon: -1, call: null, tree: false, felled: false, lastRipple: -9 }; },
+  init(w, h) { const e = w.enemy(h); return { owner: -1, kind: 'mirage', hits: 0, maxHits: 3, life: 1e9, t: 0, attack: 0, k: 1, a: 0, moon: -1, call: null, tree: false, felled: false, lastRipple: -9, x0: e.x, y0: e.y }; },
   tick(w, h, s, dt) {
     const e = w.enemy(h);
     s.t += dt; s.life -= dt;
     const ownerAlive = w.alive(s.owner);
     if (!ownerAlive || s.life <= 0 || (s.maxHits > 0 && s.hits >= s.maxHits) || s.felled) { popPhantom(w, h, s); return; }
-    if (s.tree) { e.vx = 0; e.vy = 0; return; }
+    if (s.tree) { e.vx = 0; e.vy = 0; e.x = s.x0; e.y = s.y0; return; }
     const o = w.enemy(s.owner);
-    if (s.moon >= 0 && Math.floor(s.t * 4) !== Math.floor((s.t - dt) * 4)) { const v = w.enemy(h); moonMark(w, v.x, v.y - v.r - 34, s.moon); }
     // mirror the true body's HP (so "strongest" targeting can't tell them apart)
     if (s.kind !== 'monkey') { const ohp = o.hp; const view = w.enemy(h); view.hp = Math.max(1, ohp); }
     if (s.kind === 'monkey') return; // the chain pattern places them
@@ -290,19 +297,11 @@ function phantomVolley(w: WorldApi, h: number, st: BossState, s: Phantom): void 
   });
 }
 /**
- * A moon-phase marker above a body: a pale moon ring, and an ink shadow eating it from the side the
- * phase is dark on (0 full … 4 new; 1–3 waning, dark on the right; 5–7 waxing, dark on the left).
+ * 水中月's second-phase look wearing moon phase k (0 full … 4 new; 1–3 waning, dark on the right;
+ * 5–7 waxing, dark on the left). An id beyond the contract's AtlasId (CHANGE REQUEST); the painter
+ * bakes these with the boss and falls back to the plain phase look.
  */
-function moonMark(w: WorldApi, x: number, y: number, phase: number): void {
-  const p = ((phase % 8) + 8) % 8;
-  const lit = (1 + Math.cos((p / 8) * TAU)) / 2;
-  const R = 30;
-  w.fx('moonCircle', x, y, { r: R, life: 0.3 });
-  w.fx('levelRing', x, y, { r: R / 0.4, life: 0.3 });
-  if (lit > 0.97) return;
-  const side = p >= 1 && p <= 3 ? 1 : -1;
-  w.fx('inkBurst', x + side * 2 * R * lit, y, { r: (32 * R * 1.1) / 20, life: 0.3 });
-}
+const moonLook = (k: number) => `boss:moonwater:1:m${((k % 8) + 8) % 8}`;
 
 // ═════════════════════════════════════════════ 吴刚's trees
 
@@ -318,6 +317,7 @@ function spawnTree(c: PatCtx, x: number, y: number, central: boolean): number {
   setAir(w, h, true);
   setHp(w, h, treeHp(w) * (central ? 1 : 0.5));
   c.st.trees.push(h);
+  if (central) c.st.central = h;
   return h;
 }
 /** A tree falls: the central one stuns 吴刚 4 s and stops his healing; a sapling splits the arena in a line. */
@@ -326,7 +326,8 @@ function treeFell(w: WorldApi, st: BossState, h: number, x: number, y: number): 
   w.fx('petalBurst', x, y, { r: 120, life: 0.7 });
   w.sfx('shatter');
   w.shake(4);
-  if (Math.hypot(x, y) < 40) {
+  if (h === st.central) {
+    st.central = -1;
     st.felled = true;
     st.stunT = BOSSES.wugang.p.felledStun ?? 4;
     endAll(w, st);
@@ -346,6 +347,22 @@ function treeFell(w: WorldApi, st: BossState, h: number, x: number, y: number): 
     if (playerIn(ww, shape)) hurt(c);
     ww.shake(4); ww.sfx('bossDrum');
   } });
+}
+
+/** 夔's drum-hide: after 8 stomps it cracks and 夔 takes ×2 for 4 s. */
+function* crackWatch(c: PatCtx, st: BossState, p: Readonly<Record<string, number>>): Co {
+  while (true) {
+    if (st.stomps >= (p.stomps ?? 8) && st.crackT <= 0) {
+      st.stomps = 0;
+      st.crackT = p.dur ?? 4;
+      c.w.status(c.h, 'vuln', st.crackT, ((p.x ?? 2) - 1) * 100);
+      const e = c.w.enemy(c.h);
+      c.w.fx('inkBurst', e.x, e.y, { r: 90, life: 0.5 }); c.w.fx('shockRing', e.x, e.y, { r: 140, life: 0.4 });
+      c.w.title(b('鼓裂 · 伤害 ×2', 'The drum cracks · ×2 damage'), 'edge');
+      c.w.sfx('shatter');
+    }
+    yield 0.1;
+  }
 }
 
 // ═════════════════════════════════════════════ the pattern library
@@ -377,7 +394,7 @@ const PATS: Record<BossPatternId, PatFn> = {
         w.sfx('hitMelee'); w.shake(3);
         if (playerIn(w, shape)) hurt(c);
       });
-      yield* pause(c, c.call.tele + 0.15);
+      yield* pause(c, TL(c) + 0.15);
     })());
   },
   *leapSplash(c) {
@@ -394,7 +411,7 @@ const PATS: Record<BossPatternId, PatFn> = {
           if (playerIn(w, shape)) hurt(c);
         });
         tele(c, { kind: 'circle', x: to.x, y: to.y, r: 1 }, c.call.tele + 0.3, () => waveRing(c, to.x, to.y, c.p.ringSpeed, 760, gaps, 1, 24));
-        yield* hop(c, to, c.call.tele);
+        yield* hop(c, to, TL(c));
         yield* pause(c, 0.4);
       }
     })());
@@ -402,7 +419,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   *gapRing(c) {
     const e = c.w.enemy(c.h), gaps = gapsAt([c.w.rng() * TAU], c.p.gap ?? 40);
     if (c.call.tele > 0) tele(c, { kind: 'ring', x: e.x, y: e.y, r: e.r, r2: e.r + 36, gaps }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const v = c.w.enemy(c.h);
     waveRing(c, v.x, v.y, c.p.ringSpeed ?? 300, 800, gaps);
   },
@@ -414,7 +431,7 @@ const PATS: Record<BossPatternId, PatFn> = {
       const len = rimR(c.w) * 2.2;
       tele(c, { kind: 'cone', x: e.x, y: e.y, dir: dir0, r: Math.min(len, 900), deg: c.p.deg }, c.call.tele);
       tele(c, { kind: 'line', x: e.x, y: e.y, dir: a0, len, w: c.p.w }, c.call.tele);
-      yield* pause(c, c.call.tele);
+      yield* pause(c, TL(c));
       c.w.sfx('phaseBreak');
       for (let t = 0; t < c.p.dur; t += c.w.dt) {
         const v = c.w.enemy(c.h);
@@ -438,7 +455,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   *pearlFan(c) {
     const e = c.w.enemy(c.h), dir = toPlayer(c.w, e.x, e.y), n = c.call.n ?? 5, fan = c.p.fan ?? 60;
     tele(c, { kind: 'fan', x: e.x, y: e.y, dir, deg: fan, n }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const v = c.w.enemy(c.h);
     for (let i = 0; i < n; i++) shoot(c, 'ePearl', v.x, v.y, dir + ((i - (n - 1) / 2) * fan * DEG) / Math.max(1, n - 1), c.p.speed ?? 220, { r: 10 });
     c.w.sfx('hitShot');
@@ -451,8 +468,8 @@ const PATS: Record<BossPatternId, PatFn> = {
       const a = c.w.rng() * TAU;
       spots.push(c.w.clampToArena({ x: c.w.player.x + Math.cos(a) * 300, y: c.w.player.y + Math.sin(a) * 300 }, 70));
     }
-    for (const s of spots) c.w.fx('spawnBloom', s.x, s.y, { r: 60, life: c.call.tele });
-    yield c.call.tele;
+    for (const s of spots) c.w.fx('spawnBloom', s.x, s.y, { r: 60, life: TL(c) });
+    yield TL(c);
     let k = 0;
     for (const s of spots) phantom(c, s.x, s.y, { kind: 'mirage', maxHits: c.p.hits ?? 3, attack: c.p.attack ? 1.5 + k++ * 0.8 : 0, k: k * 2.1 });
   },
@@ -467,15 +484,15 @@ const PATS: Record<BossPatternId, PatFn> = {
     const id = liveTele(w0, { kind: 'ring', x: 0, y: 0, r: R - band / 2, r2: R + band / 2, gaps }, 0);
     // towers of mist along the wall
     const towers: number[] = [];
-    for (let k = 0; k < 14; k++) towers.push(w0.zone({ side: 'player', look: 'mirageWall', x: 0, y: 0, r: 80, life: 1e6 }));
+    for (let k = 0; k < 14; k++) towers.push(w0.zone({ side: 'player', look: 'mirageWall', x: 0, y: 0, r: 80, life: FOREVER }));
     sh.wall = { id, towers };
     let tickT = p.tick ?? 0.5;
     try {
       for (let t = 0; ; t += c.w.dt) {
         const w = c.w;
-        if (t < c.call.tele) teleFill(w, id, (t / c.call.tele) * 0.85);
+        if (t < TL(c)) teleFill(w, id, (t / TL(c)) * 0.85);
         else {
-          R = Math.max(p.to ?? 300, R0 - ((R0 - (p.to ?? 300)) * (t - c.call.tele)) / (p.dur ?? 20));
+          R = Math.max(p.to ?? 300, R0 - ((R0 - (p.to ?? 300)) * (t - TL(c))) / (p.dur ?? 20));
           gapA += (p.spin ?? 20) * DEG * w.dt;
           gaps = [{ at: gapA, w: gap }];
           const s = teleShape(w, id);
@@ -510,7 +527,7 @@ const PATS: Record<BossPatternId, PatFn> = {
     const g0 = w.rng() * TAU, g1 = g0 + Math.PI * (0.6 + 0.8 * w.rng());
     const gaps = gapsAt([g0, g1].slice(0, c.p.gaps ?? 2), c.p.gapDeg ?? 40);
     tele(c, { kind: 'ring', x: e.x, y: e.y, r: e.r, r2: e.r + 40, gaps }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const v = c.w.enemy(c.h);
     ringShots(c, 'ePearl', v.x, v.y, c.p.speed ?? 240, gaps, 8, { r: 9 });
     c.w.sfx('bell');
@@ -522,8 +539,8 @@ const PATS: Record<BossPatternId, PatFn> = {
     const a0 = w0.rng() * TAU, R = Math.min(320, rimR(w0) - 120);
     const spots: Vec[] = [];
     for (let k = 0; k < n; k++) spots.push(w0.clampToArena({ x: Math.cos(a0 + (k * TAU) / n) * R, y: Math.sin(a0 + (k * TAU) / n) * R }, 80));
-    for (const s of spots) w0.fx('rippleRing', s.x, s.y, { r: 90, life: c.call.tele });
-    yield c.call.tele;
+    for (const s of spots) w0.fx('rippleRing', s.x, s.y, { r: 90, life: TL(c) });
+    yield TL(c);
     const w = c.w;
     const trueK = Math.floor(w.rng() * n);
     const others = [0, 1, 2, 3, 4, 5, 6, 7].filter((x) => x !== tonight);
@@ -533,19 +550,21 @@ const PATS: Record<BossPatternId, PatFn> = {
     for (let k = 0; k < n; k++) {
       if (k === trueK) continue;
       const moon = others.splice(Math.floor(w.rng() * others.length), 1)[0];
-      made.push(phantom(c, spots[k].x, spots[k].y, { kind: 'reflection', maxHits: 0, life: 10, moon }));
+      made.push(phantom(c, spots[k].x, spots[k].y, { kind: 'reflection', maxHits: 0, life: 10, moon, look: moonLook(moon) }));
     }
     w.sfx('bell');
     // the true one holds still and wears tonight's moon while the split lasts
     c.st.busy++;
+    setLook(w, c.h, moonLook(tonight) as never);
     try {
       for (let t = 0; t < 10; t += c.w.dt) {
-        const v = c.w.enemy(c.h);
         faceRight(c.w, c.h, c.w.dt);
-        if (Math.floor(t * 4) !== Math.floor((t + c.w.dt) * 4)) moonMark(c.w, v.x, v.y - v.r - 34, tonight);
         yield 0;
       }
-    } finally { c.st.busy = Math.max(0, c.st.busy - 1); }
+    } finally {
+      c.st.busy = Math.max(0, c.st.busy - 1);
+      if (c.w.alive(c.h)) setLook(c.w, c.h, `boss:moonwater:${Math.min(3, c.st.phase)}` as never);
+    }
     void made;
   },
   *monkeyChain(c) {
@@ -555,7 +574,7 @@ const PATS: Record<BossPatternId, PatFn> = {
     const dir = Math.atan2(to.y - top.y, to.x - top.x), len = dist(top.x, top.y, to.x, to.y) + 80;
     const shape: TeleShape = { kind: 'line', x: top.x, y: top.y, dir, len, w: 44 };
     tele(c, shape, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const mk: number[] = [];
     for (let k = 0; k < n; k++) mk.push(phantom(c, top.x, top.y, { kind: 'monkey', maxHits: 0, look: 'mon:drowned', r: 16, untargetable: true }));
     let head = 0, grabbed = false, back = false;
@@ -592,7 +611,7 @@ const PATS: Record<BossPatternId, PatFn> = {
       spots.push({ x: e.x + Math.cos(a) * 130, y: e.y + Math.sin(a) * 130 });
       tele(c, { kind: 'circle', x: spots[k].x, y: spots[k].y, r: 22 }, c.call.tele);
     }
-    yield c.call.tele;
+    yield TL(c);
     for (const s of spots) shoot(c, 'eMoonShard', s.x, s.y, toPlayer(c.w, s.x, s.y), c.p.speed ?? 200, { r: 9, homing: c.p.homing ?? 0.8, life: 6 });
   },
   // ───────────── 夔
@@ -604,15 +623,22 @@ const PATS: Record<BossPatternId, PatFn> = {
     if (p.syncopate && st.beatN % 4 === 0) return;
     const doubled = !!p.syncopate && st.beatN % 4 === 2;
     for (let k = 0; k < (doubled ? 2 : 1); k++) {
+      const tl = k ? c.call.tele / 2 : c.call.tele;
+      // the stomp lands on 夔's own beat (the tick special() plays): after a phase break, or on
+      // 闲游's longer telegraphs, wait for the next beat so the drum and the ring agree
+      if (!k) {
+        const land = st.fightT + TL(c, tl), P = beatOf(st);
+        const wait = Math.ceil((land - 0.05) / P) * P - land;
+        if (wait > 0.02) yield wait;
+      }
       const w = c.w, e = w.enemy(c.h);
       let angles: number[];
       if (p.gaps === 2) { st.gapA += 45 * DEG; angles = [st.gapA, st.gapA + Math.PI]; }
       // one gap that alternates sides of you on the beat: a sidestep of about 22° each time
       else { const side = st.beatN % 2 ? 1 : -1; angles = [Math.atan2(w.player.y - e.y, w.player.x - e.x) + side * 22 * DEG]; }
       const gaps = gapsAt(angles, p.gapDeg ?? 45);
-      const tl = k ? c.call.tele / 2 : c.call.tele;
       tele(c, { kind: 'ring', x: e.x, y: e.y, r: e.r, r2: e.r + 40, gaps }, tl);
-      yield tl;
+      yield TL(c, tl);
       const v = c.w.enemy(c.h);
       c.w.fx('shockRing', v.x, v.y, { r: 90, life: 0.3 });
       c.w.sfx('bossDrum'); c.w.shake(3);
@@ -633,25 +659,16 @@ const PATS: Record<BossPatternId, PatFn> = {
   },
   *drumCrack(c) {
     const st = c.st, p = c.p;
-    // the watcher: after 8 stomps the drum-hide cracks and 夔 takes ×2 for 4 s
-    while (true) {
-      if (st.stomps >= (p.stomps ?? 8) && st.crackT <= 0) {
-        st.stomps = 0;
-        st.crackT = p.dur ?? 4;
-        c.w.status(c.h, 'vuln', st.crackT, ((p.x ?? 2) - 1) * 100);
-        const e = c.w.enemy(c.h);
-        c.w.fx('inkBurst', e.x, e.y, { r: 90, life: 0.5 }); c.w.fx('shockRing', e.x, e.y, { r: 140, life: 0.4 });
-        c.w.title(b('鼓裂 · 伤害 ×2', 'The drum cracks · ×2 damage'), 'edge');
-        c.w.sfx('shatter');
-      }
-      yield 0.1;
-    }
+    // one watcher per fight (the script calls it again every 12 s: those return at once)
+    if (st.crackWatch) return;
+    st.crackWatch = true;
+    try { yield* crackWatch(c, st, p); } finally { st.crackWatch = false; }
   },
   // ───────────── 九尾狐
   *foxfireSpiral(c) {
     const e = c.w.enemy(c.h);
     tele(c, { kind: 'circle', x: e.x, y: e.y, r: 70 }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const p = c.p, arms = clamp(Math.ceil(c.st.tails / 3), 1, 3), per = arms / Math.max(0.1, p.rate);
     const a0 = c.w.rng() * TAU, spin = (c.w.rng() < 0.5 ? -1 : 1) * p.spin * DEG;
     let acc = 0;
@@ -669,7 +686,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   *charmGlyph(c) {
     const w = c.w, r = c.p.r ?? 90, at = { x: w.player.x, y: w.player.y };
     const shape: TeleShape = { kind: 'circle', x: at.x, y: at.y, r };
-    w.fx('charmMark', at.x, at.y - 10, { r: (32 * 36) / 8, life: c.call.tele });
+    w.fx('charmMark', at.x, at.y - 10, { r: (32 * 36) / 8, life: TL(c) });
     tele(c, shape, c.call.tele, (ww) => {
       if (!playerIn(ww, shape)) return;
       ww.fx('charmMark', ww.player.x, ww.player.y - 30, { r: (32 * 20) / 8, life: c.p.reverse ?? 1.5 });
@@ -683,8 +700,8 @@ const PATS: Record<BossPatternId, PatFn> = {
     const have = c.st.phantoms.filter((h) => c.w.alive(h)).length;
     const spots: Vec[] = [];
     for (let k = have; k < n; k++) { const a = c.w.rng() * TAU; spots.push(c.w.clampToArena({ x: c.w.player.x + Math.cos(a) * 280, y: c.w.player.y + Math.sin(a) * 280 }, 70)); }
-    for (const s of spots) c.w.fx('spawnBloom', s.x, s.y, { r: 60, life: c.call.tele });
-    yield c.call.tele;
+    for (const s of spots) c.w.fx('spawnBloom', s.x, s.y, { r: 60, life: TL(c) });
+    yield TL(c);
     let k = 0;
     for (const s of spots) phantom(c, s.x, s.y, { kind: 'illusion', maxHits: 3, attack: c.p.attack ? 2 + k * 0.9 : 0, k: 1 + k++ * 2.4 });
   },
@@ -720,7 +737,7 @@ const PATS: Record<BossPatternId, PatFn> = {
           w.sfx('hitMelee'); w.shake(5);
           if (playerIn(w, shape)) hurt(c);
         });
-        yield* pause(c, c.call.tele + 0.25);
+        yield* pause(c, TL(c) + 0.25);
       }
     })());
   },
@@ -742,7 +759,7 @@ const PATS: Record<BossPatternId, PatFn> = {
         const a = pts[s], z = pts[s + 1];
         const dir = Math.atan2(z.y - a.y, z.x - a.x), L = dist(a.x, a.y, z.x, z.y);
         tele(c, { kind: 'line', x: a.x, y: a.y, dir, len: L, w: wd }, s === 0 ? c.call.tele : 0.35);
-        yield* pause(c, s === 0 ? c.call.tele : 0.35);
+        yield* pause(c, TL(c, s === 0 ? c.call.tele : 0.35));
         let hitOnce = false;
         for (let d = 0; d < L; d += sp * c.w.dt) {
           const v = c.w.enemy(c.h);
@@ -761,7 +778,7 @@ const PATS: Record<BossPatternId, PatFn> = {
     const e0 = w0.enemy(c.h);
     let a0 = toPlayer(w0, e0.x, e0.y);
     for (let k = 0; k < arcs; k++) tele(c, { kind: 'line', x: e0.x, y: e0.y, dir: a0 + (k * TAU) / arcs, len: 255, w: 34 }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     if (c.p.ring) { const v = c.w.enemy(c.h); waveRing(c, v.x, v.y, 340, 720, gapsAt([c.w.rng() * TAU, c.w.rng() * TAU + Math.PI], 50), 0.8); }
     const radii = [90, 165, 240];
     const axes: { i: number; tag: number; k: number; rr: number }[] = [];
@@ -805,10 +822,10 @@ const PATS: Record<BossPatternId, PatFn> = {
   // ───────────── 吴刚
   *chopTree(c) {
     const w = c.w, st = c.st, e = w.enemy(c.h);
-    const tree = st.trees.find((t) => w.alive(t) && dist(w.enemy(t).x, w.enemy(t).y, 0, 0) < 40);
+    const tree = st.trees.find((t) => t === st.central && w.alive(t));
     const dir = toPlayer(w, e.x, e.y), n = c.call.n ?? 2;
     tele(c, { kind: 'fan', x: e.x, y: e.y, dir, deg: 30, n }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const v = c.w.enemy(c.h);
     c.w.fx('slashArc', v.x + Math.cos(Math.atan2(-v.y, -v.x)) * 50, v.y + Math.sin(Math.atan2(-v.y, -v.x)) * 50, { r: 80, dir: Math.atan2(-v.y, -v.x), life: 0.3 });
     c.w.sfx('hitMelee');
@@ -823,7 +840,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   *axeBarrage(c) {
     const w = c.w, e = w.enemy(c.h), n = c.call.n ?? 3, dir = toPlayer(w, e.x, e.y);
     tele(c, { kind: 'fan', x: e.x, y: e.y, dir, deg: 50, n }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const v = c.w.enemy(c.h), fly = c.p.fly ?? 360, reach = Math.max(fly, dist(v.x, v.y, c.w.player.x, c.w.player.y) + 80);
     for (let k = 0; k < n; k++) shoot(c, 'eAxe', v.x, v.y, dir + ((k - (n - 1) / 2) * 50 * DEG) / Math.max(1, n - 1), fly, { r: 13, life: (2 * reach) / fly, boomerang: true });
     c.w.sfx('hitMelee');
@@ -835,7 +852,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   },
   *twinTrees(c) {
     const w = c.w, n = c.call.n ?? 2;
-    const alive = c.st.trees.filter((t) => w.alive(t) && dist(w.enemy(t).x, w.enemy(t).y, 0, 0) >= 40).length;
+    const alive = c.st.trees.filter((t) => t !== c.st.central && w.alive(t)).length;
     for (let k = alive; k < n; k++) {
       const at = openPoint(w, 60);
       if (Math.hypot(at.x, at.y) < 250) { at.x *= 250 / Math.max(1, Math.hypot(at.x, at.y)); at.y *= 250 / Math.max(1, Math.hypot(at.x, at.y)); }
@@ -845,7 +862,7 @@ const PATS: Record<BossPatternId, PatFn> = {
   },
   *treeFall(c) {
     const w = c.w, st = c.st;
-    const saps = st.trees.filter((t) => w.alive(t) && dist(w.enemy(t).x, w.enemy(t).y, 0, 0) >= 40);
+    const saps = st.trees.filter((t) => t !== st.central && w.alive(t));
     if (saps.length) {
       // 吴刚 fells a sapling: it splits the arena
       const t = saps[Math.floor(w.rng() * saps.length)];
@@ -886,13 +903,13 @@ const PATS: Record<BossPatternId, PatFn> = {
   },
   *goldRain(c) {
     const w = c.w, n = c.call.n ?? 12, e = w.enemy(c.h);
-    const flight = c.call.tele + 0.4;
+    const tl = c.call.tele + 0.4, flight = TL(c, tl);
     for (let k = 0; k < n; k++) {
       // a few fall where you are going; the rest scatter around you
       const to = k < 4 ? openPoint(w, 20, lead(w, flight * 0.6), 70) : openPoint(w, 20, w.player, 300);
       const ox = e.x, oy = e.y - e.r * 0.4;
       const R = 38;
-      tele(c, { kind: 'circle', x: to.x, y: to.y, r: R }, flight, (ww) => { dropGold(ww, to.x, to.y, c.p.moon ?? 1); });
+      tele(c, { kind: 'circle', x: to.x, y: to.y, r: R }, tl, (ww) => { dropGold(ww, to.x, to.y, c.p.moon ?? 1); });
       enemyShot(w, 'eGold', ox, oy, (to.x - ox) / flight, (to.y - oy) / flight, R - 12, flight, dmgOf(c), { lob: true });
       if (k % 4 === 3) yield 0.15;
     }
@@ -903,7 +920,7 @@ const PATS: Record<BossPatternId, PatFn> = {
       const to = lead(c.w, 0.4, 60), r = c.p.r ?? 130;
       const shape: TeleShape = { kind: 'circle', x: to.x, y: to.y, r };
       tele(c, shape, c.call.tele, (w) => { w.fx('shockRing', to.x, to.y, { r, life: 0.35 }); w.fx('dustPuff', to.x, to.y, { r: 60, life: 0.3 }); w.sfx('bossDrum'); w.shake(4); if (playerIn(w, shape)) hurt(c); });
-      yield* hop(c, to, c.call.tele);
+      yield* hop(c, to, TL(c));
       yield* pause(c, 0.3);
     })());
   },
@@ -915,7 +932,7 @@ const PATS: Record<BossPatternId, PatFn> = {
         const e = c.w.enemy(c.h), dir = toPlayer(c.w, e.x, e.y);
         const shape: TeleShape = { kind: 'line', x: e.x, y: e.y, dir, len, w: wd };
         tele(c, shape, c.call.tele);
-        yield* pause(c, c.call.tele);
+        yield* pause(c, TL(c));
         if (playerIn(c.w, shape)) hurt(c);
         c.w.sfx('hitMelee');
         fxLine(c.w, 'swordStreak', shape.x, shape.y, dir, len, 0.3, 1.6);
@@ -931,7 +948,7 @@ const PATS: Record<BossPatternId, PatFn> = {
       const e = c.w.enemy(c.h), dir = toPlayer(c.w, e.x, e.y);
       const shape: TeleShape = { kind: 'cone', x: e.x, y: e.y, dir, r: c.p.r ?? 200, deg: c.p.deg ?? 60 };
       tele(c, shape, c.call.tele, (w) => { w.fx('slashArc', shape.x + Math.cos(dir) * 90, shape.y + Math.sin(dir) * 90, { r: 120, dir, life: 0.3 }); w.sfx('hitMelee'); w.shake(4); if (playerIn(w, shape)) hurt(c); });
-      yield* pause(c, c.call.tele + 0.2);
+      yield* pause(c, TL(c) + 0.2);
     })());
   },
   *swallowMoon(c) {
@@ -939,7 +956,7 @@ const PATS: Record<BossPatternId, PatFn> = {
     if (sh.dark) return;
     const e = c.w.enemy(c.h);
     tele(c, { kind: 'circle', x: e.x, y: e.y, r: 140 }, c.call.tele);
-    yield c.call.tele;
+    yield TL(c);
     const prev = lightNow(c.w);
     const R = c.p.light ?? 260;
     sh.dark = { prev, until: c.w.t + (c.p.dur ?? 15) };
@@ -954,7 +971,7 @@ const PATS: Record<BossPatternId, PatFn> = {
       let a0 = toPlayer(w0, e0.x, e0.y) + Math.PI / n;
       const spin = (c.p.spin ?? 30) * DEG * (w0.rng() < 0.5 ? -1 : 1);
       for (let k = 0; k < n; k++) tele(c, { kind: 'line', x: e0.x, y: e0.y, dir: a0 + (k * TAU) / n, len, w: wd }, c.call.tele);
-      yield* pause(c, c.call.tele);
+      yield* pause(c, TL(c));
       c.w.sfx('phaseBreak');
       for (let t = 0; t < (c.p.dur ?? 10); t += c.w.dt) {
         const v = c.w.enemy(c.h);
@@ -1005,7 +1022,7 @@ function newState(w: WorldApi, h: number, id: BossId): BossState {
   return {
     id, def, h, home: homeOf(id), phase: 0, phaseT: 0, fightT: 0, invulnT: 0, stunT: 0, enrage: 0, busy: 0, calls: [], next: [], unionUntil: 0,
     running: [], fx: [], contact0: e.dmg, spdK: 1, anchor: { x: e.x, y: e.y }, rimA: Math.atan2(e.y, e.x), rimDir: w.rng() < 0.5 ? -1 : 1,
-    shadow: -1, eaten: 0, tails: def.p.tails ?? 9, stomps: 0, crackT: 0, beatN: 0, gapA: w.rng() * TAU, trees: [], felled: false, phantoms: [],
+    shadow: [], eaten: 0, tails: def.p.tails ?? 9, stomps: 0, crackT: 0, beatN: 0, gapA: w.rng() * TAU, trees: [], central: -1, felled: false, crackWatch: false, phantoms: [],
     reversing: false, dead: false,
   };
 }
@@ -1026,12 +1043,16 @@ function callsFor(w: WorldApi, st: BossState, p: number): PatternCall[] {
     for (const ph of def.phases) for (const call of ph.script) if (!seen.has(call.pat)) { seen.add(call.pat); all.push({ ...call, at: (call.at ?? 0) * 0.5 }); }
     return all;
   }
-  const own = def.phases[p].script.slice();
+  let own = def.phases[p].script.slice();
   if (w.diff.bossExtraPattern) {
-    for (let k = 1; k <= 2; k++) {
+    let added = false;
+    for (let k = 1; k <= 2 && !added; k++) {
       const other = def.phases[(p + k) % 3].script.find((x) => !STATEFUL.has(x.pat) && !own.some((o) => o.pat === x.pat));
-      if (other) { own.push({ ...other, at: (other.at ?? 0) + 2, every: other.every * 1.5 }); break; }
+      if (other) { own.push({ ...other, at: (other.at ?? 0) + 2, every: other.every * 1.5 }); added = true; }
     }
+    // nothing new to borrow (蜃, 夔 P3): v1's rule instead, +20% attack rate on the phase's own
+    // attacks (夔's stomps keep the drum's tempo: a faster stomp would break the beat)
+    if (!added) own = own.map((c) => (STATEFUL.has(c.pat) || c.pat === 'stomp' ? c : { ...c, every: c.every / 1.2 }));
   }
   return own;
 }
@@ -1131,10 +1152,23 @@ function move(w: WorldApi, st: BossState, dt: number): void {
   }
 }
 
-/** Per-boss touches every step: tails, growth, the shadow, the reversal. */
+/**
+ * The true body's shadow, under its feet and wider than it (dx, dy, r in body radii): the painter's
+ * `bossShadow`, a look beyond the contract's FxName (CHANGE REQUEST), so it is cast here.
+ */
+const SHADOW: readonly [number, number, number][] = [[0, 0.8, 1.05]];
+const SHADOW_LOOK = 'bossShadow' as never;
+/** 夔's beat: 80 BPM on the fight's clock (the stomps land on it). */
+const beatOf = (st: BossState) => 60 / (st.def.p.bpm || 80);
+/** Per-boss touches every step: tails, growth, the shadow, the reversal, 夔's beat. */
 function special(w: WorldApi, st: BossState, dt: number): void {
   const e = w.enemy(st.h);
-  if (st.shadow >= 0) moveZone(w, st.shadow, e.x, e.y + e.r * 0.45, e.r * 0.95);
+  if (st.id === 'kui' && st.crackT <= 0) {
+    const P = beatOf(st);
+    if (Math.floor(st.fightT / P + 1e-6) !== Math.floor((st.fightT - dt) / P + 1e-6)) w.sfx('beatTick');
+  }
+  // below the body and wide, where the sprite doesn't cover it; decoys cast none
+  for (let k = 0; k < st.shadow.length; k++) { const o = SHADOW[k]; moveZone(w, st.shadow[k], e.x + o[0] * e.r, e.y + o[1] * e.r, o[2] * e.r); }
   if (st.id === 'fox') {
     const lost = Math.floor((1 - e.hp / e.hpMax) / (st.def.p.tailPer ?? 0.11) + 1e-9);
     const tails = Math.max(0, (st.def.p.tails ?? 9) - lost);
@@ -1166,8 +1200,10 @@ const RUNNER: ActorImpl<BossState> = {
     st.spdK = e.speed / Math.max(1, def.phases[0].speed);
     // anchors: the arena's heart for 蜃's wall and the moon, beside the tree for 吴刚
     st.anchor = id === 'wugang' ? { x: 0, y: -170 } : id === 'moonwater' || id === 'mirage' ? { x: 0, y: -60 } : { x: e.x, y: e.y };
-    if (id === 'mirage' || id === 'fox' || id === 'moonwater') st.shadow = w.zone({ side: 'player', look: 'inkPuddle', x: e.x, y: e.y, r: e.r, life: 1e6 });
+    if (id === 'mirage' || id === 'fox' || id === 'moonwater') for (const o of SHADOW) st.shadow.push(w.zone({ side: 'player', look: SHADOW_LOOK, x: e.x + o[0] * e.r, y: e.y + o[1] * e.r, r: o[2] * e.r, life: FOREVER }));
     shared(w).bosses.set(h, st);
+    // 夔 keeps its own tempo: the core's 2 Hz tick would fall off its 80 BPM stomps
+    if (id === 'kui') setBossBeat(w, false);
     if (id === 'wugang' && w.arena.obstacles.some((o) => o.kind === 'tree') && !st.trees.length) {
       const c: PatCtx = { w, h, st, call: def.phases[0].script[0], p: {}, teles: [], ended: false };
       spawnTree(c, 0, 0, true);
@@ -1239,7 +1275,7 @@ const RUNNER: ActorImpl<BossState> = {
     clearPhantoms(w, st);
     for (const t of st.trees) if (w.alive(t)) { shared(w).phantoms.delete(t); expire(w, t, 'petalBurst'); }
     st.trees.length = 0;
-    if (st.shadow >= 0) w.endZone(st.shadow);
+    for (const z of st.shadow) w.endZone(z);
     unreverse(w, st);
     if (st.id === 'eclipse') liftDark(w);
     // 蜃's wall resets when the clam dies (the pattern's finally ends it); 金蟾王 returns what it ate ×1.5

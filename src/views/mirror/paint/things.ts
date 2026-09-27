@@ -53,6 +53,17 @@ const zone = (paint: (b: B, v: number) => void, n = 1): Spec => ({ box: [-Z - 2,
 const fx = (r: number, paint: (b: B, v: number) => void, n = 1, halo: Spec['halo'] = 'none'): Spec => ({ box: [-r, -r, r, r], n, halo, paint });
 const ringOf = (b: B, r: number, w: number, c: string, tone: number, n = 28) => b.brush(arcW(0, 0, r, r, 0, Math.PI * 2, w, w, n), tone, c);
 
+/**
+ * Looks beyond the contract's FxName (CHANGE REQUEST to add them to FX_REG), drawn by id like any fx.
+ * `bossShadow`: the ground shadow only a true boss casts (蜃, 九尾狐, 水中月's decoys have none): a
+ * wide, flat, dark ellipse the engine lays under its feet as a zone.
+ */
+export const EXTRA_FX: Record<string, Spec> = {
+  bossShadow: zone((b) => {
+    b.wash(INK, ell(0, 0, 31, 14, 0, Math.PI * 2, 32), 0.45, 3);
+    b.fill(INK, ell(0, 1, 26, 10, 0, Math.PI * 2, 32), 0.9, 2.5);
+  }),
+};
 export const FX_SPECS: Record<FxName, Spec> = {
   hitSpark: fx(10, (b) => { for (let i = 0; i < 4; i++) { const a = i * 1.7 + 0.3; b.brush(rotW([[2, 0, 1.8], [9, 0, 0.3]], a), 0.9, INK); } b.dot(0, 0, 3, 0.9, INK); }),
   critSpark: fx(14, (b) => { b.fill(DANGER, star(0, 0, 13, 3.4, 6), 0.9, 0.4); b.fill('#fff4e0', star(0, 0, 6, 1.8, 6), 0.95, 0.2); }),

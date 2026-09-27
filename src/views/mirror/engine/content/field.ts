@@ -7,10 +7,10 @@ import type { Behaviour, GameEvent, WorldApi } from '../../types';
 import { HAZARDS, MUTATORS, TERM_MODS, WEAPONS } from '../../data';
 import { strengthOf } from '../../logic/formulas';
 import {
-  addCrate, core, copyShot, dotsOf, dropMoon, drunkNow, freshCoreShots, lightNow, livesLeft, moveZone, mods, nudgePlayer,
+  addCrate, core, copyShot, dotsOf, isChild, markChild, dropMoon, drunkNow, freshCoreShots, lightNow, livesLeft, moveZone, mods, nudgePlayer,
   pullPlayer, pushPlayer, restoreHp, scaleShot, sky, waveLen, waveTime, zonePos,
 } from './bridge';
-import { TAU, b, hurtPlayer, openPoint, poolFactor, rimR, shared } from './util';
+import { FOREVER, TAU, b, hurtPlayer, openPoint, poolFactor, rimR, shared } from './util';
 
 const change = (w: WorldApi) => w.run.char === 'change';
 /** The first periodic event of a hazard comes at 40% of its period, then every period. */
@@ -24,7 +24,7 @@ const moonglow: Behaviour<Glow> = {
   start(w) {
     const p = HAZARDS.moonglow.p;
     const at = openPoint(w, p.r + 40, { x: 0, y: 0 }, rimR(w) * 0.6);
-    return { id: w.zone({ side: 'player', look: 'moonCircle', x: at.x, y: at.y, r: p.r, life: 1e6 }), x: at.x, y: at.y, a: w.rng() * TAU };
+    return { id: w.zone({ side: 'player', look: 'moonCircle', x: at.x, y: at.y, r: p.r, life: FOREVER }), x: at.x, y: at.y, a: w.rng() * TAU };
   },
   tick(w, s, dt) {
     const p = HAZARDS.moonglow.p;
@@ -287,14 +287,19 @@ function huiguang(): Behaviour<{ v: number }> {
     },
   };
 }
-/** 碎镜: every enemy splits once into 2 at 30% HP (double: at 50%). */
+/**
+ * 碎镜: every enemy splits once into 2 at 30% HP (double: at 50%). A living body leaves one copy at
+ * its own HP; a blow that takes it from above the mark straight to death leaves two halves of the
+ * mark. Copies are splitters' children (the core never splits them), and a splitter's own children
+ * never split here, so one body yields at most 2 copies plus its native children: no chains.
+ */
 function suijing(): Behaviour<{ at: number }> {
   return {
     start(w, x = 1) { return { at: strengthOf('suijing', x) / 100 }; },
     on(w, s, ev) {
       if ((ev.type !== 'hit' && ev.type !== 'crit') || ev.e < 0 || !fighting(w, ev.e)) return;
       const e = w.enemy(ev.e);
-      if (e.kind !== 'mon' || e.hp > e.hpMax * s.at || flagOf(w, ev.e) & FLAG.split) return;
+      if (e.kind !== 'mon' || e.hp > e.hpMax * s.at || flagOf(w, ev.e) & FLAG.split || isChild(w, ev.e) || shared(w).copies.has(ev.e)) return;
       setFlag(w, ev.e, FLAG.split);
       const id = e.id, x = e.x, y = e.y, hpMax = e.hpMax, hp = e.hp;
       const kids = hp > 0 ? 1 : 2;
@@ -304,6 +309,7 @@ function suijing(): Behaviour<{ at: number }> {
         const h = w.spawn(id as never, x + Math.cos(a) * 16, y + Math.sin(a) * 16, { noDrops: true, hpX: each / Math.max(1, hpMax) });
         if (h < 0) continue;
         setFlag(w, h, FLAG.split);
+        markChild(w, h);
         const c = w.enemy(h);
         c.hp = Math.min(c.hp, each);
       }
@@ -459,8 +465,8 @@ const hanlu: Behaviour<null> = {
   start(w) {
     for (let k = 0; k < 5; k++) {
       const at = openPoint(w, 60);
-      w.zone({ side: 'enemy', look: 'frostPatch', x: at.x, y: at.y, r: 90, life: 1e6, slow: change(w) ? 0 : 20 });
-      w.zone({ side: 'player', look: 'frostPatch', x: at.x, y: at.y, r: 90, life: 1e6, slow: 30 });
+      w.zone({ side: 'enemy', look: 'frostPatch', x: at.x, y: at.y, r: 90, life: FOREVER, slow: change(w) ? 0 : 20 });
+      w.zone({ side: 'player', look: 'frostPatch', x: at.x, y: at.y, r: 90, life: FOREVER, slow: 30 });
     }
     return null;
   },

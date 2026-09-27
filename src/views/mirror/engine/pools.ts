@@ -94,6 +94,10 @@ export class Enemies extends Pool {
   readonly heavy: Float32Array;
   readonly lastSlot: Int16Array; readonly lastSrc: Uint8Array;
   readonly numAcc: Float32Array; readonly numT: Float32Array; readonly numCrit: Uint8Array;
+  /** The live number this body last showed (merging), −1 for none. */
+  readonly numIdx: Int16Array;
+  /** Hit reaction (打击感, visual only): strength 0..1, direction of the blow, seconds since. */
+  readonly hitV: Float32Array; readonly hitA: Float32Array; readonly hitAge: Float32Array;
   readonly partner: Int32Array;
   readonly eaten: Float32Array;
   readonly phase: Uint8Array;
@@ -129,7 +133,8 @@ export class Enemies extends Pool {
     this.untarget = new Uint8Array(cap); this.invuln = new Uint8Array(cap); this.hidden = new Uint8Array(cap); this.air = new Uint8Array(cap);
     this.tags = new Uint16Array(cap); this.cost = F(); this.noDrops = new Uint8Array(cap); this.capped = new Uint8Array(cap);
     this.heavy = F(); this.lastSlot = new Int16Array(cap); this.lastSrc = new Uint8Array(cap);
-    this.numAcc = F(); this.numT = F(); this.numCrit = new Uint8Array(cap);
+    this.numAcc = F(); this.numT = F(); this.numCrit = new Uint8Array(cap); this.numIdx = new Int16Array(cap).fill(-1);
+    this.hitV = F(); this.hitA = F(); this.hitAge = F();
     this.partner = new Int32Array(cap); this.eaten = F(); this.phase = new Uint8Array(cap); this.child = new Uint8Array(cap); this.age = F();
     this.memAll = new Float32Array(cap * 8);
     this.mem = [];
@@ -163,7 +168,8 @@ export class Enemies extends Pool {
     this.shredN[i] = 0; this.shredT[i] = 0; this.vulnV[i] = this.vulnT[i] = 0; this.staggerT[i] = 0; this.boya[i] = 0;
     this.untarget[i] = this.invuln[i] = this.hidden[i] = this.air[i] = 0;
     this.tags[i] = 0; this.cost[i] = 0; this.noDrops[i] = 0; this.capped[i] = 1; this.heavy[i] = 1;
-    this.lastSlot[i] = -1; this.lastSrc[i] = 0; this.numAcc[i] = 0; this.numT[i] = 0; this.numCrit[i] = 0;
+    this.lastSlot[i] = -1; this.lastSrc[i] = 0; this.numAcc[i] = 0; this.numT[i] = 0; this.numCrit[i] = 0; this.numIdx[i] = -1;
+    this.hitV[i] = 0; this.hitA[i] = 0; this.hitAge[i] = 9;
     this.partner[i] = -1; this.eaten[i] = 0; this.phase[i] = 0; this.child[i] = 0; this.age[i] = 0;
     this.mem[i].fill(0);
     this.actor[i] = null; this.actorS[i] = null; this.affixes[i] = null;
@@ -356,9 +362,12 @@ export class Particles extends Pool {
 
 export class Numbers extends Pool {
   readonly v: Float32Array; readonly x: Float32Array; readonly y: Float32Array; readonly t: Float32Array; readonly style: Uint8Array;
+  /** Arc velocity (u/s), size by damage (1 = a typical hit), seconds alive in all, owner handle (−1). */
+  readonly vx: Float32Array; readonly vy: Float32Array; readonly sz: Float32Array; readonly age: Float32Array; readonly owner: Int32Array;
   constructor(cap: number) {
     super(cap);
     this.v = new Float32Array(cap); this.x = new Float32Array(cap); this.y = new Float32Array(cap); this.t = new Float32Array(cap); this.style = new Uint8Array(cap);
+    this.vx = new Float32Array(cap); this.vy = new Float32Array(cap); this.sz = new Float32Array(cap); this.age = new Float32Array(cap); this.owner = new Int32Array(cap);
   }
 }
 

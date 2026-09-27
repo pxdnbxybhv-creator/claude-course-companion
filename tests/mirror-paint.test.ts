@@ -19,7 +19,9 @@ describe('atlas coverage', () => {
   const ids = allAtlasIds();
   it('lists every entity the arena draws', () => {
     const n = COMPANION_REG.length + MONSTER_REG.length + TREASURE_REG.length + ELITE_REG.length + BOSS_REG.length * 4 + 4
-      + WEAPON_REG.length + ITEM_REG.length + SUMMON_REG.length + PROJ_REG.length + DROP_REG.length + FX_REG.length;
+      + WEAPON_REG.length + ITEM_REG.length + SUMMON_REG.length + PROJ_REG.length + DROP_REG.length + FX_REG.length
+      + 8 // 水中月's reflections: boss:moonwater:1:m0 … m7
+      + 1; // fx:bossShadow
     expect(ids.length).toBe(n);
     expect(new Set(ids).size).toBe(ids.length);
   });
@@ -104,6 +106,10 @@ describe('bake plans', () => {
     expect(p.plan(run({ map: 'lake', wave: 30, vows: { daoxuan: 2 } } as Partial<RunSave>), 'endless')).toContain('boss:moonwater:3');
     // every phase-3 id has a painter
     for (const b of BOSS_REG) expect(specOf(`boss:${b.id}:3`), b.id).toBeTruthy();
+    // 水中月's reflections wear their own moon phase; a variant falls back to its phase look
+    for (let m = 0; m < 8; m++) expect(specOf(`boss:moonwater:1:m${m}`)).toBeTruthy();
+    expect(specOf('boss:carp:1:m2')).toBeNull();
+    expect(p.plan(run({ map: 'lake', wave: 29 }), 'boss')).toContain('boss:moonwater:1:m4');
     // unbaked, sprite() of phase 3 falls back to phase 2 (both null here: nothing is baked in node)
     expect(p.has('boss:carp:3' as AtlasId)).toBe(p.has('boss:carp:2' as AtlasId));
   });
@@ -170,8 +176,8 @@ describe('the mirror music', () => {
     setMirrorColour('palace'); const palace = THEMES.mirror.style;
     setMirrorColour('lake');
     expect(lake).not.toBe(palace);
-    expect(lake.bpm).toEqual([84, 104]);
-    expect(palace.bpm).toEqual([100, 124]);
+    expect(lake.bpm).toEqual([118, 126]);
+    expect(palace.bpm).toEqual([126, 132]);
   });
 });
 
@@ -190,7 +196,7 @@ describe('the mirror sound effects', () => {
       }
       expect(SFX_MIX[name].cap).toBeGreaterThanOrEqual(1);
     }
-  });
+  }, 20000); // ≈ 3.3 s alone; several times that when the suite runs in parallel
   it('the limiter: 200 frames of hit spam never starve a cue; hits stay within 4 per 50 ms', () => {
     const lim = new Limiter();
     const cues = SFX_NAMES.filter((n) => !SFX_MIX[n].spam);

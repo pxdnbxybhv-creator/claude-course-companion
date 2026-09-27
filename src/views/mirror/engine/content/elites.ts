@@ -6,8 +6,8 @@ import { AFFIX_REG, ELITE_REG, type AffixId, type EliteId, type TreasureId } fro
 import type { ActorImpl, AffixImpl, TeleShape, WorldApi } from '../../types';
 import { AFFIXES, ELITES, TREASURES } from '../../data';
 import { armorMult } from '../../logic/formulas';
-import { affixesOf, contactT, expire, fxLine, nearestSummon, setAir, setLook, setReflect, slowPlayer } from './bridge';
-import { CoRun, TAU, b, dist, hurtPlayer, playerIn, rayToWall, reflect, rimR, shared, swarmOf, toPlayer, type Co } from './util';
+import { affixesOf, contactT, expire, fxLine, nearestSummon, setAir, setHp, setLook, setReflect, slowPlayer } from './bridge';
+import { CoRun, TAU, b, dist, hurtPlayer, playerIn, rayToWall, reflect, rimR, shared, swarmOf, teleT, toPlayer, type Co } from './util';
 
 // ─────────────────────────────────────────────── helpers
 
@@ -38,10 +38,11 @@ function strikeTele(w: WorldApi, h: number, shape: TeleShape, dur: number, fn: (
 
 /** An elite as a coroutine per body (its `mem` keeps nothing; the state object does). */
 interface ES { run: CoRun; c: { w: WorldApi; h: number; dt: number }; t: number }
-function coActor(body: (c: { w: WorldApi; h: number; dt: number }) => Co, extra?: { hit?: ActorImpl['hit'] }): ActorImpl<ES> {
+function coActor(body: (c: { w: WorldApi; h: number; dt: number }) => Co, extra?: { hit?: ActorImpl['hit']; init?: (w: WorldApi, h: number) => void; death?: (w: WorldApi, h: number) => void; quiet?: boolean }): ActorImpl<ES> {
   return {
     init(w, h) {
-      announce(w, h);
+      if (!extra?.quiet) announce(w, h);
+      extra?.init?.(w, h);
       const c = { w, h, dt: w.dt };
       return { run: new CoRun(body(c)), c, t: 0 };
     },
@@ -50,20 +51,21 @@ function coActor(body: (c: { w: WorldApi; h: number; dt: number }) => Co, extra?
       if (!s.run.tick(dt)) s.run = new CoRun(body(s.c));
     },
     hit: extra?.hit as ActorImpl<ES>['hit'],
-    death(_w, _h, s) { s.run.stop(); },
+    death(w, h, s) { s.run.stop(); extra?.death?.(w, h); },
   };
 }
 /** Set while 裂 spawns its copies (they arrive without a fanfare). */
 let spawningCopies = false;
 /** A named elite enters with its name (and its 镜印) brushed at the screen's edge; 裂 copies stay quiet. */
-function announce(w: WorldApi, h: number): void {
+function announce(w: WorldApi, h: number): boolean {
   const e = w.enemy(h);
   const row = ELITE_REG.find((r) => r.id === e.id);
-  if (!row || spawningCopies) return;
+  if (!row || spawningCopies) return false;
   const affs = affixesOf(w, h).map((a) => AFFIX_REG.find((r) => r.id === a)!);
   const zh = affs.length ? `${row.zh} · ${affs.map((a) => a.zh).join('')}` : row.zh;
   const en = affs.length ? `${row.en} · ${affs.map((a) => a.en).join(', ')}` : row.en;
   w.title(b(zh, en), 'edge');
+  return true;
 }
 /** Chase for `sec` seconds (or until `until` says stop). */
 function* chase(c: { w: WorldApi; h: number }, sec: number, speedK = 1, keepAt = 0, until?: () => boolean): Co {
@@ -105,7 +107,9 @@ const turtle = coActor(function* (c) {
     w0.sfx('hitMelee');
     const v = p.shellSpeed * (w0.enemy(h).speed / Math.max(1, ELITES.turtle.speed));
     // each segment's line appears 0.8 s before the shell reaches its start
-    const starts: number[] = [p.tell];
+    // 闲游 stretches every telegraph by teleX: the shell waits as long as the ink takes to fill
+    const X = teleT(w0, 1), tell = p.tell * X;
+    const starts: number[] = [tell];
     for (let k = 1; k < pts.length - 1; k++) starts.push(starts[k - 1] + dist(pts[k - 1].x, pts[k - 1].y, pts[k].x, pts[k].y) / v);
     let t = 0, shown = 0;
     const contact0 = w0.enemy(h).dmg;
@@ -114,12 +118,12 @@ const turtle = coActor(function* (c) {
     while (seg < pts.length - 1) {
       const w = c.w;
       if (!w.alive(h)) return;
-      while (shown < starts.length && t >= starts[shown] - p.tell) {
+      while (shown < starts.length && t >= starts[shown] - tell) {
         const a = pts[shown], z = pts[shown + 1];
-        w.tele({ shape: { kind: 'line', x: a.x, y: a.y, dir: Math.atan2(z.y - a.y, z.x - a.x), len: dist(a.x, a.y, z.x, z.y), w: r * 2 }, dur: Math.max(0.05, starts[shown] - t) });
+        w.tele({ shape: { kind: 'line', x: a.x, y: a.y, dir: Math.atan2(z.y - a.y, z.x - a.x), len: dist(a.x, a.y, z.x, z.y), w: r * 2 }, dur: Math.max(0.05, (starts[shown] - t) / X) });
         shown++;
       }
-      if (t >= p.tell) {
+      if (t >= tell) {
         const a = pts[seg], z = pts[seg + 1], L = dist(a.x, a.y, z.x, z.y);
         along += v * w.dt;
         const e = w.enemy(h);
@@ -180,7 +184,7 @@ const whitesnake = coActor(function* (c) {
       }
     }
     w.sfx('bell');
-    yield p.tell + 0.2;
+    yield teleT(w, p.tell) + 0.2;
   }
 });
 
@@ -220,8 +224,9 @@ const tiger = coActor(function* (c) {
         ww.fx('shockRing', to.x, to.y, { r: R, life: 0.3 }); ww.fx('dustPuff', to.x, to.y, { r: 40, life: 0.3 }); ww.shake(3); ww.sfx('hitMelee');
       });
       setAir(w, h, true);
-      for (let t = 0; t < p.tell; t += c.w.dt) {
-        const ee = c.w.enemy(h), k2 = Math.min(1, (t + c.w.dt) / p.tell);
+      const T = teleT(w, p.tell);
+      for (let t = 0; t < T; t += c.w.dt) {
+        const ee = c.w.enemy(h), k2 = Math.min(1, (t + c.w.dt) / T);
         ee.x = from.x + (to.x - from.x) * k2; ee.y = from.y + (to.y - from.y) * k2; ee.vx = 0; ee.vy = 0;
         yield 0;
       }
@@ -233,26 +238,33 @@ const tiger = coActor(function* (c) {
 
 // ─────────────────────────────────────────────── 画皮 · the painted skin
 
-/** Disguised as a 纸人 until below 80% HP or within 150; then it sheds its skin and slashes 3 times (0.5 s tell). */
+/**
+ * Disguised as a 纸人 until below 80% HP or within 150; then it sheds its skin and slashes 3 times
+ * (0.5 s tell). The disguise is total: no name at the edge and no elite bar until the reveal (while
+ * disguised its bar's maximum follows its HP, so the bar the renderer draws on damage never shows).
+ */
+const disguised = new Map<number, number>();
 const painted = coActor(function* (c) {
     const p = ELITES.painted.p;
-    // the disguise: a paper man's shape and pace
-    setLook(c.w, c.h, 'mon:paperman', 14);
-    c.w.enemy(c.h).r = 14;
     let shown = false;
     while (!shown) {
       const w = c.w, e = w.enemy(c.h);
       steer(w, c.h, w.player.x, w.player.y, e.speed);
-      shown = e.hp < e.hpMax * p.reveal || dist(e.x, e.y, w.player.x, w.player.y) < p.near;
+      const max = disguised.get(c.h) ?? e.hpMax;
+      shown = e.hp < max * p.reveal || dist(e.x, e.y, w.player.x, w.player.y) < p.near;
+      // HP taken outside a hit (a 节气's extra share) is folded in here, a step later at most
+      if (!shown && e.hp > 0 && e.hp < e.hpMax) setHp(w, c.h, e.hp, e.hp);
       yield 0;
     }
     {
       const w = c.w, e = w.enemy(c.h);
+      unmask(w, c.h);
       setLook(w, c.h, 'elite:painted', ELITES.painted.r ?? 20);
       e.r = ELITES.painted.r ?? 20;
       w.fx('inkBurst', e.x, e.y, { r: 50, life: 0.5 });
       w.fx('petalBurst', e.x, e.y, { r: 60, life: 0.5 });
-      w.title(b('画皮', 'Painted Skin'), 'edge');
+      // its true name (and its 镜印) only now
+      if (!announce(w, c.h)) w.title(b('画皮', 'Painted Skin'), 'edge');
       w.sfx('shatter'); w.shake(3);
     }
     const fast = (p.fast / ELITES.painted.speed);
@@ -270,7 +282,7 @@ const painted = coActor(function* (c) {
           ww.fx('slashArc', shape.x + Math.cos(dir) * 50, shape.y + Math.sin(dir) * 50, { r: 90, dir, life: 0.3 });
           ww.sfx('hitMelee');
         });
-        for (let t = 0; t < p.tell; t += c.w.dt) { stop(c.w, h); yield 0; }
+        for (let t = 0, T = teleT(w, p.tell); t < T; t += c.w.dt) { stop(c.w, h); yield 0; }
         const ee = c.w.enemy(h);
         ee.vx = Math.cos(dir) * 260; ee.vy = Math.sin(dir) * 260;
         yield 0.12;
@@ -278,7 +290,30 @@ const painted = coActor(function* (c) {
       stop(c.w, c.h);
       yield 0.8;
     }
+}, {
+  quiet: true,
+  // the paper man's shape and pace from its first frame
+  init(w, h) {
+    setLook(w, h, 'mon:paperman', 14);
+    w.enemy(h).r = 14;
+    disguised.set(h, w.enemy(h).hpMax);
+  },
+  death(_w, h) { disguised.delete(h); },
+  hit(w, h) {
+    const max = disguised.get(h);
+    if (max === undefined) return;
+    const e = w.enemy(h);
+    // a killing blow dies as the elite it is; otherwise the bar's maximum follows its HP
+    if (e.hp <= 0 || e.hp < max * ELITES.painted.p.reveal) unmask(w, h); else setHp(w, h, e.hp, e.hp);
+  },
 });
+/** 画皮 drops the disguise: its real maximum HP back. */
+function unmask(w: WorldApi, h: number): void {
+  const max = disguised.get(h);
+  if (max === undefined) return;
+  disguised.delete(h);
+  if (w.alive(h)) setHp(w, h, w.enemy(h).hp, max);
+}
 
 // ─────────────────────────────────────────────── 天将 · spear and banner
 
@@ -315,7 +350,7 @@ const general = coActor(function* (c) {
       fxLine(ww, 'swordStreak', shape.x, shape.y, dir, p.thrust, 0.3, 1.4);
       ww.sfx('hitMelee');
     });
-    for (let t = 0; t < p.tell; t += c.w.dt) { stop(c.w, h); call -= c.w.dt; yield 0; }
+    for (let t = 0, T = teleT(w, p.tell); t < T; t += c.w.dt) { stop(c.w, h); call -= c.w.dt; yield 0; }
     { const ee = c.w.enemy(h); ee.vx = Math.cos(dir) * 700; ee.vy = Math.sin(dir) * 700; }
     yield 0.16;
     stop(c.w, h);
@@ -356,7 +391,7 @@ const hound = coActor(function* (c) {
       const shape: TeleShape = { kind: 'line', x: e.x, y: e.y, dir, len, w: 50 };
       stop(w, h);
       w.tele({ shape, dur: p.tell });
-      for (let t = 0; t < p.tell; t += c.w.dt) { stop(c.w, h); yield 0; }
+      for (let t = 0, T = teleT(w, p.tell); t < T; t += c.w.dt) { stop(c.w, h); yield 0; }
       // the dash: whoever is on the line when it goes
       const ww = c.w;
       if (playerIn(ww, shape)) eliteHit(ww, h, 1.2, 'hound');
