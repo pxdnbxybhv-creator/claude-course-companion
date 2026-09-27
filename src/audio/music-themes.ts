@@ -3,8 +3,8 @@
 // reverb/echo sends). Pure: no Web Audio here, so the lab and tests can inspect every note.
 import { makeRng, type Rng } from '../core/rng';
 import { clamp } from './dsp';
-import type { LineInst, LineNote, MusicJob, PluckInst, PluckNote } from './music-dsp';
-import { degreeToMidi, halfCadence, midiToFreq, modeSteps, MUSIC_GONG_PC, PENT, type MNote, type Mode, type Phrase, type Style } from './music-theory';
+import type { KitHit, KitKind, LineInst, LineNote, MusicJob, PluckInst, PluckNote } from './music-dsp';
+import { degreeToMidi, halfCadence, midiToFreq, modeSteps, MUSIC_GONG_PC, nearestOctave, PENT, type MNote, type Mode, type Phrase, type Style } from './music-theory';
 
 import type { MusicTheme } from '../views/walk/map';
 
@@ -39,8 +39,8 @@ export interface ThemeSpec {
   style: Style;
   /** Bus level for the theme (loudness calibration, measured in the lab). */
   level: number;
-  /** Reshape a phrase before it is arranged (tempo, whole bars); the Conductor reads p afterwards. */
-  shape?(p: Phrase): void;
+  /** Reshape a phrase before it is arranged (tempo, whole bars, a new tune); the Conductor reads p afterwards. */
+  shape?(p: Phrase, r?: Rng): void;
   arrange(c: Ctx): MusicEvent[];
 }
 
@@ -178,12 +178,16 @@ function pad(c: Ctx, rootDeg: number, oct: number, o: { gain: number; send: numb
 type HitKind = 'tang' | 'rim' | 'big' | 'wood' | 'bang' | 'daluo' | 'xiaoluo' | 'bo' | 'ling' | 'temple';
 
 /** A cached one-shot. */
-function hit(c: Ctx, kind: HitKind, t: number, gain: number, o: { pan?: number; send?: number; echo?: number; freq?: number; prio?: 0 | 1 | 2 } = {}): MusicEvent {
+function hit(c: Ctx, kind: HitKind, t: number, gain: number, o: { pan?: number; send?: number; echo?: number; freq?: number; prio?: 0 | 1 | 2; hard?: boolean } = {}): MusicEvent {
   const v = c.r.int(1, 3); // three cached variants of each
   const base = { t, gain, pan: o.pan ?? 0, send: o.send ?? 0.15, echo: o.echo ?? 0, prio: o.prio ?? 2 } as const;
   switch (kind) {
-    case 'tang': case 'rim': case 'big':
-      return { ...base, inst: 'drum', job: { op: 'drum', kind, seed: v }, key: `drum:${kind}:${v}`, dur: kind === 'big' ? 1.2 : 0.6, rate: 1 + (c.r() - 0.5) * 0.03 };
+    case 'tang': case 'rim': case 'big': {
+      // `hard`: the battle drums (the knock and the stick a phone can play) — the mirror's cues
+      const hard = !!o.hard && kind !== 'rim';
+      const job: MusicJob = hard ? { op: 'drum', kind, seed: v, hard } : { op: 'drum', kind, seed: v };
+      return { ...base, inst: 'drum', job, key: `drum:${kind}:${hard ? 'h:' : ''}${v}`, dur: kind === 'big' ? 1.2 : 0.6, rate: 1 + (c.r() - 0.5) * 0.03 };
+    }
     case 'wood': case 'bang':
       return { ...base, inst: 'wood', job: { op: 'wood', seed: v }, key: `wood:${v}`, dur: 0.3, rate: (kind === 'bang' ? 1.85 : 1) * (1 + (c.r() - 0.5) * 0.03) };
     case 'daluo': case 'xiaoluo':
@@ -597,21 +601,25 @@ const taoyuan: ThemeSpec = {
 //   mirror-calm  lobby, shop and results, 84–92 bpm: a breath between waves, never a nap. A soft
 //                大鼓 on every bar, 梆子 / 木鱼 off-beats and a quiet 古筝 ostinato keep a pulse
 //                under the old colours (古琴 and 箫 · 洞箫 and 手鼓 · 编钟 and 笙).
-//   mirror       the waves, 羽 or 商, 120–138 bpm — 《十面埋伏》, not a tea-house. Layers enter as
-//                the wave runs: drums (大鼓 on the downbeats, 板 and 梆子 on the off-beats, 钹 and 锣
-//                on the phrase turns) → an ostinato bass (低音古筝, or 阮 on the forest's pipa) →
-//                琵琶 扫弦 and 轮 figures → the lead (笛, 唢呐; tongued and short). The last 10 s
-//                tighten (≈ 4 % faster, 16th 板, 战鼓 pickups, 小锣 on the backbeat, the lead doubled);
-//                danger (a crowd near the cap, low HP) pushes one layer up. The first phrase of a
-//                wave opens with a drum fill into a 钹 + 大锣 downbeat.
-//   mirror-boss  heavier per map, 138–150 bpm, darker modes (羽, 商 low, 角): war drums, a 大鼓 roll
-//                into every phrase, 唢呐 calls, 琵琶 轮指 on the long notes; each boss phase adds a
-//                layer and 4 bpm. It opens with a 大鼓 roll into the 大锣: the 锣 on boss entry.
+//   mirror       the waves, 132–152 bpm: a battle score led by the winds. After a one-bar drum fill
+//                (the 笛's 吐音 pickup inside it) the 笛 states the map's own call — upward 4ths and
+//                5ths, dotted drive, 吐音 repeated-note runs, 叠音/打音 ornaments — in 起承转合
+//                periods: the 箫 answers low in every held note and takes the second statement, the
+//                转 is a call-and-response (笛 against 箫, then 唢呐), the 合 rises into a held final
+//                (花舌 on the climaxes). War drums drive it (大鼓, 堂鼓, 板, 梆子, 小锣; 钹 and 大锣 on the
+//                turns); 二胡 and 笙 support; the 琵琶/古筝 only keep the rhythm. Layers grow with the
+//                wave clock and the danger; the last 10 s tighten (+4 %, the 唢呐 doubles the tune).
+//                湖: a bright 曲笛 and a prominent 箫 · 林: 箫 + 唢呐, 堂鼓 toms · 宫: 笛 + 编钟, high 笙.
+//   mirror-boss  144–152 bpm, darker modes: a 大鼓 roll into the 大锣, then the 唢呐 leads the boss's
+//                call (上滑音 scoops, a wide vibrato), the 箫 low and ominous under it in every phase; each
+//                boss phase adds the 笛 a 4th above the 唢呐 (花舌 on the holds; never past E6), the 二胡
+//                and 笙 stabs, heavier drums.
 //
-// Every phrase is squared to whole 4/4 bars (the groove never skips a beat across phrases) and read
-// its tempo and layers from the mirror state below when it is composed, ≈ 4.5 s ahead of the audio
-// clock (music.ts HORIZON): a change is heard at the next phrase. The mirror's audio module
-// (src/views/mirror/audio/music.ts) sets that state from the wave clock and the HUD.
+// Every phrase is four whole 4/4 bars (the groove never skips a beat across phrases) and reads its
+// tempo and layers from the mirror state below when it is composed, ≈ 4.5 s ahead of the audio clock
+// (music.ts HORIZON): a change is heard at the next phrase — the director (src/views/mirror/audio/
+// music.ts) fires a cue on the music bus — on the band's next beat, in its tempo — for a rise in danger
+// or a boss phase.
 
 export type MirrorColour = 'lake' | 'forest' | 'palace';
 
@@ -649,16 +657,21 @@ export const MIRROR_LOOKAHEAD = 4.5;
 export const MIRROR_TIGHT_SECS = 10;
 
 /**
- * The wave's layers for a phrase: 0 drums · 1 + bass · 2 + 琵琶 · 3 + lead · 4 tight. From the wave
- * clock when the engine reports it (the last 10 s are tight), else one layer per phrase; danger ≥ 0.5
- * pushes one layer up.
+ * The wave's layers for a phrase — the 笛 leads in every one of them:
+ *   0  笛 and 箫, the war drums, a 琵琶 strum on each bar
+ *   1  + 笙 pad, 梆子, the 大鼓's pickups, 刮奏 into the periods (湖)
+ *   2  + 二胡 counterline, the 箫 doubling the long notes, 低音古筝 gallop, 堂鼓 ghosts
+ *   3  + 花舌 on the climaxes, 笙 stabs, the 唢呐 answering in the 转, 小锣
+ *   4  tight (the last 10 s): + 4 % tempo, the 唢呐 doubles the whole tune, 16th 板, 大锣 each phrase
+ * From the wave clock when the engine reports it, else one layer per phrase; danger ≥ 0.5 pushes one
+ * layer up.
  */
 export function mirrorTier(p: Phrase, s: Readonly<MirrorMusicState> = mm): number {
   let t: number;
   if (s.left != null && s.total) {
     const left = s.left - MIRROR_LOOKAHEAD - 2.5; // the middle of this phrase, when it is heard
     const prog = 1 - left / s.total;
-    t = left <= MIRROR_TIGHT_SECS ? 4 : prog < 0.1 ? 0 : prog < 0.25 ? 1 : prog < 0.42 ? 2 : 3;
+    t = left <= MIRROR_TIGHT_SECS ? 4 : prog < 0.12 ? 0 : prog < 0.3 ? 1 : prog < 0.55 ? 2 : 3;
   } else t = Math.min(3, p.index);
   if (s.danger >= 0.5) t += 1;
   return Math.min(4, Math.max(0, t));
@@ -688,60 +701,35 @@ const MIRROR_CALM_STYLE: Record<MirrorColour, Style> = {
 /** Driving cells: 8ths and 16ths, dotted pushes, few long notes. */
 const DRIVE = [[0.5, 0.5], [1], [0.75, 0.25], [0.25, 0.25, 0.5], [0.5, 0.25, 0.25], [1.5, 0.5], [0.5, 1, 0.5]];
 
+// The battle styles give the day's mode and tempo (the Composer's own tune is replaced by the battle
+// composer below, which keeps its 起承转合 role, period and mode).
+const battleStyle = (bpm: [number, number], modes: Mode[]): Style => ({
+  bpm, modes, range: [-1, 7], cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1],
+  periodRest: [0.5, 1], cadenceBeats: 2, leap: 0.5, modulate: 0.2,
+});
+
 const MIRROR_STYLE: Record<MirrorColour, Style> = {
-  // 月湖: 羽 on D (or 商 on G), 笛 over a 古筝 gallop, 刮奏 like water breaking
-  lake: {
-    bpm: [118, 126], modes: [M(62, 4), M(55, 1)], range: [-1, 7],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 1.5, leap: 0.5, modulate: 0.2,
-  },
-  // 墨林: 商 on G (or 羽), the ambush — 堂鼓 toms, 阮 on the pipa's low strings, a 唢呐 lead
-  forest: {
-    bpm: [122, 130], modes: [M(55, 1), M(62, 4)], range: [-1, 7],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 1.5, leap: 0.55, modulate: 0.2,
-  },
-  // 广寒: 羽 or 商, bright and cold — 笛 with 编钟 on the strong beats, the fastest of the three
-  palace: {
-    bpm: [126, 132], modes: [M(62, 4), M(67, 1)], range: [0, 7],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.04, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 1.5, leap: 0.5, modulate: 0.2,
-  },
+  // 月湖: 羽 on D (or 商 on G) — a bright 曲笛 and the lake's 箫
+  lake: battleStyle([132, 138], [M(62, 4), M(55, 1)]),
+  // 墨林: 商 on G (or 羽) — the ambush: 箫 and 唢呐, 堂鼓 toms
+  forest: battleStyle([136, 142], [M(55, 1), M(62, 4)]),
+  // 广寒: 羽 or 商, bright and cold — the 笛 with 编钟, high 笙, the fastest of the three
+  palace: battleStyle([140, 146], [M(62, 4), M(67, 1)]),
 };
 
 const MIRROR_BOSS_STYLE: Record<MirrorColour, Style> = {
-  lake: {
-    bpm: [136, 142], modes: [M(62, 4), M(57, 2)], range: [-2, 6],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.03, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 2, leap: 0.55, modulate: 0.2,
-  },
-  forest: {
-    bpm: [138, 144], modes: [M(55, 1), M(50, 4)], range: [-2, 6],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.03, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 2, leap: 0.6, modulate: 0.2,
-  },
-  palace: {
-    bpm: [140, 146], modes: [M(57, 2), M(62, 4)], range: [-2, 6],
-    cells: DRIVE, motifBeats: 4, statements: [2, 2], restChance: 0.03, breath: [0.5, 1], periodRest: [0.5, 1],
-    cadenceBeats: 2, leap: 0.55, modulate: 0.2,
-  },
+  lake: battleStyle([144, 148], [M(62, 4), M(57, 2)]),
+  forest: battleStyle([144, 150], [M(55, 1), M(50, 4)]),
+  palace: battleStyle([146, 150], [M(57, 2), M(62, 4)]),
 };
 
-/** Per-colour level (the music lab asks for −24…−18 dBFS at full volume). */
-const MIRROR_CALM_LEVEL: Record<MirrorColour, number> = { lake: 0.95, forest: 0.9, palace: 1.0 };
-const MIRROR_LEVEL: Record<MirrorColour, number> = { lake: 0.62, forest: 0.56, palace: 0.6 };
-const MIRROR_BOSS_LEVEL: Record<MirrorColour, number> = { lake: 0.58, forest: 0.58, palace: 0.56 };
+/** The fastest a battle phrase may go (the tight last 10 s and the boss phases included). */
+export const MIRROR_MAX_BPM = 152;
 
-/** Square a phrase to whole 4/4 bars at a set tempo (the Conductor reads p after arrange()). */
-function toBars(p: Phrase, bpm: number, intro = false) {
-  if (intro) {
-    // a bar of drums before the tune (the fill into the wave, the roll into the boss)
-    for (const n of p.notes) n.beat += 4;
-    p.end += 4;
-  }
-  p.bpm = Math.round(bpm);
-  p.beats = Math.max(4, Math.ceil((p.end + 0.5 - 1e-6) / 4) * 4);
-}
+/** Per-colour level (the music lab asks for −24…−18 dBFS at full volume; a wave is never quieter than the shop). */
+const MIRROR_CALM_LEVEL: Record<MirrorColour, number> = { lake: 0.95, forest: 0.9, palace: 1.0 };
+const MIRROR_LEVEL: Record<MirrorColour, number> = { lake: 0.8, forest: 0.8, palace: 0.8 };
+const MIRROR_BOSS_LEVEL: Record<MirrorColour, number> = { lake: 0.78, forest: 0.78, palace: 0.78 };
 
 const between = (x: number, [lo, hi]: [number, number]) => clamp(x, lo, hi);
 
@@ -750,127 +738,6 @@ const rootAt = (p: Phrase, beat: number) => rootUnder(p, (p.notes.filter((n) => 
 
 /** The octave that puts the mode's final nearest `midi`. */
 const octFor = (p: Phrase, midi: number) => Math.round((midi - p.mode.tonic) / 12);
-
-/** Melody notes tongued short (the lead kept tight): long inner notes lose a quarter. */
-const tongued = (notes: MNote[]) => notes.map((n) => (n.dur >= 0.5 && !n.cad ? { ...n, dur: n.dur * 0.72 } : n));
-
-interface DrumOpts {
-  /** 0 drums … 4 tight (mirrorTier). */
-  tier: number;
-  /** Bar 0 is a fill: two 大鼓 strokes and a rising 堂鼓 roll (wave), or a 大鼓 roll (boss). */
-  intro?: 'fill' | 'roll';
-  /** 墨林's toms: a syncopated 堂鼓 on the and-of-3 and the last 16th. */
-  toms?: boolean;
-  /** Boss: war drums, 小锣 on the backbeat, a 大鼓 roll into the next phrase; `step` adds 大锣 and 16ths. */
-  boss?: boolean;
-  step?: number;
-  gain?: number;
-}
-
-/**
- * The percussion bed over the whole phrase (breath included): 大鼓 on the downbeats, 板 on the
- * off-beats, 堂鼓 on the backbeat, 梆子 pushing into it, 钹 and 锣 on the phrase turns.
- */
-function drumBed(c: Ctx, o: DrumOpts): MusicEvent[] {
-  const { p, r } = c;
-  const ev: MusicEvent[] = [];
-  const G = o.gain ?? 1, tier = o.tier, step = o.step ?? 0;
-  const at = (kind: HitKind, beat: number, gain: number, pan: number, prio: 0 | 1 | 2 = 2, send = 0.12) => {
-    if (beat >= p.beats - 1e-6) return;
-    ev.push(hit(c, kind, Math.max(0, secOf(c, beat) + (r() - 0.5) * 0.006), clamp(G * gain * (0.92 + r() * 0.16), 0.01, 1), { pan, send, prio }));
-  };
-  const bars = Math.round(p.beats / 4);
-  const intro = o.intro && p.index === 0;
-  for (let b = 0; b < bars; b++) {
-    const b0 = b * 4, last = b === bars - 1;
-    if (intro && b === 0) {
-      if (o.intro === 'fill') {
-        // 咚 咚 哒哒哒哒哒哒哒哒 | 仓 — into the wave
-        at('big', 0, 0.5, -0.1, 0); at('big', 1, 0.42, -0.1, 0);
-        for (let k = 0; k < 8; k++) at('tang', 2 + k * 0.25, 0.16 + 0.035 * k, -0.3 + 0.08 * k, 1);
-      } else {
-        // the boss: a drum roll swelling for a whole bar — 大鼓 on the 8ths, 堂鼓 between
-        for (let k = 0; k < 8; k++) { at('big', k * 0.5, 0.2 + 0.045 * k, -0.1, 0); at('tang', k * 0.5 + 0.25, 0.1 + 0.035 * k, 0.2); }
-      }
-      continue;
-    }
-    // 大鼓: 1 and 3 (the pulse: never dropped, like a melody); the and-of-4 pickup from the lead's
-    // entry; the and-of-2 when tight (战鼓)
-    at('big', b0, 0.52, -0.1, 0); at('big', b0 + 2, 0.44, -0.1, 0);
-    if (tier >= 3 || o.boss) at('big', b0 + 3.5, 0.28, -0.1);
-    if ((tier >= 4 || o.boss) && b % 2 === 1) at('big', b0 + 1.5, 0.26, -0.1);
-    if (o.boss && step >= 2 && b % 2 === 0) for (const k of [1.5, 1.75]) at('tang', b0 + k, 0.24, -0.3);
-    // 板 (the clapper) on every off-beat; tight: the 16ths between too
-    for (const k of [0.5, 1.5, 2.5, 3.5]) at('rim', b0 + k, 0.17, 0.3);
-    if (tier >= 4 || (o.boss && step >= 2)) for (const k of [0.25, 1.25, 2.25, 3.25]) at('rim', b0 + k, 0.09, 0.38);
-    // 堂鼓 backbeat, ghost 16ths from the 琵琶's entry
-    if (tier >= 1 || o.boss) { at('tang', b0 + 1, 0.32, 0.15); at('tang', b0 + 3, 0.32, 0.15); }
-    if (tier >= 2 && b % 2 === 1 && !last) { at('tang', b0 + 2.75, 0.12, 0.22); at('tang', b0 + 3.25, 0.1, 0.22); }
-    if (o.toms && tier >= 1) { at('tang', b0 + 2.5, 0.2, -0.35); at('tang', b0 + 3.75, 0.16, -0.35); }
-    // 梆子: a 16th before each backbeat
-    if (tier >= 1 || o.boss) { at('bang', b0 + 0.75, 0.11, 0.45); at('bang', b0 + 2.75, 0.11, 0.45); }
-    // 小锣 (才) on 3 when tight and for a boss; on 1 too from the boss's second phase
-    if (o.boss && step >= 2) at('xiaoluo', b0 + 1, 0.07, 0.42);
-    if (tier >= 4 || o.boss) at('xiaoluo', b0 + 3, 0.08, 0.42);
-    // into the next phrase: a 堂鼓 fill, or for a boss a 大鼓 roll (大鼓 and 堂鼓 alternating)
-    // (the backbeat on 3 starts it)
-    if (last && o.boss) for (let k = 1; k < 4; k++) at(k === 2 ? 'big' : 'tang', b0 + 3 + k * 0.25, 0.26 + 0.06 * k, k === 2 ? -0.1 : 0.2);
-    else if (last && tier >= 2) for (let k = 1; k < 4; k++) at('tang', b0 + 3 + k * 0.25, 0.16 + 0.05 * k, -0.25 + 0.12 * k);
-  }
-  // phrase turns: 钹 on the first downbeat, the 大锣 opening each period (every phrase when tight,
-  // or from the boss's second phase), and after an intro bar
-  const first = intro ? 4 : 0;
-  if (first < p.beats) {
-    at('bo', first, 0.2, 0.3, 1, 0.2);
-    const turn = p.role === 'qi' || ((tier >= 4 || (o.boss && step >= 1)) && p.role === 'zhuan');
-    if (turn || intro) at('daluo', first, intro ? 0.26 : 0.2, 0.05, 1, 0.25);
-    else if (tier >= 4 || o.boss) at('xiaoluo', first, 0.1, 0.35, 1, 0.2);
-  }
-  return ev;
-}
-
-/**
- * The ostinato bass: a gallop on the root (8th, two 16ths), the fifth on 2, the octave or a turn on
- * 4 — 低音古筝 (damped short, like a palm) or 阮 (the pipa's low strings).
- */
-function ostinato(c: Ctx, inst: 'zheng' | 'pipa', o: { gain: number; from?: number; heavy?: boolean }): MusicEvent[] {
-  const { p } = c;
-  const oct = octFor(p, inst === 'zheng' ? 40 : 45);
-  const A: [number, number, number][] = [[0, 0, 1], [0.5, 0, 0.5], [0.75, 0, 0.6], [1, 3, 0.8], [1.5, 0, 0.55], [2, 0, 0.9], [2.5, 0, 0.5], [2.75, 0, 0.6], [3, 5, 0.8], [3.5, 3, 0.6]];
-  const B: [number, number, number][] = [[0, 0, 1], [0.5, 0, 0.5], [0.75, 0, 0.6], [1, 3, 0.8], [1.5, 0, 0.55], [2, 0, 0.9], [2.5, 0, 0.5], [2.75, 0, 0.6], [3, 2, 0.75], [3.5, 1, 0.65]];
-  const raw: { beat: number; dur: number; midi: number; vel: number }[] = [];
-  for (let b0 = o.from ?? 0; b0 < p.beats - 1e-6; b0 += 4) {
-    const root = rootAt(p, b0);
-    for (const [k, d, v] of (b0 / 4) % 2 ? B : A) raw.push({ beat: b0 + k, dur: 0.5, midi: midiOf(c, root + d, oct), vel: v * 0.82 });
-    if (o.heavy) raw.push({ beat: b0, dur: 1, midi: midiOf(c, root + 5, oct), vel: 0.6 });
-  }
-  const ev = plucks(c, inst, raw, { gain: o.gain, send: 0.08, spread: 0.12, center: -0.18, prio: 1, humanize: 0.004 });
-  // the zheng's low strings ring for seconds: damp them to a short, driving note
-  if (inst === 'zheng') for (const e of ev) if (e.job.op === 'pluck') for (const n of e.job.notes) n.ring = 0.42;
-  return ev;
-}
-
-/** 琵琶: 扫弦 (a four-string strum) on each bar, 轮 figures (four repeated 16ths) on 2 and 4, root and fifth between. */
-function pipaDrive(c: Ctx, o: { gain: number; tight?: boolean; from?: number }): MusicEvent[] {
-  const { p } = c;
-  const oct = octFor(p, 52);
-  const raw: { beat: number; dur: number; midi: number; vel: number }[] = [];
-  const strum = (beat: number, root: number, vel: number) => {
-    [0, 3, 5, 7].forEach((d, i) => raw.push({ beat: beat + (i * 0.014) / c.spb, dur: 0.5, midi: midiOf(c, root + d, oct), vel: vel * (1 - i * 0.06) }));
-  };
-  const lun = (beat: number, deg: number, vel: number) => {
-    [1, 0.55, 0.72, 0.55].forEach((v, i) => raw.push({ beat: beat + i * 0.25, dur: 0.25, midi: midiOf(c, deg, oct + 1), vel: vel * v }));
-  };
-  for (let b0 = o.from ?? 0; b0 < p.beats - 1e-6; b0 += 4) {
-    const root = rootAt(p, b0);
-    strum(b0, root, 0.85);
-    lun(b0 + 1, root + 3, 0.7);
-    raw.push({ beat: b0 + 2, dur: 0.5, midi: midiOf(c, root, oct + 1), vel: 0.72 }, { beat: b0 + 2.5, dur: 0.5, midi: midiOf(c, root + 3, oct), vel: 0.55 });
-    if (o.tight) strum(b0 + 2.5, root, 0.7);
-    lun(b0 + 3, root + ((b0 / 4) % 2 ? 2 : 5), 0.72);
-  }
-  return plucks(c, 'pipa', raw.filter((n) => n.beat < p.beats - 1e-6), { gain: o.gain, send: 0.14, spread: 0.3, center: 0.3, prio: 1, humanize: 0.003 });
-}
 
 /** A soft pulse for the calm theme: 大鼓 on the bar, 梆子 or 木鱼 on the off-beats, a 古筝 ostinato. */
 function calmPulse(c: Ctx, o: { knock: 'bang' | 'wood'; zheng: number; drum: number }): MusicEvent[] {
@@ -908,16 +775,21 @@ function bells(c: Ctx, notes: MNote[], oct: number, gain: number, prio: 0 | 1 | 
 const mirrorCalm: ThemeSpec = {
   get level() { return MIRROR_CALM_LEVEL[mm.colour]; },
   get style() { return MIRROR_CALM_STYLE[mm.colour]; },
-  shape(p) { toBars(p, between(p.bpm, MIRROR_CALM_STYLE[mm.colour].bpm)); },
+  shape(p) {
+    p.bpm = Math.round(between(p.bpm, MIRROR_CALM_STYLE[mm.colour].bpm));
+    p.beats = Math.max(4, Math.ceil((p.end + 0.5 - 1e-6) / 4) * 4);
+  },
   arrange(c) {
     const { p, r } = c;
     const ev: MusicEvent[] = [];
     const last = p.notes[p.notes.length - 1];
     if (mm.colour === 'lake') {
-      // 古琴 sings, a 箫 takes the second statement; 木鱼 and a soft 大鼓 keep the pulse
-      if (p.role === 'cheng') ev.push(...[line(c, 'xiao', p.notes, 0, { gain: 0.6, pan: -0.15, send: 0.42, grace: 0.45, slide: 0.25 })].filter(notNull));
-      else ev.push(...plucks(c, 'qin', mel(c, 0), { gain: 0.85, send: 0.32, bend: 0.3, glide: 0.2, vib: 0.5, spread: 0.25 }));
-      ev.push(...calmPulse(c, { knock: 'wood', zheng: 0.3, drum: 0.2 }));
+      // the 箫 sings the call and its answer, the 笛 takes the turn over the water, the 古琴 only the
+      // close (合) and its low final; 木鱼 and a soft 大鼓 keep the pulse
+      if (p.role === 'zhuan') ev.push(...[line(c, 'dizi', p.notes, octFor(p, 72), { gain: 0.5, pan: 0.15, send: 0.4, grace: 0.6, slide: 0.2, echo: 0.14 })].filter(notNull));
+      else if (p.role === 'he') ev.push(...plucks(c, 'qin', mel(c, 0), { gain: 0.85, send: 0.32, bend: 0.3, glide: 0.2, vib: 0.5, spread: 0.25 }));
+      else ev.push(...[line(c, 'xiao', p.notes, 0, { gain: 0.62, pan: -0.15, send: 0.42, grace: 0.45, slide: 0.25 })].filter(notNull));
+      ev.push(...calmPulse(c, { knock: 'wood', zheng: 0.22, drum: 0.2 }));
       if (p.role === 'he') ev.push(...plucks(c, 'qin', [{ beat: last.beat, dur: last.dur, midi: midiOf(c, 0, -1), vel: 0.45 }], { gain: 0.55, send: 0.35, prio: 1 }));
     } else if (mm.colour === 'forest') {
       // 洞箫 low and breathy over 手鼓; the 笛 answers in the 转
@@ -939,41 +811,572 @@ const mirrorCalm: ThemeSpec = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// The battle composer. The Composer supplies the phrase's role (起承转合), period and mode; the tune
+// is rewritten here as four bars around the map's fixed call (the head), so every wave of a run
+// states the same hook and a player learns it.
+
+export type BattleVoice = 'dizi' | 'xiao' | 'suona';
+
+/** A battle melody note: a composer note plus who plays it and how. */
+export interface BattleNote extends MNote {
+  /** The wind carrying it: 笛 (lead), 箫 (second statements, answers), 唢呐 (bosses, the 转's answer). */
+  v: BattleVoice;
+  /** 吐音: tongued short (repeated notes, pickups, runs). */
+  tu?: boolean;
+  /** Held (≥ 1.5 beats): the other wind answers inside it. */
+  hold?: boolean;
+  /** The phrase's high point (花舌 from tier 3, or in a boss). */
+  climax?: boolean;
+  /** The pickup into the next phrase. */
+  pick?: boolean;
+}
+
+/** A two-bar call: degrees from the mode's final and their lengths in beats (4 + 4). */
+interface Head { degs: number[]; beats: number[] }
+
+/**
+ * The maps' calls (written for this game). 湖: the long D, a dotted fall, a climb by a 4th to the held
+ * fifth — a call across the water. 林: a 吐音 burst on the final, a 5th up, a half-cadence hold — the
+ * ambush. 宫: a rising 5th + 4th arpeggio to the top, then 吐音 below it — cold and high.
+ */
+const WAVE_HEAD: Record<MirrorColour, Head> = {
+  lake: { degs: [5, 6, 5, 4, 3, 4, 5, 7, 8], beats: [1.5, 0.5, 0.75, 0.25, 1, 0.5, 0.5, 1, 2] },
+  forest: { degs: [0, 0, 0, 0, 3, 3, 5, 4, 3, 2, 3, 4, 3], beats: [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 1, 0.75, 0.25, 0.5, 0.5, 1, 2] },
+  palace: { degs: [2, 5, 7, 6, 7, 6, 6, 6, 6, 6, 5, 4, 5], beats: [0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 2] },
+};
+/** The 吐音 pickup into a phrase starting on `start`: a 4th below it, or a 5th above when the flute has no room below. */
+const pickupDeg = (start: number, lo: number, hi: number) => (start - 2 >= lo ? start - 2 : Math.min(hi, start + 3));
+/** The bosses' calls: long notes to scoop into (the 唢呐's 上滑音), a dotted answer. */
+const BOSS_HEAD: Record<MirrorColour, Head> = {
+  lake: { degs: [0, 2, 3, 2, 3, 5, 4, 3, 2, 3], beats: [1.5, 0.5, 1, 0.5, 0.5, 2, 0.75, 0.25, 0.5, 0.5] },
+  forest: { degs: [0, 0, 0, 0, 2, 3, 5, 4, 3, 2, 3, 0], beats: [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 2, 0.5, 0.5, 0.5, 0.5, 2] },
+  palace: { degs: [5, 4, 5, 7, 6, 5, 4, 3, 5], beats: [1, 0.5, 0.5, 2, 0.75, 0.25, 0.5, 0.5, 2] },
+};
+/** Where each colour's lead sits: the MIDI note the head's middle is placed nearest. */
+const LEAD_REG: Record<MirrorColour, number> = { lake: 76, forest: 77, palace: 81 };
+const BOSS_REG: Record<MirrorColour, number> = { lake: 74, forest: 74, palace: 76 };
+
+/** One bar of drive (4 beats): 8ths, dotted pushes, 吐音 16ths, syncopation. */
+const DRIVE_BARS = [
+  [0.5, 0.5, 0.75, 0.25, 1, 1],
+  [0.25, 0.25, 0.5, 0.5, 0.5, 1, 1],
+  [0.75, 0.25, 0.75, 0.25, 0.5, 0.5, 1],
+  [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 0.5, 1],
+  [0.5, 0.25, 0.25, 0.5, 0.25, 0.25, 0.5, 0.5, 1],
+  [0.5, 1, 0.5, 0.75, 0.25, 1],
+];
+/** The 转's call-and-response cells (2 beats each). */
+const CALL_CELLS = [[0.25, 0.25, 0.5, 1], [0.5, 0.25, 0.25, 1], [0.75, 0.25, 1], [0.25, 0.25, 0.25, 0.25, 1]];
+
+interface BattlePlan {
+  head: Head;
+  /** The lowest and highest degree the tune may use (the lead instrument's range at its octave). */
+  lo: number;
+  hi: number;
+  tier: number;
+  boss: boolean;
+  /** Who takes the 承's first statement (the second statement of the call). */
+  second: BattleVoice;
+  /** Who answers the 笛 in the 转. */
+  answer: BattleVoice;
+  /** Who leads. */
+  lead: BattleVoice;
+}
+
+/** Split a head into its two bars. */
+function headBars(h: Head): [{ degs: number[]; beats: number[] }, { degs: number[]; beats: number[] }] {
+  let acc = 0, k = 0;
+  while (k < h.beats.length && acc < 4 - 1e-6) acc += h.beats[k++];
+  return [{ degs: h.degs.slice(0, k), beats: h.beats.slice(0, k) }, { degs: h.degs.slice(k), beats: h.beats.slice(k) }];
+}
+
+/** Degrees for a bar of drive: steps toward `to`, 吐音 repeats on 16th pairs, upward 4th/5th leaps on strong beats. */
+function walk(r: Rng, from: number, to: number, rh: number[], lo: number, hi: number, tu: number, rise: number): number[] {
+  const out: number[] = [];
+  let d = from, beat = 0, rep = 0;
+  for (let i = 0; i < rh.length; i++) {
+    const left = rh.length - i;
+    const need = to - d;
+    let s: number;
+    const six = rh[i] <= 0.25 + 1e-6;
+    const strong = Math.abs(beat - Math.round(beat)) < 1e-6;
+    if (i > 0 && six && rep < 3 && r.chance(tu)) s = 0; // 吐音: tongue the same note again
+    else if (strong && i < rh.length - 1 && d + 3 <= hi && need >= -1 && r.chance(rise)) s = r.pick([2, 3]); // a 4th/5th up
+    else if (Math.abs(need) >= left * 1.5) s = Math.sign(need) * 2;
+    else if (need === 0) s = r.chance(0.5) ? 1 : -1;
+    else s = r.chance(0.78) ? Math.sign(need) : -Math.sign(need);
+    const nd = clamp(d + s, lo, hi);
+    rep = nd === d ? rep + 1 : 0;
+    d = nd;
+    out.push(d);
+    beat += rh[i];
+  }
+  return out;
+}
+
+/**
+ * Compose one battle phrase (four bars; the first phrase of a theme opens with a bar of drums and the
+ * pickup). Mutates `p`: notes, end, beats, cadence.
+ */
+function composeBattle(p: Phrase, r: Rng, plan: BattlePlan): BattleNote[] {
+  const { head, tier } = plan;
+  const [bar1, bar2] = headBars(head);
+  const hHi = Math.max(...head.degs);
+  const { lo, hi } = plan;
+  const half = halfCadence(p.mode.final);
+  const out: BattleNote[] = [];
+  let b = 0;
+  const put = (deg: number, dur: number, v: BattleVoice, x: Partial<BattleNote> = {}) => {
+    out.push({ beat: b, dur, deg, vel: 0.8, v, ...x });
+    b += dur;
+  };
+  const lastDeg = () => (out.length ? out[out.length - 1].deg : head.degs[0]);
+  const tuChance = 0.25 + 0.08 * tier;
+  const rise = 0.28 + 0.04 * tier;
+  const drive = (to: number, v: BattleVoice, rh = r.pick(DRIVE_BARS)) => {
+    const ds = walk(r, lastDeg(), to, rh, lo, hi, tuChance, rise);
+    rh.forEach((d, i) => put(ds[i], d, v, { tu: d <= 0.25 + 1e-6 && i > 0 && ds[i] === ds[i - 1] ? true : undefined }));
+  };
+  const statement = (bar: { degs: number[]; beats: number[] }, v: BattleVoice, shift = 0) => {
+    if (Math.max(...bar.degs) + shift > hi) shift = 0; // a sequence up only while the flute has room
+    bar.degs.forEach((d, i) => {
+      const dur = bar.beats[i];
+      const tu = dur <= 0.25 + 1e-6 && i > 0 && bar.degs[i - 1] === d;
+      put(d + shift, dur, v, { tu: tu || undefined, hold: dur >= 1.5 || undefined });
+    });
+  };
+  const nearest = (target: number) => nearestOctave(target, lastDeg(), lo, hi);
+  // the next phrase's first note, and the 吐音 pickup a 4th below it
+  const nextRole = ROLE_ORDER[(p.index + 1) % 4];
+  const zStart = hHi - 1;
+  const nextStart = nextRole === 'zhuan' ? zStart : head.degs[0];
+  const pickup = (v: BattleVoice) => {
+    const d = pickupDeg(nextStart, lo, hi);
+    put(d, 0.25, v, { tu: true, pick: true }); put(d, 0.25, v, { tu: true, pick: true }); put(d, 0.5, v, { tu: true, pick: true });
+  };
+  /** Approach (1 beat), a 2-beat hold on the cadence degree, the pickup. */
+  const cadenceBar = (target: number, v: BattleVoice) => {
+    const t = nearest(target);
+    const from = lastDeg();
+    const dir = Math.sign(t - from) || -1;
+    const ap = r.pick([[0.5, 0.5], [0.75, 0.25], [0.25, 0.25, 0.5]]);
+    ap.forEach((d, i) => put(clamp(t - dir * (ap.length - i), lo, hi), d, v));
+    put(t, 2, v, { cad: true, hold: true });
+    pickup(plan.lead);
+  };
+  const L = plan.lead;
+  const dev = p.period % 3; // the call is re-stated every wave; its second bar develops with the periods
+  switch (p.role) {
+    case 'qi': {
+      statement(bar1, L);
+      statement(bar2, L, dev === 2 ? 1 : 0);
+      drive(half + 2, L);
+      cadenceBar(half, L);
+      break;
+    }
+    case 'cheng': {
+      // the second statement (箫 in 湖 and 林): the call again, its second bar moved
+      statement(bar1, plan.second);
+      const moved = { degs: bar2.degs.map((d, i) => (i > 0 && i < bar2.degs.length - 1 && r.chance(0.4) ? clamp(d + r.pick([-1, 1]), lo, hi) : d)), beats: bar2.beats };
+      statement(moved, plan.second, dev === 1 ? 1 : 0); // (moved up a step only while the flute has room)
+      drive(r.pick([1, half]) + 2, L, r.pick([DRIVE_BARS[1], DRIVE_BARS[3], DRIVE_BARS[4]]));
+      cadenceBar(r.pick([1, half]), L);
+      break;
+    }
+    case 'zhuan': {
+      // call and response in 2-beat cells, sequenced upward; a 历音 run into the climax; down to the cadence
+      let d = zStart;
+      for (let k = 0; k < 2; k++) {
+        const cell = r.pick(CALL_CELLS);
+        const degs = cell.map((_, i) => (i < cell.length - 2 ? d : i === cell.length - 2 ? d + 1 : d + r.pick([2, 3])));
+        cell.forEach((dur, i) => put(clamp(degs[i], lo, hi), dur, L, { tu: i > 0 && degs[i] === degs[i - 1] && dur <= 0.5 ? true : undefined }));
+        const resp = r.pick([[0.75, 0.25, 1], [0.5, 0.5, 1], [0.25, 0.25, 0.5, 1]]);
+        const top = clamp(degs[degs.length - 1], lo, hi);
+        resp.forEach((dur, i) => put(clamp(top - 2 - (i === resp.length - 1 ? 1 : i % 2), lo, hi), dur, plan.answer));
+        d += 1;
+      }
+      const peak = Math.min(hi, zStart + 3);
+      [4, 3, 2, 1].forEach((k) => put(clamp(peak - k, lo, hi), 0.25, L));
+      put(peak, 3, L, { climax: true, hold: true });
+      [1, 2, 3, 4].forEach((k) => put(clamp(peak - k, lo, hi), 0.25, L));
+      put(nearest(r.pick([2, 4, 1])), 2, L, { cad: true, hold: true });
+      pickup(L);
+      break;
+    }
+    case 'he': {
+      // the call's first bar, a rising drive, and the heroic cadence rising into the final, held
+      statement(bar1, L);
+      const fin = nearestOctave(0, hHi, lo, hi);
+      drive(fin - 3, L);
+      put(clamp(fin - 2, lo, hi), 1, L);
+      put(clamp(fin - 1, lo, hi), 1, L);
+      put(fin, 5, L, { cad: true, hold: true, climax: true });
+      pickup(L);
+      break;
+    }
+  }
+  // velocity: strong beats lean, 吐音 alternates T/K, the climax peaks; each layer adds a little
+  let prev: BattleNote | undefined;
+  for (const n of out) {
+    const onBeat = Math.abs(n.beat - Math.round(n.beat)) < 1e-6;
+    let v = onBeat && Math.round(n.beat) % 2 === 0 ? 0.86 : onBeat ? 0.8 : 0.74;
+    if (n.tu) v = Math.round(n.beat * 4) % 2 === 0 ? 0.92 : 0.76;
+    if (n.climax) v = 1;
+    else if (n.hold) v = Math.max(v, 0.88);
+    n.vel = clamp((v + 0.025 * tier) * r.range(0.96, 1.03), 0.3, 1);
+    if (prev && n.deg - prev.deg >= 2) n.leap = true;
+    prev = n;
+  }
+  return out;
+}
+
+const ROLE_ORDER = ['qi', 'cheng', 'zhuan', 'he'] as const;
+
+interface Battle { notes: BattleNote[]; tier: number; lead: number; intro: boolean }
+let lastBpm = 140;
+/** The tempo of the last battle phrase composed (the cues play in the band's 16ths). */
+export const mirrorBpm = () => lastBpm;
+/** The battle tune of each composed phrase, kept for its arrangement (the Conductor holds the Phrase). */
+const BATTLE = new WeakMap<Phrase, Battle>();
+
+/** Shape a battle phrase: the tempo, the tune, four whole bars (a fifth — the drum fill — first). */
+function shapeBattle(p: Phrase, r: Rng, boss: boolean): void {
+  const col = mm.colour;
+  const tier = boss ? mirrorBossStep() : mirrorTier(p);
+  const style = (boss ? MIRROR_BOSS_STYLE : MIRROR_STYLE)[col];
+  const bpm = boss ? between(p.bpm, style.bpm) + 3 * Math.min(2, tier) : between(p.bpm, style.bpm) * (tier >= 4 ? 1.04 : 1);
+  p.bpm = Math.round(Math.min(MIRROR_MAX_BPM, bpm));
+  lastBpm = p.bpm;
+  const head = (boss ? BOSS_HEAD : WAVE_HEAD)[col];
+  // the lead's octave: the head's middle pitch nearest the colour's register; the tune keeps inside
+  // the lead's range there (a 曲笛/梆笛 G4–E6, a 唢呐 D4–C6) and never below the call itself
+  const reg = (boss ? BOSS_REG : LEAD_REG)[col];
+  const pitches = head.degs.map((d) => degreeToMidi(p.mode, d)).sort((a, b) => a - b);
+  const lead = Math.round((reg - pitches[pitches.length >> 1]) / 12);
+  const [pLo, pHi] = boss ? [62, 84] : [67, 88];
+  let lo = Math.min(...head.degs) - 2, hi = Math.max(...head.degs) + 3;
+  while (degreeToMidi(p.mode, lo) + 12 * lead < pLo && lo < Math.min(...head.degs)) lo++;
+  while (degreeToMidi(p.mode, hi) + 12 * lead > pHi && hi > Math.max(...head.degs)) hi--;
+  const plan: BattlePlan = boss
+    ? { head, lo, hi, tier: 2 + Math.min(2, tier), boss, lead: 'suona', second: 'suona', answer: tier >= 1 ? 'dizi' : 'xiao' }
+    : { head, lo, hi, tier, boss, lead: 'dizi', second: col === 'palace' ? 'dizi' : 'xiao', answer: col === 'forest' ? (tier >= 1 ? 'suona' : 'xiao') : tier >= 3 ? 'suona' : 'xiao' };
+  const notes = composeBattle(p, r, plan);
+  const intro = p.index === 0;
+  if (intro) {
+    // a bar of drums first; the lead's 吐音 pickup sits in its last beat
+    for (const n of notes) n.beat += 4;
+    const d = pickupDeg(head.degs[0], lo, hi);
+    notes.unshift(
+      { beat: 3, dur: 0.25, deg: d, vel: 0.84, v: plan.lead, tu: true, pick: true },
+      { beat: 3.25, dur: 0.25, deg: d, vel: 0.72, v: plan.lead, tu: true, pick: true },
+      { beat: 3.5, dur: 0.5, deg: d, vel: 0.86, v: plan.lead, tu: true, pick: true },
+    );
+  }
+  p.notes = notes;
+  const cad = [...notes].reverse().find((n) => n.cad) ?? notes[notes.length - 1];
+  p.end = Math.max(...notes.filter((n) => !n.pick).map((n) => n.beat + n.dur));
+  p.beats = 16 + (intro ? 4 : 0);
+  p.cadence = cad.deg;
+  BATTLE.set(p, { notes, tier, lead, intro });
+}
+
+// ---------------------------------------------------------------------------
+// The battle band
+
+/** The octave that puts the median of `notes` (degrees + `shift`) nearest `target` (each wind in its own register). */
+function octNear(c: Ctx, notes: readonly MNote[], target: number, shift = 0): number {
+  if (!notes.length) return 0;
+  const ms = notes.map((n) => midiOf(c, n.deg + shift, 0)).sort((a, b) => a - b);
+  return Math.round((target - ms[ms.length >> 1]) / 12);
+}
+/** Where the supporting voices sit (median MIDI): the 箫 low and hollow, the 二胡 under the 笛, the 唢呐 below it;
+ *  the 笛's answers in its singing register (G5–A5), never its shrill top. */
+const REG = { xiao: 65, erhu: 67, suona: 71, sheng: 62, diziAns: 79, bossDizi: 78, bossXiao: 62 } as const;
+/** The battle 笛's ceiling (E6): above it a band flute turns shrill. */
+export const DIZI_TOP = 88;
+/** `oct`, lowered by octaves until the line's top note (degrees + `shift`) is at most the 笛's ceiling. */
+function diziOct(c: Ctx, notes: readonly MNote[], oct: number, shift = 0): number {
+  if (!notes.length) return oct;
+  const top = Math.max(...notes.map((n) => midiOf(c, n.deg + shift, oct)));
+  return top > DIZI_TOP ? oct - Math.ceil((top - DIZI_TOP) / 12) : oct;
+}
+
+/** A wind line of the battle score (the loud voices), with its ornaments. */
+function battleLine(c: Ctx, inst: LineInst, notes: BattleNote[], oct: number, o: {
+  gain: number; pan: number; send: number; echo?: number; prio?: 0 | 1 | 2;
+  /** Chance of a 叠音 / 打音 / 颤音 on a fitting note. */
+  orn?: number;
+  /** 花舌 on the climaxes (and the 合's held final). */
+  flutter?: boolean;
+  /** 上滑音 into long notes (cents). */
+  scoop?: number;
+  slide?: number;
+  degShift?: number;
+}): MusicEvent | null {
+  if (!notes.length) return null;
+  const r = c.r, sh = o.degShift ?? 0;
+  if (inst === 'dizi') oct = diziOct(c, notes, oct, sh); // never above E6
+  const t0 = secOf(c, notes[0].beat);
+  const ln: LineNote[] = notes.map((n, i) => {
+    const prev = notes[i - 1];
+    const m = midiOf(c, n.deg + sh, oct);
+    const secs = secOf(c, n.dur);
+    const dur = n.tu ? secs * 0.62 : n.hold ? secs * 0.97 : n.dur >= 0.5 ? secs * 0.84 : secs * 0.8;
+    const x: LineNote = { t: secOf(c, n.beat) - t0, dur, freq: hz(m), vel: n.vel };
+    if (n.tu) x.tongue = true;
+    const onBeat = Math.abs(n.beat - Math.round(n.beat)) < 1e-6;
+    const orn = o.orn ?? 0;
+    if (n.leap && prev && n.deg > prev.deg && secs > 0.18 && r.chance(0.55)) { x.grace = hz(midiOf(c, n.deg + sh + 1, oct)); x.graceLen = 0.05; }
+    else if (onBeat && !n.tu && n.dur >= 0.5 && !n.hold && r.chance(orn)) { x.grace = hz(midiOf(c, n.deg + sh + 1, oct)); x.graceLen = 0.032; } // 叠音
+    else if (prev && !n.tu && Math.abs(n.deg - prev.deg) === 1 && r.chance(o.slide ?? 0)) x.slide = true;
+    if (n.hold && o.flutter && (n.climax || (n.cad && n.dur >= 2))) x.flutter = n.climax ? 0.75 : 0.55;
+    else if (n.hold && secs > 0.5 && r.chance(orn)) {
+      if (n.cad && r.chance(0.5)) x.trill = hz(midiOf(c, n.deg + sh + 1, oct)); // 颤音
+      else x.tap = { at: secs * r.range(0.4, 0.6), freq: hz(midiOf(c, n.deg + sh - 1, oct)) }; // 打音
+    }
+    if (o.scoop && n.dur >= 1 && !n.tu) x.scoop = o.scoop;
+    x.vib = secs < 0.4 ? 0.15 : n.hold ? 1.25 : 0.8;
+    return x;
+  });
+  return {
+    t: t0, inst, job: { op: 'line', inst, notes: ln, seed: nextSeed(c), loud: true },
+    gain: o.gain, pan: o.pan, send: o.send, echo: o.echo ?? 0, prio: o.prio ?? 0,
+    dur: ln[ln.length - 1].t + ln[ln.length - 1].dur + 0.3,
+    notes: ln.map((n) => ({ t: n.t, dur: n.dur, midi: 69 + 12 * Math.log2(n.freq / 440) })),
+  };
+}
+
+/**
+ * The answers: while one wind holds a note, another echoes the figure before it (a 4th lower for the
+ * 箫, a 4th higher for the 笛) — call and response inside every phrase.
+ */
+function answers(notes: BattleNote[], by: (holder: BattleVoice) => BattleVoice | null): Map<BattleVoice, BattleNote[]> {
+  const out = new Map<BattleVoice, BattleNote[]>();
+  notes.forEach((h, i) => {
+    if (!h.hold || h.dur < 2 || h.climax) return;
+    const who = by(h.v);
+    if (!who) return;
+    const before = notes.slice(Math.max(0, i - 3), i).filter((n) => n.v === h.v);
+    if (before.length < 2) return;
+    const shift = who === 'dizi' ? 2 : -2;
+    const rh = h.dur >= 3 ? [0.75, 0.25, 0.5, 0.5, 1] : [0.5, 0.5, 0.5];
+    const src = [...before.map((n) => n.deg), h.deg];
+    let b = h.beat + 0.5;
+    const list = out.get(who) ?? [];
+    rh.forEach((d, k) => {
+      list.push({ beat: b, dur: d, deg: src[Math.min(src.length - 1, k)] + shift, vel: 0.72 + (k === 0 ? 0.08 : 0), v: who, hold: k === rh.length - 1 && d >= 1 ? true : undefined });
+      b += d;
+    });
+    out.set(who, list);
+  });
+  return out;
+}
+
+/** Percussion collected for one phrase and mixed into a single stereo buffer (a single voice). */
+class Kit {
+  readonly hits: KitHit[] = [];
+  constructor(private c: Ctx, private g = 1) {}
+  at(kind: KitKind, beat: number, gain: number, pan: number) {
+    const { p, r } = this.c;
+    if (beat < -1e-6 || beat >= p.beats - 1e-6) return;
+    const rate = (kind === 'bang' ? 1.85 : 1) * (1 + (r() - 0.5) * 0.03);
+    this.hits.push({ t: Math.max(0, secOf(this.c, beat) + (r() - 0.5) * 0.006), kind, gain: clamp(this.g * gain * (0.92 + r() * 0.16), 0.01, 1.2), pan, v: r.int(1, 3), rate });
+  }
+  event(send = 0.12): MusicEvent {
+    const c = this.c;
+    return {
+      t: 0, inst: 'drum', job: { op: 'kit', hits: this.hits.slice().sort((a, b) => a.t - b.t), hard: true },
+      gain: 1, pan: 0, send, echo: 0, prio: 0, dur: phraseSec(c) + 1.4,
+    };
+  }
+}
+
+interface BattleDrums { tier: number; intro?: 'fill' | 'roll'; boss?: boolean; toms?: boolean; gain?: number }
+
+/**
+ * The war drums over the whole phrase: 大鼓 on 1 and 3 (the pulse) with pickups, the 堂鼓 backbeat,
+ * 板 on the off-beats, 梆子 pushing into the backbeat, 小锣, fills into the next phrase; 钹 and 大锣
+ * on the turns (separate voices: they ring into the reverb).
+ */
+function battleDrums(c: Ctx, o: BattleDrums): MusicEvent[] {
+  const { p } = c;
+  const tier = o.tier, boss = !!o.boss;
+  // each layer leans in a little harder (the tight last 10 s ≈ +2 dB over the first layer)
+  const kit = new Kit(c, (o.gain ?? 1) * (1 + 0.06 * Math.min(4, tier)));
+  const bars = Math.round(p.beats / 4);
+  const intro = !!o.intro && p.index === 0;
+  for (let b = 0; b < bars; b++) {
+    const b0 = b * 4, last = b === bars - 1;
+    if (intro && b === 0) {
+      if (o.intro === 'fill') {
+        // 咚 咚 哒哒哒哒哒哒哒哒 | 仓 — into the wave (the lead's pickup rides the roll's last beat)
+        kit.at('big', 0, 0.62, -0.1); kit.at('big', 1, 0.54, -0.1);
+        for (let k = 0; k < 8; k++) kit.at('tang', 2 + k * 0.25, 0.2 + 0.045 * k, -0.3 + 0.08 * k);
+      } else {
+        // the boss: a roll swelling for a whole bar — 大鼓 on the 8ths, 堂鼓 between
+        for (let k = 0; k < 8; k++) { kit.at('big', k * 0.5, 0.26 + 0.05 * k, -0.1); kit.at('tang', k * 0.5 + 0.25, 0.14 + 0.04 * k, 0.2); }
+      }
+      continue;
+    }
+    // 大鼓: 1 and 3; the and-of-4 pickup; war drums (a boss, tight) push the and-of-2 too
+    kit.at('big', b0, 0.66, -0.1); kit.at('big', b0 + 2, 0.56, -0.1);
+    if (tier >= 1 || boss) kit.at('big', b0 + 3.5, 0.34, -0.1);
+    if (tier >= 4 || boss || (tier >= 3 && b % 2 === 1)) kit.at('big', b0 + 1.5, 0.32, -0.1);
+    if (boss && tier >= 3) { kit.at('big', b0 + 1, 0.3, -0.1); kit.at('big', b0 + 3, 0.34, -0.1); }
+    // 堂鼓 backbeat (the phone hears it), ghost 16ths from tier 2
+    kit.at('tang', b0 + 1, 0.78, 0.15); kit.at('tang', b0 + 3, 0.78, 0.15);
+    if ((tier >= 2 || boss) && b % 2 === 1 && !last) { kit.at('tang', b0 + 2.75, 0.16, 0.22); kit.at('tang', b0 + 3.25, 0.13, 0.22); }
+    if (o.toms) { kit.at('tang', b0 + 2.5, 0.54, -0.35); kit.at('tang', b0 + 3.75, 0.44, -0.35); }
+    // 板 on every off-beat; tight and in a boss's heat, the 16ths between
+    for (const k of [0.5, 1.5, 2.5, 3.5]) kit.at('rim', b0 + k, 0.56, 0.3);
+    if (tier >= 4 || (boss && tier >= 3)) for (const k of [0.25, 1.25, 2.25, 3.25]) kit.at('rim', b0 + k, 0.2, 0.38);
+    // 梆子: a 16th before each backbeat
+    if (tier >= 1 || boss) { kit.at('bang', b0 + 0.75, 0.44, 0.45); kit.at('bang', b0 + 2.75, 0.44, 0.45); }
+    // 小锣 (才) on 3 from tier 3; on 1 too in a boss's later phases
+    if (tier >= 3 || boss) kit.at('xiaoluo', b0 + 3, 0.065, 0.42);
+    if (boss && tier >= 3) kit.at('xiaoluo', b0 + 1, 0.05, 0.42);
+    // into the next phrase: a 堂鼓 fill under the pickup (a boss: 大鼓 and 堂鼓 alternating)
+    if (last) for (let k = 1; k < 4; k++) kit.at(boss && k === 2 ? 'big' : 'tang', b0 + 3 + k * 0.25, 0.2 + 0.07 * k, -0.25 + 0.12 * k);
+  }
+  const ev: MusicEvent[] = [kit.event()];
+  // phrase turns: 钹 on the first downbeat, the 大锣 opening each period (every phrase when tight or
+  // in a boss's later phases), and after the intro bar
+  const first = intro ? 4 : 0;
+  if (first < p.beats) {
+    ev.push(hit(c, 'bo', secOf(c, first), 0.24, { pan: 0.3, send: 0.2, prio: 1 }));
+    const turn = p.role === 'qi' || tier >= 4 || (boss && tier >= 3) || ((tier >= 3 || boss) && p.role === 'zhuan');
+    if (turn || intro) ev.push(hit(c, 'daluo', secOf(c, first), intro ? 0.3 : 0.24, { pan: 0.05, send: 0.25, prio: 1 }));
+  }
+  return ev;
+}
+
+/** 琵琶 扫弦 (four-string strums) as rhythm: on 1, then the and-of-2, then 3 and 4 as the tiers rise. */
+function strums(c: Ctx, tier: number, o: { gain: number; from: number }): MusicEvent[] {
+  const { p } = c;
+  const oct = octFor(p, 52);
+  const at = tier >= 4 ? [0, 1.5, 2.5, 3, 3.5] : tier >= 3 ? [0, 1.5, 2.5] : tier >= 2 ? [0, 1.5] : [0];
+  const raw: { beat: number; dur: number; midi: number; vel: number }[] = [];
+  for (let b0 = o.from; b0 < p.beats - 1e-6; b0 += 4) {
+    const root = rootAt(p, b0);
+    for (const k of at) {
+      const vel = k === 0 ? 0.9 : 0.7;
+      [0, 3, 5, 7].forEach((d, i) => raw.push({ beat: b0 + k + (i * 0.012) / c.spb, dur: 0.5, midi: midiOf(c, root + d, oct), vel: vel * (1 - i * 0.07) }));
+    }
+  }
+  const ev = plucks(c, 'pipa', raw.filter((n) => n.beat < p.beats - 1e-6), { gain: o.gain, send: 0.12, spread: 0.3, center: 0.3, prio: 1, humanize: 0.003 });
+  for (const e of ev) if (e.job.op === 'pluck') e.job.tone = 'battle';
+  return ev;
+}
+
+/** 低音古筝: a damped gallop on the root (8th, two 16ths), the fifth on 2 — rhythm under the winds. */
+function gallop(c: Ctx, o: { gain: number; from: number }): MusicEvent[] {
+  const { p } = c;
+  const oct = octFor(p, 43);
+  const A: [number, number, number][] = [[0, 0, 1], [0.5, 0, 0.5], [0.75, 0, 0.6], [1, 3, 0.8], [2, 0, 0.9], [2.5, 0, 0.5], [2.75, 0, 0.6], [3, 2, 0.8]];
+  const raw: { beat: number; dur: number; midi: number; vel: number }[] = [];
+  for (let b0 = o.from; b0 < p.beats - 1e-6; b0 += 4) {
+    const root = rootAt(p, b0);
+    for (const [k, d, v] of A) raw.push({ beat: b0 + k, dur: 0.5, midi: midiOf(c, root + d, oct), vel: v * 0.8 });
+  }
+  const ev = plucks(c, 'zheng', raw, { gain: o.gain, send: 0.08, spread: 0.12, center: -0.2, prio: 1, humanize: 0.004 });
+  for (const e of ev) if (e.job.op === 'pluck') { e.job.tone = 'battle'; for (const n of e.job.notes) n.ring = 0.3; }
+  return ev;
+}
+
+/** 二胡: a counterline a 4th/3rd under the tune's strong notes, long and sliding (or 快弓 on the root). */
+function erhuLine(c: Ctx, notes: BattleNote[], oct: number, o: { gain: number; kuai?: boolean; from: number }): MusicEvent | null {
+  const { p } = c;
+  const src: BattleNote[] = [];
+  for (let b = o.from; b < p.beats - 1e-6; b += 2) {
+    const under = notes.filter((n) => n.beat <= b + 1e-6 && !n.pick).pop();
+    if (!under) continue;
+    src.push({ beat: b, dur: 1.9, deg: under.deg - 2, vel: 0.72, v: 'dizi' });
+  }
+  if (o.kuai) {
+    // 快弓: the root re-bowed in 16ths through the 转's second half
+    const root = rootAt(p, 8 + o.from);
+    for (let b = 8 + o.from; b < 12 + o.from; b += 0.25) src.push({ beat: b, dur: 0.25, deg: root, vel: b % 1 === 0 ? 0.85 : 0.65, v: 'dizi', tu: true });
+    src.sort((a, b) => a.beat - b.beat);
+    for (let i = src.length - 1; i > 0; i--) if (src[i].beat < src[i - 1].beat + src[i - 1].dur - 1e-6 && !src[i - 1].tu) src[i - 1].dur = src[i].beat - src[i - 1].beat;
+  }
+  return battleLine(c, 'erhu', src.filter((n) => n.dur > 0.05), oct, { gain: o.gain, pan: -0.3, send: 0.2, prio: 1, slide: 0.5, orn: 0 });
+}
+
+/** 笙 stabs: short tongued chords on the off-beats (cached per chord). */
+function shengStabs(c: Ctx, oct: number, o: { gain: number; from: number; at: number[] }): MusicEvent[] {
+  const { p } = c;
+  const ev: MusicEvent[] = [];
+  for (let b0 = o.from; b0 < p.beats - 1e-6; b0 += 4) {
+    for (const k of o.at) {
+      const root = midiOf(c, rootAt(p, b0 + k), oct);
+      const fifth = inMode(p.mode, root + 7) ? root + 7 : root + 5;
+      const tones = [root, fifth, root + 12];
+      const t = secOf(c, b0 + k);
+      ev.push({
+        t, inst: 'sheng', job: { op: 'sheng', freqs: tones.map(hz), dur: 0.26, vel: 0.8, seed: 7, air: 0.2, stab: true },
+        key: `sheng:stab:${root}`, gain: o.gain, pan: 0, send: 0.14, echo: 0, prio: 2, dur: 0.26,
+        notes: tones.map((m) => ({ t: 0, dur: 0.26, midi: m })),
+      });
+    }
+  }
+  return ev;
+}
+
 const mirror: ThemeSpec = {
   get level() { return MIRROR_LEVEL[mm.colour]; },
   get style() { return MIRROR_STYLE[mm.colour]; },
-  shape(p) {
-    const tier = mirrorTier(p);
-    toBars(p, between(p.bpm, MIRROR_STYLE[mm.colour].bpm) * (tier >= 4 ? 1.04 : 1));
-  },
+  shape(p, r) { shapeBattle(p, r ?? makeRng(p.index + 1), false); },
   arrange(c) {
     const { p } = c;
-    const tier = mirrorTier(p);
+    const bt = BATTLE.get(p);
+    if (!bt) return [];
+    const { notes, tier, lead: o } = bt;
     const col = mm.colour;
     const ev: MusicEvent[] = [];
-    const fill = p.index === 0;
-    const from = fill ? 4 : 0; // melodic layers wait for the fill's downbeat
-    ev.push(...drumBed(c, { tier, intro: 'fill', toms: col === 'forest' }));
-    if (tier >= 1) ev.push(...ostinato(c, col === 'forest' ? 'pipa' : 'zheng', { gain: col === 'forest' ? 0.62 : 0.56, from, heavy: tier >= 4 }));
-    if (tier >= 2) ev.push(...pipaDrive(c, { gain: 0.46, tight: tier >= 4, from }));
-    if (tier >= 3) {
-      const notes = tongued(p.notes);
-      if (col === 'forest') {
-        ev.push(...[line(c, 'suona', notes, octFor(p, 62), { gain: 0.5, pan: 0.05, send: 0.2, grace: 0.55, slide: 0.12, vib: 0.7 })].filter(notNull));
-        if (tier >= 4) ev.push(...[line(c, 'dizi', tongued(strongOnly(p.notes)), octFor(p, 74), { gain: 0.34, pan: 0.25, send: 0.25, grace: 0.4, slide: 0.05, prio: 1 })].filter(notNull));
-      } else {
-        ev.push(...[line(c, 'dizi', notes, octFor(p, 67), { gain: 0.56, pan: 0.1, send: 0.24, grace: 0.55, slide: 0.08, vib: 0.6, echo: col === 'lake' ? 0.14 : 0.06 })].filter(notNull));
-        if (tier >= 4) ev.push(...[line(c, 'suona', tongued(strongOnly(p.notes)), octFor(p, 58), { gain: 0.36, pan: -0.1, send: 0.2, grace: 0.4, slide: 0.08, prio: 1 })].filter(notNull));
-        // 编钟 on the half-bar strong notes (long rings: every other one)
-        if (col === 'palace') ev.push(...bells(c, strongOnly(p.notes).filter((n) => n.cad || Math.round(n.beat) % 2 === 0), octFor(p, 79), 0.22, 2));
-      }
-    } else if (p.role === 'he' && tier >= 2) {
-      // before the lead enters, the 琵琶's top string hints at the tune's cadence
-      const lastN = p.notes[p.notes.length - 1];
-      ev.push(...plucks(c, 'pipa', [{ beat: lastN.beat, dur: lastN.dur, midi: midiOf(c, lastN.deg, octFor(p, 64)), vel: 0.7 }], { gain: 0.5, send: 0.2, trem: 0.3, prio: 1, center: 0.2 }));
+    const from = bt.intro ? 4 : 0;
+    ev.push(...battleDrums(c, { tier, intro: 'fill', toms: col === 'forest' }));
+    // the winds: the 笛 leads; the 箫 (an octave below) takes the second statement; the 唢呐 answers
+    const orn = 0.22 + 0.07 * tier;
+    const flutter = tier >= 3;
+    const by = (v: BattleVoice) => notes.filter((n) => n.v === v);
+    const dizi = battleLine(c, 'dizi', by('dizi'), o, { gain: 0.66 + 0.02 * tier, pan: 0.1, send: 0.16, echo: col === 'lake' ? 0.12 : 0.05, orn, flutter });
+    const xiao = battleLine(c, 'xiao', by('xiao'), octNear(c, by('xiao'), REG.xiao), { gain: 0.78, pan: -0.25, send: 0.3, orn: orn * 0.7, slide: 0.25, echo: col === 'lake' ? 0.1 : 0 });
+    const suona = battleLine(c, 'suona', by('suona'), octNear(c, by('suona'), REG.suona), { gain: 0.5, pan: 0.05, send: 0.18, orn, scoop: 90 });
+    ev.push(...[dizi, xiao, suona].filter(notNull));
+    // answers inside the holds: the 箫 under the 笛, the 笛 over the 箫 and the 唢呐
+    const ans = answers(notes, (v) => (v === 'dizi' ? 'xiao' : 'dizi'));
+    const ax = ans.get('xiao'), ad = ans.get('dizi');
+    if (ax) ev.push(...[battleLine(c, 'xiao', ax, octNear(c, ax, REG.xiao), { gain: col === 'lake' ? 0.66 : 0.56, pan: -0.3, send: 0.32, prio: 1, slide: 0.3, echo: col === 'lake' ? 0.12 : 0 })].filter(notNull));
+    if (ad) ev.push(...[battleLine(c, 'dizi', ad, octNear(c, ad, REG.diziAns), { gain: 0.46, pan: 0.25, send: 0.2, prio: 1, echo: 0.08 })].filter(notNull));
+    // tight (or pushed by danger into it): the 唢呐 doubles the whole tune an octave below the 笛
+    // (always the octave: in unison it would beat against the lead and bury it)
+    if (tier >= 4) {
+      const dbl = notes.filter((n) => n.v === 'dizi' && !n.pick).map((n) => ({ ...n, v: 'suona' as const }));
+      ev.push(...[battleLine(c, 'suona', dbl, o - 1, { gain: 0.4, pan: -0.08, send: 0.18, prio: 1, scoop: 70 })].filter(notNull));
+    } else if (tier >= 2 && (p.role === 'cheng' || p.role === 'he')) {
+      // 支声: the 箫 doubles the 笛's long notes an octave below
+      const long = notes.filter((n) => n.v === 'dizi' && n.dur >= 1 && !n.pick);
+      if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.xiao), { gain: 0.46, pan: -0.2, send: 0.3, prio: 1 })].filter(notNull));
     }
-    // 刮奏 on the lake: a sweep up into each period from the 琵琶's entry
-    if (col === 'lake' && tier >= 2 && p.role === 'qi' && !fill) ev.push(...gliss(c, 0, -3, 7, 0.45, 0, { gain: 0.26, send: 0.3, echo: 0.15 }));
+    // support: 笙 (pad, then stabs), 二胡 counterline
+    const sh = octFor(p, REG.sheng) + (col === 'palace' ? 1 : 0); // the palace's 笙 voiced high
+    if (tier >= 1) ev.push(pad(c, p.role === 'zhuan' ? halfCadence(p.mode.final) : 0, sh, { gain: 0.13, send: 0.35, vel: 0.62, air: 0.4, overlap: 1.5, start: secOf(c, from) }));
+    if (tier >= 3) ev.push(...shengStabs(c, sh, { gain: col === 'palace' ? 0.2 : 0.16, from, at: tier >= 4 ? [0.5, 1.5, 2.5, 3.5] : [1.5, 3.5] }));
+    if (tier >= 2 || (col === 'forest' && tier >= 1)) {
+      const x = erhuLine(c, notes, octNear(c, notes, REG.erhu, -2), { gain: 0.3, kuai: tier >= 3 && p.role === 'zhuan', from });
+      if (x) ev.push(x);
+    }
+    // rhythm: 琵琶 strums, then the 低音古筝 gallop (plucks keep the time, never the tune)
+    ev.push(...strums(c, tier, { gain: col === 'forest' && tier < 4 ? 0.3 : 0.26, from }));
+    if (tier >= 2) ev.push(...gallop(c, { gain: 0.24, from }));
+    // 编钟 on the palace's strong notes; 刮奏 into the lake's periods
+    if (col === 'palace' && tier >= 1) ev.push(...bells(c, notes.filter((n) => !n.pick && n.v === 'dizi' && (n.hold || (Math.abs(n.beat - Math.round(n.beat)) < 1e-6 && Math.round(n.beat) % 4 === 0))), o, 0.2, 2));
+    if (col === 'lake' && tier >= 1 && p.role === 'qi' && !bt.intro) {
+      const g = gliss(c, 0, -3, 7, 0.45, octFor(p, 62), { gain: 0.16, send: 0.3, echo: 0.15 });
+      for (const e of g) if (e.job.op === 'pluck') e.job.tone = 'battle';
+      ev.push(...g);
+    }
     return ev;
   },
 };
@@ -981,36 +1384,77 @@ const mirror: ThemeSpec = {
 const mirrorBoss: ThemeSpec = {
   get level() { return MIRROR_BOSS_LEVEL[mm.colour]; },
   get style() { return MIRROR_BOSS_STYLE[mm.colour]; },
-  shape(p) { toBars(p, between(p.bpm, MIRROR_BOSS_STYLE[mm.colour].bpm) + 3 * Math.min(2, mirrorBossStep()), p.index === 0); },
+  shape(p, r) { shapeBattle(p, r ?? makeRng(p.index + 1), true); },
   arrange(c) {
     const { p } = c;
+    const bt = BATTLE.get(p);
+    if (!bt) return [];
+    const { notes, lead: o } = bt;
     const step = mirrorBossStep();
     const col = mm.colour;
     const ev: MusicEvent[] = [];
-    const from = p.index === 0 ? 4 : 0;
-    ev.push(...drumBed(c, { tier: 3 + Math.min(1, step), intro: 'roll', boss: true, step, toms: col === 'forest' }));
-    ev.push(...ostinato(c, col === 'forest' ? 'pipa' : 'zheng', { gain: 0.6, from, heavy: true }));
-    ev.push(...pipaDrive(c, { gain: 0.4, tight: step >= 1, from }));
-    // 琵琶 轮指 on the tune's long notes (heterophony)
-    const long = p.notes.filter((n) => n.dur >= 1);
-    if (long.length) ev.push(...plucks(c, 'pipa', mel(c, octFor(p, 64), long), { gain: 0.42, send: 0.18, trem: 0.3, spread: 0.2, center: 0.25, prio: 2 }));
-    // the lead: 唢呐 calls on the strong notes (the whole tune in the 转, and from the second phase)
-    const full = p.role === 'zhuan' || step >= 1;
-    const lead = full ? tongued(p.notes) : strongOnly(p.notes).map((n) => ({ ...n, dur: Math.max(n.dur, 0.75) }));
-    ev.push(...[line(c, 'suona', lead, octFor(p, 60), { gain: 0.52, pan: 0.05, send: 0.22, grace: 0.6, slide: 0.2, vib: 0.8 })].filter(notNull));
-    if (col === 'forest') ev.push(...[line(c, 'erhu', tongued(p.notes), octFor(p, 52), { gain: 0.4, pan: -0.25, send: 0.2, grace: 0.3, slide: 0.3, prio: 1 })].filter(notNull));
-    if (col === 'palace') ev.push(...bells(c, strongOnly(p.notes).filter((n) => n.cad || Math.round(n.beat) % 2 === 0), octFor(p, 76), 0.24, 2));
-    if (col === 'lake' && step >= 1) ev.push(...[line(c, 'dizi', tongued(strongOnly(p.notes)), octFor(p, 74), { gain: 0.3, pan: 0.3, send: 0.25, echo: 0.12, prio: 2 })].filter(notNull));
+    const from = bt.intro ? 4 : 0;
+    ev.push(...battleDrums(c, { tier: 2 + Math.min(2, step), intro: 'roll', boss: true, toms: col === 'forest', gain: 1.05 }));
+    const by = (v: BattleVoice) => notes.filter((n) => n.v === v);
+    // the 唢呐 leads (scoops, a wide vibrato); the 箫 takes the second statement, low
+    const suona = battleLine(c, 'suona', by('suona'), o, { gain: 0.7, pan: 0.05, send: 0.2, orn: 0.3, scoop: 110, flutter: false });
+    const xiao = battleLine(c, 'xiao', by('xiao'), octNear(c, by('xiao'), REG.bossXiao), { gain: 0.78, pan: -0.25, send: 0.3, orn: 0.2, slide: 0.3 });
+    const dz = battleLine(c, 'dizi', by('dizi'), octNear(c, by('dizi'), REG.bossDizi), { gain: 0.5, pan: 0.2, send: 0.2, orn: 0.3, flutter: true });
+    ev.push(...[suona, xiao, dz].filter(notNull));
+    // the 箫 low and ominous under the long notes, in every phase; from phase 1 the 笛 above the 唢呐
+    // (支声): a 4th over it, meeting it in unison where that would climb past E6
+    const long = notes.filter((n) => n.v === 'suona' && n.dur >= 1 && !n.pick);
+    if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.bossXiao), { gain: step === 0 ? 0.42 : 0.36, pan: -0.3, send: 0.32, prio: 1 })].filter(notNull));
+    if (step >= 1) {
+      const het = notes.filter((n) => n.v === 'suona' && !n.pick && (n.dur >= 0.75 || Math.abs(n.beat - Math.round(n.beat)) < 1e-6 || step >= 2))
+        .map((n) => ({ ...n, deg: midiOf(c, n.deg + 2, o) <= DIZI_TOP ? n.deg + 2 : n.deg, v: 'dizi' as const }));
+      ev.push(...[battleLine(c, 'dizi', het, o, { gain: step >= 2 ? 0.5 : 0.42, pan: 0.25, send: 0.2, prio: 1, flutter: true, orn: 0.25, echo: col === 'lake' ? 0.1 : 0 })].filter(notNull));
+    }
+    const ans = answers(notes, (v) => (v === 'suona' ? (step >= 1 ? null : 'xiao') : v === 'xiao' ? 'dizi' : null));
+    for (const [who, list] of ans) ev.push(...[battleLine(c, who, list, octNear(c, list, who === 'dizi' ? REG.bossDizi : REG.bossXiao), { gain: 0.5, pan: who === 'dizi' ? 0.25 : -0.3, send: 0.3, prio: 1 })].filter(notNull));
+    // support: 笙 pad, then stabs; 二胡 (快弓 in the 转); 琵琶 strums, 古筝 gallop
+    ev.push(pad(c, 0, octFor(p, REG.sheng), { gain: 0.13, send: 0.35, vel: 0.62, air: 0.3, overlap: 1.5, start: secOf(c, from) }));
+    if (step >= 1) ev.push(...shengStabs(c, octFor(p, REG.sheng), { gain: 0.18, from, at: step >= 2 ? [0.5, 1.5, 2.5, 3.5] : [1.5, 3.5] }));
+    if (step >= 1 || col === 'forest') { const x = erhuLine(c, notes, octNear(c, notes, REG.erhu, -2), { gain: 0.32, kuai: p.role === 'zhuan', from }); if (x) ev.push(x); }
+    ev.push(...strums(c, 2 + Math.min(2, step), { gain: 0.26, from }));
+    ev.push(...gallop(c, { gain: 0.26, from }));
+    if (col === 'palace') ev.push(...bells(c, notes.filter((n) => !n.pick && n.hold), o, 0.22, 2));
     return ev;
   },
 };
 
-/** One-shots the mirror's audio plays on the music bus between themes (music.cue). */
-export type MirrorCue = 'clear';
-export function mirrorCue(_kind: MirrorCue, seed = 1): MusicEvent[] {
-  const c = { p: { bpm: 120 } as Phrase, r: makeRng(seed), spb: 0.5, seed } as Ctx;
+/** One-shots the mirror's audio plays on the music bus between phrases (music.cue). */
+export type MirrorCue = 'clear' | 'danger' | 'phase';
+/**
+ * A cue in the band's time: `bpm` is the band's tempo (mirrorBpm()); t = 0 is meant to fall on a beat
+ * (music.cue's `quantize`), so the roll runs in the band's 16ths and its accent lands on the next beat.
+ * The drums are the battle kit's (the knock a phone can play).
+ */
+export function mirrorCue(kind: MirrorCue, seed = 1, bpm = 144): MusicEvent[] {
+  const tempo = Math.round(clamp(Number.isFinite(bpm) ? bpm : 144, 128, MIRROR_MAX_BPM));
+  const spb = 60 / tempo;
+  const c = { p: { bpm: tempo, beats: 8, mode: M(62, 4) } as Phrase, r: makeRng(seed), spb, seed } as Ctx;
+  if (kind === 'danger') {
+    // the danger rises: a 堂鼓 roll in 16ths swelling into 大鼓 + 小锣 on the next beat — the band
+    // leans in before its next phrase
+    const ev = Array.from({ length: 4 }, (_, k) => hit(c, 'tang', k * 0.25 * spb, 0.34 + 0.09 * k, { pan: -0.2 + 0.1 * k, send: 0.12, prio: 1, hard: true }));
+    ev.push(hit(c, 'xiaoluo', spb, 0.12, { pan: 0.35, send: 0.2, prio: 1 }), hit(c, 'big', spb, 0.6, { pan: -0.1, send: 0.15, prio: 1, hard: true }));
+    return ev;
+  }
+  if (kind === 'phase') {
+    // a boss phase: 大锣 and 大鼓 on the beat, and the 唢呐's two-note call — a tongued 8th pickup, a
+    // 4th up onto the next beat, scooped
+    const call: LineNote[] = [
+      { t: 0, dur: 0.4 * spb, freq: hz(69), vel: 0.9, tongue: true, scoop: 80 },
+      { t: 0.5 * spb, dur: 2.2 * spb, freq: hz(74), vel: 1, scoop: 120, vib: 1.3 },
+    ];
+    return [
+      hit(c, 'daluo', 0, 0.32, { pan: 0.05, send: 0.25, prio: 1 }), hit(c, 'big', 0, 0.62, { pan: -0.1, send: 0.15, prio: 1, hard: true }),
+      { t: 0.5 * spb, inst: 'suona', job: { op: 'line', inst: 'suona', notes: call, seed: 11, loud: true }, key: `cue:phase:suona:${tempo}`, gain: 0.5, pan: 0.05, send: 0.2, echo: 0, prio: 1, dur: 3 * spb + 0.3 },
+    ];
+  }
   // the wave is won: 仓! — 钹 and 大鼓 together, the cymbal choked by the hand (music.cue's choke)
-  return [hit(c, 'bo', 0, 0.34, { pan: 0.15, send: 0.25, prio: 1 }), hit(c, 'big', 0, 0.6, { pan: -0.1, send: 0.2, prio: 1 })];
+  return [hit(c, 'bo', 0, 0.34, { pan: 0.15, send: 0.25, prio: 1 }), hit(c, 'big', 0, 0.6, { pan: -0.1, send: 0.2, prio: 1, hard: true })];
 }
 
 export const THEMES: Record<ThemeId, ThemeSpec> = {
@@ -1018,10 +1462,10 @@ export const THEMES: Record<ThemeId, ThemeSpec> = {
   mirror, 'mirror-calm': mirrorCalm, 'mirror-boss': mirrorBoss,
 };
 
-/** Arrange one phrase of a theme (a theme may first reshape it: tempo, whole bars — the Conductor reads p after this). */
+/** Arrange one phrase of a theme (a theme may first reshape it: tempo, whole bars, its tune — the Conductor reads p afterwards). */
 export function arrange(theme: ThemeId, p: Phrase, r: Rng, seed: number): MusicEvent[] {
   const spec = THEMES[theme];
-  spec.shape?.(p);
+  spec.shape?.(p, r);
   const c: Ctx = { p, r, spb: 60 / p.bpm, seed };
   return spec.arrange(c).filter((e) => e && Number.isFinite(e.t) && e.t >= 0);
 }

@@ -26,3 +26,12 @@ export function blitRot(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
   if (a !== 1) ctx.globalAlpha = 1;
 }
+
+/** CSS px per world u for a viewport of cssW × cssH: the shorter side shows ≈ 440 u (a phone sees
+ *  ~440 × 950 u, a desktop ~950 × 590 u), within 0.7–1.35. The engine's camera (× the canvas dpr) and
+ *  the painter's bake scale (paint/index.ts bakeScale) both start here, so sprites are painted at the
+ *  size they are drawn. */
+export function viewScale(cssW: number, cssH: number): number {
+  const m = Math.min(cssW, cssH);
+  return Math.max(0.7, Math.min(1.35, (Number.isFinite(m) && m > 0 ? m : 440) / 440));
+}

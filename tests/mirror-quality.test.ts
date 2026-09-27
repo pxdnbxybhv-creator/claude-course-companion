@@ -1,0 +1,164 @@
+// 水月幻镜 · picture quality: sprites baked at the size they are drawn, the canvas at the screen's own
+// resolution on every quality (dynamic resolution steps it down under load), the auto policy, and the
+// ambience layer's contract with the engine.
+import { afterEach, describe, expect, it } from 'vitest';
+import type { ContentRegistry, EngineSettings, MirrorAudio, NewRunOpts, Quality, RunSave } from '../src/views/mirror/types';
+import { allUnlocked, beginWave, newRun, waveSetup } from '../src/views/mirror/logic';
+import { defaultMeta } from '../src/app/mirror';
+import { createEngine, RES_STEPS, type MirrorEngine } from '../src/views/mirror/engine';
+import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
+import { EKind } from '../src/views/mirror/engine/pools';
+import { ST } from '../src/views/mirror/engine/enemies';
+import { bakeScale, createPainter, specOf, viewScale } from '../src/views/mirror/paint';
+import { AMB_EKIND, AMB_ST, Ambience } from '../src/views/mirror/paint/ambient';
+import { isZone } from '../src/views/mirror/paint/things';
+import { FX_REG } from '../src/views/mirror/ids';
+import { dprCapOf, qualityOf } from '../src/views/mirror/ui/Run';
+
+const QS: Quality[] = ['low', 'mid', 'high'];
+/** Phones (portrait, DPR 2–3) and desktops (DPR 1–2). */
+const SCREENS = [
+  { name: 'phone 390×844', w: 390, h: 844, dprs: [2, 3] },
+  { name: 'phone 430×932', w: 430, h: 932, dprs: [2, 3] },
+  { name: 'phone 360×780', w: 360, h: 780, dprs: [2, 3] },
+  { name: 'desktop 1280×800', w: 1280, h: 800, dprs: [1, 2] },
+  { name: 'desktop 1920×1080', w: 1920, h: 1080, dprs: [1, 2] },
+];
+
+describe('resolution: nothing is drawn larger than it was painted', () => {
+  it('the canvas is at the device resolution on every quality (DPR ≤ 3): the browser never stretches it', () => {
+    for (const q of QS) for (const s of SCREENS) for (const dpr of s.dprs) {
+      const canvasDpr = Math.min(dpr, dprCapOf(q));
+      expect(dpr / canvasDpr, `${s.name} @${dpr} ${q}`).toBeLessThanOrEqual(1);
+    }
+  });
+  it('sprites bake at ≥ the camera scale (effective upscale ≤ 1.0 at zoom 1) on every quality, within memory caps', () => {
+    for (const q of QS) for (const s of SCREENS) for (const dpr of s.dprs) {
+      const canvasDpr = Math.min(dpr, dprCapOf(q));
+      const cam = viewScale(s.w, s.h) * canvasDpr; // canvas px per u, what the engine draws at
+      const k = bakeScale(s.w, s.h, canvasDpr, q);
+      expect(cam / k, `${s.name} @${dpr} ${q}: cam ${cam.toFixed(2)} k ${k.toFixed(2)}`).toBeLessThanOrEqual(1.0001);
+      expect(k).toBeLessThanOrEqual(3.4);
+      // mid and high keep headroom for the zoom punches
+      if (q !== 'low') expect(k / cam).toBeGreaterThanOrEqual(1.09);
+    }
+  });
+  it('the engine and the painter start from the same view scale', () => {
+    expect(viewScale(390, 844)).toBeCloseTo(390 / 440, 5);
+    expect(viewScale(1920, 1080)).toBe(1.35);
+    expect(viewScale(200, 300)).toBe(0.7);
+    expect(viewScale(0, 0)).toBe(1);
+  });
+  it('the painter keeps the bake scale it is given, and its dpr up to 3', () => {
+    const p = createPainter('lake', 'mid', 3, 2.9) as unknown as { k: number; dpr: number };
+    expect(p.k).toBeCloseTo(2.9, 5);
+    expect(p.dpr).toBe(3);
+    // without a bake scale: the old dpr × quality factor
+    expect((createPainter('lake', 'high', 1) as unknown as { k: number }).k).toBeCloseTo(1.15, 5);
+  });
+  it('zone looks are flagged so they bake at a fixed pixel size', () => {
+    const zones = FX_REG.filter((f) => { const s = specOf(`fx:${f.id}`); return !!s && isZone(s.spec); }).map((f) => f.id);
+    expect(zones).toContain('shockRing');
+    expect(zones).toContain('bossShadow');
+    expect(zones).not.toContain('hitSpark');
+  });
+});
+
+describe('auto quality', () => {
+  const g = globalThis as unknown as { matchMedia?: unknown; navigator?: unknown; window?: unknown };
+  const saved = { matchMedia: g.matchMedia, navigator: Object.getOwnPropertyDescriptor(globalThis, 'navigator'), window: g.window };
+  afterEach(() => {
+    g.matchMedia = saved.matchMedia;
+    if (saved.navigator) Object.defineProperty(globalThis, 'navigator', saved.navigator);
+    g.window = saved.window;
+  });
+  const env = (coarse: boolean, cores: number, mem: number | undefined, width: number) => {
+    g.matchMedia = () => ({ matches: coarse });
+    Object.defineProperty(globalThis, 'navigator', { value: { hardwareConcurrency: cores, deviceMemory: mem }, configurable: true });
+    g.window = { innerWidth: width };
+  };
+  it('a phone gets mid whatever its core count (iOS reports few); only a device that says it is weak gets low', () => {
+    env(true, 4, undefined, 390); expect(qualityOf('auto')).toBe('mid');
+    env(true, 8, 8, 412); expect(qualityOf('auto')).toBe('mid');
+    env(true, 8, 2, 412); expect(qualityOf('auto')).toBe('low');
+    env(true, 2, undefined, 390); expect(qualityOf('auto')).toBe('low');
+    env(false, 8, 8, 1440); expect(qualityOf('auto')).toBe('high');
+    env(false, 8, 8, 800); expect(qualityOf('auto')).toBe('mid');
+    expect(qualityOf('low')).toBe('low');
+  });
+});
+
+describe('dynamic resolution', () => {
+  const SILENT: MirrorAudio = { prime: async () => {}, sfx: () => {}, pickup: () => {}, music: () => {}, dispose: () => {} } as unknown as MirrorAudio;
+  const EMPTY: ContentRegistry = { skills: {}, passives: {}, hazards: {}, elites: {}, treasures: {}, bosses: {}, patterns: {}, affixes: {}, mutators: {}, terms: {} };
+  const opts = (): NewRunOpts => ({
+    seed: 4242, char: 'gardener', map: 'lake', diff: 1, vows: {}, daily: false, plain: false, heart: {}, ticket: 20, free: false,
+    runIndex: 1, rate: 1, startedDay: '2026-09-27', term: null, mutator: null, boon: null, unlocks: allUnlocked(), mastery: 0,
+  });
+  const g = globalThis as unknown as { window?: unknown };
+  const savedWindow = g.window;
+  afterEach(() => { g.window = savedWindow; });
+  function make(q: Quality, dpr: number) {
+    g.window = { devicePixelRatio: dpr };
+    const cv = { width: 390, height: 844, clientWidth: 390, clientHeight: 844, getContext: () => null, getBoundingClientRect: () => ({ width: 390, height: 844 }) } as unknown as HTMLCanvasElement;
+    const run: RunSave = beginWave(newRun(opts()));
+    const settings: EngineSettings = { quality: q, dprCap: 3, reduceMotion: false, nums: 2, shake: true, aim: 'auto', lang: 'zh' };
+    const eng = createEngine(cv, run, { painter: createDebugPainter('lake', q, 1), audio: SILENT, content: EMPTY, hooks: { hud() {}, levelUp() {}, crate() {}, coin() {}, boss() {}, waveEnd() {}, death() {}, error() {} }, settings }) as MirrorEngine;
+    eng.start(run, waveSetup(run, defaultMeta('2026-09-27'), new Date(2026, 8, 27, 20)));
+    const W = eng.world;
+    W.godmode = true; W.plan = { ...W.plan, groups: [], elites: [], treasures: [] }; W.len = 1e9;
+    return { eng, W, cv };
+  }
+  it('slow frames step the canvas dpr down (3 → 2.5 → 2 → 1.5) before any effect is cut; fast frames bring it back', () => {
+    const { eng, W, cv } = make('mid', 3);
+    expect(eng.resolution).toBe(3);
+    expect(cv.width).toBe(1170);
+    let now = 1000;
+    const seen: number[] = [];
+    for (let f = 0; f < 60 * 12; f++) { now += 40; eng.frame(now); if (seen[seen.length - 1] !== eng.resolution) seen.push(eng.resolution); if (W.degrade) break; }
+    expect(seen).toEqual([3, 2.5, 2, 1.5]);
+    expect(W.degrade).toBe(1); // only at the floor
+    expect(cv.width).toBe(Math.round(390 * 1.5));
+    // fast again: effects first, then a notch of resolution after a long fast stretch
+    for (let f = 0; f < 60 * 9; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(W.degrade).toBe(0);
+    expect(eng.resolution).toBe(1.5);
+    for (let f = 0; f < 60 * 22; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(eng.resolution).toBe(2);
+    expect(RES_STEPS[0]).toBe(3);
+    eng.dispose();
+  });
+  it('a DPR-1 screen has nothing to step down: the guard cuts effects as before', () => {
+    const { eng, W } = make('high', 1);
+    let now = 1000;
+    for (let f = 0; f < 60; f++) { now += 40; eng.frame(now); }
+    expect(eng.resolution).toBe(1);
+    expect(W.degrade).toBe(1);
+    eng.dispose();
+  });
+});
+
+describe('ambience', () => {
+  it('its enemy kinds and states match the engine', () => {
+    expect(AMB_EKIND).toEqual(EKind);
+    expect(AMB_ST.bloom).toBe(ST.bloom);
+    expect(AMB_ST.under).toBe(ST.under);
+    expect(AMB_ST.air).toBe(ST.air);
+  });
+  it('the painter owns one, sized by quality (low draws no motes)', () => {
+    for (const q of QS) {
+      const p = createPainter('forest', q, 2, 2) as unknown as { ambience: Ambience };
+      expect(p.ambience).toBeInstanceOf(Ambience);
+      const n = (p.ambience as unknown as { n: number }).n;
+      if (q === 'low') expect(n).toBe(0); else expect(n).toBeGreaterThan(0);
+    }
+  });
+  it('draws nothing before it is baked (node: no document)', () => {
+    const a = new Ambience('lake', 'high', 2, 2);
+    const calls: string[] = [];
+    const ctx = new Proxy({}, { get: (_t, k) => (typeof k === 'string' && k !== 'then' ? (..._a: unknown[]) => { calls.push(k); } : undefined), set: () => true }) as unknown as CanvasRenderingContext2D;
+    a.bake(false);
+    a.draw({} as never, ctx, { x: 0, y: 0, scale: 2, w: 780, h: 1688, dpr: 2 });
+    expect(calls).toEqual([]);
+  });
+});

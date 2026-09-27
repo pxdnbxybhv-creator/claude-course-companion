@@ -10,10 +10,21 @@ import { World } from './world';
 import { Renderer } from './render';
 import { createDebugPainter } from './debugPainter';
 import { installDev } from './dev';
+import { viewScale } from '../paint/draw';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 4;
 const DT_CLAMP = 0.05;
+/** Dynamic resolution: the canvas dpr steps down these notches under load before the guard cuts any
+ *  effect, and back up after long fast stretches (sprites are baked for the top notch, so a step only
+ *  ever draws them smaller). */
+export const RES_STEPS = [3, 2.5, 2, 1.5, 1.25, 1] as const;
+/** The lowest notch by quality (low may fall to 1; mid and high keep 1.5 and cut effects instead). */
+const RES_FLOOR = { low: 1, mid: 1.5, high: 1.5 } as const;
+/** Fast seconds before a step back up, and how many step-ups a run allows (hysteresis: a device that
+ *  slows again at the higher notch settles one below it). */
+const RES_UP_AFTER = 20;
+const RES_UPS = 3;
 
 class MirrorEngine implements Engine {
   readonly world: World;
@@ -114,18 +125,49 @@ class MirrorEngine implements Engine {
     let w = 0, h = 0;
     try { const r = c.getBoundingClientRect(); w = r.width; h = r.height; } catch { /* not in a document */ }
     if (!w || !h) { w = c.clientWidth || c.width || 1; h = c.clientHeight || c.height || 1; }
-    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const dpr = Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2));
+    const dpr = this.dprNow();
     this.cssW = w; this.cssH = h;
     const pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
     if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; }
     this.cam.w = pw; this.cam.h = ph; this.cam.dpr = dpr;
-    // the shorter side shows ≈ 440 u (a phone sees ~420 × 900 u, a desktop ~950 × 590 u)
-    this.baseScale = Math.max(0.7, Math.min(1.35, Math.min(w, h) / 440)) * dpr;
+    // the shorter side shows ≈ 440 u (a phone sees ~440 × 950 u, a desktop ~950 × 590 u); the painter
+    // bakes its sprites from the same viewScale (paint/index.ts bakeScale), so they are drawn ≤ 1:1
+    this.baseScale = viewScale(w, h) * dpr;
     this.cam.scale = this.baseScale;
     if (this._paused || this.world.phase !== 'wave') this.drawFrame();
   }
   private baseScale = 1;
+  /** The dynamic-resolution ceiling on the canvas dpr (Infinity: the settings' cap alone). */
+  private resCap = Infinity;
+  private resUps = RES_UPS;
+  /** The canvas dpr now: the device's, within the settings' cap and the dynamic notch. */
+  private dprNow(): number {
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    return Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2, this.resCap));
+  }
+  /** The canvas dpr the engine is drawing at (dev, perf probe). */
+  get resolution(): number { return this.cam.dpr; }
+  /**
+   * One notch of dynamic resolution: dir −1 steps the canvas dpr down (false when already at the
+   * quality's floor), +1 back up toward the cap. One resize: a canvas reallocation (≈ 1–3 ms).
+   */
+  private stepRes(dir: -1 | 1): boolean {
+    const cur = this.cam.dpr;
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const top = Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2));
+    if (dir < 0) {
+      const floor = Math.min(top, RES_FLOOR[this.deps.settings.quality] ?? 1.5);
+      const next = RES_STEPS.find((d) => d < cur - 0.01 && d >= floor - 0.001);
+      if (next === undefined) return false;
+      this.resCap = next;
+    } else {
+      if (this.resCap === Infinity || cur >= top - 0.01) { this.resCap = Infinity; return false; }
+      const up = [...RES_STEPS].reverse().find((d) => d > cur + 0.01);
+      this.resCap = up === undefined || up >= top - 0.01 ? Infinity : up;
+    }
+    this.resize();
+    return true;
+  }
 
   skill(t?: SkillTarget): void {
     const w = this.world;
@@ -241,8 +283,17 @@ class MirrorEngine implements Engine {
     this.frameMs = this.frameMs * 0.9 + ms * 0.1;
     const s = ms / 1000;
     if (this.frameMs > 20) { this.slowFor += s; this.fastFor = 0; } else { this.fastFor += s; if (this.fastFor > 3) this.slowFor = 0; }
-    if (this.slowFor > 2 && !w.degrade) w.degrade = 1;
+    // slow: first a notch of resolution (every 2 s while still slow), then effects
+    if (this.slowFor > 2) {
+      if (!w.degrade && this.stepRes(-1)) this.slowFor = 0;
+      else if (!w.degrade) w.degrade = 1;
+    }
+    // fast again: effects come back first; resolution only after a long fast stretch, a few times a run
     if (w.degrade && this.fastFor > 8) w.degrade = 0;
+    else if (!w.degrade && this.resCap !== Infinity && this.resUps > 0 && this.fastFor > RES_UP_AFTER) {
+      if (this.stepRes(1)) this.resUps--;
+      this.fastFor = 0;
+    }
   }
   private frameMs = 16.7;
 

@@ -1,7 +1,9 @@
 // 水月幻镜 · the music director (src/views/mirror/audio/music.ts, GDD §22) with a stubbed music engine:
 // the calm theme for the lobby, the shop and the results; the wave theme with a 0.3 s cut (its drum
 // fill); the clear cue (钹 + 大鼓) when the timer reaches 0 or the last boss falls; the boss phase and
-// danger fed to the band; a new map restarts the band through a breath of silence; dispose forgets.
+// danger fed to the band, each answered by a cue on the band's next beat (a 堂鼓 roll into 大鼓 + 小锣 when the danger rises,
+// at most every 12 s; a 大锣 with the 唢呐's call on a new boss phase); a new map restarts the band
+// through a breath of silence; dispose forgets.
 // The mirror audio (sfx.ts) hands its music() and the engine's HUD feed to the director.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -48,7 +50,7 @@ describe('the mirror music director', () => {
     expect(getMirrorMusic().total).toBe(20);
     hud(10, 50, 0.95);
     expect(getMirrorMusic().danger).toBeGreaterThanOrEqual(0.5); // a crowd at the cap pushes a layer up
-    expect(take()).toEqual([]);
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']); // …and the drums answer at once
     hud(0);
     expect(take()).toEqual(['cue(bo+drum, {"choke":0.16})', 'setTheme(mirror-calm, {"cut":0.05,"fade":0.4})']);
     hud(0); // heard once
@@ -79,8 +81,11 @@ describe('the mirror music director', () => {
     hud(null, 80, 0.1, null); // the intro, before the boss stands
     expect(take()).toEqual([]);
     hud(null, 80, 0.1, { id: 'b', hp: 1, phase: 0 });
+    expect(take()).toEqual([]); // the entry has its own roll into the 锣
     hud(null, 80, 0.1, { id: 'b', hp: 0.6, phase: 1 });
     expect(getMirrorMusic().bossPhase).toBe(1);
+    expect(take()).toEqual(['cue(gong+drum+suona, {"quantize":true})']); // a new phase: 大锣, 大鼓 and the 唢呐's call
+    hud(null, 80, 0.1, { id: 'b', hp: 0.5, phase: 1 });
     expect(take()).toEqual([]);
     hud(null, 80, 0.1, null);
     expect(take()).toEqual(['cue(bo+drum, {"choke":0.16})', 'setTheme(mirror-calm, {"cut":0.05,"fade":0.4})']);
@@ -104,6 +109,31 @@ describe('the mirror music director', () => {
     expect(getMirrorMusic()).toMatchObject({ left: null, total: null, danger: 0, bossPhase: 0 });
     take();
     hud(0); // no phase: the feed is ignored
+    expect(take()).toEqual([]);
+  });
+
+  it('the danger cue: on the rise past one half, at most every 12 s, never for the dead or outside a fight', () => {
+    mirrorMusic.phase('wave', 'lake');
+    take();
+    hud(30, 90, 0.2);
+    hud(29, 90, 0.95); // a crowd at the cap
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']);
+    hud(28, 90, 0.95); // still in danger: no repeat
+    for (let i = 0; i < 20; i++) hud(27, 90, 0.2); // it falls away (0.05 per report)
+    expect(getMirrorMusic().danger).toBeLessThan(0.5);
+    hud(26, 90, 0.95); // rises again within 12 s: the band's next phrase carries it, no second cue
+    expect(take()).toEqual([]);
+    for (let i = 0; i < 20; i++) hud(25, 90, 0.2);
+    vi.advanceTimersByTime(12_500);
+    hud(24, 90, 0.95);
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']);
+    for (let i = 0; i < 20; i++) hud(23, 90, 0.2);
+    vi.advanceTimersByTime(12_500);
+    hud(22, 0, 0.95); // dead
+    expect(take()).toEqual([]);
+    mirrorMusic.phase('shop', 'lake');
+    take();
+    hud(10, 90, 0.95); // not a fight
     expect(take()).toEqual([]);
   });
 

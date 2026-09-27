@@ -11,8 +11,9 @@ import { blit, blitRot } from '../paint/draw';
 import { EKind, SMode } from './pools';
 import { DROP_ATLAS, PROJ_ATLAS, SK, SUMMON_ATLAS, SWORDS_ON_SCREEN, TAU } from './consts';
 import { ST } from './enemies';
-import { PF } from './feel';
+import { CRIT_NUM, MK, PF, numPop } from './feel';
 import { SH, SWIPE_FRAMES, TN } from '../paint/feel';
+import { drawAmbience } from '../paint/ambient';
 import type { World } from './world';
 
 /** Trail tint of a player shot by its weapon's feel class. */
@@ -25,6 +26,9 @@ type DrawNum = (ctx: CanvasRenderingContext2D, value: number, sx: number, sy: nu
 const NUM_STYLE: readonly NumStyle[] = ['hit', 'crit', 'heal', 'moon', 'coin', 'player'];
 const FX_BASE: Record<string, number> = { beamRay: 64, boltChain: 32, swordStreak: 40, slashArc: 32 };
 
+/** Extra passes (a flash twin over a body, its ink tint) a frame may spend on the crowd, by quality. */
+const BODY_PASSES = { low: 12, mid: 20, high: 32 } as const;
+
 /** Everything the renderer keeps between frames (made once, reused). */
 export class Renderer {
   private light: HTMLCanvasElement | null = null;
@@ -34,6 +38,8 @@ export class Renderer {
   /** The darkness's hole and its four rects, reused every frame (holeRects). */
   private readonly hole = new Float64Array(20);
   private atlasCache = new Map<string, AtlasId>();
+  /** Extra body passes spent this frame (BODY_PASSES). */
+  private passes = 0;
 
   constructor(private painter: Painter) {}
 
@@ -55,7 +61,7 @@ export class Renderer {
   /** One layer of the frame (draw() walks drawOrder). */
   layer(L: Layer, W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     switch (L) {
-      case 'arena': this.painter.drawArena(ctx, cam); break;
+      case 'arena': this.painter.drawArena(ctx, cam); drawAmbience(W, ctx, cam); break;
       case 'telegraphs': this.drawTeles(W, ctx, cam); break;
       // in the dark the player's washes stay under it and the enemy's ground (webs, clouds, puddles) rises above
       case 'zones': this.drawZones(W, ctx, cam, W.lightR !== null ? 1 : -1); break;
@@ -135,8 +141,11 @@ export class Renderer {
   }
 
   private drawEnemies(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    // enemies
-    const E = W.E;
+    // enemies; 打击感: the ground's splashes under them, their pieces and the marks of the blows over them
+    const E = W.E, F = W.feel;
+    if (F.mk.count) this.drawMarks(W, ctx, cam, true);
+    this.passes = 0;
+    F.sprites.frame();
     for (let i = 0; i < E.n; i++) {
       if (!E.alive[i] || E.hidden[i]) {
         if (E.alive[i] && E.hidden[i] && E.st[i] !== ST.bloom && (E.id[i] === 'rat' || E.id[i] === 'drowned')) {
@@ -147,6 +156,8 @@ export class Renderer {
       }
       this.drawEnemy(W, ctx, cam, i);
     }
+    if (F.fr.count) this.drawFrags(W, ctx, cam);
+    if (F.mk.count) this.drawMarks(W, ctx, cam, false);
   }
 
   private drawSummons(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -224,8 +235,8 @@ export class Renderer {
 
   private drawNumbers(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     const P = this.painter, lang = W.settings.lang;
-    // numbers pop (overshoot to 1.15×, settle), size by damage (≤ 1.2×), fly an arc, then fade — under
-    // the enemy shots, so a crit never hides the danger
+    // numbers pop (overshoot to 1.15×, settle; crits 1.4× with a bounce), size by damage (≤ 1.2×; crits a
+    // size up), fly an arc, then fade — under the enemy shots, so a crit never hides the danger
     const N = W.N;
     const dn = P.drawNumber as DrawNum;
     const calm = W.settings.reduceMotion;
@@ -233,12 +244,10 @@ export class Renderer {
       if (!N.alive[i]) continue;
       const t = N.t[i];
       const a = t < 0.58 ? 1 : Math.max(0, 1 - (t - 0.58) / 0.2);
-      let pop = 1;
-      if (!calm) {
-        if (t < 0.06) pop = 0.6 + 0.55 * (t / 0.06);
-        else if (t < 0.18) { const u = (t - 0.06) / 0.12; pop = 1.15 - 0.15 * (1 - (1 - u) * (1 - u)); }
-      }
-      const sc = pop * (N.sz[i] || 1) * (t > 0.58 ? 0.85 + 0.15 * a : 1);
+      // 打击感: a crit pops bigger (1.4×) with a short bounce and stays a size up (feel.numPop)
+      const crit = N.style[i] === 1;
+      const pop = numPop(t, crit, calm);
+      const sc = pop * (crit ? CRIT_NUM : 1) * (N.sz[i] || 1) * (t > 0.58 ? 0.85 + 0.15 * a : 1);
       const sx = (N.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (N.y[i] - cam.y) * cam.scale + cam.h / 2;
       dn.call(P, ctx, N.v[i], sx, sy, NUM_STYLE[N.style[i]] ?? 'hit', a, lang, sc);
     }
@@ -278,30 +287,37 @@ export class Renderer {
   }
 
   private drawEnemy(W: World, ctx: CanvasRenderingContext2D, cam: Camera, i: number): void {
-    const E = W.E;
+    const E = W.E, F = W.feel;
     const id = E.atlas[i];
     const k = E.kind[i];
     const tell = E.st[i] === ST.tell;
     const v = k === EKind.Boss ? Math.floor(W.t * 2 + i) & 1 : tell ? 2 : (Math.floor(W.t * 5 + i * 0.37) & 1);
-    const calm = W.settings.reduceMotion;
-    const flash = E.flash[i] > 0 && !calm;
-    const s = id ? (flash ? this.painter.flash(id, v) ?? this.sprite(id, v) : this.sprite(id, v)) : null;
+    // 打击感: the body shows the blow (feel.pose): drawn where the freeze holds it or the recoil throws
+    // it, squashed along the blow, a white flash in an ink rim that fades into an ink tint, a wobble
+    F.pose(i);
+    const o = F.po;
+    const s = id ? this.sprite(id, v) : null;
+    const twin = id && o.fl ? this.painter.flash(id, v) : null;
     const flip = Math.cos(E.face[i]) < 0;
     const scale = E.r[i] / Math.max(1, E.r0[i]);
     const air = E.air[i] ? 10 : 0;
     const a = E.untarget[i] ? 0.45 : k === EKind.Ally || E.charmT[i] > 0 ? 0.85 : 1;
-    // 打击感: the blow squashes the body (wide, then a springy stretch back) and nudges it away
-    let sqx = 1, sqy = 1, ox = 0, oy = 0;
-    const hv = E.hitV[i], ha = E.hitAge[i];
-    if (hv > 0 && ha < 0.35 && !calm) {
-      const env = hv * Math.exp(-ha / 0.085);
-      const osc = Math.cos(ha * 40);
-      sqx = 1 + 0.26 * env * osc; sqy = 1 - 0.22 * env * osc;
-      const push = hv * 6 * Math.exp(-ha / 0.05);
-      ox = Math.cos(E.hitA[i]) * push; oy = Math.sin(E.hitA[i]) * push;
-    }
-    if (s) blit(ctx, cam, s, E.x[i] + ox, E.y[i] - air + oy, scale, flip, a, (1 + (E.st[i] === ST.act ? 0.08 : 0)) * sqx, (1 - (tell ? 0.08 : 0)) * sqy);
-    else circle(ctx, cam, E.x[i] + ox, E.y[i] - air + oy, E.r[i] * (sqx + sqy) / 2, flash ? '#ffffff' : k === EKind.Elite ? '#5a4012' : k === EKind.Boss ? '#12141a' : k === EKind.Treasure ? '#d9a62e' : '#1d2430', a);
+    const bx = 1 + (E.st[i] === ST.act ? 0.08 : 0), by = 1 - (tell ? 0.08 : 0);
+    const x = o.x, y = o.y - air;
+    F.dX[i] = x; F.dY[i] = y;
+    if (s) {
+      blitBody(ctx, cam, o.fl === 1 && twin ? twin : s, x, y, scale, flip, a, bx, by, o.s, o.ang, o.wob);
+      // one extra pass at most per body, and a frame budget for them (a crowd under a fast weapon)
+      if (this.passes < (BODY_PASSES[W.quality] ?? 20) * (W.degrade ? 0.5 : 1)) {
+        if (o.fl === 2 && twin && twin !== s && o.fa > 0.02) {
+          this.passes++;
+          blitBody(ctx, cam, twin, x, y, scale, flip, a * o.fa, bx, by, o.s, o.ang, o.wob);
+        } else if (o.ink > 0.02) {
+          const ink = F.sprites.ink(s);
+          if (ink) { this.passes++; blitBody(ctx, cam, ink, x, y, scale, flip, a * o.ink, bx, by, o.s, o.ang, o.wob); }
+        }
+      }
+    } else circle(ctx, cam, x, y, E.r[i] * (1 - o.s * 0.15), o.fl ? '#ffffff' : k === EKind.Elite ? '#5a4012' : k === EKind.Boss ? '#12141a' : k === EKind.Treasure ? '#d9a62e' : '#1d2430', a);
     // 伐桂人's three axes orbit it
     if (E.id[i] === 'axeshade') {
       const ax = this.sprite('proj:eAxe');
@@ -311,20 +327,100 @@ export class Renderer {
         if (ax) blitRot(ctx, cam, ax, x, y, a * 3, 1.2); else circle(ctx, cam, x, y, 8, '#c0412f');
       }
     }
-    // marks: allies, statuses
-    if (k === EKind.Ally || E.charmT[i] > 0) this.mark(ctx, cam, k === EKind.Ally ? 'sum:inkAlly' : 'fx:charmMark', E.x[i], E.y[i] - E.r[i] - 6, k === EKind.Ally ? scale : 0.35);
-    else if (E.stunT[i] > 0) this.mark(ctx, cam, 'fx:stunMark', E.x[i], E.y[i] - E.r[i] - 6, 0.35);
-    else if (E.burnN[i] > 0) this.mark(ctx, cam, 'fx:burnMark', E.x[i], E.y[i] - 4, 0.35);
-    else if (E.rootT[i] > 0) this.mark(ctx, cam, 'fx:rootMark', E.x[i], E.y[i] + E.r[i] * 0.6, 0.4);
-    else if (E.slowT[i] > 0) this.mark(ctx, cam, 'fx:slowMark', E.x[i], E.y[i] + E.r[i] * 0.6, 0.35);
+    // marks: allies, statuses (they ride the drawn body)
+    const mx = o.x, my = o.y;
+    if (k === EKind.Ally || E.charmT[i] > 0) this.mark(ctx, cam, k === EKind.Ally ? 'sum:inkAlly' : 'fx:charmMark', mx, my - E.r[i] - 6, k === EKind.Ally ? scale : 0.35);
+    else if (E.stunT[i] > 0) this.mark(ctx, cam, 'fx:stunMark', mx, my - E.r[i] - 6, 0.35);
+    else if (E.burnN[i] > 0) this.mark(ctx, cam, 'fx:burnMark', mx, my - 4, 0.35);
+    else if (E.rootT[i] > 0) this.mark(ctx, cam, 'fx:rootMark', mx, my + E.r[i] * 0.6, 0.4);
+    else if (E.slowT[i] > 0) this.mark(ctx, cam, 'fx:slowMark', mx, my + E.r[i] * 0.6, 0.35);
     // elites and treasures: a thin bar
     if ((k === EKind.Elite || k === EKind.Demon) && E.hp[i] < E.hpMax[i]) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      const sx = (E.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (E.y[i] - E.r[i] - 10 - cam.y) * cam.scale + cam.h / 2;
+      const sx = (mx - cam.x) * cam.scale + cam.w / 2, sy = (my - E.r[i] - 10 - cam.y) * cam.scale + cam.h / 2;
       const w = E.r[i] * 2 * cam.scale;
       ctx.fillStyle = 'rgba(20,20,20,0.5)'; ctx.fillRect(sx - w / 2, sy, w, 3 * cam.dpr);
       ctx.fillStyle = '#c0412f'; ctx.fillRect(sx - w / 2, sy, w * Math.max(0, E.hp[i] / E.hpMax[i]), 3 * cam.dpr);
     }
+  }
+
+  /**
+   * 打击感: the marks of the blows (feel.mk): impact stars, cuts across the bodies, pierce beams, rings of
+   * light, claw rakes — over the bodies, following each one's drawn pose — or the ground's splashes
+   * under them (`ground`). One drawImage each from the feel layer's baked sprites.
+   */
+  private drawMarks(W: World, ctx: CanvasRenderingContext2D, cam: Camera, ground: boolean): void {
+    const F = W.feel, M = F.mk, S = F.sprites, E = W.E;
+    if (!S.ok) return;
+    const pa = W.degrade ? 0.7 : 1;
+    for (let j = 0; j < M.n; j++) {
+      if (!M.alive[j]) continue;
+      const kd = M.kind[j];
+      if ((kd === MK.ground) !== ground) continue;
+      const s = S.get(M.shape[j], M.tint[j]);
+      if (!s) continue;
+      const u = Math.min(1, Math.max(0, 1 - M.life[j] / M.life0[j]));
+      const e = 1 - (1 - u) * (1 - u);
+      const calm = M.calm[j] === 1;
+      let x = M.x[j], y = M.y[j];
+      const ow = M.owner[j];
+      if (ow >= 0 && E.alive[ow] && E.gen[ow] === M.gen[j]) { x = F.dX[ow] + M.ox[j]; y = F.dY[ow] + M.oy[j]; }
+      let kx: number, ky: number, al: number;
+      if (kd === MK.pop) {
+        // a star blooms fast, holds, then fades
+        kx = ky = calm ? M.s1[j] : M.s0[j] + (M.s1[j] - M.s0[j]) * Math.min(1, e * 1.7);
+        al = u < 0.35 ? 1 : 1 - (u - 0.35) / 0.65;
+      } else if (kd === MK.cut) {
+        // the cut opens along its length and thins away
+        kx = M.s0[j] * (calm ? 1 : 0.75 + 0.35 * e); ky = M.s1[j] * (1 - 0.8 * u);
+        al = u < 0.4 ? 1 : 1 - (u - 0.4) / 0.6;
+      } else if (kd === MK.beam) {
+        kx = M.s0[j] * (calm ? 1 : 0.55 + 0.6 * e); ky = M.s1[j] * (1 - 0.7 * u);
+        al = 1 - u * u;
+      } else if (kd === MK.ring) {
+        kx = ky = calm ? M.s1[j] : M.s0[j] + (M.s1[j] - M.s0[j]) * e;
+        al = 1 - u;
+      } else if (kd === MK.ground) {
+        // it lands (a quick spread), then dries away
+        kx = ky = calm ? M.s1[j] : M.s0[j] + (M.s1[j] - M.s0[j]) * Math.min(1, u * 5);
+        al = u < 0.45 ? 1 : 1 - (u - 0.45) / 0.55;
+      } else {
+        kx = M.s1[j]; ky = M.s1[j] * (1 - 0.4 * u);
+        al = u < 0.5 ? 1 : 1 - (u - 0.5) / 0.5;
+      }
+      blitAff(ctx, cam, s, x, y, M.ang[j], kx, ky, al * M.a0[j] * pa);
+    }
+  }
+
+  /** 打击感: the dead body's pieces (feel.fr), cut from its own sprite — white for their first frames. */
+  private drawFrags(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    const Fr = W.feel.fr;
+    for (let j = 0; j < Fr.n; j++) {
+      if (!Fr.alive[j]) continue;
+      const id = Fr.id[j];
+      if (!id) continue;
+      const white = Fr.life0[j] - Fr.life[j] < 0.035;
+      const s = (white ? this.painter.flash(id, 0) : null) ?? this.sprite(id, 0);
+      if (!s) continue;
+      const g = Fr.g[j] || 2, q = Fr.q[j];
+      const qx = q % g, qy = (q / g) | 0;
+      const u = Math.min(1, Math.max(0, 1 - Fr.life[j] / Fr.life0[j]));
+      const al = u < 0.6 ? 1 : (1 - u) / 0.4;
+      if (al <= 0.02) continue;
+      const cw = s.w / g, ch = s.h / g;
+      // the piece's place in the body (u from the anchor), mirrored with it
+      let ox = (qx + 0.5) * cw - s.ax * s.w;
+      const oy = (qy + 0.5) * ch - s.ay * s.h;
+      const f = Fr.flip[j] ? -1 : 1;
+      ox *= f;
+      const sc = Fr.sc[j];
+      const px = (Fr.x[j] + ox * sc - cam.x) * cam.scale + cam.w / 2, py = (Fr.y[j] + oy * sc - cam.y) * cam.scale + cam.h / 2;
+      const k = cam.scale * sc * (1 - 0.3 * u), c = Math.cos(Fr.rot[j]) * k, n = Math.sin(Fr.rot[j]) * k;
+      ctx.setTransform(c * f, n * f, -n, c, px, py);
+      ctx.globalAlpha = al;
+      ctx.drawImage(s.img, s.sx + (qx * s.sw) / g, s.sy + (qy * s.sh) / g, s.sw / g, s.sh / g, -cw / 2, -ch / 2, cw, ch);
+    }
+    ctx.globalAlpha = 1;
   }
 
   /** The feel layer's sparks, each a drawImage from a baked sprite. */
@@ -563,6 +659,33 @@ function blitAff(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: numbe
   ctx.globalAlpha = Math.min(1, a);
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
   ctx.globalAlpha = 1;
+}
+
+/**
+ * A body: its base scale (mirrored when it faces left) and act/tell stretch (bx, by), squashed by `sq`
+ * along the blow's axis `ang` (compressed along it, widened across) and turned by `wob` (rad), about
+ * its anchor — one setTransform, one drawImage.
+ */
+function blitBody(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, size: number, flip: boolean, a: number, bx: number, by: number, sq: number, ang: number, wob: number): void {
+  if (a <= 0.01) return;
+  const k = cam.scale * size;
+  const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
+  const fx = (flip ? -k : k) * bx, fy = k * by;
+  let m11 = fx, m12 = 0, m21 = 0, m22 = fy;
+  if (sq !== 0) {
+    const c = Math.cos(ang), n = Math.sin(ang), d1 = 1 - sq, d2 = 1 + 0.7 * sq;
+    const a11 = c * c * d1 + n * n * d2, a12 = c * n * (d1 - d2), a22 = n * n * d1 + c * c * d2;
+    m11 = a11 * fx; m12 = a12 * fy; m21 = a12 * fx; m22 = a22 * fy;
+  }
+  if (wob !== 0) {
+    const c = Math.cos(wob), n = Math.sin(wob);
+    const r11 = c * m11 - n * m21, r12 = c * m12 - n * m22, r21 = n * m11 + c * m21, r22 = n * m12 + c * m22;
+    m11 = r11; m12 = r12; m21 = r21; m22 = r22;
+  }
+  ctx.setTransform(m11, m21, m12, m22, px, py);
+  if (a !== 1) ctx.globalAlpha = a;
+  ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
+  if (a !== 1) ctx.globalAlpha = 1;
 }
 
 function circle(ctx: CanvasRenderingContext2D, cam: Camera, x: number, y: number, r: number, fill: string, a = 1): void {

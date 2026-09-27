@@ -1,6 +1,7 @@
 // Atlas pages: sprites are painted once into small canvases, then packed on shelves into 1024² pages
-// (one texture per page for drawImage). Every sprite gets a white hit-flash twin (source-in), and
-// on demand a 倒影 twin (lightness inverted, hue kept: white ink on black paper).
+// (one texture per page for drawImage). Bodies that flash get a hit-flash twin (a white body in an ink
+// rim), and on demand a 倒影 twin (lightness inverted, hue kept: white ink on black paper). Figures get a
+// moonlight rim (and pale ones an ink hairline) so they stand off the paper.
 import { paintStroke } from '../../../ink/brush';
 import { grainPattern } from '../../../ink/paper';
 import type { Sprite } from '../types';
@@ -42,14 +43,26 @@ export interface RenderOpts {
   invert?: boolean;
   /** Replace every colour by white ink on a black halo (镜主). */
   ghost?: boolean;
+  /** Bake the hit-flash twin (default true). Only bodies that flash (enemies, summons, the companion)
+   *  need one: everything else shares its sprite as its "flash", which halves its memory. */
+  flash?: boolean;
+  /** Moonlight rim: a thin moon-white edge along the silhouette's upper-left, at this alpha (0 none). */
+  rim?: number;
+  /** An ink hairline outside the halo at this alpha (0 none): pale figures on pale paper get an edge. */
+  outline?: number;
 }
+
+/** The moonlight rim's colour and the ink of the outline and of the flash twin's rim. */
+const RIM = '#fbfcff';
+const RIM_INK = '20,18,16';
 
 /** Paint a spec's variant into a fresh canvas with its halo; plus its flash twin. */
 export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
   const k = o.k;
   const haloKind = o.ghost ? 'dark' : spec.halo ?? 'paper';
   const hp = haloKind === 'none' ? 0 : o.halo;
-  const pad = hp + 2;
+  const ol = !o.ghost && o.outline && hp > 0 ? Math.max(1, Math.round(hp * 0.6)) : 0;
+  const pad = hp + ol + 2;
   const b = new B(o.seed);
   spec.paint(b, v);
   // the canvas covers what the marks really reach (brush half-widths, discs, glyphs), not just the box
@@ -72,26 +85,86 @@ export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
   const ink = canvas(cw, ch);
   ctx2d(ink).drawImage(sc.c, 0, 0, cw, ch, 0, 0, cw, ch);
   if (o.ghost) ghostify(ink);
+  // the white body of the flash twin (before the rim light: a flash is flat white)
+  const wantFlash = o.flash !== false;
+  const white = wantFlash ? tinted(ink, '#fffdf6') : null;
+  if (!o.ghost && o.rim && o.rim > 0) rimLight(ink, Math.max(1, Math.round(k * 0.9)), o.rim);
   let out = ink;
   if (hp > 0) {
     out = canvas(cw, ch);
     const q = ctx2d(out);
-    const d = hp, e = hp * 0.72;
-    for (const [dx, dy] of [[d, 0], [-d, 0], [0, d], [0, -d], [e, e], [-e, e], [e, -e], [-e, -e]]) q.drawImage(ink, dx, dy);
-    q.globalCompositeOperation = 'source-in';
-    q.fillStyle = haloKind === 'dark' ? 'rgba(12,12,16,0.78)' : hexA(PAPER, 0.92);
-    q.fillRect(0, 0, cw, ch);
-    q.globalCompositeOperation = 'source-over';
+    if (ol > 0) {
+      // the ink hairline: the silhouette grown by halo + outline, under the paper halo
+      stamp(q, ink, hp + ol);
+      q.globalCompositeOperation = 'source-in';
+      q.fillStyle = `rgba(${RIM_INK},${Math.min(1, o.outline!)})`;
+      q.fillRect(0, 0, cw, ch);
+      q.globalCompositeOperation = 'source-over';
+      const h = canvas(cw, ch), hq = ctx2d(h);
+      stamp(hq, ink, hp);
+      hq.globalCompositeOperation = 'source-in';
+      hq.fillStyle = haloKind === 'dark' ? 'rgba(12,12,16,0.78)' : hexA(PAPER, 0.92);
+      hq.fillRect(0, 0, cw, ch);
+      q.drawImage(h, 0, 0);
+      h.width = h.height = 1;
+    } else {
+      stamp(q, ink, hp);
+      q.globalCompositeOperation = 'source-in';
+      q.fillStyle = haloKind === 'dark' ? 'rgba(12,12,16,0.78)' : hexA(PAPER, 0.92);
+      q.fillRect(0, 0, cw, ch);
+      q.globalCompositeOperation = 'source-over';
+    }
     q.drawImage(ink, 0, 0);
   }
   if (o.invert) invertLightness(out);
-  const flash = canvas(cw, ch);
-  const f = ctx2d(flash);
-  f.drawImage(out, 0, 0);
-  f.globalCompositeOperation = 'source-in';
-  f.fillStyle = '#fffdf6';
-  f.fillRect(0, 0, cw, ch);
+  let flash = out;
+  if (wantFlash && white) {
+    // the twin: a crisp white body inside an ink rim (the halo turned ink), so a struck body reads as
+    // a flash of light on pale paper rather than a hole cut in it
+    flash = canvas(cw, ch);
+    const f = ctx2d(flash);
+    f.drawImage(out, 0, 0);
+    f.globalCompositeOperation = 'source-in';
+    f.fillStyle = o.invert ? 'rgba(240,238,232,0.9)' : `rgba(${RIM_INK},0.9)`;
+    f.fillRect(0, 0, cw, ch);
+    f.globalCompositeOperation = 'source-over';
+    f.drawImage(white, 0, 0);
+    white.width = white.height = 1;
+  }
   return { img: out, flash, w: cw / k, h: ch / k, ax: ox / cw, ay: oy / ch };
+}
+
+/** Stamp `src` at 8 offsets of distance d (a dilation: the halo's shape). */
+function stamp(q: CanvasRenderingContext2D, src: HTMLCanvasElement, d: number) {
+  const e = d * 0.72;
+  for (const [dx, dy] of [[d, 0], [-d, 0], [0, d], [0, -d], [e, e], [-e, e], [e, -e], [-e, -e]]) q.drawImage(src, dx, dy);
+}
+/** A copy of `src` with every painted pixel replaced by `color` (alpha kept). */
+function tinted(src: HTMLCanvasElement, color: string): HTMLCanvasElement {
+  const c = canvas(src.width, src.height), g = ctx2d(c);
+  g.drawImage(src, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = color;
+  g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+/** Moonlight from the upper left: the silhouette minus itself shifted down-right by d px leaves a thin
+ *  band along the lit edges; laid over the body (source-atop) in moon-white at alpha a. */
+function rimLight(ink: HTMLCanvasElement, d: number, a: number) {
+  const m = canvas(ink.width, ink.height), g = ctx2d(m);
+  g.drawImage(ink, 0, 0);
+  g.globalCompositeOperation = 'destination-out';
+  g.drawImage(ink, d, d);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = RIM;
+  g.fillRect(0, 0, m.width, m.height);
+  const q = ctx2d(ink);
+  q.globalCompositeOperation = 'source-atop';
+  q.globalAlpha = a;
+  q.drawImage(m, 0, 0);
+  q.globalAlpha = 1;
+  q.globalCompositeOperation = 'source-over';
+  m.width = m.height = 1;
 }
 
 /** Warm the brush's grain patterns on the shared scratch context for these colours (the pattern
@@ -155,13 +228,22 @@ function ghostify(c: HTMLCanvasElement): void {
 interface Shelf { page: HTMLCanvasElement; y: number; h: number; x: number }
 export class Pages {
   pages: HTMLCanvasElement[] = [];
+  /** Oversized sprites that keep their own canvas. */
+  private own: HTMLCanvasElement[] = [];
   private shelves: Shelf[] = [];
+  /** Bytes held (RGBA pages plus oversized canvases). */
+  bytes(): number {
+    let n = 0;
+    for (const c of this.pages) n += c.width * c.height * 4;
+    for (const c of this.own) n += c.width * c.height * 4;
+    return n;
+  }
   /** The next free row of the newest page. */
   private top = 0;
   /** Copy `src` into a page; returns the page and the rect. Oversized images keep their own canvas. */
   put(src: HTMLCanvasElement): { img: HTMLCanvasElement; sx: number; sy: number } {
     const w = src.width, h = src.height;
-    if (w > PAGE / 2 || h > PAGE / 2) return { img: src, sx: 0, sy: 0 };
+    if (w > PAGE / 2 || h > PAGE / 2) { this.own.push(src); return { img: src, sx: 0, sy: 0 }; }
     let best: Shelf | null = null;
     for (const sh of this.shelves) {
       if (sh.h < h || sh.h > h * 1.4 + 8 || sh.x + w > PAGE) continue;
@@ -189,7 +271,9 @@ export class Pages {
   }
   dispose() {
     for (const p of this.pages) { p.width = 1; p.height = 1; }
+    for (const p of this.own) { p.width = 1; p.height = 1; }
     this.pages = [];
+    this.own = [];
     this.shelves = [];
     this.top = 0;
   }
@@ -197,7 +281,7 @@ export class Pages {
 
 /** Pack a painted pair into pages as two Sprites. */
 export function pack(pages: Pages, p: Painted): { s: Sprite; f: Sprite } {
-  const a = pages.put(p.img), b = pages.put(p.flash);
+  const a = pages.put(p.img), b = p.flash === p.img ? a : pages.put(p.flash);
   const base = { sw: p.img.width, sh: p.img.height, w: p.w, h: p.h, ax: p.ax, ay: p.ay };
   return { s: { img: a.img, sx: a.sx, sy: a.sy, ...base }, f: { img: b.img, sx: b.sx, sy: b.sy, ...base } };
 }

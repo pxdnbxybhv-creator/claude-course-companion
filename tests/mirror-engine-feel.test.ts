@@ -1,7 +1,11 @@
-// 水月幻镜 · 打击感 (the engine's feel layer): the hitstop budget holds in a busy second, the sound bus
-// never starts more than 4 voices a step and meets the hit on its own step, sparks stay inside their
-// pool, reduced motion turns off every stop, shake, kick, zoom and squash, numbers pop at once and
-// merge per body, and the impact voices render cleanly.
+// 水月幻镜 · 打击感 (the engine's feel layer): the monsters show the hits, the screen stays still —
+// ordinary hits and crits never stop the world or move the camera (only big moments do, ≤ 3 px, and
+// the shake setting turns those off too); the struck body flashes, squashes along the blow, recoils
+// and freezes locally from its own bank (the world runs on); marks by class and a death that breaks
+// the body into pieces; the sound bus never starts more than 4 voices a step and meets the hit on its
+// own step; sparks stay inside their pool; reduced motion turns off every stop, shake, zoom, jitter and
+// fling; numbers pop at once (crits bigger, with a bounce) and merge per body; the impact voices
+// render cleanly.
 import { describe, expect, it } from 'vitest';
 import type { ContentRegistry, EngineSettings, MirrorAudio, NewRunOpts, RunSave, WaveSetup } from '../src/views/mirror/types';
 import type { WeaponId } from '../src/views/mirror/ids';
@@ -9,7 +13,9 @@ import { allUnlocked, beginWave, newRun, waveSetup } from '../src/views/mirror/l
 import { defaultMeta } from '../src/app/mirror';
 import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
-import { FC, fcOfWeapon } from '../src/views/mirror/engine/feel';
+import { FC, MK, fcOfWeapon, numPop } from '../src/views/mirror/engine/feel';
+import { SRCI } from '../src/views/mirror/engine/consts';
+import { SH } from '../src/views/mirror/paint/feel';
 import { FEEL_MIX, FEEL_NAMES, renderFeel } from '../src/views/mirror/audio/voices';
 
 const EMPTY: ContentRegistry = { skills: {}, passives: {}, hazards: {}, elites: {}, treasures: {}, bosses: {}, patterns: {}, affixes: {}, mutators: {}, terms: {} };
@@ -62,27 +68,37 @@ function crowd(W: MirrorEngine['world'], n: number): void {
 const BUSY: [WeaponId, 1 | 2 | 3 | 4][] = [['yanyue', 4], ['pestle', 4], ['longquan', 4], ['claw', 4], ['repeater', 4], ['thunder', 4]];
 
 describe('打击感: the feel layer', () => {
-  it('hitstop never takes more than ~15% of any second of a busy, crit-heavy fight', () => {
-    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3 })), BUSY), wave: 11, stats: { aspd: 150, crit: 70 } });
-    const { eng } = make(run);
-    eng.start(run, setup);
-    const W = quiet(eng);
-    crowd(W, 60);
-    let now = 1000;
-    const secs: number[] = [];
-    let frozen0 = 0, real0 = 0;
-    for (let f = 0; f < 60 * 8; f++) {
-      now += 1000 / 60;
-      eng.frame(now);
-      if (f % 60 === 59) { const st = W.feel.st; secs.push((st.frozenMs - frozen0) / (st.realMs - real0)); frozen0 = st.frozenMs; real0 = st.realMs; }
+  it('hitstop: ordinary hits and crits never stop the world; the rare heavy moments stay within ~15% of any second', () => {
+    // a fast crit build without heavy arms: the world never stops
+    const LIGHT: [WeaponId, 1 | 2 | 3 | 4][] = [['longquan', 4], ['claw', 4], ['repeater', 4], ['thunder', 4], ['casket', 4], ['dart', 4]];
+    for (const [ws, heavy] of [[LIGHT, false], [BUSY, true]] as const) {
+      const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3 })), ws), wave: 11, stats: { aspd: 150, crit: 70 } });
+      const { eng } = make(run);
+      eng.start(run, setup);
+      const W = quiet(eng);
+      crowd(W, 60);
+      let now = 1000;
+      const secs: number[] = [];
+      let frozen0 = 0, real0 = 0;
+      for (let f = 0; f < 60 * 8; f++) {
+        now += 1000 / 60;
+        eng.frame(now);
+        if (f % 60 === 59) { const st = W.feel.st; secs.push((st.frozenMs - frozen0) / (st.realMs - real0)); frozen0 = st.frozenMs; real0 = st.realMs; }
+      }
+      const st = W.feel.stats();
+      expect(st.hits).toBeGreaterThan(200);
+      if (!heavy) expect(st.stopMs).toBe(0); // no global stop from your own blows
+      else {
+        expect(st.stopMs).toBeGreaterThan(0); // a heavy weapon's crit still lands a beat …
+        expect(st.stopMs).toBeLessThan(80 + 30 * 8 + 1); // … from a small bucket
+      }
+      for (const s of secs) expect(s).toBeLessThanOrEqual(0.15);
+      expect(st.maxShare).toBeLessThanOrEqual(0.15);
+      // the bodies took it instead: pulses and local freezes
+      expect(st.pulses).toBeGreaterThan(100);
+      expect(st.freezes).toBeGreaterThan(10);
+      eng.dispose();
     }
-    const st = W.feel.stats();
-    expect(st.stopReqMs).toBeGreaterThan(st.stopMs); // it asked for more than it got: the budget bit
-    expect(st.stopMs).toBeGreaterThan(100); // … and it still stops
-    for (const s of secs) expect(s).toBeLessThanOrEqual(0.15);
-    expect(st.maxShare).toBeLessThanOrEqual(0.15);
-    expect(st.hits).toBeGreaterThan(200);
-    eng.dispose();
   });
 
   it('the sound bus: ≤ 4 impact voices a step, started on the step of the hit; sparks stay in their pool', () => {
@@ -109,7 +125,7 @@ describe('打击感: the feel layer', () => {
     eng.dispose();
   });
 
-  it('reduced motion: no stop, shake, kick, zoom or squash reaches the frame', () => {
+  it('reduced motion: no stop, shake, kick or zoom reaches the frame; the bodies react gently', () => {
     const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 7 })), BUSY), wave: 11, stats: { crit: 100 } });
     const { eng } = make(run, { reduceMotion: true, shake: true });
     eng.start(run, setup);
@@ -122,12 +138,22 @@ describe('打击感: the feel layer', () => {
       eng.frame(now);
       worst = Math.max(worst, W.hitstopMs, Math.abs(W.feel.offX), Math.abs(W.feel.offY), W.feel.zoom, W.shakePx);
     }
-    W.hitstop(80); W.shake(12); W.feel.punch(0.1);
+    W.hitstop(80); W.shake(12); W.feel.punch(0.1); W.feel.hurt(W.px + 50, W.py, true, 0.5);
     eng.frame(now + 16);
     expect(worst).toBe(0);
     expect(W.hitstopMs).toBe(0);
     expect(W.tWave - t0).toBeGreaterThan(3.95); // the game never froze
     expect(W.feel.st.hits).toBeGreaterThan(50);
+    // gentle reactions: no local freeze or jitter, no full-white flash frame, no fling of pieces
+    const F = W.feel, E = W.E;
+    expect(F.st.freezes).toBe(0);
+    for (let k = 0; k < 30; k++) {
+      eng.stepN(1);
+      for (let i = 0; i < E.n; i++) if (E.alive[i]) { F.pose(i); expect(F.po.fl).not.toBe(1); expect(Math.abs(F.po.s)).toBeLessThanOrEqual(0.06); }
+    }
+    const h = W.spawn('blot', W.px + 60, W.py, { bloom: false });
+    W.kill(h);
+    for (let j = 0; j < F.fr.n; j++) if (F.fr.alive[j]) { expect(F.fr.vx[j]).toBe(0); expect(F.fr.vr[j]).toBe(0); }
     eng.dispose();
   });
 
@@ -151,34 +177,141 @@ describe('打击感: the feel layer', () => {
     eng.dispose();
   });
 
-  it('the camera: never past 6 px in a busy crit fight, small bumps most of the time; zoom halves with shake off', () => {
-    const zmax: number[] = [];
+  it('the camera stays still for your own hits, crits and kills; big moments only move it (≤ 3 px), and the setting turns them off', () => {
     for (const shake of [true, false]) {
       const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3 })), BUSY), wave: 11, stats: { aspd: 150, crit: 60 } });
       const { eng } = make(run, { shake });
       eng.start(run, setup);
       const W = quiet(eng);
-      crowd(W, 60);
-      let now = 1000, z = 0;
-      const offs: number[] = [];
+      crowd(W, 50);
+      // and bodies that die (kills, crits on them)
+      for (let k = 0; k < 40; k++) W.spawn('blot', W.px + Math.cos(k) * (60 + k * 3), W.py + Math.sin(k) * (60 + k * 3), { bloom: false });
+      const kills0 = W.feel.st.kills;
+      let now = 1000, worst = 0, z = 0;
       for (let f = 0; f < 60 * 6; f++) {
         now += 1000 / 60;
         eng.frame(now);
-        offs.push(Math.hypot(W.feel.offX, W.feel.offY));
+        worst = Math.max(worst, Math.hypot(W.feel.offX, W.feel.offY));
         z = Math.max(z, W.feel.zoom);
-        if (f === 200) W.feel.skillImpact(W.px, W.py); // a big jolt on top of the crits
+        if (f % 90 === 0) W.feel.level(W.px, W.py); // level-ups: a burst, no camera
       }
-      offs.sort((a, b) => a - b);
-      if (shake) {
-        expect(offs[offs.length - 1]).toBeLessThanOrEqual(6.0001); // GDD §20.3
-        expect(offs[Math.floor(offs.length * 0.9)]).toBeLessThanOrEqual(3.5);
-        expect(offs[Math.floor(offs.length * 0.9)]).toBeGreaterThan(0.3); // … but the crits are felt
-      } else expect(offs[offs.length - 1]).toBe(0);
-      zmax.push(z);
+      expect(W.feel.st.kills - kills0).toBeGreaterThan(10);
+      expect(W.critN).toBeGreaterThan(50);
+      expect(worst).toBe(0); // not a pixel from your own blows
+      expect(z).toBe(0);
+      // the 镜技's landing: a gentle zoom, no shake
+      W.feel.skillImpact(W.px, W.py);
+      eng.frame((now += 1000 / 60));
+      if (shake) { expect(W.feel.zoom).toBeGreaterThan(0.01); expect(W.feel.zoom).toBeLessThanOrEqual(0.02); } else expect(W.feel.zoom).toBe(0);
+      expect(Math.hypot(W.feel.offX, W.feel.offY)).toBe(0);
+      for (let f = 0; f < 60; f++) eng.frame((now += 1000 / 60));
+      // a light blow you take: still; a hard one (≥ 15% of your HP): a small, short nudge
+      const peak = (fn: () => void) => {
+        fn();
+        let m = 0, frames = 0;
+        for (let f = 0; f < 60; f++) { eng.frame((now += 1000 / 60)); const o = Math.hypot(W.feel.offX, W.feel.offY); m = Math.max(m, o); if (o > 0.5) frames++; }
+        return { m, frames };
+      };
+      expect(peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.05)).m).toBe(0);
+      const hard = peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.3));
+      const slam = peak(() => { W.shake(5); W.shake(5); });
+      const phase = peak(() => W.feel.phase(W.px, W.py));
+      for (const p of [hard, slam, phase]) {
+        if (shake) { expect(p.m).toBeGreaterThan(0.3); expect(p.m).toBeLessThanOrEqual(3.0001); expect(p.frames).toBeLessThan(20); } else expect(p.m).toBe(0);
+      }
       eng.dispose();
     }
-    expect(zmax[0]).toBeGreaterThan(0.04);
-    expect(zmax[1]).toBeCloseTo(zmax[0] / 2, 5);
+  });
+
+  it('the struck body shows the blow: tiers by weight, squash along the blow, a local freeze from its own bank; the world runs on', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 11 })), []), wave: 5 });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const F = W.feel, E = W.E;
+    const h = W.spawn('blot', W.px + 100, W.py, { bloom: false });
+    const i = E.slotOf(h);
+    E.hp[i] = E.hpMax[i] = 1000; E.speed[i] = 0; E.dmg[i] = 0;
+    // a light talisman tick: a flash and a small squash, no freeze
+    F.hit(i, W.px, W.py, 5, false, FC.talisman, false, SRCI.weapon, -1);
+    expect(E.flash[i]).toBeGreaterThan(0);
+    expect(F.rFrz[i]).toBe(0);
+    F.pose(i);
+    expect(F.po.s).toBeCloseTo(0.12, 2);
+    expect(F.po.fl).toBe(1); // the first frames: the white twin
+    eng.stepN(20);
+    // a heavy blow from the left: the body holds where it was struck, compressed along the blow, jitters, then flies
+    const x0 = E.x[i];
+    E.kx[i] = 900; E.kT[i] = 0.12; // the simulation carries it off (a knockback)
+    F.hit(i, W.px, W.py, 400, false, FC.heavy, false, SRCI.weapon, -1);
+    expect(F.rFrz[i]).toBeGreaterThanOrEqual(0.06);
+    expect(W.hitstopMs).toBe(0); // the world does not stop
+    eng.stepN(2);
+    expect(E.x[i]).toBeGreaterThan(x0 + 10); // … it keeps running
+    F.pose(i);
+    expect(Math.abs(F.po.ang)).toBeLessThan(0.01); // the blow's axis: +x
+    expect(F.po.s).toBeGreaterThan(0.25);
+    expect(Math.abs(F.po.x - (x0 + 0.35 * F.rR[i]))).toBeLessThan(0.01); // held (plus the first of its recoil)
+    expect(Math.abs(F.po.y - E.y[i])).toBeGreaterThan(1); // jitter across the blow
+    eng.stepN(8);
+    F.pose(i);
+    expect(F.po.x).toBeGreaterThan(x0 + 15); // released: it flies after its body
+    // hammered every step for 3 s: the body's bank keeps it held ≤ 30% of the time
+    const s0 = F.st.freezeS;
+    for (let k = 0; k < 180; k++) { F.hit(i, W.px, W.py, 400, k % 3 === 0, FC.heavy, false, SRCI.weapon, -1); eng.stepN(1); }
+    expect(F.st.freezeS - s0).toBeLessThanOrEqual(0.3 * 3 + 0.15 + 1e-6);
+    expect(F.st.freezeS - s0).toBeGreaterThan(0.3);
+    // the flash is paced: never on for more than ~half the frames under a fast weapon
+    let on = 0;
+    for (let k = 0; k < 120; k++) { F.hit(i, W.px, W.py, 20, false, FC.slash, false, SRCI.weapon, -1); eng.stepN(1); F.pose(i); if (F.po.fl === 1) on++; }
+    expect(on).toBeLessThanOrEqual(60);
+    expect(on).toBeGreaterThan(10);
+    eng.dispose();
+  });
+
+  it('marks by class across the body, pieces of the body on death, capped in a crowd', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 12 })), []), wave: 5 });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const F = W.feel, E = W.E, M = F.mk;
+    const h = W.spawn('crab', W.px + 100, W.py, { bloom: false });
+    const i = E.slotOf(h);
+    E.hp[i] = E.hpMax[i] = 1000; E.speed[i] = 0; E.dmg[i] = 0;
+    const find = (kind: number) => { for (let j = 0; j < M.n; j++) if (M.alive[j] && M.kind[j] === kind) return j; return -1; };
+    // a sword's cut runs across the blow (⟂), a flying sword's beam along it
+    F.hit(i, W.px, W.py, 300, false, FC.slash, false, SRCI.weapon, -1);
+    const c = find(MK.cut);
+    expect(c).toBeGreaterThanOrEqual(0);
+    expect(M.shape[c]).toBe(SH.cut);
+    expect(Math.abs(Math.abs(Math.sin(M.ang[c])) - 1)).toBeLessThan(0.2);
+    expect(find(MK.pop)).toBeGreaterThanOrEqual(0); // the impact star
+    expect(find(MK.ground)).toBeGreaterThanOrEqual(0); // the ground's splash
+    M.clear();
+    eng.stepN(1); // (a new step: a fresh mark budget)
+    F.hit(i, W.px, W.py - 100, 300, false, FC.flying, false, SRCI.weapon, -1);
+    const b = find(MK.beam);
+    expect(b).toBeGreaterThanOrEqual(0);
+    expect(Math.abs(Math.cos(M.ang[b]))).toBeLessThan(0.75); // along the blow (from above)
+    // a death: pieces of its own sprite, flung on along the killing blow
+    const atlas = E.atlas[i];
+    F.hit(i, W.px, W.py, 300, false, FC.slash, false, SRCI.weapon, -1);
+    W.kill(h);
+    expect(F.fr.count).toBeGreaterThanOrEqual(3);
+    let vx = 0;
+    for (let j = 0; j < F.fr.n; j++) if (F.fr.alive[j]) { expect(F.fr.id[j]).toBe(atlas); vx += F.fr.vx[j]; }
+    expect(vx).toBeGreaterThan(0);
+    // a crowd under fire: the marks stay inside their pool and their step budget
+    crowd(W, 120);
+    let peak = 0;
+    for (let k = 0; k < 120; k++) {
+      for (let j = 0; j < E.n; j++) if (E.alive[j]) F.hit(j, W.px, W.py, 50, k % 4 === 0, FC.slash, false, SRCI.weapon, -1);
+      eng.stepN(1);
+      peak = Math.max(peak, M.count);
+    }
+    expect(peak).toBeLessThanOrEqual(M.cap);
+    expect(F.st.marks).toBeLessThan(120 * 12);
+    eng.dispose();
   });
 
   it('a blow you take: no drift, an 8 ms tick, the drum under the grunt in the bus; crits never buzz', () => {
@@ -217,6 +350,17 @@ describe('打击感: the feel layer', () => {
     } finally {
       if (nav) Object.defineProperty(globalThis, 'navigator', nav); else delete (globalThis as { navigator?: unknown }).navigator;
     }
+  });
+
+  it('numbers pop: crits jump bigger, bounce under and settle; reduced motion holds still', () => {
+    expect(numPop(0.05, true, false)).toBeGreaterThanOrEqual(1.4);
+    expect(numPop(0.05, false, false)).toBeLessThan(1.2);
+    let low = 9;
+    for (let t = 0.08; t < 0.3; t += 0.005) low = Math.min(low, numPop(t, true, false));
+    expect(low).toBeLessThan(0.97);
+    expect(Math.abs(numPop(0.34, true, false) - 1)).toBeLessThan(0.03);
+    expect(numPop(0.4, true, false)).toBe(1);
+    for (const t of [0, 0.03, 0.05, 0.1, 0.2]) { expect(numPop(t, true, true)).toBe(1); expect(numPop(t, false, true)).toBe(1); }
   });
 
   it('every weapon has a feel class; the impact voices render short and clean', () => {

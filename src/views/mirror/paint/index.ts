@@ -26,7 +26,9 @@ import type {
   ArenaGeom, AtlasId, BakeStage, Camera, MoonLook, NumStyle, Painter, Quality, RunSave, Sprite, StampKind, TeleShape,
 } from '../types';
 import { canvas, ctx2d, pack, Pages, renderSpec, warmGrain } from './atlas';
+import { viewScale } from './draw';
 import { ArenaLayer } from './arena';
+import { Ambience } from './ambient';
 import { BOSS_SPEC, MOON_SPEC } from './bosses';
 import { CHAR_SPECS } from './figures';
 import { PROJ_SPECS, SUM_SPECS, WPN_SPECS } from './gear';
@@ -35,16 +37,58 @@ import { B, extentOf, type Spec } from './kit';
 import { MON_SPECS } from './monsters';
 import { Numbers } from './numbers';
 import { Tele } from './tele';
-import { DROP_SPECS, FX_SPECS } from './things';
+import { DROP_SPECS, FX_SPECS, isZone } from './things';
 
-export { blit, blitRot } from './draw';
+export { blit, blitRot, viewScale } from './draw';
 export { abbrev } from './numbers';
 
-/** Sprite resolution: CSS px per u at bake time, by quality (× the capped dpr). */
+/** Sprite resolution when no bake scale is given (the lab, icons): px per u = dpr × this. */
 const PX_PER_U: Record<Quality, number> = { low: 0.85, mid: 1, high: 1.15 };
+/** Bake scale over the camera's base px per u: zoom punches reach +3–10% for a tenth of a second, and a
+ *  little supersample keeps rotating blades and thin lines crisp. Low paints exactly at the drawn size. */
+const HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.15 };
+/** The bake scale's ceiling (memory grows with k²: the start atlas is ≈ 3 MB × k²). */
+const K_MAX: Record<Quality, number> = { low: 3, mid: 3.2, high: 3.4 };
+/** Zone looks (a ±32 u disc the engine draws at r 40–360 u) bake at least this many px per u. */
+const ZONE_K: Record<Quality, number> = { low: 2, mid: 2.6, high: 3.2 };
+
+/**
+ * The sprite resolution (px per u) for a viewport: the camera's base scale there (viewScale × the
+ * canvas dpr) × a small headroom by quality, within [1, K_MAX]. Sprites are then drawn at ≤ 1.0× their
+ * baked pixels at every quality (bosses and a few ids adjust by how large they are drawn: kindScale).
+ */
+export function bakeScale(cssW: number, cssH: number, dpr: number, quality: Quality): number {
+  const cam = viewScale(cssW, cssH) * Math.max(1, dpr || 1);
+  return Math.max(1, Math.min(K_MAX[quality], cam * HEADROOM[quality]));
+}
+/** How large an id is drawn relative to 1 × its size (bake it that much larger or smaller). */
+function kindScale(id: string): number {
+  if (id.startsWith('boss:')) return 0.9; // the boss fight's camera zooms out to 0.84
+  if (id.startsWith('wpn:')) return 0.6; // held weapons are drawn at 0.55 (baked small: no shimmer)
+  if (id.startsWith('proj:e')) return 1.5; // enemy shots are drawn at 1.5×
+  if (id === 'sum:molong') return 1.4; // 墨龙 is drawn at 1.4×
+  if (id === 'fx:stunMark' || id === 'fx:charmMark' || id === 'fx:burnMark' || id === 'fx:slowMark' || id === 'fx:rootMark') return 0.5;
+  return 1;
+}
+/** Only bodies flash (enemies, summons, the companion); the rest shares its sprite as its flash. */
+function flashes(id: string): boolean {
+  return id.startsWith('mon:') || id.startsWith('elite:') || id.startsWith('boss:') || id.startsWith('sum:') || id.startsWith('char:');
+}
+/** The moonlight rim and ink hairline by kind: figures stand off the paper; effects stay flat washes. */
+function edgeOf(id: string): { rim: number; outline: number } {
+  if (id.startsWith('char:')) return { rim: 0.6, outline: 0.5 };
+  if (id.startsWith('sum:')) return { rim: 0.45, outline: 0.35 };
+  if (id.startsWith('mon:') || id.startsWith('elite:')) return { rim: 0.32, outline: 0 };
+  if (id.startsWith('boss:')) return { rim: 0.3, outline: 0 };
+  return { rim: 0, outline: 0 };
+}
 const FONT_WAIT_MS = 1500;
 /** Bake budget per frame (GDD §21: 6 ms). One job always runs, so a single big sprite can exceed it. */
 const SLICE_MS = 6;
+/** The first bake (the start plan, behind the 研墨 screen, which only animates a bar) takes bigger
+ *  slices: the frames between slices are idle there, and sprites painted at the camera's scale cost
+ *  2× the old pixels. Later bakes run in the shop's background and keep to SLICE_MS. */
+const START_SLICE_MS = 14;
 /** Icons kept painted (≈ 48–96 px each: a few MB at most). */
 const ICON_CACHE = 260;
 
@@ -186,14 +230,19 @@ class InkPainter implements Painter {
   /** Bake enemies as 倒影 (the endless stage). */
   private wantInv = false;
   private arena: ArenaLayer;
+  /** The arena's ambience (grain, vignette, contact shadows, motes): render.ts draws it after the arena. */
+  readonly ambience: Ambience;
   private tele: Tele;
   private nums: Numbers;
   private disposed = false;
+  /** Bakes started (the first is the start plan: START_SLICE_MS). */
+  private bakes = 0;
 
-  constructor(readonly map: MapId, readonly quality: Quality, dpr: number) {
-    this.dpr = Math.max(1, Math.min(dpr || 1, quality === 'low' ? 1.5 : 2));
-    this.k = this.dpr * PX_PER_U[quality];
-    this.arena = new ArenaLayer(map, quality, this.dpr);
+  constructor(readonly map: MapId, readonly quality: Quality, dpr: number, pxPerU?: number) {
+    this.dpr = Math.max(1, Math.min(dpr || 1, 3));
+    this.k = pxPerU && Number.isFinite(pxPerU) && pxPerU > 0 ? Math.max(0.5, Math.min(K_MAX[quality], pxPerU)) : this.dpr * PX_PER_U[quality];
+    this.arena = new ArenaLayer(map, quality, this.dpr, this.k);
+    this.ambience = new Ambience(map, quality, this.dpr, this.k);
     this.tele = new Tele(this.dpr);
     this.nums = new Numbers(this.dpr);
   }
@@ -248,6 +297,7 @@ class InkPainter implements Painter {
       for (let v = 0; v < n; v++) jobs.push({ id, v, inv, n });
     }
     const total = jobs.length;
+    const slice = this.bakes++ === 0 ? START_SLICE_MS : SLICE_MS;
     let done = 0;
     onProgress?.(0, total);
     // warm the grain tiles of every colour the jobs use, a slice at a time, before the first sprite
@@ -264,7 +314,7 @@ class InkPainter implements Painter {
           (op.s.kind === 'wash' ? wet : fine).push(op.s.color);
         }
         if (fine.length || wet.length) warmGrain(fine, wet);
-      } while (i < jobs.length && performance.now() - t0 < SLICE_MS);
+      } while (i < jobs.length && performance.now() - t0 < slice);
       if (i < jobs.length) await nextFrame();
       if (this.disposed) return;
     }
@@ -275,7 +325,7 @@ class InkPainter implements Painter {
         const j = jobs[done];
         this.bakeOne(j.id, j.v, j.inv, j.n, pending);
         done++;
-      } while (done < total && performance.now() - t0 < SLICE_MS);
+      } while (done < total && performance.now() - t0 < slice);
       onProgress?.(done, total);
       if (done < total) await nextFrame();
       if (this.disposed) return;
@@ -291,8 +341,11 @@ class InkPainter implements Painter {
     if (!e) { e = { s: new Array(n), f: new Array(n) }; pending.set(key + (inv ? '|i' : ''), e); }
     try {
       const big = id.startsWith('boss:');
-      const k = big ? this.k * 0.8 : this.k;
-      const painted = renderSpec(sp.spec, v, { k, seed: seedOf(id) + v * 7919, halo: Math.max(1, Math.round(this.dpr * (big ? 1.6 : 1.1))), invert: inv, ghost: sp.ghost });
+      const k = isZone(sp.spec) ? Math.max(this.k, ZONE_K[this.quality]) : this.k * kindScale(id);
+      const edge = edgeOf(id);
+      // the halo in px follows the bake scale (≈ 1 u; bosses 1.8 u), never under 1 px
+      const halo = Math.max(1, Math.round(k * (big ? 1.8 : 1)));
+      const painted = renderSpec(sp.spec, v, { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, flash: flashes(id), rim: edge.rim, outline: edge.outline });
       const { s, f } = pack(this.pages, painted);
       e.s[v] = s; e.f[v] = f;
     } catch (err) {
@@ -332,7 +385,10 @@ class InkPainter implements Painter {
     return specOf(id, this.self)?.spec.n ?? 1;
   }
 
-  paintArena(geom: ArenaGeom, seed: number, inverted: boolean): void { this.arena.paint(geom, seed, inverted); }
+  paintArena(geom: ArenaGeom, seed: number, inverted: boolean): void {
+    this.arena.paint(geom, seed, inverted);
+    this.ambience.bake(inverted);
+  }
   drawArena(ctx: CanvasRenderingContext2D, cam: Camera): void { this.arena.draw(ctx, cam); }
   stamp(kind: StampKind, x: number, y: number, r: number, seed: number, tint?: string): void { this.arena.stamp(kind, x, y, r, seed, tint); }
   wash(f: number): void { this.arena.wash(f); }
@@ -375,7 +431,7 @@ class InkPainter implements Painter {
     try {
       const [x0, y0, x1, y1] = extentOf(sp.spec, 0, seedOf(id));
       const k = (size * 0.86) / Math.max(x1 - x0, y1 - y0);
-      const p = renderSpec(sp.spec, 0, { k, seed: seedOf(id), halo: Math.max(1, Math.round(size / 40)), ghost: sp.ghost });
+      const p = renderSpec(sp.spec, 0, { k, seed: seedOf(id), halo: Math.max(1, Math.round(size / 40)), ghost: sp.ghost, flash: false });
       const g = ctx2d(c);
       const s = Math.min(size / p.img.width, size / p.img.height, 1);
       g.drawImage(p.img, (size - p.img.width * s) / 2, (size - p.img.height * s) / 2, p.img.width * s, p.img.height * s);
@@ -386,6 +442,14 @@ class InkPainter implements Painter {
   }
 
   arenaImage(w: number, h: number): HTMLCanvasElement { return this.arena.image(w, h); }
+
+  /** Memory held, in bytes (beyond the contract: the lab, the perf probe and the tests read it). */
+  memory(): { atlas: number; arena: number; total: number } {
+    const atlas = this.pages.bytes(), arena = this.arena.bytes() + this.ambience.bytes();
+    return { atlas, arena, total: atlas + arena };
+  }
+  /** Whether the arena is painted as 倒影 now (the ambience layer reads it). */
+  get invertedNow(): boolean { return this.arena.inverted; }
 
   dispose(): void {
     this.disposed = true;
@@ -404,4 +468,6 @@ function seedOf(id: string): number {
   return h >>> 0;
 }
 
-export const createPainter = (map: MapId, quality: Quality, dpr: number): Painter => new InkPainter(map, quality, dpr);
+/** `pxPerU` (optional, beyond the contract's three arguments): the sprite resolution, from bakeScale()
+ *  for the viewport the run is played in; without it sprites bake at dpr × a quality factor. */
+export const createPainter = (map: MapId, quality: Quality, dpr: number, pxPerU?: number): Painter => new InkPainter(map, quality, dpr, pxPerU);

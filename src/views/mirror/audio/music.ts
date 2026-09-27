@@ -1,9 +1,12 @@
 // 水月幻镜 · the music director (GDD §22). It picks the theme for each phase — 'mirror-calm' for the
-// lobby, the shop and the results, 'mirror' for a wave, 'mirror-boss' for a boss — hands over with the
-// transitions (a drum fill into a wave, a choked 钹 on the clear, a 大鼓 roll into the 大锣 when a
-// boss arrives), and feeds the band the wave clock and the danger. The themes read that state as each
-// phrase is composed (src/audio/music-themes.ts: mirrorTier, mirrorBossStep), so layers enter over the
-// wave, the last 10 s tighten and danger pushes a layer up.
+// lobby, the shop and the results, 'mirror' for a wave (the battle score: the 笛 leads from the first
+// bar), 'mirror-boss' for a boss (the 唢呐 leads) — hands over with the transitions (a drum fill into a
+// wave, a choked 钹 on the clear, a 大鼓 roll into the 大锣 when a boss arrives), and feeds the band the
+// wave clock and the danger. The themes read that state as each phrase is composed
+// (src/audio/music-themes.ts: mirrorTier, mirrorBossStep), so layers enter over the wave, the last 10 s
+// tighten and danger pushes a layer up. A phrase is composed ≈ 4.5 s ahead, so the director also plays
+// a cue at once — on the band's next beat, in its tempo: a 堂鼓 roll into 大鼓 + 小锣 when the danger
+// rises past one half (at most every 12 s), a 大锣 with the 唢呐's call when a boss enters a new phase.
 //
 //   mirrorMusic.phase(phase, map)   the theme for a phase (what MirrorAudio.music does)
 //   mirrorMusic.hud(s, crowd)       the ≈ 8 Hz HUD feed: the wave clock, the danger, the boss phase,
@@ -14,7 +17,7 @@
 // Volume and the music switch are the app's (settings.music, settings.musicVolume → music.ts), and the
 // music bus has its own compressor and soft clip. No Web Audio here; never throws.
 import { music } from '../../../audio/music';
-import { getMirrorColour, getMirrorMusic, mirrorCue, setMirrorMusic } from '../../../audio/music-themes';
+import { getMirrorColour, getMirrorMusic, mirrorBpm, mirrorCue, setMirrorMusic } from '../../../audio/music-themes';
 import type { MusicTheme } from '../../walk/map';
 import type { MapId } from '../ids';
 import type { HudState, MusicPhase } from '../types';
@@ -23,6 +26,11 @@ import type { HudState, MusicPhase } from '../types';
  *  than music.ts's 450 ms debounce, so the silence is honoured and a new Composer takes the map's
  *  tempo and modes. */
 const RECOLOUR_MS = 520;
+/** The danger cue at most this often (ms): a warning, not a metronome. */
+const DANGER_CUE_MS = 12_000;
+/** The danger and boss-phase cues start on the band's next beat (their rolls run in its 16ths, see
+ *  mirrorCue) when music.cue quantises; an engine that does not know the flag plays them at once. */
+const ON_BEAT: NonNullable<Parameters<typeof music.cue>[1]> & { quantize?: boolean } = { quantize: true };
 
 export const themeOf = (phase: MusicPhase): MusicTheme | null =>
   phase === null ? null : phase === 'boss' ? 'mirror-boss' : phase === 'wave' ? 'mirror' : 'mirror-calm';
@@ -46,6 +54,9 @@ class MirrorMusic {
   private cleared = false;
   private sawBoss = false;
   private danger = 0;
+  /** The last boss phase heard this fight (−1: none yet). */
+  private bossPhase = -1;
+  private dangerCueAt = -Infinity;
 
   /** The theme for a phase, coloured by the map. Switches only when the phase or the map changes. */
   phase(phase: MusicPhase, map: MapId): void {
@@ -66,6 +77,7 @@ class MirrorMusic {
       setMirrorMusic({ left: null, total: null, danger: 0, bossPhase: 0 });
       this.danger = 0;
       this.sawBoss = false;
+      this.bossPhase = -1;
     }
     const wasClear = this.cleared;
     this.cleared = false;
@@ -105,7 +117,13 @@ class MirrorMusic {
       if (this.now !== 'wave' && this.now !== 'boss') return;
       // danger rises at once and falls over about a second, so the band does not flicker
       const d = dangerOf(s, crowd);
+      const was = this.danger;
       this.danger = Math.max(d, this.danger - 0.05);
+      // the band hears the danger at its next phrase; the drums answer it now
+      if (was < 0.5 && this.danger >= 0.5 && s.hp > 0) {
+        const now = Date.now();
+        if (now - this.dangerCueAt >= DANGER_CUE_MS) { this.dangerCueAt = now; music.cue(mirrorCue('danger', 1, mirrorBpm()), ON_BEAT); }
+      }
       const st = getMirrorMusic();
       const upd: Parameters<typeof setMirrorMusic>[0] = { danger: this.danger };
       if (s.time != null && Number.isFinite(s.time)) {
@@ -113,7 +131,13 @@ class MirrorMusic {
         // the first report of a wave is its length
         if (st.total == null || s.time > st.total) upd.total = Math.max(1, s.time);
       }
-      if (s.boss) { upd.bossPhase = s.boss.phase; this.sawBoss = true; }
+      if (s.boss) {
+        upd.bossPhase = s.boss.phase;
+        this.sawBoss = true;
+        // a new boss phase: 大锣 and the 唢呐's call at once (the boss's entry has its own roll into the 锣)
+        if (this.bossPhase >= 0 && s.boss.phase > this.bossPhase && s.hp > 0) music.cue(mirrorCue('phase', 1, mirrorBpm()), ON_BEAT);
+        this.bossPhase = Math.max(this.bossPhase, s.boss.phase);
+      }
       setMirrorMusic(upd);
       // the clear, heard as it happens (the UI's shop comes ≈ 1.2 s later, after the 「破」 title)
       if (!this.cleared && s.hp > 0 && ((this.now === 'wave' && s.time != null && s.time <= 0.05) || (this.now === 'boss' && this.sawBoss && !s.boss))) this.clear();
@@ -137,6 +161,8 @@ class MirrorMusic {
     this.now = null;
     this.map = null;
     this.cleared = false;
+    this.bossPhase = -1;
+    this.dangerCueAt = -Infinity;
     setMirrorMusic({ left: null, total: null, danger: 0, bossPhase: 0 });
   }
 }

@@ -96,14 +96,40 @@ function eshot(b: B, r: number, core = '#ffffff', rim = DANGER) {
   b.disc(0, 0, r * 0.52, core);
 }
 
+/** A soft round glow of radius r under a player shot (baked once: light on paper, never a per-frame
+ *  gradient): three pale discs, the tint at its edge, white toward the heart. */
+function glow(b: B, r: number, tint: string) {
+  b.disc(0, 0, r, tint, 0.16);
+  b.disc(0, 0, r * 0.66, tint, 0.24);
+  b.disc(0, 0, r * 0.36, '#ffffff', 0.5);
+}
+/** A soft glow along a shaft from x0 to x1, half-width w. */
+function glowLine(b: B, x0: number, x1: number, w: number, tint: string) {
+  b.flat((g) => {
+    for (const [k, a] of [[1, 0.14], [0.6, 0.22]] as [number, number][]) {
+      g.globalAlpha = a; g.fillStyle = tint;
+      g.beginPath(); g.ellipse((x0 + x1) / 2, 0, (x1 - x0) / 2 + w * k * 0.5, w * k, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.globalAlpha = 1;
+  }, [x0 - w, -w, x1 + w, w]);
+}
+
 export const PROJ_SPECS: Record<ProjKind, Spec> = {
-  dartStar: shot(6, (b) => { b.fill(CLASS_WASH.sword, star(0, 0, 6, 1.8, 4, 0), 0.7, 0.3); b.fill(STEEL, star(0, 0, 4.6, 1.3, 4, 0), 0.95, 0.2); }),
-  coinBlade: shot(6, (b) => { b.fill('#d9b24a', star(0, 0, 6, 4.8, 12, 0), 0.95, 0.2); b.disc(0, 0, 1.6, '#f2d77a'); }),
-  sunArrow: shot(3, (b) => { b.brush([[-14, 0, 1], [10, 0, 1]], 0.95, LACQ); b.fill(SILVER, [[9, -2.4], [15, 0], [9, 2.4]], 0.95, 0.2); b.fill('#f4efe4', [[-14, 0], [-10, -3], [-8, 0], [-10, 3]], 0.9, 0.2); }, 'none', 15),
-  crossBolt: shot(2.4, (b) => { b.brush([[-6, 0, 1.4], [6, 0, 1.4]], 0.95, DARKWOOD); b.fill(SILVER, [[5, -2], [9, 0], [5, 2]], 0.95, 0.2); }, 'none', 9),
+  dartStar: shot(7, (b) => { glow(b, 7, '#9fc2d6'); b.fill(CLASS_WASH.sword, star(0, 0, 6.6, 1.9, 4, 0), 0.8, 0.3); b.fill('#dfe9ee', star(0, 0, 5, 1.3, 4, 0), 0.97, 0.2); b.disc(0, 0, 1.1, '#ffffff'); }),
+  coinBlade: shot(7, (b) => { glow(b, 7, '#f2d77a'); b.fill('#d9b24a', star(0, 0, 6, 4.8, 12, 0), 0.95, 0.2); b.ring(0, 0, 4.2, 0.5, '#8a5a12', 0.8); b.disc(0, 0, 1.6, '#fff4c8'); b.disc(-2, -2.4, 0.9, '#ffffff'); }),
+  sunArrow: shot(4, (b) => { glowLine(b, -12, 16, 3.4, '#f2d77a'); b.brush([[-14, 0, 1.2], [10, 0, 1.2]], 0.95, LACQ); b.line([[-12, -0.3], [9, -0.3]], 0.3, 0.7, '#e8b870'); b.fill('#eef2f4', [[9, -2.8], [16, 0], [9, 2.8]], 0.97, 0.2); b.line([[9, -2.8], [16, 0], [9, 2.8]], 0.35, 0.8, INK); b.disc(13.4, -0.5, 0.7, '#ffffff'); b.fill('#f4efe4', [[-15, 0], [-10, -3.4], [-8, 0], [-10, 3.4]], 0.95, 0.2); b.line([[-14, 0], [-9, 0]], 0.3, 0.7, GOLD); }, 'none', 16),
+  crossBolt: shot(3, (b) => { glowLine(b, -7, 10, 2.8, '#c9d8e0'); b.brush([[-7, 0, 1.6], [6, 0, 1.6]], 0.95, DARKWOOD); b.fill('#eef2f4', [[5, -2.4], [10, 0], [5, 2.4]], 0.97, 0.2); b.line([[5, -2.4], [10, 0], [5, 2.4]], 0.3, 0.8, INK); b.disc(7.6, -0.4, 0.6, '#ffffff'); }, 'none', 10),
   hookLine: shot(4, (b) => { b.line([[-14, 0], [2, 0]], 0.3, 0.7, INK); b.brush(arcW(4, 1.4, 2.4, 2.8, -1.6, 2, 1, 0.6, 6), 0.95, GOLD); }, 'none', 14),
-  flySword: shot(3, (b) => { b.dry([[-20, 0, 4], [-6, 0, 3]], 0.45, CLASS_WASH.sword); blade(b, -6, 12, 2.8, '#b9d2dc'); b.brush([[-9, 0, 1.6], [-6, 0, 1.6]], 0.9, JADE); }, 'none', 20),
-  noteGlyph: shot(6, (b) => { b.wash(CLASS_WASH.music, ell(0, 0, 6, 6), 0.45); b.brush([[-1, 4, 1.6], [-1, -5, 1.2], [4, -3, 0.6]], 0.95, '#3e6a44'); b.dot(-2.4, 4, 3.4, 0.95, '#3e6a44'); }),
+  // 仙剑: a luminous blade — azure halo, a pale steel body with an azure edge, a white-hot spine and tip
+  flySword: shot(4, (b) => {
+    glowLine(b, -10, 18, 4.4, '#9fc8dc');
+    b.dry([[-22, 0, 4.4], [-6, 0, 3.2]], 0.5, CLASS_WASH.sword);
+    blade(b, -6, 17, 3.6, '#d6e8ef', '#2f5f78');
+    b.line([[-4, -0.35], [13, -0.35]], 0.45, 0.95, '#ffffff');
+    b.disc(15.4, 0, 0.9, '#ffffff');
+    b.brush([[-10, 0, 1.8], [-6, 0, 1.8]], 0.95, JADE); b.brush([[-6, -2.6, 1.2], [-6, 2.6, 1.2]], 0.95, '#3f6f5f');
+  }, 'none', 22),
+  noteGlyph: shot(7, (b) => { glow(b, 7, '#b8dcb0'); b.wash(CLASS_WASH.music, ell(0, 0, 6.4, 6.4), 0.55); b.disc(0, 0, 2.6, '#f4fbef', 0.9); b.brush([[-1, 4, 1.7], [-1, -5.4, 1.3], [4.4, -3.2, 0.6]], 0.97, '#2f5a36'); b.dot(-2.4, 4, 3.6, 0.97, '#2f5a36'); }),
   inkBlob: shot(6, (b) => { b.dot(0, 0, 11, 0.95, INK); b.disc(-1.6, -1.8, 1.4, '#6a6a6a'); }),
   bambooLeaf: shot(3, (b) => { b.brush([[-8, 0, 0.4], [-2, 0, 3.4], [8, 0, 0.3]], 0.9, '#2f5a36'); b.line([[-7, 0], [7, 0]], 0.25, 0.6, '#a8c49a'); }, 'none', 8),
   moonMote: shot(4, (b) => { b.disc(0, 0, 4, MOON, 0.35); b.fill(MOON, [[-4, 0], [0, -3], [5, 0], [0, 3]], 0.95, 0.3); b.disc(0.6, -0.4, 1, '#ffffff'); }),

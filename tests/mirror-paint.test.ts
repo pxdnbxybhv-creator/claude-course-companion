@@ -118,7 +118,8 @@ describe('bake plans', () => {
     expect(ids.has('mon:tadpole')).toBe(true);
     expect(ids.has('mon:rat')).toBe(true);
     expect(ids.has('boss:mirrorself:1')).toBe(true);
-    expect(p.dpr).toBe(1.5);
+    // every quality draws at the screen's resolution (up to 3): the old low cap of 1.5 stretched a DPR-3 phone 2×
+    expect(p.dpr).toBe(3);
   });
 });
 

@@ -1,24 +1,31 @@
-// 水月幻镜 · 打击感, the feel layer (GDD §20): what makes a hit land. Every player-side strike and
-// kill reports here; the feel layer answers with
-//   · a hit reaction on the body (1–2 frame white flash, a squash that recovers, a recoil nudge);
-//   · directional spatter by weapon class (sword streaks, heavy rings and blots, feathers, talisman
-//     sparks, wine drops, 墨宝 ink, jade chips, go stones, notes, moon glints) and an impact flare;
-//   · a death burst (a wet crown, flung droplets, a stain stamped into the paper, a pop);
-//   · micro-hitstop (crits, heavy blows, elite kills, big area hits, the 镜技's impact) spent from a
-//     token bucket so hitstop never takes more than ~14% of any second (5% sustained);
-//   · a trauma camera (amplitude ∝ trauma², smooth noise, real-time decay), directional kicks and
-//     zoom punches. The offset never exceeds 6 px (GDD §20.3); ordinary hits spend trauma and kicks
-//     from a per-second budget (small bumps), the big jolts are elite kills, 镜技, bosses and blows
-//     you take. Shake and kicks obey the shake setting (zoom punches halve without it), everything
-//     obeys reduced motion;
+// 水月幻镜 · 打击感, the feel layer (GDD §20): what makes a hit land. The struck body shows the blow;
+// the world does not. Every player-side strike and kill reports here; the feel layer answers with
+//   · a reaction on the body, scaled by the blow's class and damage (light · medium · heavy/crit):
+//     a crisp white flash in an ink rim (2 frames) that fades into a brief ink tint, a squash along
+//     the blow that springs back, a recoil that snaps away and settles, and on medium and heavy blows
+//     a LOCAL freeze — the struck sprite alone holds where it was hit and jitters for 35–70 ms (a per-
+//     body bank keeps it ≤ 30% of any second) while the world runs on; then it flies (knockback).
+//     Elites and bosses stagger (a flash, a ring of light, a wobble) every few % of their HP. All of
+//     it is drawn only: the hitbox never moves (pose());
+//   · luminous marks on the body by weapon class (an impact star; a cut across it for blades, a
+//     double cut and a ring for heavy arms, a pierce beam for flying swords, claw rakes), directional
+//     sparks flung out of the far side, spatter and a ground splash (marks, sparks);
+//   · a death burst: the body's own sprite breaks into pieces flung along the killing blow (frags),
+//     a pop of light, a ring, a wet crown, droplets and a stain stamped into the paper;
+//   · the camera stays still for your own hits, crits, kills and weapons. It moves only a little, and
+//     rarely: a hard blow you take (≥ 15% of your HP, or a boss's), an enemy slam, a boss's phase or
+//     death (≤ 3 px, short), and a gentle zoom on the 镜技's landing. The shake setting means "big
+//     moments only"; off removes those too; reduced motion removes every camera motion and stop;
+//   · global hitstop only for rare heavy moments (a heavy weapon's crit, elite kills, the 镜技, a hard
+//     blow you take), spent from a small token bucket;
 //   · a sound bus: the step's hits become ≤ 4 voices (class colour, kill pop, crit crack, thump),
 //     started on the step the hit lands so the sound meets the flash on the same frame;
 //   · navigator.vibrate ticks (an 8 ms tick when you are hurt; elite kills and the 镜技 at most once a
 //     second; boss blows), silent where unsupported.
 // Everything is pooled (typed arrays, a cosmetic RNG that never touches the simulation's streams)
-// and thinned by load and by the frame-time guard. The renderer draws the sparks; world.ts calls in.
+// and thinned by load and by the frame-time guard. The renderer draws; world.ts calls in.
 import type { WeaponId } from '../ids';
-import type { SfxName, WClass } from '../types';
+import type { AtlasId, SfxName, WClass } from '../types';
 import type { FeelVoice } from '../audio/voices';
 import { FeelSprites, SH, TN, WARM } from '../paint/feel';
 import { EKind, Pool } from './pools';
@@ -112,60 +119,203 @@ export class Sparks extends Pool {
   }
 }
 
+/** What a class leaves on the body it strikes: the impact star (tint, size × 48 u), a mark across the
+ *  body (shape, tint, size), a ring of light (−1 none), the ground splash's tint (−1 none), the tint of
+ *  the directional sparks. Player tints only: never vermilion. */
+interface MarkDef { star: number; starS: number; mark: number; markT: number; markS: number; halo: number; splat: number; spark: number }
+const MD = (o: Partial<MarkDef>): MarkDef => ({ star: TN.white, starS: 0.5, mark: -1, markT: TN.white, markS: 1, halo: -1, splat: TN.ink, spark: TN.white, ...o });
+const MKD: readonly MarkDef[] = [
+  /* slash */ MD({ star: TN.azure, starS: 0.55, mark: SH.cut, markT: TN.azure, markS: 0.8, spark: TN.azure }),
+  /* heavy */ MD({ star: TN.white, starS: 0.75, mark: SH.cut, markT: TN.azure, markS: 1.15, halo: TN.azure, spark: TN.azure }),
+  /* claw */ MD({ star: TN.white, starS: 0.5, mark: SH.rake, markT: TN.moon, markS: 1.1, splat: TN.wine, spark: TN.white }),
+  /* fist */ MD({ star: TN.gold, starS: 0.6, halo: TN.gold, splat: TN.wine, spark: TN.gold }),
+  /* arrow */ MD({ star: TN.moon, starS: 0.45, mark: SH.beam, markT: TN.moon, markS: 0.6, spark: TN.moon }),
+  /* dart */ MD({ star: TN.white, starS: 0.45, spark: TN.gold }),
+  /* talisman */ MD({ star: TN.gold, starS: 0.6, splat: -1, spark: TN.gamboge }),
+  /* wine */ MD({ star: TN.gold, starS: 0.5, splat: TN.wine, spark: TN.gold }),
+  /* ink */ MD({ star: TN.indigo, starS: 0.5, splat: TN.indigo, spark: TN.indigo }),
+  /* flying */ MD({ star: TN.jade, starS: 0.5, mark: SH.beam, markT: TN.jade, markS: 0.65, spark: TN.jade }),
+  /* go */ MD({ star: TN.white, starS: 0.5, halo: TN.white, spark: TN.white }),
+  /* music */ MD({ star: TN.green, starS: 0.45, halo: TN.green, splat: -1, spark: TN.green }),
+  /* moon */ MD({ star: TN.moon, starS: 0.55, halo: TN.white, splat: -1, spark: TN.moon }),
+  /* skill */ MD({ star: TN.gold, starS: 0.9, halo: TN.gold, spark: TN.gold }),
+  /* generic */ MD({ star: TN.white, starS: 0.4, splat: -1 }),
+];
+
+/** Mark kinds: how the renderer animates one. */
+export const MK = {
+  /** An impact star: blooms 0.6 → 1, then fades. */
+  pop: 0,
+  /** A cut across the body: opens along its length and thins away. */
+  cut: 1,
+  /** A pierce beam: shoots along the blow and thins. */
+  beam: 2,
+  /** A ring of light that grows and fades. */
+  ring: 3,
+  /** A ground splash under the bodies: lands and dries away. */
+  ground: 4,
+  /** Claw rakes across the body. */
+  rake: 5,
+} as const;
+
+/** Hit marks: stars, cuts, beams and rings on (and splashes under) the bodies, drawn by the renderer
+ *  in the enemy layer. A mark with an owner follows the body's drawn pose (recoil, freeze). */
+export class Marks extends Pool {
+  readonly x: Float32Array; readonly y: Float32Array; readonly ox: Float32Array; readonly oy: Float32Array;
+  readonly ang: Float32Array; readonly life: Float32Array; readonly life0: Float32Array;
+  readonly s0: Float32Array; readonly s1: Float32Array; readonly a0: Float32Array;
+  readonly owner: Int16Array; readonly gen: Uint32Array;
+  readonly shape: Uint8Array; readonly tint: Uint8Array; readonly kind: Uint8Array; readonly calm: Uint8Array;
+  constructor(cap: number) {
+    super(cap);
+    const F = () => new Float32Array(cap);
+    this.x = F(); this.y = F(); this.ox = F(); this.oy = F(); this.ang = F(); this.life = F(); this.life0 = F();
+    this.s0 = F(); this.s1 = F(); this.a0 = F();
+    this.owner = new Int16Array(cap); this.gen = new Uint32Array(cap);
+    this.shape = new Uint8Array(cap); this.tint = new Uint8Array(cap); this.kind = new Uint8Array(cap); this.calm = new Uint8Array(cap);
+  }
+}
+
+/** Death fragments: pieces of the body's own sprite (cell q of a g × g grid), flung and spinning. */
+export class Frags extends Pool {
+  readonly x: Float32Array; readonly y: Float32Array; readonly vx: Float32Array; readonly vy: Float32Array;
+  readonly rot: Float32Array; readonly vr: Float32Array; readonly life: Float32Array; readonly life0: Float32Array;
+  readonly sc: Float32Array;
+  /** The grid (g × g pieces) and which cell this piece is. */
+  readonly g: Uint8Array; readonly q: Uint8Array; readonly flip: Uint8Array; readonly stamp: Uint8Array;
+  /** The atlas id each piece is cut from (a reference kept in a fixed array: assigned, never allocated). */
+  readonly id: (AtlasId | null)[];
+  constructor(cap: number) {
+    super(cap);
+    const F = () => new Float32Array(cap);
+    this.x = F(); this.y = F(); this.vx = F(); this.vy = F(); this.rot = F(); this.vr = F(); this.life = F(); this.life0 = F(); this.sc = F();
+    this.g = new Uint8Array(cap); this.q = new Uint8Array(cap); this.flip = new Uint8Array(cap); this.stamp = new Uint8Array(cap);
+    this.id = new Array(cap).fill(null);
+  }
+}
+
+/** The drawn pose of one body (pose() fills it; reused, never allocated per frame). */
+export interface Pose {
+  /** Where to draw it (world u; the hitbox stays at E.x/E.y). */
+  x: number; y: number;
+  /** The blow's axis (rad) and the squash along it (> 0 compressed), a wobble (rad). */
+  ang: number; s: number; wob: number;
+  /** Flash: 0 none, 1 the white twin alone, 2 the body with the twin over it at `fa`. */
+  fl: number; fa: number;
+  /** The ink tint that follows the flash (alpha of the ink twin over the body, 0 none). */
+  ink: number;
+}
+
 /** Live sparks by quality: phones (mid, low) raster every one at DPR 2–3, so they keep fewer. */
 const SPARK_CAP = { low: 140, mid: 220, high: 360 } as const;
-const Q_BASE = { low: 0.55, mid: 0.8, high: 1 } as const;
-/** Largest shake (CSS px) at trauma 1; a shake(px) request maps to trauma √(px / MAX). GDD §20.3: 6 px. */
+/** Live marks and fragments by quality. */
+const MARK_CAP = { low: 36, mid: 56, high: 80 } as const;
+const FRAG_CAP = { low: 24, mid: 40, high: 64 } as const;
+/** Marks a step may add (the busiest steps keep the heavy blows' marks). */
+const MARK_STEP = { low: 5, mid: 7, high: 9 } as const;
+/** Fragments per mob death. */
+const FRAG_MOB = { low: 3, mid: 4, high: 4 } as const;
+const Q_BASE = { low: 0.7, mid: 0.85, high: 1 } as const;
+/** Largest shake (CSS px) at trauma 1 (amplitude ∝ trauma²). */
 const MAX_SHAKE = 6;
-/** The camera's whole offset (shake + kick) never exceeds this (CSS px). */
-const MAX_OFFSET = 6;
-/** Kicks: what the hits of one step may add, and the total (CSS px). */
-const KICK_STEP = 3.5;
-const KICK_MAX = 4;
-/** Hit trauma (crits, heavy blows) comes from its own bucket — capacity and refill per real second — and
- *  never lifts trauma past HIT_CEIL (≈ 2.6 px): a crit build gets small bumps, not a held 6 px shake. */
-const HIT_TRAUMA_CAP = 0.6;
-const HIT_TRAUMA_REFILL = 0.9;
-const HIT_CEIL = 0.66;
-/** Ranged weapons whose single blows are heavy by nature (the 射日弓, the flying swords, the first
- *  strike of 雷符): they land with a flare, a ring and a short stop even without a crit. */
+/** The camera's whole offset (shake + kick) never exceeds this (CSS px): big moments only, and small. */
+const MAX_OFFSET = 3;
+/** Kicks (a hard blow you take) stay within this (CSS px). */
+const KICK_MAX = 2;
+/** Trauma decays this much per real second (short tails). */
+const TRAUMA_DECAY = 2.6;
+/** Ranged weapons whose single blows are heavy by nature (the 射日弓, the flying swords, 雷符): their
+ *  class weight counts 0.25 more (a bigger reaction on the body; never the camera). */
 const WEIGHTY: ReadonlySet<string> = new Set(['sunbow', 'qingping', 'casket', 'thunder']);
-/** Hitstop token bucket: capacity and refill (ms of freeze per s of real time): ≤ 140 ms in any second. */
-const STOP_CAP = 90;
-const STOP_REFILL = 50;
+/** Hitstop token bucket (ms of freeze; refill per real s): only rare heavy moments stop the world. */
+const STOP_CAP = 80;
+const STOP_REFILL = 30;
+/** A heavy weapon's crits stop the world at most this often (s). */
+const HEAVY_CRIT_GAP = 0.45;
+
+// the body's reaction by tier (light · medium · heavy/crit)
+const SQUASH = [0.12, 0.18, 0.28] as const;
+const RECOIL = [4, 7, 11] as const;
+const FREEZE = [0, 0.035, 0.07] as const;
+const JITTER = [0, 1.5, 2.6] as const;
+const FLASH = [0.05, 0.066, 0.1] as const;
+/** A body re-pulses on a blow ≥ this share of its live reaction, or after PULSE_GAP s (≤ 12 Hz). */
+const PULSE_SHARE = 0.6;
+const PULSE_GAP = 0.08;
+/** The flash never restarts within this (s): ≤ 50% duty, no strobe (reduced motion: CALM_FLASH_GAP). */
+const FLASH_GAP = 0.066;
+const CALM_FLASH_GAP = 0.25;
+/** A body's freeze bank: it holds at most FRZ_CAP s, refilled at FRZ_REFILL per s (≤ 30% of a second). */
+const FRZ_CAP = 0.15;
+const FRZ_REFILL = 0.3;
+/** The impact star by tier: life (s) and final size; the spatter by tier: count and size factors. */
+const STAR_LIFE = [0.08, 0.1, 0.12] as const;
+const STAR_GROW = [0.8, 1, 1.15] as const;
+const SPRAY_N = [0.5, 1, 1.5] as const;
+const SPRAY_S = [1, 1.15, 1.35] as const;
+/** Full-white frames of a flash (s): 2 frames at 60 fps. */
+const FLASH_FULL = 0.03;
+/** The ink tint after the flash (s, peak alpha of the ink twin over the body). */
+const INK_T = 0.16;
+const INK_A = 0.34;
 
 export interface FeelStats {
   sparks: number; emitted: number; hits: number; kills: number; voices: number; stopReqMs: number; stopMs: number; stopDenied: number;
   frozenMs: number; realMs: number; maxShare: number; lastShare: number; stamps: number; q: number;
+  /** Body reactions: pulses, local freezes (count, total s), staggers; marks and fragments made. */
+  pulses: number; freezes: number; freezeS: number; staggers: number; marks: number; frags: number;
+  /** Camera: frames drawn, frames the offset was > 0.5 px, frames zoomed. */
+  camFrames: number; camOff: number; camZoom: number;
 }
 
 export class Feel {
   readonly sp: Sparks;
-  readonly sprites: FeelSprites;
+  readonly mk: Marks;
+  readonly fr: Frags;
+  sprites: FeelSprites;
   /** Emission quality 0..1 (quality × load × the frame guard), recomputed each step. */
   q = 1;
   private stepEmit = 0;
-  /** Trauma the step's ordinary hits have added (capped, so a crowd of crits is one jolt, not seven). */
-  private stepTrauma = 0;
-  /** Kick the step's hits have added (CSS px). */
-  private stepKick = 0;
-  /** The hit-trauma bucket (see HIT_TRAUMA_CAP). */
-  private hitBank = HIT_TRAUMA_CAP;
-  private lastHitKick = -9;
-  private lastWeighty = -9;
   private stepBudget = 24;
+  private stepMarks = 0;
+  private markBudget = 7;
+  private fragBursts = 0;
   private stampsStep = 0;
   private seed = 0x2545f491;
+  // per-body reaction state (indexed by enemy slot; valid while rGen matches the slot's generation)
+  readonly rGen: Uint32Array;
+  /** Sim time of the last pulse and of the last flash start. */
+  readonly rAt: Float32Array; readonly rFlAt: Float32Array;
+  /** The pulse: weight, squash, recoil (u), blow axis, freeze (s), jitter (u) and how long it jitters. */
+  readonly rW: Float32Array; readonly rS: Float32Array; readonly rR: Float32Array; readonly rA: Float32Array;
+  readonly rFrz: Float32Array; readonly rJ: Float32Array; readonly rJT: Float32Array;
+  /** Where the body was struck (the freeze holds it there). */
+  readonly rHX: Float32Array; readonly rHY: Float32Array;
+  /** The flash's length (s). */
+  readonly rFl0: Float32Array;
+  /** The freeze bank (s) and when it was last topped up. */
+  readonly rBank: Float32Array; readonly rBankT: Float32Array;
+  /** Elites and bosses: damage toward the next stagger, the wobble (rad) and when it started. */
+  readonly rAcc: Float32Array; readonly rWob: Float32Array; readonly rWobAt: Float32Array;
+  /** Where the renderer drew each body this frame (marks follow it). */
+  readonly dX: Float32Array; readonly dY: Float32Array;
+  /** pose()'s output. */
+  readonly po: Pose = { x: 0, y: 0, ang: 0, s: 0, wob: 0, fl: 0, fa: 0, ink: 0 };
+  // the body about to die (corpse(), then kill())
+  private cId: AtlasId | null = null;
+  private cFlip = 0;
+  private cSc = 1;
   // camera (CSS px; real time)
   trauma = 0;
   kickX = 0; kickY = 0;
   zoom = 0;
   offX = 0; offY = 0;
   private shakeT = 0;
+  private lastSlam = -9;
+  private lastHurtShake = -9;
   // hitstop budget
   private bank = STOP_CAP;
   private lastCritStop = -9;
-  private lastHeavyStop = -9;
   private lastSkill = -9;
   private secReal = 0; private secFrozen = 0;
   // player
@@ -190,19 +340,41 @@ export class Feel {
   slotMelee = new Uint8Array(8);
   /** The swipe direction alternates per slot (a combo swings back and forth). */
   private slotFlip = new Uint8Array(8);
+  /** The cut direction alternates per body hit (a combo cuts back and forth). */
+  private cutFlip = 0;
   /** A running mean of hit numbers (numbers size by damage against it). */
   numRef = 10;
-  readonly st: FeelStats = { sparks: 0, emitted: 0, hits: 0, kills: 0, voices: 0, stopReqMs: 0, stopMs: 0, stopDenied: 0, frozenMs: 0, realMs: 0, maxShare: 0, lastShare: 0, stamps: 0, q: 1 };
+  readonly st: FeelStats = {
+    sparks: 0, emitted: 0, hits: 0, kills: 0, voices: 0, stopReqMs: 0, stopMs: 0, stopDenied: 0, frozenMs: 0, realMs: 0, maxShare: 0, lastShare: 0, stamps: 0, q: 1,
+    pulses: 0, freezes: 0, freezeS: 0, staggers: 0, marks: 0, frags: 0, camFrames: 0, camOff: 0, camZoom: 0,
+  };
 
   constructor(private W: World) {
-    this.sp = new Sparks(SPARK_CAP[W.quality] ?? SPARK_CAP.mid);
-    // baked at the canvas's real DPR (min(dprCap, devicePixelRatio)), not the cap
-    const dev = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    this.sprites = new FeelSprites(Math.max(1, Math.min(W.settings.dprCap || 2, dev)), W.quality === 'low' ? 0.85 : 1);
+    const q = W.quality;
+    this.sp = new Sparks(SPARK_CAP[q] ?? SPARK_CAP.mid);
+    this.mk = new Marks(MARK_CAP[q] ?? MARK_CAP.mid);
+    this.fr = new Frags(FRAG_CAP[q] ?? FRAG_CAP.mid);
+    const cap = W.E.cap;
+    const F = () => new Float32Array(cap);
+    this.rGen = new Uint32Array(cap).fill(0xffffffff);
+    this.rAt = F(); this.rFlAt = F(); this.rW = F(); this.rS = F(); this.rR = F(); this.rA = F(); this.rFrz = F(); this.rJ = F(); this.rJT = F();
+    this.rHX = F(); this.rHY = F(); this.rFl0 = F(); this.rBank = F(); this.rBankT = F(); this.rAcc = F(); this.rWob = F(); this.rWobAt = F();
+    this.dX = F(); this.dY = F();
+    this.sprites = new FeelSprites(this.spriteRes());
   }
 
   get motion(): boolean { return !this.W.settings.reduceMotion; }
   get shakeOn(): boolean { return !!this.W.settings.shake && !this.W.settings.reduceMotion; }
+
+  /** Device px per u to bake the marks at: the painter's own sprite scale when it has one (the camera's
+   *  scale), else the canvas dpr. */
+  private spriteRes(): number {
+    const W = this.W;
+    const k = (W.painter as unknown as { k?: number } | null)?.k;
+    if (typeof k === 'number' && Number.isFinite(k) && k > 0) return Math.max(1, Math.min(3.4, k)) * (W.quality === 'low' ? 0.9 : 1);
+    const dev = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    return Math.max(1, Math.min(W.settings.dprCap || 2, dev, 3)) * (W.quality === 'low' ? 0.85 : 1);
+  }
 
   /** A cosmetic random in [0, 1) (xorshift; never the simulation's streams). */
   rnd(): number {
@@ -213,14 +385,20 @@ export class Feel {
   }
 
   begin(): void {
-    this.sp.clear();
+    this.sp.clear(); this.mk.clear(); this.fr.clear();
+    this.fr.id.fill(null);
+    this.rGen.fill(0xffffffff);
     this.trauma = 0; this.kickX = this.kickY = 0; this.zoom = 0; this.offX = this.offY = 0;
-    this.bank = STOP_CAP; this.hitBank = HIT_TRAUMA_CAP; this.hurtAge = 9; this.hurtK = 0;
+    this.bank = STOP_CAP; this.hurtAge = 9; this.hurtK = 0;
     this.slotT.fill(9);
+    this.cId = null;
     // the world clock restarts at 0 every wave, so every rate gate starts fresh too
-    this.lastHitKick = this.lastWeighty = this.lastCritStop = this.lastHeavyStop = this.lastSkill = -9;
+    this.lastCritStop = this.lastSkill = this.lastSlam = this.lastHurtShake = -9;
     this.lastCrack = this.lastThump = this.lastZip = this.lastVib = -9;
     this.busReset();
+    // a new painter (a new screen, a new quality) may bake at a new scale: the marks follow it
+    const res = this.spriteRes();
+    if (Math.abs(res - this.sprites.res) > 0.12) { this.sprites.dispose(); this.sprites = new FeelSprites(res); }
     try { this.sprites.warm(WARM); } catch { /* no canvas */ }
   }
 
@@ -246,6 +424,27 @@ export class Feel {
     this.st.emitted++;
     return i;
   }
+  /** May a mark of this priority be added now (0 a light hit, 1 medium/heavy/kills, 2 elites, bosses, skills)? */
+  markRoom(prio: number): boolean {
+    const M = this.mk;
+    if (M.count >= M.cap) return false;
+    if (prio >= 2) return true;
+    const fill = M.count / M.cap;
+    if (prio === 0) return fill < 0.6 && this.stepMarks < this.markBudget * 0.5;
+    return fill < 0.88 && this.stepMarks < this.markBudget;
+  }
+  /** Add a mark (call markRoom() first). Owner i ≥ 0: it follows that body's drawn pose. */
+  mark(kind: number, shape: number, tint: number, i: number, x: number, y: number, ang: number, life: number, s0: number, s1: number, a0: number): number {
+    const M = this.mk, E = this.W.E;
+    const j = M.take();
+    if (j < 0) return -1;
+    M.kind[j] = kind; M.shape[j] = shape; M.tint[j] = tint; M.x[j] = x; M.y[j] = y; M.ang[j] = ang;
+    M.life[j] = M.life0[j] = life; M.s0[j] = s0; M.s1[j] = s1; M.a0[j] = a0; M.calm[j] = this.motion ? 0 : 1;
+    if (i >= 0) { M.owner[j] = i; M.gen[j] = E.gen[i]; M.ox[j] = x - E.x[i]; M.oy[j] = y - E.y[i]; } else { M.owner[j] = -1; M.ox[j] = 0; M.oy[j] = 0; }
+    this.stepMarks++;
+    this.st.marks++;
+    return j;
+  }
   /** n (fractional: the rest by chance) scaled by the emission quality. */
   private count(n: number): number {
     const k = n * this.q;
@@ -268,20 +467,22 @@ export class Feel {
     }
   }
 
-  /** One simulation step: move the sparks, stamp what lands, flush the sound bus. */
+  /** One simulation step: move the sparks, marks and fragments, stamp what lands, flush the sound bus. */
   step(dt: number): void {
     const W = this.W;
     // emission quality: the quality setting, the frame guard, and the crowd on screen
-    let q = Q_BASE[W.quality] ?? 0.8;
+    let q = Q_BASE[W.quality] ?? 0.85;
     if (W.degrade) q *= 0.45;
     const load = W.E.count + W.PS.count * 0.25;
     if (load > 110) q *= Math.max(0.3, 110 / load);
     this.q = q;
     this.st.q = q;
     this.stepBudget = Math.max(6, (this.sp.cap / 16) * q);
+    const mb = MARK_STEP[W.quality] ?? MARK_STEP.mid;
+    this.markBudget = Math.max(3, mb * (W.degrade ? 0.5 : 1) * (load > 110 ? Math.max(0.5, 110 / load) : 1));
     this.stepEmit = 0;
-    this.stepTrauma = 0;
-    this.stepKick = 0;
+    this.stepMarks = 0;
+    this.fragBursts = 0;
     this.stampsStep = 0;
     const P = this.sp;
     for (let i = 0; i < P.n; i++) {
@@ -302,9 +503,165 @@ export class Feel {
       P.rot[i] += P.vr[i] * dt;
     }
     P.trim();
+    const Mk = this.mk;
+    for (let i = 0; i < Mk.n; i++) {
+      if (!Mk.alive[i]) continue;
+      Mk.life[i] -= dt;
+      if (Mk.life[i] <= 0) Mk.release(i);
+    }
+    Mk.trim();
+    const Fr = this.fr;
+    const fk = Math.exp(-4.5 * dt);
+    for (let i = 0; i < Fr.n; i++) {
+      if (!Fr.alive[i]) continue;
+      Fr.life[i] -= dt;
+      if (Fr.life[i] <= 0) {
+        // the first piece of a burst lands and stains the paper
+        if (Fr.stamp[i] && this.stampsStep < 3 && W.painter) {
+          this.stampsStep++;
+          this.st.stamps++;
+          try { W.painter.stamp('splat', Fr.x[i], Fr.y[i], 4 + 6 * Fr.sc[i], (i * 2246822519 + W.kills) >>> 0); } catch { /* optional */ }
+        }
+        Fr.id[i] = null;
+        Fr.release(i);
+        continue;
+      }
+      Fr.vx[i] *= fk; Fr.vy[i] *= fk;
+      Fr.x[i] += Fr.vx[i] * dt; Fr.y[i] += Fr.vy[i] * dt;
+      Fr.rot[i] += Fr.vr[i] * dt;
+    }
+    Fr.trim();
     this.st.sparks = P.count;
     for (let k = 0; k < 8; k++) if (this.slotT[k] < 9) this.slotT[k] += dt;
     this.flush();
+  }
+
+  // ─────────────────────────────────────────────────────────── the body's reaction
+
+  /**
+   * The struck body reacts (drawn only): a pulse of squash and recoil along the blow, a local freeze
+   * and jitter on medium and heavy blows (from the body's own bank), a paced flash; elites and bosses
+   * stagger every few % of their HP. `kk` scales the reaction by kind (elite 0.7, boss 0.35).
+   */
+  private react(i: number, tier: number, crit: boolean, ang: number, kk: number, thunder: boolean, d: number): void {
+    const W = this.W, E = W.E, t = W.t;
+    const k = E.kind[i];
+    const boss = k === EKind.Boss, big = boss || k === EKind.Elite || k === EKind.Demon;
+    if (this.rGen[i] !== E.gen[i]) {
+      this.rGen[i] = E.gen[i];
+      this.rAt[i] = this.rFlAt[i] = this.rWobAt[i] = -9; this.rW[i] = 0; this.rFrz[i] = 0; this.rJT[i] = 0; this.rFl0[i] = 0;
+      this.rBank[i] = FRZ_CAP; this.rBankT[i] = t; this.rAcc[i] = 0; this.rWob[i] = 0;
+    }
+    const calm = !this.motion;
+    const age = t - this.rAt[i];
+    const live = age >= 0 && age < 0.6 ? this.rW[i] * Math.exp(-age / 0.1) : 0;
+    const w = (tier + 1) / 3 * kk * (crit ? 1.15 : 1);
+    if (w >= live * PULSE_SHARE || age >= PULSE_GAP || age < 0) {
+      this.st.pulses++;
+      this.rAt[i] = t; this.rW[i] = w; this.rA[i] = ang;
+      let S: number = SQUASH[tier] * (crit ? 1.14 : 1);
+      let R: number = RECOIL[tier] + (crit ? 2 : 0);
+      let frz: number = crit && tier === 2 ? 0.05 : FREEZE[tier];
+      let J: number = JITTER[tier];
+      let jt = 0;
+      if (boss) { S *= 0.35; R = Math.min(3, R * 0.35); frz = 0; J = 1.5; jt = tier >= 1 ? 0.06 : 0; }
+      else if (big) { S *= 0.7; R *= 0.7; frz = Math.min(0.05, frz); J = Math.min(2, J); }
+      if (thunder) { J = Math.max(J, 1.5); jt = Math.max(jt, 0.09); }
+      if (calm) { S = 0.06; R = Math.min(2, R); frz = 0; J = 0; jt = 0; }
+      if (frz > 0) {
+        // the bank: a fast weapon can't pin a body in place
+        const bank = Math.min(FRZ_CAP, this.rBank[i] + (t - this.rBankT[i]) * FRZ_REFILL);
+        this.rBankT[i] = t;
+        frz = Math.min(frz, bank);
+        if (frz < 0.02) frz = 0;
+        this.rBank[i] = bank - frz;
+        if (frz > 0) { this.st.freezes++; this.st.freezeS += frz; }
+      }
+      this.rS[i] = S; this.rR[i] = R; this.rFrz[i] = frz; this.rJ[i] = J; this.rJT[i] = Math.max(frz, jt);
+      this.rHX[i] = E.x[i]; this.rHY[i] = E.y[i];
+      E.hitV[i] = w; E.hitAge[i] = 0;
+    }
+    E.hitA[i] = ang;
+    // the flash: paced, so a fast weapon never strobes a body
+    const fl = FLASH[tier];
+    const fAge = t - this.rFlAt[i];
+    if (calm) {
+      if (fAge >= CALM_FLASH_GAP || fAge < 0) { this.rFlAt[i] = t; this.rFl0[i] = 0.15; E.flash[i] = 0.15; }
+    } else if (fAge >= FLASH_GAP || fAge < 0 || (tier === 2 && E.flash[i] <= 0)) {
+      this.rFlAt[i] = t; this.rFl0[i] = fl; E.flash[i] = fl;
+    }
+    // elites and bosses stagger every 8% (bosses 4%) of their HP, at most once per 0.6 s: a flash, a
+    // ring of light, a wobble
+    if (big && d > 0) {
+      this.rAcc[i] += d;
+      const th = E.hpMax[i] * (boss ? 0.04 : 0.08);
+      if (this.rAcc[i] >= th && th > 0 && (t - this.rWobAt[i] >= 0.6 || t < this.rWobAt[i])) {
+        this.rAcc[i] = 0;
+        this.st.staggers++;
+        this.rWobAt[i] = t; this.rWob[i] = calm ? 0 : boss ? 0.05 : 0.1;
+        if (!calm) { this.rFlAt[i] = t; this.rFl0[i] = 0.1; E.flash[i] = 0.1; }
+        if (this.markRoom(2)) {
+          const r = E.r[i];
+          this.mark(MK.ring, SH.halo, TN.azure, i, E.x[i], E.y[i], 0, 0.26, (r * 0.6) / 28, (r * 2.1) / 28, 0.95);
+        }
+      }
+    }
+  }
+
+  /**
+   * The drawn pose of body i this frame (the renderer's; visual only). Fills `po`; false when the body
+   * shows nothing (draw it plainly at E.x, E.y).
+   */
+  pose(i: number): boolean {
+    const W = this.W, E = W.E, o = this.po;
+    o.x = E.x[i]; o.y = E.y[i]; o.ang = 0; o.s = 0; o.wob = 0; o.fl = 0; o.fa = 0; o.ink = 0;
+    const calm = !this.motion;
+    const valid = this.rGen[i] === E.gen[i];
+    const t = W.t;
+    if (E.flash[i] > 0) {
+      const f0 = valid && this.rFl0[i] > 0 ? this.rFl0[i] : 0.05;
+      const el = Math.max(0, f0 - E.flash[i]);
+      const k = Math.max(0, Math.min(1, E.flash[i] / f0));
+      if (calm) { o.fl = 2; o.fa = 0.3 * k; }
+      else if (E.kind[i] === EKind.Boss) { o.fl = 2; o.fa = el < FLASH_FULL ? 0.6 : 0.4 * k; }
+      else if (el < FLASH_FULL) o.fl = 1;
+      else { o.fl = 2; o.fa = 0.6 * k; }
+    } else if (valid && !calm) {
+      // the ink tint the flash leaves behind
+      const fa = t - this.rFlAt[i] - this.rFl0[i];
+      if (fa >= -0.001 && fa < INK_T) o.ink = INK_A * (1 - Math.max(0, fa) / INK_T);
+    }
+    if (!valid) return o.fl !== 0;
+    const age = t - this.rAt[i];
+    if (age >= 0 && age < 0.5) {
+      const frz = this.rFrz[i], S = this.rS[i], R = this.rR[i];
+      let off: number;
+      o.ang = this.rA[i];
+      if (age < frz) {
+        // held where it was struck, compressed (the simulation may already be carrying it away)
+        o.x = this.rHX[i]; o.y = this.rHY[i];
+        o.s = S; off = 0.35 * R;
+      } else {
+        const tau = age - frz;
+        if (frz > 0 && tau < 0.05) {
+          // released: it catches up with its body (a knockback now reads as a flight)
+          const u = tau / 0.05, e = 1 - (1 - u) * (1 - u);
+          o.x = this.rHX[i] + (E.x[i] - this.rHX[i]) * e; o.y = this.rHY[i] + (E.y[i] - this.rHY[i]) * e;
+        }
+        if (calm) { o.s = S * Math.exp(-tau / 0.08); off = R * Math.exp(-tau / 0.08); }
+        else {
+          o.s = S * Math.exp(-tau / 0.07) * Math.cos(tau * 48.33);
+          off = tau < 0.035 ? R * (0.35 + 0.65 * (1 - (1 - tau / 0.035) ** 2)) : R * Math.exp(-(tau - 0.035) / 0.08) * Math.cos((tau - 0.035) * 13);
+        }
+      }
+      let jit = 0;
+      if (!calm && age < this.rJT[i]) jit = this.rJ[i] * ((Math.floor(age / 0.02) & 1) ? 1 : -1);
+      const c = Math.cos(o.ang), n = Math.sin(o.ang);
+      o.x += c * off - n * jit; o.y += n * off + c * jit;
+    }
+    const wa = t - this.rWobAt[i];
+    if (!calm && wa >= 0 && wa < 0.45 && this.rWob[i] > 0) o.wob = this.rWob[i] * Math.exp(-wa / 0.12) * Math.sin(wa * 32);
+    return true;
   }
 
   // ─────────────────────────────────────────────────────────── hits and kills
@@ -318,78 +675,134 @@ export class Feel {
     this.st.hits++;
     if (dot) return; // burns and bleeds tick quietly: their marks already show
     const def = FXD[fc] ?? FXD[FC.generic];
+    const md = MKD[fc] ?? MKD[FC.generic];
     const x = E.x[i], y = E.y[i], r = E.r[i];
     let dx = x - fx, dy = y - fy;
     let L = Math.hypot(dx, dy);
     if (L < 1) { const a = this.rnd() * Math.PI * 2; dx = Math.cos(a); dy = Math.sin(a); L = 1; }
     const ux = dx / L, uy = dy / L, ang = Math.atan2(uy, ux);
     const kind = E.kind[i];
-    const big = kind === EKind.Elite || kind === EKind.Boss || kind === EKind.Demon;
-    const heavy = def.weight >= 0.75;
+    const boss = kind === EKind.Boss;
+    const big = boss || kind === EKind.Elite || kind === EKind.Demon;
+    const heavyCls = def.weight >= 0.75;
     const t = W.t;
-    // a weighty single blow (a quarter of the body at once, or a weapon heavy by nature): not a crit,
-    // not a heavy melee class, not the 镜技 — those have their own jolts
     const wid = slot >= 0 && slot < W.slots.length ? W.slots[slot].id : '';
-    const weighty = !crit && !heavy && src !== SRCI.skill && (d >= E.hpMax[i] * 0.25 || WEIGHTY.has(wid));
-    // the body: a white flash of 3 frames (4 on a crit, a heavy or a weighty blow), squash and recoil
-    E.flash[i] = crit || heavy || weighty ? 0.066 : 0.05;
-    const w = Math.min(1, (weighty ? Math.max(0.75, def.weight * 1.4) : def.weight) * (crit ? 1.35 : 1) * (kind === EKind.Boss ? 0.35 : big ? 0.7 : 1));
-    const now = E.hitAge[i] < 9 ? E.hitV[i] * Math.exp(-E.hitAge[i] / 0.09) : 0;
-    if (w >= now * 0.8) { E.hitV[i] = w; E.hitA[i] = ang; E.hitAge[i] = 0; }
+    const weighty = WEIGHTY.has(wid);
+    // the blow's weight: its class (weighty weapons a notch up) and its damage against the body
+    const dmgK = Math.max(0, Math.min(1, d / Math.max(1e-6, 0.2 * E.hpMax[i])));
+    const w = Math.min(1.3, (def.weight + (weighty ? 0.25 : 0)) * (0.7 + 0.6 * dmgK) * (crit ? 1.3 : 1));
+    const tier = crit || src === SRCI.skill || w >= 0.75 ? 2 : w >= 0.45 ? 1 : 0;
+    this.react(i, tier, crit, ang, boss ? 0.35 : big ? 0.7 : 1, wid === 'thunder', d);
+    // the marks: an impact star where the blow went in, the class's mark across the body, a ring
+    const prio = tier === 2 || big ? 1 : 0;
+    const calm = !this.motion;
+    const lite = W.degrade ? 0.5 : 1;
+    const sz = Math.max(0.8, Math.min(1.6, r / 20)) * (crit ? 1.3 : 1);
+    const cx = x - ux * r * 0.45, cy = y - uy * r * 0.45;
+    if (this.markRoom(prio) && (tier > 0 || this.rnd() < 0.7 * lite)) {
+      this.mark(MK.pop, SH.star, md.star, i, cx, cy, ang, STAR_LIFE[tier], md.starS * sz * 0.6, md.starS * sz * STAR_GROW[tier], 1);
+    }
+    if (crit && this.markRoom(1)) {
+      this.mark(MK.pop, SH.star, TN.gold, i, x - ux * r * 0.2, y - uy * r * 0.2, ang + 0.4, 0.13, 0.5 * sz, 0.95 * sz, 1);
+      if (this.markRoom(1)) this.mark(MK.cut, SH.cut, TN.white, i, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.5, 0.12, 0.9 * sz, 1.1, 1);
+    }
+    if (md.mark >= 0 && tier + (this.rnd() < 0.5 * lite ? 1 : 0) >= 1 && this.markRoom(prio)) {
+      if (md.mark === SH.cut) {
+        // the blade's path across the body (⟂ the blow), back and forth on a combo
+        this.cutFlip ^= 1;
+        const a = ang + Math.PI / 2 + (this.cutFlip ? 0.35 : -0.35) + (this.rnd() - 0.5) * 0.3;
+        this.mark(MK.cut, SH.cut, md.markT, i, x, y, a, heavyCls ? 0.14 : 0.11, md.markS * sz, heavyCls ? 1.2 : 1, 1);
+        if (heavyCls && this.markRoom(prio)) this.mark(MK.cut, SH.cut, TN.white, i, x + ux * 5, y + uy * 5, a - 0.5, 0.12, md.markS * sz * 0.8, 0.9, 0.95);
+      } else if (md.mark === SH.beam) {
+        // the flying sword's 流光 straight through the body, along its flight
+        this.mark(MK.beam, SH.beam, md.markT, i, x + ux * r * 0.5, y + uy * r * 0.5, ang, 0.09, md.markS * sz, 0.75, 1);
+      } else {
+        this.mark(MK.rake, md.mark, md.markT, i, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.4, 0.14, md.markS * sz * 0.8, md.markS * sz, 1);
+      }
+    }
+    if (md.halo >= 0 && (tier === 2 || (heavyCls && tier >= 1)) && this.markRoom(prio)) {
+      this.mark(MK.ring, SH.halo, md.halo, i, x, y, 0, 0.18, (r * 0.5) / 28, (r * 1.6) / 28, 0.9);
+    }
+    // the ground takes a splash on medium and heavy blows (under the bodies, drying away)
+    if (md.splat >= 0 && tier >= 1 && (tier === 2 || this.rnd() < 0.5) && this.markRoom(prio)) {
+      this.mark(MK.ground, SH.splat, md.splat, -1, x + ux * r * 0.3, y + uy * r * 0.3, ang + (this.rnd() - 0.5) * 0.5, 0.55, 0.45 * sz, 0.62 * sz, 0.75);
+    }
+    // directional sparks: out of the far side, along the blow
+    if (tier >= 1 && !calm) {
+      const n = this.count(tier === 2 ? 3 : 2);
+      for (let k = 0; k < n && this.room(prio); k++) {
+        const a = ang + (this.rnd() - 0.5) * 0.9;
+        const v = 380 + 260 * this.rnd();
+        this.emit(SH.ember, md.spark, x + ux * r * 0.4, y + uy * r * 0.4, Math.cos(a) * v, Math.sin(a) * v, 0.1 + 0.06 * this.rnd(), 0.9 * sz, 0.35 * sz, a, 0, 9, 0, 1);
+      }
+    }
     // spatter from the side the blow came in, flung on through the body
-    const prio = crit || big ? 1 : 0;
-    const cx = x - ux * r * 0.55, cy = y - uy * r * 0.55;
-    if (this.room(prio)) this.emit(SH.flare, crit ? TN.gold : TN.white, cx, cy, 0, 0, crit ? 0.09 : 0.06, crit ? 0.75 : 0.45, crit ? 1.05 : 0.6, 0, 0, 0, PF.ease, crit ? 0.95 : 0.8);
-    const n = this.count(def.n * (crit ? 1.8 : 1) * (big ? 1.4 : 1));
-    this.spray(def, n, x + ux * r * 0.3, y + uy * r * 0.3, ang, prio, 1 + (crit ? 0.25 : 0), 0);
-    if (fc === FC.claw && this.room(prio)) this.emit(SH.claw, TN.ink, x, y, ux * 30, uy * 30, 0.16, 0.9, 1, ang + Math.PI / 2, 0, 8, 0, 0.9);
-    if (def.ring >= 0 && (heavy || crit || fc !== FC.go || this.rnd() < 0.5) && this.room(prio)) {
+    const n = this.count(def.n * SPRAY_N[tier] * (big ? 1.4 : 1));
+    this.spray(def, n, x + ux * r * 0.3, y + uy * r * 0.3, ang, prio, SPRAY_S[tier], 0);
+    if (def.ring >= 0 && fc !== FC.heavy && (tier >= 1 || fc !== FC.go || this.rnd() < 0.5) && this.room(prio)) {
       this.emit(SH.ring, def.ring, x, y, 0, 0, 0.16, (def.ringR / 32) * 0.35, (def.ringR / 32) * (crit ? 1.3 : 1), this.rnd() * 6.28, 0, 0, PF.ease, 0.8);
-    }
-    if (weighty && t - this.lastWeighty >= 0.1 && this.room(1)) {
-      // the weighty blow's impact: a white flare and an ink ring
-      this.emit(SH.flare, TN.white, x, y, 0, 0, 0.09, 0.6, 1.25, 0, 0, 0, PF.ease, 0.9);
-      if (this.room(1)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.18, 0.2, 0.75, this.rnd() * 6.28, 0, 0, PF.ease, 0.75);
-    }
-    if (crit && this.room(1)) {
-      // the crit's gold star-burst
-      this.emit(SH.spark, TN.gold, x, y - r * 0.2, 0, 0, 0.14, 0.6, 1.5, this.rnd() * 6.28, 9, 0, PF.ease, 1);
-      if (this.room(1)) { const a = ang + (this.rnd() - 0.5) * 1.2; this.emit(SH.streak, TN.gold, x, y, Math.cos(a) * 440, Math.sin(a) * 440, 0.12, 0.65, 0.2, a, 0, 10, PF.stretch, 0.9); }
     }
     // the bus: the class colour, a crack and a thump
     this.busW[fc] = Math.max(this.busW[fc], def.weight * (crit ? 1.3 : weighty ? 1.5 : 1));
     this.busN[fc]++;
     if (crit) this.busCrit++;
-    if (heavy) this.busHeavy++;
-    else if (weighty) this.busWeighty++;
-    // hitstop and the camera: small bumps from the hit budget; the big jolts live elsewhere
+    if (heavyCls) this.busHeavy++;
+    else if (weighty || tier === 2) this.busWeighty++;
+    // the world stops only for the rare heavy moment: a heavy weapon's crit, the 镜技's landing
     if (src === SRCI.skill) this.skillImpact(x, y);
-    else if (crit) {
-      if (t - this.lastCritStop >= 0.14) { this.lastCritStop = t; this.stop(heavy ? 45 : 24); }
-      this.hitTrauma(heavy ? 0.34 : 0.24);
-      this.hitKick(ux, uy, heavy ? 3.5 : 2.5);
-    } else if (heavy && t - this.lastHeavyStop >= 0.22) {
-      this.lastHeavyStop = t;
-      this.stop(20);
-      this.hitTrauma(0.24);
-      this.hitKick(ux, uy, 3);
-    } else if (weighty && t - this.lastWeighty >= 0.1) {
-      this.lastWeighty = t;
-      this.stop(18);
-      this.hitTrauma(0.18);
-      this.hitKick(ux, uy, 2.5);
-    }
+    else if (crit && heavyCls && t - this.lastCritStop >= HEAVY_CRIT_GAP) { this.lastCritStop = t; this.stop(30); }
+  }
+
+  /** The body about to die (world.killIn, before it releases the slot): its fragments are cut from this. */
+  corpse(id: AtlasId | null, face: number, scale: number): void {
+    this.cId = id; this.cFlip = Math.cos(face) < 0 ? 1 : 0; this.cSc = scale > 0 && Number.isFinite(scale) ? scale : 1;
   }
 
   /** A body died at (x, y) (radius r, kind k); ang is the direction of the killing blow. */
   kill(x: number, y: number, r: number, k: number, crit: boolean, ang: number, fc: number): void {
+    const W = this.W;
     this.st.kills++;
     const elite = k === EKind.Elite || k === EKind.Demon;
     const boss = k === EKind.Boss;
     const prio = elite || boss ? 2 : 1;
     const sz = r / 22;
+    const md = MKD[fc] ?? MKD[FC.generic];
+    const calm = !this.motion;
+    const id = this.cId, flip = this.cFlip, sc = this.cSc;
+    this.cId = null;
+    // a pop of light where it broke, a ring of it spreading
+    const popT = md.star === TN.white || md.star === TN.moon ? TN.gold : md.star;
+    if (this.markRoom(prio)) this.mark(MK.pop, SH.star, popT, -1, x, y, ang, boss ? 0.14 : 0.09, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48 * 0.6, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48, 1);
+    if (this.markRoom(prio)) this.mark(MK.ring, SH.halo, md.halo >= 0 ? md.halo : md.star === TN.white ? TN.azure : md.star, -1, x, y, 0, 0.22, (0.4 * r) / 28, (2.2 * r) / 28, 0.9);
+    if ((elite || boss) && this.markRoom(prio)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.36, (0.6 * r) / 28, (3.2 * r) / 28, 0.8);
+    // the body breaks: pieces of its own sprite flung on along the blow (the droplets and the world's
+    // splat stain the paper; the pieces only fly and fade)
+    if (id && this.fragBursts < 4 && !W.degrade) {
+      this.fragBursts++;
+      const Fr = this.fr;
+      const g = boss ? 4 : elite ? 3 : 2;
+      const want = boss ? (W.quality === 'low' ? 8 : 12) : elite ? (W.quality === 'low' ? 6 : 8) : (FRAG_MOB[W.quality] ?? 4);
+      const room = Fr.cap - Fr.count - (prio >= 2 ? 0 : Math.floor(Fr.cap * 0.25));
+      const nf = Math.min(want, g * g, Math.max(0, room));
+      const off = Math.floor(this.rnd() * g * g);
+      for (let j = 0; j < nf; j++) {
+        const f = Fr.take();
+        if (f < 0) break;
+        this.st.frags++;
+        const q = (off + j * 5) % (g * g);
+        // it flies out from its place in the body (the renderer adds the piece's exact offset in the sprite)
+        const qx = (q % g + 0.5) / g - 0.5, qy = (Math.floor(q / g) + 0.5) / g - 0.5;
+        const out = Math.atan2(qy, flip ? -qx : qx);
+        const a = ang + Math.max(-1.05, Math.min(1.05, Math.atan2(Math.sin(out - ang), Math.cos(out - ang)) * 0.6 + (this.rnd() - 0.5) * 0.7));
+        const v = calm ? 0 : (160 + 160 * this.rnd()) * (boss ? 1.3 : elite ? 1.2 : 1);
+        Fr.x[f] = x; Fr.y[f] = y; Fr.vx[f] = Math.cos(a) * v; Fr.vy[f] = Math.sin(a) * v;
+        Fr.rot[f] = 0; Fr.vr[f] = calm ? 0 : (5 + 7 * this.rnd()) * (this.rnd() < 0.5 ? -1 : 1);
+        Fr.life[f] = Fr.life0[f] = calm ? 0.25 : (boss ? 0.5 : 0.32) + 0.13 * this.rnd();
+        Fr.sc[f] = sc; Fr.g[f] = g; Fr.q[f] = q; Fr.flip[f] = flip; Fr.stamp[f] = 0; Fr.id[f] = id;
+      }
+    }
     // the crown: a wet ring breaking outward
-    if (this.room(prio)) this.emit(SH.crown, TN.ink, x, y, 0, 0, boss ? 0.5 : elite ? 0.34 : 0.24, sz * 0.45, sz * (boss ? 2.2 : elite ? 1.6 : 1.15), this.rnd() * 6.28, 0, 0, PF.ease, 0.85);
+    if (this.room(prio)) this.emit(SH.crown, TN.ink, x, y, 0, 0, boss ? 0.5 : elite ? 0.38 : 0.28, sz * 0.5, sz * (boss ? 2.2 : elite ? 2.1 : 1.5), this.rnd() * 6.28, 0, 0, PF.ease, 0.85);
     // droplets flung along the blow (one lands and stains the paper)
     const n = boss ? 18 : elite ? 9 : this.count(3 + (crit ? 2 : 0));
     const def = FXD[fc] ?? FXD[FC.generic];
@@ -399,62 +812,66 @@ export class Feel {
       const v = (180 + 260 * this.rnd()) * (boss ? 1.6 : elite ? 1.3 : 1);
       const shape = j & 1 ? SH.dot : SH.drop;
       const tint = j === 2 && fc !== FC.generic && fc !== FC.heavy && fc !== FC.skill ? def.tint : TN.ink;
-      this.emit(shape, tint, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.22 + 0.16 * this.rnd(), (0.8 + 0.6 * this.rnd()) * Math.max(0.8, sz), 0.4, a, 0, 5.5, (shape === SH.drop ? PF.stretch : 0) | (j === 0 ? PF.stamp : 0), 0.95);
+      this.emit(shape, tint, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.22 + 0.16 * this.rnd(), (0.9 + 0.6 * this.rnd()) * Math.max(0.8, sz), 0.4, a, 0, 5.5, (shape === SH.drop ? PF.stretch : 0) | (j === 0 ? PF.stamp : 0), 0.95);
     }
+    // a splash on the ground along the blow
+    if (this.markRoom(prio)) this.mark(MK.ground, SH.splat, md.splat >= 0 ? md.splat : TN.ink, -1, x, y, ang, 0.7, 0.55 * Math.max(0.8, sz), 0.8 * Math.max(0.8, sz), 0.8);
     this.busKill++;
     if (elite || boss) {
       this.busBig++;
-      if (this.room(2)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.3, sz * 0.4, sz * 2, this.rnd() * 6.28, 0, 0, PF.ease, 0.9);
-      if (this.room(2)) this.emit(SH.flare, TN.white, x, y, 0, 0, 0.1, sz * 1.2, sz * 2.4, 0, 0, 0, PF.ease, 0.9);
+      // an elite's death: a beat of stillness (no shake, no zoom)
       if (elite) {
-        this.stop(60);
-        this.addTrauma(0.7);
-        this.punch(0.03);
+        this.stop(40);
         this.vib(15, 1);
       }
     }
   }
 
-  /** The 镜技 landed (the first hit of a cast, rate-limited): a boom, a ring, a zoom punch. */
+  /** The 镜技 landed (the first hit of a cast, rate-limited): a boom, rings of light, a gentle zoom. */
   skillImpact(x: number, y: number): void {
     const W = this.W;
     if (W.t - this.lastSkill < 0.35) return;
     this.lastSkill = W.t;
-    this.stop(55);
-    this.addTrauma(0.75);
-    this.punch(0.05);
+    this.stop(40);
+    this.punch(0.02);
     this.vib(14, 1);
-    if (this.room(2)) this.emit(SH.ring, TN.gold, x, y, 0, 0, 0.32, 0.5, 2.6, this.rnd() * 6.28, 0, 0, PF.ease, 0.9);
+    if (this.markRoom(2)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.32, 0.5 * 1.1, 2.6 * 1.1, 0.95);
     if (this.room(2)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.26, 0.3, 1.8, this.rnd() * 6.28, 0, 0, PF.ease, 0.8);
     // the boom goes out with the step's bus, counted in its 4 voices
     this.busSkill++;
   }
 
-  /** A boss changed phase (the core's 120 ms stop already runs). */
+  /** A boss changed phase (the core's 120 ms stop already runs): a short, small shake. */
   phase(x: number, y: number): void {
-    this.addTrauma(0.85);
-    this.punch(0.08);
+    this.addTrauma(0.5);
+    this.punch(0.03);
     this.vib(40, 0);
     for (let k = 0; k < 2; k++) if (this.room(2)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.4 + k * 0.15, 0.6, 3.5 + k, this.rnd() * 6.28, 0, 0, PF.ease, 0.9);
   }
-  /** A boss died (the core stops 160 ms and shakes). */
+  /** A boss died (the core stops 160 ms). */
   bossDown(x: number, y: number): void {
-    this.addTrauma(1);
-    this.punch(0.1);
+    this.addTrauma(0.6);
+    this.punch(0.04);
     this.vib(80, 0);
     if (this.room(2)) this.emit(SH.crown, TN.ink, x, y, 0, 0, 0.6, 1, 4, 0, 0, 0, PF.ease, 0.9);
   }
 
-  /** You were hurt from (fx, fy) (NaN: unknown). */
-  hurt(fx: number, fy: number, boss: boolean): void {
+  /** You were hurt from (fx, fy) (NaN: unknown); frac is the blow's share of your max HP. Only a hard
+   *  blow (≥ 15%, or a boss's) moves the camera, a little, at most once per 0.6 s. */
+  hurt(fx: number, fy: number, boss: boolean, frac = 0): void {
     const W = this.W;
+    const hard = boss || frac >= 0.15;
     this.hurtAge = 0;
-    this.hurtK = boss ? 1 : 0.8;
+    this.hurtK = hard ? 1 : 0.75;
     let ux = 0, uy = 0;
     if (Number.isFinite(fx)) { const dx = W.px - fx, dy = W.py - fy, L = Math.hypot(dx, dy) || 1; ux = dx / L; uy = dy / L; }
     this.hurtUx = ux; this.hurtUy = uy;
-    this.addTrauma(boss ? 1 : 0.8);
-    this.kick(ux, uy, boss ? KICK_MAX : 3);
+    if (hard && (W.t - this.lastHurtShake >= 0.6 || W.t < this.lastHurtShake)) {
+      this.lastHurtShake = W.t;
+      this.addTrauma(0.45);
+      this.kick(ux, uy, KICK_MAX);
+      this.stop(40);
+    }
     // GDD §20.2: an 8 ms haptic tick (a boss's blow a little longer)
     this.vib(boss ? 20 : 8, 0.3);
     // ink knocked off you
@@ -462,13 +879,6 @@ export class Feel {
       const a = Math.atan2(uy, ux) + (this.rnd() - 0.5) * 2.4;
       const v = 150 + 180 * this.rnd();
       this.emit(SH.drop, TN.ink, W.px, W.py, Math.cos(a) * v, Math.sin(a) * v, 0.25, 0.9, 0.4, a, 0, 6, PF.stretch, 0.9);
-    }
-    // the stop: always felt (at least 30 ms), paid from the same bucket
-    if (this.motion) {
-      const g = Math.max(30, Math.min(60, this.bank));
-      this.bank = Math.max(-60, this.bank - g);
-      W.hitstopMs = Math.max(W.hitstopMs, g);
-      this.st.stopMs += g; this.st.stopReqMs += 60;
     }
     // GDD §20.2: the heartbeat drum (lub-dub) is the body of the sound; the clenched grunt sits on it
     try { W.sfx('hurt'); } catch { /* audio optional */ }
@@ -500,15 +910,13 @@ export class Feel {
     this.voice('release', 0.8, 0.9 + 0.2 * this.rnd());
   }
 
-  /** A mid-wave level-up: a gold burst, a thump, a zoom punch. */
+  /** A mid-wave level-up: a gold burst and a thump (the camera stays still). */
   level(x: number, y: number): void {
     for (let k = 0; k < 12 && this.room(2); k++) {
       const a = (k / 12) * Math.PI * 2 + this.rnd() * 0.3, v = 260 + 120 * this.rnd();
       this.emit(k & 1 ? SH.glint : SH.streak, TN.gold, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.4, 1, 0.4, a, 0, 4, k & 1 ? 0 : PF.stretch, 0.95);
     }
     if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 1.2, 3, 0, 0, 0, PF.ease, 0.8);
-    this.punch(0.05);
-    this.addTrauma(0.3);
     this.busLevel++;
   }
   /** 月华 (or a coin) reached you: a glint. */
@@ -534,7 +942,6 @@ export class Feel {
   frame(realMs: number, frozenMs: number): void {
     const dt = Math.min(0.05, Math.max(0, realMs / 1000));
     this.bank = Math.min(STOP_CAP, this.bank + STOP_REFILL * dt);
-    this.hitBank = Math.min(HIT_TRAUMA_CAP, this.hitBank + HIT_TRAUMA_REFILL * dt);
     this.st.frozenMs += frozenMs; this.st.realMs += realMs;
     this.secReal += realMs; this.secFrozen += frozenMs;
     if (this.secReal >= 1000) {
@@ -542,21 +949,26 @@ export class Feel {
       this.st.lastShare = s; this.st.maxShare = Math.max(this.st.maxShare, s);
       this.secReal = 0; this.secFrozen = 0;
     }
-    this.trauma = Math.max(0, this.trauma - dt * 1.7);
+    this.trauma = Math.max(0, this.trauma - dt * TRAUMA_DECAY);
     this.shakeT += dt;
-    const amp = this.shakeOn ? MAX_SHAKE * this.trauma * this.trauma : 0;
+    const on = this.shakeOn;
+    const amp = on ? MAX_SHAKE * this.trauma * this.trauma : 0;
     const t = this.shakeT;
     const kd = Math.exp(-dt * 20);
     this.kickX *= kd; this.kickY *= kd;
-    if (!this.shakeOn) { this.kickX = 0; this.kickY = 0; }
+    if (!on) { this.kickX = 0; this.kickY = 0; this.trauma = 0; }
     let ox = amp * (Math.sin(t * 47.3 + 1.1) * 0.6 + Math.sin(t * 23.9 + 4.2) * 0.4) + this.kickX;
     let oy = amp * (Math.sin(t * 41.7 + 2.3) * 0.6 + Math.sin(t * 29.1 + 0.7) * 0.4) + this.kickY;
-    // the whole offset stays inside the GDD's 6 px, whatever piled up
+    // the whole offset stays small, whatever piled up
     const L = Math.hypot(ox, oy);
     if (L > MAX_OFFSET) { ox *= MAX_OFFSET / L; oy *= MAX_OFFSET / L; }
+    if (L < 0.02) { ox = 0; oy = 0; }
     this.offX = ox; this.offY = oy;
     this.zoom *= Math.exp(-dt * 9);
-    if (!this.motion) this.zoom = 0;
+    if (this.zoom < 1e-4 || !on) this.zoom = 0;
+    this.st.camFrames++;
+    if (L > 0.5) this.st.camOff++;
+    if (this.zoom > 0.005) this.st.camZoom++;
     this.hurtAge += dt;
     // the low-HP heartbeat: 72 → 110 bpm as the last quarter drains
     const W = this.W;
@@ -591,31 +1003,19 @@ export class Feel {
     this.st.stopReqMs += ms; this.st.stopMs += Math.max(0, ms - Math.max(0, W.hitstopMs));
     W.hitstopMs = Math.max(W.hitstopMs, ms);
   }
-  /** Trauma from an ordinary hit: ≤ 0.3 a step, paid from the hit bucket, never past HIT_CEIL. */
-  private hitTrauma(a: number): void {
-    if (!this.shakeOn) return;
-    const g = Math.min(a, Math.max(0, 0.3 - this.stepTrauma), this.hitBank, Math.max(0, HIT_CEIL - this.trauma));
-    if (g <= 0) return;
-    this.stepTrauma += g;
-    this.hitBank -= g;
-    this.addTrauma(g);
-  }
-  /** A kick from an ordinary hit: at most one per 0.08 s, ≤ KICK_STEP a step. */
-  private hitKick(ux: number, uy: number, px: number): void {
-    const t = this.W.t;
-    if (t - this.lastHitKick < 0.08 || this.stepKick >= KICK_STEP) return;
-    this.lastHitKick = t;
-    const k = Math.min(px, KICK_STEP - this.stepKick);
-    this.stepKick += k;
-    this.kick(ux, uy, k);
-  }
   addTrauma(a: number): void {
     if (!this.shakeOn) return;
     this.trauma = Math.min(1, this.trauma + a);
   }
-  /** The contract's shake(px): trauma that alone gives about px of shake. */
+  /** The contract's shake(px), now an enemy's slam (bosses, elites): a small, short shake of
+   *  min(2, px / 2) px, at most once per 0.5 s. The player's own weapons and 镜技 never call it. */
   shake(px: number): void {
-    this.addTrauma(Math.sqrt(Math.min(1, Math.max(0, px) / MAX_SHAKE)));
+    if (!this.shakeOn || !(px > 0)) return;
+    const t = this.W.t;
+    if (t - this.lastSlam < 0.5 && t >= this.lastSlam) return;
+    this.lastSlam = t;
+    const amp = Math.min(2, 0.5 * px);
+    this.addTrauma(Math.sqrt(amp / MAX_SHAKE));
   }
   /** A directional kick of the camera (CSS px; the total stays within KICK_MAX). */
   kick(ux: number, uy: number, px: number): void {
@@ -624,10 +1024,10 @@ export class Feel {
     const L = Math.hypot(this.kickX, this.kickY);
     if (L > KICK_MAX) { this.kickX *= KICK_MAX / L; this.kickY *= KICK_MAX / L; }
   }
-  /** A zoom punch: off under reduced motion, halved with the shake setting off. */
+  /** A zoom punch (big moments only): off with the shake setting off and under reduced motion. */
   punch(z: number): void {
-    if (!this.motion) return;
-    this.zoom = Math.max(this.zoom, this.shakeOn ? z : z * 0.5);
+    if (!this.shakeOn) return;
+    this.zoom = Math.max(this.zoom, z);
   }
   /** A haptic tick (setting on, supported, not within `gap` s of the last). */
   vib(ms: number, gap: number): void {
@@ -681,12 +1081,28 @@ export class Feel {
     if (this.busKill && v < 4) { this.voice(this.busBig ? 'popBig' : 'pop', 0.7 + 0.3 * Math.min(1, this.busKill / 4), this.busBig ? 1 : 0.92 + 0.16 * this.rnd()); v++; }
     if (this.busCrit && t - this.lastCrack >= 0.06 && v < 4) { this.lastCrack = t; this.voice('crack', 0.85, 0.95 + 0.1 * this.rnd()); v++; }
     if ((this.busCrit || this.busHeavy || this.busWeighty) && t - this.lastThump >= 0.07 && v < 4) { this.lastThump = t; this.voice('thump', this.busHeavy ? 1 : this.busWeighty ? 0.85 : 0.7, 0.95 + 0.1 * this.rnd()); v++; }
-    // a big area blow (a heavy weapon or a blast into a crowd) stops the world a beat
-    if (this.busHeavy >= 6) { this.stop(30); this.hitTrauma(0.2); }
     this.busReset();
   }
 
   stats(): FeelStats { return { ...this.st, sparks: this.sp.count }; }
+}
+
+/** A crit number's steady size (× its size by damage): crits read bigger than plain hits. */
+export const CRIT_NUM = 1.12;
+/**
+ * A damage number's pop at age t (s): plain hits overshoot to 1.15× and settle; crits jump to 1.42×,
+ * bounce under (≈ 0.9×) and settle within 0.3 s. Reduced motion: no pop.
+ */
+export function numPop(t: number, crit: boolean, calm: boolean): number {
+  if (calm) return 1;
+  if (crit) {
+    if (t < 0.05) return 0.7 + 0.72 * Math.max(0, t) / 0.05;
+    if (t < 0.34) return 1 + 0.42 * Math.exp(-(t - 0.05) / 0.07) * Math.cos((t - 0.05) * 26);
+    return 1;
+  }
+  if (t < 0.06) return 0.6 + 0.55 * (Math.max(0, t) / 0.06);
+  if (t < 0.18) { const u = (t - 0.06) / 0.12; return 1.15 - 0.15 * (1 - (1 - u) * (1 - u)); }
+  return 1;
 }
 
 /** Device-level feel preferences the UI sets (the pause sheet's 震动 switch: blows you take, elite

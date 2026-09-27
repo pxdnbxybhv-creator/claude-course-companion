@@ -67,7 +67,6 @@ const yizi: SkillImpl = {
       const w = c.w;
       const n = w.hitArea(at.x, at.y, p.r, hit(p.base, { [bestStat(w)]: p.k }, { knock: 30 }));
       w.fx('shockRing', at.x, at.y, { r: p.r, life: 0.4 });
-      w.shake(5);
       if (!n) w.sfx('bossDrum');
       // the lingering 镇: slow 40%, and +20% damage taken from every source
       w.zone({
@@ -373,7 +372,6 @@ const wei: SkillImpl = {
       if (n >= 6) w.title({ zh: '提子', en: 'Captured' }, 'edge');
       // captures pop through the feel layer; an empty 围 only clacks its stones
       if (!n) w.sfx('merge');
-      w.shake(3);
     });
   },
 };
@@ -403,7 +401,6 @@ const pudie: SkillImpl = {
       const n = w.hitArea(x, y, p.r, hit(p.base, { melee: p.k }, { status: { kind: 'stun', dur: p.stun }, knock: 40 }));
       w.fx('shockRing', x, y, { r: p.r, life: 0.3 });
       w.fx('dustPuff', x, y, { r: 30, life: 0.3 });
-      w.shake(3);
       if (!n) w.sfx('hitMelee');
     }, {
       // only the landing's own kills count (weapons firing through the leap don't chain it)
@@ -427,7 +424,6 @@ const daoyao: SkillImpl = {
         const w = c.w, x = w.player.x, y = w.player.y;
         const n = w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock }));
         w.fx('shockRing', x, y, { r: p.r, life: 0.35 });
-        w.shake(2);
         if (!n) w.sfx('bossDrum');
         yield step * 0.25;
       }
@@ -506,7 +502,6 @@ const tuodao: SkillImpl = {
       const n = w.hitArea(x, y, p.r, hit(p.kWeapon * best, { melee: p.kMelee }, { knock: p.knock, status: { kind: 'stun', dur: p.stun } }));
       for (let k = 0; k < 4; k++) w.fx('slashArc', x + Math.cos(k * TAU / 4) * 120, y + Math.sin(k * TAU / 4) * 120, { r: 110, dir: k * TAU / 4 + Math.PI / 2, life: 0.35 });
       w.fx('shockRing', x, y, { r: p.r, life: 0.4 });
-      w.shake(6);
       if (!n) w.sfx('bossDrum');
     });
   },
@@ -540,7 +535,6 @@ const qinghui: SkillImpl = {
         onTick: (ww) => { if ((ww.player.x - x) ** 2 + (ww.player.y - y) ** 2 <= p.r * p.r) ww.buff('moonpool', { regen: p.poolRegen }, 0.3); },
       });
       setMoon(w, 0);
-      w.shake(3);
       if (!landed) w.sfx('bell'); // a landing on foes gets the feel layer's boom instead
     });
   },

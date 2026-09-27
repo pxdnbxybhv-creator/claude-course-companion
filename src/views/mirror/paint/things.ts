@@ -49,13 +49,18 @@ export const DROP_SPECS: Record<DropKind, Spec> = {
 // ───────────────────────────────────────────── effects
 
 const Z = 32;
-const zone = (paint: (b: B, v: number) => void, n = 1): Spec => ({ box: [-Z - 2, -Z - 2, Z + 2, Z + 2], n, halo: 'none', paint });
+/** Zone looks are drawn at r / 32 of their size (up to 11×): the painter bakes them at a fixed pixel
+ *  size (paint/index.ts ZONE_K) whatever the sprite scale. */
+const ZONES = new WeakSet<Spec>();
+export const isZone = (s: Spec): boolean => ZONES.has(s);
+const zone = (paint: (b: B, v: number) => void, n = 1): Spec => { const s: Spec = { box: [-Z - 2, -Z - 2, Z + 2, Z + 2], n, halo: 'none', paint }; ZONES.add(s); return s; };
 const fx = (r: number, paint: (b: B, v: number) => void, n = 1, halo: Spec['halo'] = 'none'): Spec => ({ box: [-r, -r, r, r], n, halo, paint });
 const ringOf = (b: B, r: number, w: number, c: string, tone: number, n = 28) => b.brush(arcW(0, 0, r, r, 0, Math.PI * 2, w, w, n), tone, c);
 
 export const FX_SPECS: Record<FxName, Spec> = {
   hitSpark: fx(10, (b) => { for (let i = 0; i < 4; i++) { const a = i * 1.7 + 0.3; b.brush(rotW([[2, 0, 1.8], [9, 0, 0.3]], a), 0.9, INK); } b.dot(0, 0, 3, 0.9, INK); }),
-  critSpark: fx(14, (b) => { b.fill(DANGER, star(0, 0, 13, 3.4, 6), 0.9, 0.4); b.fill('#fff4e0', star(0, 0, 6, 1.8, 6), 0.95, 0.2); }),
+  // the player's crit (侠客's 一剑光寒): a gold star-burst with a white heart — never the enemy's vermilion
+  critSpark: fx(14, (b) => { b.disc(0, 0, 9, '#f6d77a', 0.28); b.fill(GOLD, star(0, 0, 13, 3.4, 6), 0.92, 0.4); b.fill('#fff8e6', star(0, 0, 7, 1.8, 6), 0.97, 0.2); b.disc(0, 0, 1.8, '#ffffff'); }),
   inkBurst: fx(20, (b, v) => { b.wash(INK, blob(0, 0, 14, 13, 3 + v * 7, 0.25), 0.7, 3); for (let i = 0; i < 7; i++) { const a = h01(v + 1, i) * Math.PI * 2, r = 14 + h01(v + 5, i) * 5; b.dot(Math.cos(a) * r, Math.sin(a) * r, 2 + h01(v + 9, i) * 3, 0.85, INK); } }, 2),
   splat: fx(20, (b, v) => { b.wash(INK, blob(0, 0, 13, 11, 11 + v * 13, 0.3), 0.5, 3); b.wash(INK, blob(2, -1, 7, 6, 17 + v * 5, 0.25), 0.35, 2); for (let i = 0; i < 5; i++) { const a = h01(v + 21, i) * Math.PI * 2, r = 13 + h01(v + 31, i) * 6; b.dot(Math.cos(a) * r, Math.sin(a) * r, 1.4 + h01(v + 41, i) * 2.4, 0.6, INK); } }, 3),
   spawnBloom: zone((b) => { b.wash(INK, blob(0, 0, 26, 25, 5, 0.12), 0.35, 5); ringOf(b, 26, 1.6, INK, 0.45); }),

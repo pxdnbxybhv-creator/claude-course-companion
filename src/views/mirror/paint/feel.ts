@@ -1,9 +1,12 @@
 // 水月幻镜 · impact sprites (打击感): the small baked pieces the engine's feel layer throws around —
 // ink droplets and spatter streaks, feathers, talisman sparks, jade chips, go-stone chips, impact
 // rings and flares, the brush-stroke swipe of a melee swing (5 reveal frames), the death crown, the
-// muzzle puff and the moon glint. Painted once with plain Canvas 2D (gradients only here, at bake
-// time), lazily per (shape, tint) into shelf-packed pages; the frame loop only calls drawImage.
-// Colours follow the readability grammar: player-side effects are ink and pale class washes; no
+// muzzle puff and the moon glint — and the luminous hit marks drawn on the struck body: a four-point
+// impact star, a cut (the blade's crescent across the body), a pierce beam (流光 through it), a
+// ring of light, an ink shard and a ground splash. Painted once with plain Canvas 2D (gradients only
+// here, at bake time), lazily per (shape, tint) into shelf-packed pages; the frame loop only calls
+// drawImage. Colours follow the readability grammar: player-side effects are ink, class washes and
+// light (white cores in a class-coloured glow with an ink hairline, so they read on pale paper); no
 // sprite here is vermilion (danger stays the enemy's colour). Node-safe: without a document every
 // lookup is null and the engine falls back to the painter's fx.
 import type { Sprite } from '../types';
@@ -12,12 +15,16 @@ import type { Sprite } from '../types';
 export const SH = {
   dot: 0, drop: 1, streak: 2, feather: 3, spark: 4, chip: 5, stone: 6, ring: 7, flare: 8, swipe: 9, puff: 10, glint: 11, blot: 12,
   crown: 13, claw: 14, note: 15,
+  /** Hit marks (luminous, drawn across the struck body) and the ground splash. */
+  star: 16, cut: 17, beam: 18, halo: 19, shard: 20, splat: 21, ember: 22, rake: 23,
 } as const;
 /** Tints. */
 export const TN = {
   ink: 0, azure: 1, indigo: 2, gamboge: 3, green: 4, moon: 5, wine: 6, jade: 7, white: 8, gold: 9, paper: 10, grey: 11, black: 12,
 } as const;
 const TINT_HEX = ['#1b1916', '#3f7fa6', '#2f4d73', '#d9a520', '#6fa87c', '#eef3f8', '#7a2640', '#5fae8e', '#ffffff', '#e7b547', '#f4efe4', '#6d6a63', '#141414'];
+/** The glow of each tint for the luminous marks (star, cut, beam, halo): brighter, never vermilion. */
+const GLOW_HEX = ['#5a6272', '#4fb0ec', '#6f8fe8', '#f2b52c', '#5cc98a', '#d8e6f8', '#b95c95', '#36cf9c', '#e6f0ff', '#f6c443', '#f4efe4', '#9a978f', '#3a3a3a'];
 /** Light tints get a thin ink hairline so they read on pale paper. */
 const LIGHT = new Set<number>([TN.moon, TN.white, TN.paper, TN.gold, TN.gamboge]);
 export const SWIPE_FRAMES = 5;
@@ -40,13 +47,23 @@ const SIZE: readonly (readonly [number, number, number, number])[] = [
   [60, 60, 0.5, 0.5], // crown
   [22, 16, 0.5, 0.5], // claw
   [10, 12, 0.5, 0.5], // note
+  [48, 48, 0.5, 0.5], // star (long axis along +x: the blow)
+  [64, 16, 0.5, 0.5], // cut (a crescent along +x, drawn across the blow)
+  [64, 8, 0.82, 0.5], // beam (head at +x)
+  [64, 64, 0.5, 0.5], // halo (a ring of light, radius 28)
+  [12, 10, 0.5, 0.5], // shard
+  [52, 30, 0.3, 0.5], // splat (a ground splash flung toward +x)
+  [28, 4, 0.75, 0.5], // ember (a thin spark of light, head at +x)
+  [44, 22, 0.5, 0.5], // rake (three claw scratches of light along x)
 ];
 
 /** Page size (px). Small on purpose: drawing from a 512²-or-larger extra canvas forces a flush of the
  *  frame's canvas each frame at phone DPR (≈ 20 ms for 30 draws at DPR 2); 256² pages cost nothing. */
 const PAGE = 256;
 /** Resolution factor per shape (big soft washes need fewer pixels). */
-const RES_K: Partial<Record<number, number>> = { [SH.swipe]: 0.45, [SH.ring]: 0.8, [SH.crown]: 0.8 };
+const RES_K: Partial<Record<number, number>> = { [SH.swipe]: 0.45, [SH.ring]: 0.8, [SH.crown]: 0.8, [SH.halo]: 0.9, [SH.splat]: 0.8 };
+/** Largest resolution per shape (device px per u): the big swipe stays inside a 256² page. */
+const RES_MAX: Partial<Record<number, number>> = { [SH.swipe]: 0.9 };
 
 /** Deterministic little hash for bake-time wobble. */
 function h01(a: number, b: number): number {
@@ -62,12 +79,55 @@ export class FeelSprites {
   private px = 0; private py = 0; private rowH = 0;
   private cache = new Map<number, Sprite | null>();
   readonly ok: boolean;
-  /** Device px per world u at bake time. */
-  private res: number;
+  /** Device px per world u at bake time (the camera's scale, so a mark is drawn about 1:1). */
+  readonly res: number;
 
-  constructor(dpr: number, pxPerU = 1) {
-    this.res = Math.max(1, Math.min(2, dpr)) * pxPerU;
+  constructor(res: number) {
+    this.res = Math.max(0.85, Math.min(3.4, Number.isFinite(res) ? res : 1));
     this.ok = typeof document !== 'undefined';
+  }
+
+  /** Let the pages go (a new resolution replaces this set). */
+  dispose(): void {
+    for (const c of this.pages) { c.width = 1; c.height = 1; }
+    this.pages = []; this.g = null; this.cur = null; this.cache.clear(); this.inks = new WeakMap();
+  }
+
+  /** Ink twins of body sprites (the tint a struck body takes after its flash), by the painter's sprite. */
+  private inks = new WeakMap<Sprite, Sprite | null>();
+  /** Ink twins baked this frame (a crowd's first blows never bake all at once). */
+  private inkBakes = 0;
+  /** The frame loop calls this once a frame: the ink-twin bake budget refills. */
+  frame(): void { this.inkBakes = 0; }
+  /**
+   * The ink twin of a body sprite: its silhouette (paper halo included) filled with ink, drawn over the
+   * body at a low alpha after the white flash — the blow's bruise, fading. Baked on first use (≤ 2 a
+   * frame; null until then) into a small canvas of its own: writing into a page the frame has already
+   * drawn from would make the browser flush the frame mid-way. In the frame loop it is a plain
+   * source-over drawImage (no blend modes: an advanced blend copies the frame on many phones).
+   */
+  ink(src: Sprite): Sprite | null {
+    const hit = this.inks.get(src);
+    if (hit !== undefined) return hit;
+    if (!this.ok || this.inkBakes >= 2) return null;
+    this.inkBakes++;
+    let out: Sprite | null = null;
+    try {
+      const pw = Math.max(1, Math.ceil(src.sw)), ph = Math.max(1, Math.ceil(src.sh));
+      const c = document.createElement('canvas');
+      c.width = pw; c.height = ph;
+      const g = c.getContext('2d');
+      if (g) {
+        g.drawImage(src.img, src.sx, src.sy, src.sw, src.sh, 0, 0, src.sw, src.sh);
+        g.globalCompositeOperation = 'source-in';
+        g.fillStyle = 'rgb(20,18,16)';
+        g.fillRect(0, 0, pw, ph);
+        this.pages.push(c);
+        out = { img: c, sx: 0, sy: 0, sw: src.sw, sh: src.sh, w: src.w, h: src.h, ax: src.ax, ay: src.ay };
+      }
+    } catch { out = null; }
+    this.inks.set(src, out);
+    return out;
   }
 
   /** The sprite for (shape, tint, frame); baked on first use. */
@@ -115,7 +175,7 @@ export class FeelSprites {
 
   private bake(shape: number, tint: number, frame: number): Sprite | null {
     const [w, h, ax, ay] = SIZE[shape] ?? SIZE[0];
-    const r = this.res * (RES_K[shape] ?? 1);
+    const r = Math.min(RES_MAX[shape] ?? 9, this.res * (RES_K[shape] ?? 1));
     const pw = Math.ceil(w * r) + 2, ph = Math.ceil(h * r) + 2;
     const at = this.place(pw, ph);
     const g = at.g;
@@ -335,6 +395,130 @@ PAINT[SH.note] = (g, col, edge) => {
   g.beginPath(); g.moveTo(1.8, -4.6); g.quadraticCurveTo(4.6, -3.4, 3.8, -0.8); g.lineWidth = 0.9; g.strokeStyle = col; g.stroke();
 };
 
+
+// ── the luminous hit marks: a class-coloured glow, a white core, an ink hairline between them
+
+/** `#rrggbb` → `rgba(r,g,b,a)`. */
+function rgba(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+const HAIR = 'rgba(20,18,16,0.6)';
+/** A tapered sliver along x from −L to +L (bowed by `bow` toward −y), half-width `th` at its middle. */
+function sliver(g: CanvasRenderingContext2D, L: number, bow: number, th: number, head = 0): void {
+  const N = 22;
+  g.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const u = -1 + (2 * i) / N;
+    // the thickest point leans toward the head (+x) when `head` > 0
+    const k = Math.pow(Math.max(0, 1 - u * u), 0.75) * (1 + head * u);
+    const y = -bow * (1 - u * u) - th * k;
+    if (i === 0) g.moveTo(u * L, y); else g.lineTo(u * L, y);
+  }
+  for (let i = N; i >= 0; i--) {
+    const u = -1 + (2 * i) / N;
+    const k = Math.pow(Math.max(0, 1 - u * u), 0.75) * (1 + head * u);
+    g.lineTo(u * L, -bow * (1 - u * u) + th * k * 0.7);
+  }
+  g.closePath();
+}
+PAINT[SH.star] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  // the soft glow, longer along the blow
+  const gr = g.createRadialGradient(0, 0, 0, 0, 0, 22);
+  gr.addColorStop(0, rgba(glow, 0.8)); gr.addColorStop(0.3, rgba(glow, 0.42)); gr.addColorStop(1, rgba(glow, 0));
+  g.save(); g.scale(1, 0.7); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 22, 0, Math.PI * 2); g.fill(); g.restore();
+  // the four points (concave sides), long along x; a thinner cross at 45°
+  const star = (a: number, b: number, w: number) => {
+    g.beginPath();
+    g.moveTo(a, 0); g.quadraticCurveTo(w, w, 0, b); g.quadraticCurveTo(-w, w, -a, 0);
+    g.quadraticCurveTo(-w, -w, 0, -b); g.quadraticCurveTo(w, -w, a, 0); g.closePath();
+  };
+  g.save(); g.rotate(Math.PI / 4); star(9, 9, 1.1); g.fillStyle = rgba(glow, 0.85); g.fill(); g.restore();
+  star(22, 8.5, 2.2);
+  g.lineJoin = 'round'; g.strokeStyle = HAIR; g.lineWidth = 1; g.stroke();
+  const sg = g.createRadialGradient(0, 0, 0, 0, 0, 20);
+  sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.28, '#ffffff'); sg.addColorStop(0.62, glow); sg.addColorStop(1, glow);
+  g.fillStyle = sg; g.fill();
+  g.beginPath(); g.arc(0, 0, 2.6, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
+};
+PAINT[SH.cut] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  // the glow band, the ink hairline, the white edge of the blade's path
+  sliver(g, 31, 3.2, 6.2); g.fillStyle = rgba(glow, 0.42); g.fill();
+  sliver(g, 30, 3.2, 2.9); g.fillStyle = glow; g.fill(); g.strokeStyle = HAIR; g.lineWidth = 0.7; g.stroke();
+  sliver(g, 27, 3.2, 1.25); g.fillStyle = '#ffffff'; g.fill();
+};
+PAINT[SH.beam] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  // a straight light-lance (流光): bright at its head (+x), fading to nothing behind
+  const lin = (a: number) => {
+    const gr = g.createLinearGradient(-31.5, 0, 31.5, 0);
+    gr.addColorStop(0, rgba(glow, 0)); gr.addColorStop(0.55, rgba(glow, a * 0.6)); gr.addColorStop(0.9, rgba(glow, a)); gr.addColorStop(1, rgba(glow, a));
+    return gr;
+  };
+  g.save(); g.translate(-20, 0);
+  sliver(g, 31.5, 0, 2.8, 0.6); g.fillStyle = lin(0.5); g.fill();
+  sliver(g, 30.5, 0, 1.3, 0.65); g.fillStyle = lin(1); g.fill();
+  const core = g.createLinearGradient(-28, 0, 28, 0);
+  core.addColorStop(0, 'rgba(255,255,255,0)'); core.addColorStop(0.6, 'rgba(255,255,255,0.7)'); core.addColorStop(1, '#ffffff');
+  sliver(g, 28, 0, 0.6, 0.7); g.fillStyle = core; g.fill();
+  g.restore();
+  // an ink hairline under the bright head only (the tail stays pure light)
+  g.beginPath(); g.moveTo(-6, -1.9); g.lineTo(9.8, -0.5); g.moveTo(-6, 1.9); g.lineTo(9.8, 0.5);
+  g.strokeStyle = 'rgba(20,18,16,0.35)'; g.lineWidth = 0.4; g.stroke();
+  g.beginPath(); g.arc(8.4, 0, 1.3, 0, Math.PI * 2); g.fillStyle = '#ffffff'; g.fill();
+};
+PAINT[SH.halo] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  // a thin bright band (not a disc: a ring of light, not a bubble)
+  const gr = g.createRadialGradient(0, 0, 22, 0, 0, 31.5);
+  gr.addColorStop(0, rgba(glow, 0)); gr.addColorStop(0.5, rgba(glow, 0.8)); gr.addColorStop(0.68, 'rgba(255,255,255,0.98)');
+  gr.addColorStop(0.8, rgba(glow, 0.85)); gr.addColorStop(1, rgba(glow, 0));
+  g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 31.5, 0, Math.PI * 2); g.fill();
+  // an ink hairline just outside the bright band: the ring reads on pale paper
+  g.beginPath(); g.arc(0, 0, 29.4, 0, Math.PI * 2); g.strokeStyle = 'rgba(20,18,16,0.32)'; g.lineWidth = 0.6; g.stroke();
+};
+PAINT[SH.ember] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  g.save(); g.translate(-7, 0);
+  sliver(g, 14, 0, 1.6, 0.7); g.fillStyle = rgba(glow, 0.9); g.fill(); g.strokeStyle = 'rgba(20,18,16,0.45)'; g.lineWidth = 0.35; g.stroke();
+  sliver(g, 12.5, 0, 0.6, 0.7); g.fillStyle = '#ffffff'; g.fill();
+  g.restore();
+};
+PAINT[SH.rake] = (g, _col, _edge, _f, tint) => {
+  const glow = GLOW_HEX[tint] ?? GLOW_HEX[TN.white];
+  // three scratches, raked slightly apart and askew
+  for (let k = 0; k < 3; k++) {
+    g.save(); g.translate((k - 1) * 2.5, (k - 1) * 6.2); g.rotate(-0.12 + k * 0.06);
+    const L = 19 - Math.abs(k - 1) * 3;
+    sliver(g, L, 1.6, 2.4); g.fillStyle = rgba(glow, 0.45); g.fill();
+    sliver(g, L - 1, 1.6, 1.05); g.fillStyle = glow; g.fill(); g.strokeStyle = HAIR; g.lineWidth = 0.45; g.stroke();
+    sliver(g, L - 3, 1.6, 0.45); g.fillStyle = '#ffffff'; g.fill();
+    g.restore();
+  }
+};
+PAINT[SH.shard] = (g, col) => {
+  g.beginPath(); g.moveTo(-5.4, -1.8); g.lineTo(-0.8, -4.4); g.lineTo(5.6, -1.2); g.lineTo(2.2, 4.2); g.lineTo(-4.2, 3.2); g.closePath();
+  g.fillStyle = col; g.fill(); g.strokeStyle = 'rgba(244,239,228,0.55)'; g.lineWidth = 0.5; g.stroke();
+};
+PAINT[SH.splat] = (g, col) => {
+  // a wet blot where the blow landed, droplets and streaks flung on along +x
+  g.fillStyle = col;
+  blobPath(g, 0, 0, 7.4, 6.2, 31, 0.5, 16); g.globalAlpha = 0.88; g.fill();
+  for (let i = 0; i < 7; i++) {
+    const a = (h01(32, i) - 0.5) * 1.3, d = 9 + h01(33, i) * 25, rr = Math.max(0.7, 2.9 - d * 0.075) * (0.7 + h01(34, i) * 0.6);
+    g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, rr, 0, Math.PI * 2); g.globalAlpha = 0.82; g.fill();
+  }
+  for (let i = 0; i < 3; i++) {
+    const a = (h01(35, i) - 0.5) * 0.9, L = 14 + h01(36, i) * 14, w = 1.5 - i * 0.3;
+    const c = Math.cos(a), s = Math.sin(a);
+    g.beginPath(); g.moveTo(c * 5 - s * w, s * 5 + c * w); g.lineTo(c * (5 + L), s * (5 + L)); g.lineTo(c * 5 + s * w, s * 5 - c * w); g.closePath();
+    g.globalAlpha = 0.8; g.fill();
+  }
+  g.globalAlpha = 1;
+};
+
 /** The combos the engine uses, baked at the wave start (≈ 60 small cells). */
 export const WARM: readonly (readonly [number, number])[] = [
   [SH.dot, TN.ink], [SH.drop, TN.ink], [SH.streak, TN.ink], [SH.streak, TN.azure], [SH.streak, TN.indigo], [SH.streak, TN.jade],
@@ -344,4 +528,12 @@ export const WARM: readonly (readonly [number, number])[] = [
   [SH.flare, TN.white], [SH.flare, TN.gold], [SH.swipe, TN.azure], [SH.swipe, TN.ink], [SH.swipe, TN.wine], [SH.puff, TN.paper], [SH.puff, TN.grey],
   [SH.glint, TN.moon], [SH.glint, TN.gold], [SH.blot, TN.ink], [SH.blot, TN.indigo], [SH.drop, TN.wine], [SH.dot, TN.wine], [SH.crown, TN.ink],
   [SH.claw, TN.ink], [SH.claw, TN.wine], [SH.note, TN.green], [SH.dot, TN.indigo], [SH.drop, TN.indigo],
+  // the hit marks
+  [SH.star, TN.azure], [SH.star, TN.jade], [SH.star, TN.gold], [SH.star, TN.gamboge], [SH.star, TN.indigo], [SH.star, TN.moon],
+  [SH.star, TN.white], [SH.star, TN.wine], [SH.star, TN.green],
+  [SH.cut, TN.azure], [SH.cut, TN.white], [SH.cut, TN.gold], [SH.cut, TN.wine], [SH.beam, TN.jade], [SH.beam, TN.azure], [SH.beam, TN.gold],
+  [SH.beam, TN.moon], [SH.halo, TN.azure], [SH.halo, TN.gold], [SH.halo, TN.white], [SH.halo, TN.jade], [SH.halo, TN.wine],
+  [SH.halo, TN.indigo], [SH.halo, TN.moon], [SH.halo, TN.green], [SH.splat, TN.ink], [SH.splat, TN.indigo], [SH.splat, TN.wine], [SH.shard, TN.ink],
+  [SH.ember, TN.azure], [SH.ember, TN.jade], [SH.ember, TN.gold], [SH.ember, TN.gamboge], [SH.ember, TN.moon], [SH.ember, TN.white],
+  [SH.ember, TN.indigo], [SH.ember, TN.green], [SH.rake, TN.white], [SH.rake, TN.moon],
 ];

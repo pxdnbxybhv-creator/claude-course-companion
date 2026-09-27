@@ -11,7 +11,7 @@ import { openSheets, Sheet, toast } from '../../../ui/kit';
 import { coinToast } from '../../../ui/coins';
 import { coins } from '../../../app/play';
 import { todayKey } from '../../../core/date';
-import { createPainter } from '../paint';
+import { bakeScale, createPainter } from '../paint';
 import { arenaGeom, computeStats, nextScreen, openShop, unlocksOf } from '../logic';
 import { abandon, commit, died, engineFailed, leaveMidWave, markSeen, startWave, waveWon } from '../logic/session';
 import { COMPANIONS } from '../data';
@@ -33,20 +33,44 @@ type Stage = 'ritual' | 'bake' | 'between' | 'wave' | 'dying';
 
 /** Reduced motion: the OS setting or the mirror's own 减少动态. */
 export const prefersReduced = calmNow;
+/**
+ * 自动 → a quality. Phones get mid (iOS reports few cores whatever the chip, so cores say little);
+ * low only for a device that says it is weak (≤ 2 GB or ≤ 2 cores); a desktop or a large tablet with a
+ * fine pointer gets high. Every quality draws at the screen's own resolution (dprCapOf): quality
+ * decides the effects, and the engine lowers the resolution itself when frames run slow.
+ */
 export function qualityOf(q: MirrorSettings['quality']): Quality {
   if (q !== 'auto') return q;
   try {
     const coarse = matchMedia('(pointer: coarse)').matches;
     const cores = navigator.hardwareConcurrency || 4;
-    if (coarse && cores <= 4) return 'low';
-    return !coarse && window.innerWidth >= 900 ? 'high' : 'mid';
+    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+    if ((typeof mem === 'number' && mem > 0 && mem <= 2) || cores <= 2) return 'low';
+    if (coarse) return 'mid';
+    return window.innerWidth >= 900 ? 'high' : 'mid';
   } catch { return 'mid'; }
+}
+/** The canvas's device-pixel-ratio cap: native up to 3 at every quality (a DPR-3 phone is never
+ *  stretched); the engine's dynamic resolution steps down from it under load (engine/index.ts). */
+export function dprCapOf(_q: Quality): number { return 3; }
+/** The run's sprite resolution (px per u) for this screen: the camera's scale here × a little headroom
+ *  (paint/index.ts bakeScale). A desktop window may grow after the bake, so it bakes for the largest
+ *  camera scale (a window ≥ 600 px on its short side). */
+export function spriteScale(quality: Quality, el?: Element | null): number {
+  const dpr = Math.min(dprCapOf(quality), (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
+  let w = 0, h = 0;
+  try { const r = el?.getBoundingClientRect(); w = r?.width ?? 0; h = r?.height ?? 0; } catch { /* no layout */ }
+  if (!w || !h) { w = typeof window !== 'undefined' ? window.innerWidth : 390; h = typeof window !== 'undefined' ? window.innerHeight : 844; }
+  let coarse = true;
+  try { coarse = matchMedia('(pointer: coarse)').matches; } catch { /* assume a phone */ }
+  if (!coarse) { w = Math.max(w, 600); h = Math.max(h, 600); }
+  return bakeScale(w, h, dpr, quality);
 }
 function engineSettings(): EngineSettings {
   const s = mirror.value.settings;
   const quality = qualityOf(s.quality);
   const reduceMotion = prefersReduced();
-  return { quality, dprCap: quality === 'low' ? 1.5 : 2, reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: s.aim, lang: lang.value === 'en' ? 'en' : 'zh' };
+  return { quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: s.aim, lang: lang.value === 'en' ? 'en' : 'zh' };
 }
 const sheetOpen = () => !!document.querySelector('.sheet-backdrop');
 
@@ -241,7 +265,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     void (async () => {
       const r = runRef.current;
       const es = engineSettings();
-      const p = painter.current ?? (painter.current = createPainter(r.map, es.quality, Math.min(es.dprCap, window.devicePixelRatio || 1)));
+      const p = painter.current ?? (painter.current = createPainter(r.map, es.quality, Math.min(es.dprCap, window.devicePixelRatio || 1), spriteScale(es.quality, wrap.current)));
       const engP = loadEngine();
       engP.catch(() => {});
       const primed = P.current.audio.prime();
