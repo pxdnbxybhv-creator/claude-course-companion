@@ -59,7 +59,7 @@ const D = (o: Partial<ClassFx>): ClassFx => ({
 const FXD: readonly ClassFx[] = [
   /* slash */ D({ shape: SH.streak, tint: TN.azure, tint2: TN.ink, n: 2, v0: 300, v1: 480, life: 0.16, spread: 0.8, s0: 0.75, s1: 0.35, drag: 9, stretch: true, weight: 0.55, voice: 'slash', fb: 'hitMelee', shape2: SH.drop, tint3: TN.ink, swipe: TN.azure }),
   /* heavy */ D({ shape: SH.blot, tint: TN.ink, tint2: TN.grey, n: 3, v0: 150, v1: 320, life: 0.28, spread: 1.7, s0: 0.95, s1: 0.45, drag: 7, weight: 1, voice: 'smash', fb: 'hitMelee', ring: TN.ink, ringR: 30, shape2: SH.drop, tint3: TN.ink, swipe: TN.ink }),
-  /* claw */ D({ shape: SH.drop, tint: TN.ink, tint2: TN.wine, n: 2, v0: 180, v1: 320, life: 0.2, spread: 1.1, s0: 0.7, s1: 0.35, drag: 8, stretch: true, weight: 0.5, voice: 'clawHit', fb: 'hitMelee', shape2: SH.claw, tint3: TN.ink, swipe: TN.ink }),
+  /* claw */ D({ shape: SH.drop, tint: TN.ink, tint2: TN.wine, n: 2, v0: 180, v1: 320, life: 0.2, spread: 1.1, s0: 0.7, s1: 0.35, drag: 8, stretch: true, weight: 0.5, voice: 'clawHit', fb: 'hitMelee', shape2: SH.dot, tint3: TN.wine, swipe: TN.ink }),
   /* fist */ D({ shape: SH.drop, tint: TN.wine, tint2: TN.ink, n: 3, v0: 170, v1: 330, life: 0.24, spread: 1.4, s0: 0.8, s1: 0.4, drag: 7, stretch: true, weight: 0.75, voice: 'smash', fb: 'hitMelee', ring: TN.ink, ringR: 18, swipe: TN.wine }),
   /* arrow */ D({ shape: SH.feather, tint: TN.paper, tint2: TN.grey, n: 2, v0: 110, v1: 240, life: 0.38, spread: 2.2, s0: 0.9, s1: 0.7, drag: 5, spin: 14, weight: 0.45, voice: 'arrow', fb: 'hitShot', shape2: SH.dot, tint3: TN.ink }),
   /* dart */ D({ shape: SH.spark, tint: TN.white, tint2: TN.gold, n: 3, v0: 240, v1: 430, life: 0.13, spread: 1.4, s0: 0.55, s1: 0.2, drag: 10, stretch: true, weight: 0.35, voice: 'dartHit', fb: 'hitShot' }),
@@ -317,6 +317,7 @@ export class Feel {
   private bank = STOP_CAP;
   private lastCritStop = -9;
   private lastSkill = -9;
+  private lastSkillStop = -9;
   private secReal = 0; private secFrozen = 0;
   // player
   /** Seconds (real) since you were last hurt; the heartbeat phase at low HP. */
@@ -393,7 +394,7 @@ export class Feel {
     this.slotT.fill(9);
     this.cId = null;
     // the world clock restarts at 0 every wave, so every rate gate starts fresh too
-    this.lastCritStop = this.lastSkill = this.lastSlam = this.lastHurtShake = -9;
+    this.lastCritStop = this.lastSkill = this.lastSkillStop = this.lastSlam = this.lastHurtShake = -9;
     this.lastCrack = this.lastThump = this.lastZip = this.lastVib = -9;
     this.busReset();
     // a new painter (a new screen, a new quality) may bake at a new scale: the marks follow it
@@ -830,10 +831,15 @@ export class Feel {
   /** The 镜技 landed (the first hit of a cast, rate-limited): a boom, rings of light, a gentle zoom. */
   skillImpact(x: number, y: number): void {
     const W = this.W;
-    if (W.t - this.lastSkill < 0.35) return;
+    if (W.t - this.lastSkill < 0.35 && W.t >= this.lastSkill) return;
     this.lastSkill = W.t;
-    this.stop(40);
-    this.punch(0.02);
+    // the beat of stillness and the zoom once per cast (a 镜技 that keeps striking, like 急急如律令,
+    // must not stutter the world): at most once per 1.2 s
+    if (W.t - this.lastSkillStop >= 1.2 || W.t < this.lastSkillStop) {
+      this.lastSkillStop = W.t;
+      this.stop(40);
+      this.punch(0.02);
+    }
     this.vib(14, 1);
     if (this.markRoom(2)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.32, 0.5 * 1.1, 2.6 * 1.1, 0.95);
     if (this.room(2)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.26, 0.3, 1.8, this.rnd() * 6.28, 0, 0, PF.ease, 0.8);

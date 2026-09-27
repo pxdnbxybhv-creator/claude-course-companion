@@ -14,12 +14,25 @@ import { ST } from './enemies';
 import { CRIT_NUM, MK, PF, numPop } from './feel';
 import { SH, SWIPE_FRAMES, TN } from '../paint/feel';
 import { drawAmbience } from '../paint/ambient';
+import { STAIN, VFX_CAP, VF, VT, vfxOf, type Vfx } from './vfx';
+import { TG, TSY, Trails } from './trails';
 import type { World } from './world';
 
-/** Trail tint of a player shot by its weapon's feel class. */
-const TRAIL_TINT: readonly number[] = [
-  TN.azure, TN.ink, TN.ink, TN.wine, TN.grey, TN.gold, TN.gamboge, TN.wine, TN.indigo, TN.jade, TN.ink, TN.green, TN.moon, TN.gold, TN.ink,
+/** 流光: the light tint (VT) of a player shot, trail and glow by its weapon's feel class (never vermilion). */
+const SHOT_TINT: readonly number[] = [
+  VT.azure, VT.gold, VT.ink, VT.wine, VT.gold, VT.azure, VT.gamboge, VT.wine, VT.indigo, VT.azure, VT.ink, VT.green, VT.moon, VT.gold, VT.moon,
 ];
+/** Per projectile kind (PROJ_REG order): trail width (u), length (s), style (0 none, 1 light, 2 ink), glow size (× r). */
+const SHOT_TRAIL: Readonly<Record<string, readonly [number, number, number, number]>> = {
+  flySword: [5.5, 0.2, 1, 2.6], sunArrow: [3.4, 0.1, 1, 2.2], crossBolt: [3, 0.08, 1, 2.2], dartStar: [3.6, 0.09, 1, 2.4], coinBlade: [3.8, 0.09, 1, 2.4],
+  noteGlyph: [3.2, 0.13, 1, 2.6], moonDisc: [8, 0.13, 1, 2.2], crescentWave: [20, 0.11, 1, 1.6], inkBlob: [5.5, 0.1, 2, 0], bambooLeaf: [3, 0.08, 1, 1.8],
+  fireLob: [6, 0.12, 1, 2.4], gourdLob: [5, 0.1, 2, 0], verseGlyph: [5, 0.14, 1, 2.2], moonMote: [3, 0.12, 1, 2.6],
+};
+/** The companion's own light (dash and leap ribbons, afterimages). */
+const CHAR_TINT: Readonly<Record<string, number>> = {
+  swordsman: VT.azure, guan: VT.gold, change: VT.moon, cat: VT.gold, rabbit: VT.moon, poet: VT.wine, taoist: VT.gamboge, painter: VT.indigo,
+  scholar: VT.indigo, gardener: VT.green, fisher: VT.azure, musician: VT.green, player: VT.moon,
+};
 /** A drawNumber that also takes a scale (the painter's implementation accepts it). */
 type DrawNum = (ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale?: number) => void;
 
