@@ -179,7 +179,7 @@ const moonphase: Behaviour<null> = {
   start(w) {
     if (sky(w).fullWave) {
       w.buff('moonphase', { luck: HAZARDS.moonphase.p.luck }, 1e6);
-      w.title(b('满月 · 福缘 +10', 'Full moon · 福缘 +10'), 'edge');
+      w.title(b('满月 · 福缘 +10', 'Full moon · Luck +10'), 'edge');
     } else w.title(b('月晦', 'Dark moon'), 'edge');
     return null;
   },

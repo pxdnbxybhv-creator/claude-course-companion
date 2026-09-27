@@ -112,7 +112,7 @@ export function Lobby(props: {
           </div>
           <div class="mj-lobby-row">
             <button type="button" class="btn btn-small" onClick={() => setVows(true)}>{t(`镜誓 · 劫火 ${heat}`, `Vows · heat ${heat}`)}</button>
-            {m.heart.plain && <span class="chip" aria-label={t('素镜：心镜不生效', 'Plain mirror: 心镜 off')}>{t('素镜', 'Plain')}</span>}
+            {m.heart.plain && <span class="chip" aria-label={t('素镜：心镜不生效', 'Plain mirror: Heart mirror off')}>{t('素镜', 'Plain')}</span>}
           </div>
           <EntryButton q={q} t={t} onEnter={() => props.onEnter({ daily: false })} />
         </>

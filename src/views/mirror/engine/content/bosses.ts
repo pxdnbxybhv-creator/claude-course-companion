@@ -410,7 +410,7 @@ const PATS: Record<BossPatternId, PatFn> = {
           w.sfx('bossDrum'); w.shake(4);
           if (playerIn(w, shape)) hurt(c);
         });
-        tele(c, { kind: 'circle', x: to.x, y: to.y, r: 1 }, c.call.tele + 0.3, () => waveRing(c, to.x, to.y, c.p.ringSpeed, 760, gaps, 1, 24));
+        tele(c, { kind: 'circle', x: to.x, y: to.y, r: 1 }, c.call.tele + 0.3, () => waveRing(c, to.x, to.y, c.p.ringSpeed, 760, gaps, c.p.ringK ?? 1, 24));
         yield* hop(c, to, TL(c));
         yield* pause(c, 0.4);
       }

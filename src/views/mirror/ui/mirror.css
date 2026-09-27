@@ -150,10 +150,32 @@
 /* between waves the frozen arena sits behind paper: blurred, so the last frame's brush titles do not read through the cards */
 .mj-run.is-between .mj-canvas { filter: saturate(0.7) blur(2px); opacity: 0.55; }
 .mj-run.is-between.is-lowq .mj-canvas { filter: saturate(0.7); }
-.mj-hud { position: absolute; inset: 0; pointer-events: none; z-index: 3; padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) 0 calc(env(safe-area-inset-left) + 10px); color: #1b1916; }
+/* HUD colours as tokens: ink on paper by default, with a paper halo on every word so a dark map edge
+   (the void beyond the rim) never swallows it; 倒影 (endless, wave 31+) turns the arena dark, so
+   .is-inverted swaps to paper-light words with an ink halo. */
+.mj-run {
+  --hud-ink: #1b1916; --hud-ink-2: #4a443c; --hud-halo: rgba(241, 233, 216, 0.95);
+  --hud-glow: 0 0 2px var(--hud-halo), 0 0 5px var(--hud-halo), 0 0 9px var(--hud-halo);
+  --hud-track: rgba(27, 25, 22, 0.18); --hud-edge: rgba(27, 25, 22, 0.5); --hud-xp: #3d5a73; --hud-curse: #6a3d7a; --hud-alarm: #c0412f;
+  --hud-pill: rgba(241, 233, 216, 0.8); --hud-veil: rgba(241, 233, 216, 0.62);
+}
+.mj-run.is-inverted {
+  --hud-ink: #f3ecdd; --hud-ink-2: #ddd3c1; --hud-halo: rgba(14, 12, 10, 0.92);
+  --hud-track: rgba(243, 236, 221, 0.2); --hud-edge: rgba(243, 236, 221, 0.6); --hud-xp: #a9c3d6; --hud-curse: #d2aee0; --hud-alarm: #ef7a62;
+  --hud-pill: rgba(20, 18, 14, 0.72); --hud-veil: rgba(14, 12, 10, 0.5);
+}
+/* a faint wash of paper (ink, in 倒影) under the two text corners: invisible on the arena's own
+   ground, it keeps the small words legible over the dark void beyond the rim */
+.mj-hud-tl, .mj-hud-tc { isolation: isolate; }
+.mj-hud-tl::before, .mj-hud-tc::before {
+  content: ''; position: absolute; z-index: -1; pointer-events: none; inset: -2px -4px -2px -4px;
+  border-radius: 16px; background: var(--hud-veil); box-shadow: 0 0 14px 10px var(--hud-veil);
+}
+.mj-hud-tl::before { bottom: -20px; right: 30%; } /* the Lv line hangs below the XP bar; the words end left of the bar's end */
+.mj-hud { position: absolute; inset: 0; pointer-events: none; z-index: 3; padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) 0 calc(env(safe-area-inset-left) + 10px); color: var(--hud-ink); }
 .mj-hud button { pointer-events: auto; }
 .mj-hud-tl { position: absolute; left: calc(env(safe-area-inset-left) + 10px); top: calc(env(safe-area-inset-top) + 8px); width: min(33vw, 200px); display: flex; flex-direction: column; gap: 4px; }
-.mj-hp { position: relative; height: 18px; border-radius: 3px 9px 9px 3px; background: rgba(27, 25, 22, 0.18); overflow: hidden; box-shadow: 0 0 0 1px rgba(27, 25, 22, 0.45); }
+.mj-hp { position: relative; height: 18px; border-radius: 3px 9px 9px 3px; background: var(--hud-track); overflow: hidden; box-shadow: 0 0 0 1px var(--hud-edge); }
 .mj-hp-fill, .mj-hp-shield { position: absolute; inset: 0; transform-origin: left; transition: transform 0.12s linear; }
 .mj-hp-fill { background: linear-gradient(90deg, #8e2b1f, #c0412f); }
 .mj-hp-shield { background: rgba(220, 232, 240, 0.8); mix-blend-mode: screen; }
@@ -161,37 +183,39 @@
 .mj-hud.is-low .mj-hp { animation: mj-pulse 0.9s ease-in-out infinite; }
 .mj-hud.is-low::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 60px 20px rgba(110, 60, 20, 0.35); }
 @keyframes mj-pulse { 50% { box-shadow: 0 0 0 2px #c0412f; } }
-.mj-armor { font-size: 11.5px; color: #4a443c; text-shadow: 0 0 4px rgba(241, 233, 216, 0.9); }
-.mj-moon, .mj-sleeve { display: flex; align-items: center; gap: 4px; font-size: 16px; text-shadow: 0 0 4px rgba(241, 233, 216, 0.9); }
+.mj-armor { font-size: 11.5px; color: var(--hud-ink-2); text-shadow: var(--hud-glow); }
+.mj-moon, .mj-sleeve { display: flex; align-items: center; gap: 4px; font-size: 16px; text-shadow: var(--hud-glow); }
 .mj-sleeve { font-size: 14px; }
 .mj-sleeve.is-ring { animation: mj-ring 0.5s ease-out; }
 @keyframes mj-ring { 30% { transform: scale(1.25); } }
-.mj-xp { position: relative; height: 3px; background: rgba(27, 25, 22, 0.15); margin-top: 2px; }
-.mj-xp > i { position: absolute; inset: 0; background: #3d5a73; transform-origin: left; transform: scaleX(0); transition: transform 0.2s; }
-.mj-lvl { position: absolute; top: 5px; left: 0; font-size: 11.5px; color: #4a443c; }
+.mj-xp { position: relative; height: 3px; background: var(--hud-track); margin-top: 2px; }
+.mj-xp > i { position: absolute; inset: 0; background: var(--hud-xp); transform-origin: left; transform: scaleX(0); transition: transform 0.2s; }
+.mj-lvl { position: absolute; top: 5px; left: 0; font-size: 11.5px; color: var(--hud-ink-2); text-shadow: var(--hud-glow); }
 .mj-lvl.is-flash { animation: mj-lvflash 0.8s ease-out; }
 @keyframes mj-lvflash { 0% { color: #c0412f; transform: scale(1.4); } }
-.mj-crates { font-size: 12px; margin-top: 14px; text-shadow: 0 0 4px rgba(241, 233, 216, 0.9); }
-.mj-hud-tc { position: absolute; top: calc(env(safe-area-inset-top) + 4px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; text-shadow: 0 0 6px rgba(241, 233, 216, 0.95); }
+.mj-crates { font-size: 12px; margin-top: 14px; text-shadow: var(--hud-glow); }
+.mj-hud-tc { position: absolute; top: calc(env(safe-area-inset-top) + 4px); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; text-shadow: var(--hud-glow); }
 .mj-wave { font-size: 16px; }
 .mj-timer { font-size: 34px; line-height: 1; }
-.mj-timer.is-last { color: #c0412f; animation: mj-tick 1s steps(1) infinite; }
+.mj-timer.is-last { color: var(--hud-alarm); animation: mj-tick 1s steps(1) infinite; }
 @keyframes mj-tick { 50% { transform: scale(1.12); } }
 .mj-boss { display: flex; flex-direction: column; align-items: center; width: min(44vw, 360px); }
 .mj-boss-name { font-size: 20px; }
-.mj-boss-bar { width: 100%; height: 8px; border-radius: 4px; background: rgba(27, 25, 22, 0.2); overflow: hidden; box-shadow: 0 0 0 1px rgba(27, 25, 22, 0.5); }
-.mj-boss-bar i { display: block; height: 100%; background: #1b1916; transform-origin: left; transition: transform 0.15s; }
+.mj-boss-bar { width: 100%; height: 8px; border-radius: 4px; background: var(--hud-track); overflow: hidden; box-shadow: 0 0 0 1px var(--hud-edge), 0 0 6px var(--hud-halo); }
+.mj-boss-bar i { display: block; height: 100%; background: var(--hud-ink); transform-origin: left; transition: transform 0.15s; }
 .mj-hud-tr { position: absolute; top: calc(env(safe-area-inset-top) + 8px); right: calc(env(safe-area-inset-right) + 10px); display: flex; align-items: flex-start; gap: 6px; }
 .mj-marks { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; font-size: 12.5px; }
-.mj-mark { padding: 0 6px; border-radius: 999px; background: rgba(241, 233, 216, 0.8); }
-.mj-curse { color: #6a3d7a; }
-.mj-phase { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at calc(50% + (1 - var(--k)) * 60%) 50%, transparent 0 48%, #f6f7fb 50%); box-shadow: 0 0 0 1px #4a443c; vertical-align: -2px; }
+.mj-mark { padding: 0 6px; border-radius: 999px; background: var(--hud-pill); }
+.mj-curse { color: var(--hud-curse); }
+.mj-phase { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at calc(50% + (1 - var(--k)) * 60%) 50%, transparent 0 48%, #f6f7fb 50%); box-shadow: 0 0 0 1px var(--hud-ink-2); vertical-align: -2px; }
 .mj-pause { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(27, 25, 22, 0.35); background: rgba(241, 233, 216, 0.85); color: #1b1916; font-size: 18px; font-weight: 700; }
 .mj-hud.is-beat .mj-timer { transform: scale(1.06); }
 
 .mj-controls { position: absolute; inset: 0; z-index: 2; touch-action: none; }
 .mj-stick { position: absolute; left: 0; top: 0; width: 112px; height: 112px; border-radius: 50%; border: 2px solid rgba(27, 25, 22, 0.25); background: rgba(241, 233, 216, 0.25); opacity: 0; pointer-events: none; transition: opacity 0.12s; }
 .mj-stick-knob { position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%; background: rgba(27, 25, 22, 0.35); }
+.mj-run.is-inverted .mj-stick { border-color: rgba(243, 236, 221, 0.35); background: rgba(20, 18, 14, 0.25); }
+.mj-run.is-inverted .mj-stick-knob { background: rgba(243, 236, 221, 0.4); }
 .mj-aimstick { border-color: rgba(192, 65, 47, 0.35); }
 .mj-aimstick .mj-stick-knob { background: rgba(192, 65, 47, 0.4); }
 .mj-skill {
@@ -199,6 +223,7 @@
   width: 72px; height: 72px; border-radius: 50%; border: 0; background: rgba(27, 25, 22, 0.82); color: #fbf5ea; font-size: 32px; touch-action: none; z-index: 4;
   display: grid; place-items: center;
 }
+.mj-run.is-inverted .mj-skill { box-shadow: 0 0 0 1px rgba(243, 236, 221, 0.45); }
 .mj-controls.is-left .mj-skill { right: auto; left: calc(env(safe-area-inset-left) + 22px); }
 .mj-skill svg { position: absolute; inset: 0; width: 72px; height: 72px; transform: rotate(-90deg); pointer-events: none; }
 .mj-skill-track { fill: none; stroke: rgba(251, 245, 234, 0.2); stroke-width: 4; }
@@ -206,7 +231,7 @@
 .mj-skill span { position: relative; }
 .mj-skill.is-cd span { opacity: 0.45; }
 .mj-skill.is-off { opacity: 0.4; filter: grayscale(1); }
-.mj-skill.is-active { box-shadow: 0 0 0 4px rgba(192, 65, 47, 0.5); }
+.mj-skill.is-active, .mj-run.is-inverted .mj-skill.is-active { box-shadow: 0 0 0 4px rgba(192, 65, 47, 0.5); }
 .mj-skill.is-held { transform: scale(0.95); }
 .mj-skill-aim { position: absolute; left: 50%; top: 50%; width: 120px; height: 3px; margin-top: -1.5px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(192, 65, 47, 0.8), rgba(192, 65, 47, 0)); opacity: 0; pointer-events: none; }
 
@@ -288,11 +313,19 @@ button.mj-card[disabled] { opacity: 0.55; }
 /* shop */
 .mj-shop { max-width: 980px; margin: 0 auto; }
 .mj-shop-top { position: sticky; top: calc(-1 * (env(safe-area-inset-top) + 10px)); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 8px 0; background: color-mix(in srgb, var(--paper) 94%, transparent); border-bottom: 1px solid var(--line); }
-.mj-shop-moon { display: flex; align-items: center; font-size: 22px; min-width: 64px; }
-.mj-shop-next { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
-.mj-shop-next .brush { font-size: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mj-shop-next small { font-size: 12px; color: var(--ink-3); }
-.mj-next { min-width: 96px; min-height: 48px; padding: 0 14px; }
+.mj-shop-moon { display: flex; align-items: center; font-size: 22px; min-width: 64px; flex-shrink: 0; }
+/* the wave label never truncates (the column is at least as wide as it); the line under it may */
+.mj-shop-next { flex: 1; display: flex; flex-direction: column; line-height: 1.2; }
+.mj-shop-next .brush { font-size: 18px; white-space: nowrap; }
+.mj-shop-next small { font-size: 12px; color: var(--ink-3); width: 0; min-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mj-next { min-width: 96px; min-height: 48px; padding: 0 14px; flex-shrink: 0; }
+@media (max-width: 400px) {
+  .mj-shop-top { gap: 6px; }
+  .mj-shop-moon { min-width: 0; font-size: 20px; }
+  /* 「暂离」 / "Step away" gives way first: it wraps to two short lines */
+  .mj-shop-top .btn-ghost { padding: 0 6px; white-space: normal; line-height: 1.1; text-align: center; letter-spacing: 0.02em; }
+  .mj-next { min-width: 84px; padding: 0 10px; letter-spacing: 0.02em; }
+}
 .mj-preview { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 8px 0 0; font-size: 13px; }
 .mj-preview-tag { padding: 0 6px; border-radius: 3px; background: var(--indigo); color: #fbf5ea; font-size: 12px; }
 .mj-preview-item { display: inline-flex; align-items: center; gap: 4px; }

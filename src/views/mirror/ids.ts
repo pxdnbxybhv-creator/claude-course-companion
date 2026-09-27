@@ -523,7 +523,7 @@ export const RECORD_REG = [
   { id: 'bigHit', zh: '最重一击', en: 'Biggest Hit', look: 'largest single hit' },
   { id: 'mostSummons', zh: '墨宝最多', en: 'Most Inks at Once', look: 'most 墨宝 alive at once' },
   { id: 'mostSwords', zh: '飞剑最多', en: 'Most Swords Aloft', look: 'most swords in the air at once' },
-  { id: 'highestDrunk', zh: '醉意最浓', en: 'Deepest 醉', look: 'highest 醉' },
+  { id: 'highestDrunk', zh: '醉意最浓', en: 'Most Drunk', look: 'highest 醉' },
   { id: 'noHitStreak', zh: '毫发无伤', en: 'Untouched Streak', look: 'most waves in a row without being hit' },
   { id: 'deepest', zh: '入镜最深', en: 'Deepest Wave', look: 'deepest endless wave' },
   { id: 'mostMoon', zh: '月华最丰', en: 'Richest Run', look: 'most 月华 collected in one run' },

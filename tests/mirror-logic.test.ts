@@ -70,7 +70,8 @@ describe('formulas', () => {
     expect(budgetBase(10)).toBe(150);
     expect(budgetBase(30)).toBe(650);
     expect(budgetBase(45)).toBeCloseTo(650 * Math.pow(1.02, 15));
-    const rows: [number, number, number][] = [[1, 1, 1], [5, 2.2, 1.6], [9, 3.4, 2.2], [10, 3.7, 2.35], [12, 5.5, 2.86], [15, 14, 4.22], [19, 46, 6.85], [20, 62, 7.7], [25, 260, 13.5], [29, 800, 20.8], [30, 1056, 23.1]];
+    // DMG grows 1.06 a wave from 11 (⚖3, the real-engine harness: was 1.08, 20.8 at 29 and 23.1 at 30)
+    const rows: [number, number, number][] = [[1, 1, 1], [5, 2.2, 1.6], [9, 3.4, 2.2], [10, 3.7, 2.35], [12, 5.5, 2.81], [15, 14, 3.91], [19, 46, 5.9], [20, 62, 6.5], [25, 260, 10.4], [29, 800, 14.84], [30, 1056, 16.19]];
     for (const [w, hp, dmg] of rows) {
       expect(hpMul(w) / hp).toBeGreaterThan(0.99);
       expect(hpMul(w) / hp).toBeLessThan(1.01);

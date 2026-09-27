@@ -19,7 +19,7 @@ To change `ids.ts`, `types.ts` or this file after the contracts step, send a cha
         │    ▲ hooks           │         ▼
         │    │           logic/* (pure, node-tested) ◀──── data/* (typed tables keyed by ids.ts)
         ▼    │                   ▲          ▲
-   engine/* (createEngine) ──────┘          └──── sim/* (镜衡 bot on logic + a simplified step)
+   engine/* (createEngine) ──────┘          └──── sim/* (镜衡: realbal.ts on the real engine; bot.ts a logic smoke)
         │  ▲ WorldApi
         ▼  │
    engine/content/* (skills, passives, hazards, elites, affixes, treasures, bosses, endless, 节气)
@@ -132,6 +132,13 @@ F (formula constants, ⚖ values), PAY (economy constants: FEE 20, RUN_CAP 70, C
 ```
 
 Deeds are fully described by `DEED_REG` in `ids.ts`: what each unlocks, the `RunStatKey` it reads, the goal and the mode.
+
+### 2.1a Balance: tune on the real engine (`sim/realbal.ts`)
+
+- **`sim/realbal.ts` is the balance harness.** `playReal({ seed, char, map, maxWave, beginner, godTo })` plays a whole run on the real engine and `CONTENT`, headless (debug painter, no canvas, ~0.05–0.1 ms a step: a run to wave 31 in seconds). A kiting bot moves; `sim/bot.ts`'s card, crate, 镜心 and shop policy plays between waves. It returns the waves cleared, the trace and the fatal wave's damage by source (`p2 carp` = the boss's phase 2). Sweep: `MIRROR_REALBAL=1 SEEDS=6 npx vitest run tests/mirror-realbal.test.ts` (add `BEGIN=1` for the beginner, `OUT=file.jsonl` to keep rows).
+- **The in-app sim (`sim/bot.ts`, `sim/balance.ts`) is a smoke test only.** Its simplified combat step disagrees with the real engine both ways (for the same seeds it gave mean wave 15.8 skilled where the engine gives 19; median 4 beginner where the engine gives 8). It checks that logic runs whole runs deterministically. It does not vouch for `balance.md`'s depths.
+- Bot play is not human play: read the harness's depths as relative (before / after a change), and its fatal-source tallies as where to look.
+- ⚖3 (2026-09-27, from the harness): enemy damage growth `F.dmg.grow` 1.08 → 1.06; 白鹭 6 → 5; 鲤王's spirals 8 → 6 a second, leap rings 60° gaps at 260 u/s for 60%, the beam 10 → 7. Skilled bot, 月湖 照影, 13 companions × 6 seeds, same bot before and after: median wave 18.5 → 21, reach 20 41% → 56%, clear 30 8% → 18%, wave-10 hazard 32% → 13% (design 1.8%). The beginner bot's median stays 8 (target 9). Still far from `balance.md` §5 (clear-30 56–96%): the next walls are 蜃 at 20, 水中月 at 30 and waves 21–29.
 
 ### 2.2 Formulas and the run (`logic/formulas.ts`, `rng.ts`, `spawn.ts`, `arena.ts`, `run.ts`)
 

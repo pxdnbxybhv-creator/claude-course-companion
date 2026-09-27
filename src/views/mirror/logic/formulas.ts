@@ -55,7 +55,7 @@ export function hpMul(w: number): number {
   const f = (x: number) => (1 + F.hp.slope * (x - 1)) * Math.pow(F.hp.grow, Math.max(0, x - F.hp.from));
   return w <= 30 ? f(Math.max(1, w)) : f(30) * Math.pow(F.endless.hp, w - 31);
 }
-/** DMG(w)/D₀ before difficulty: (1 + 0.15(w−1))·1.08^max(0, w−11); endless ×1.05^(w−31). */
+/** DMG(w)/D₀ before difficulty: (1 + 0.15(w−1))·1.06^max(0, w−11) (⚖3; GDD §5.2 had 1.08); endless ×1.05^(w−31). */
 export function dmgMul(w: number): number {
   const f = (x: number) => (1 + F.dmg.slope * (x - 1)) * Math.pow(F.dmg.grow, Math.max(0, x - F.dmg.from));
   return w <= 30 ? f(Math.max(1, w)) : f(30) * Math.pow(F.endless.dmg, w - 31);

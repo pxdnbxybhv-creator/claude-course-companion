@@ -1,4 +1,6 @@
 // 水月幻镜 · 镜衡 smoke: batches of bot runs and the summary the tests check (GDD §24.4, §25).
+// A SMOKE TEST ONLY: bot.ts's simplified combat step disagrees with the real engine in both directions,
+// so these numbers do not vouch for balance.md. Tune on the real engine with sim/realbal.ts (API.md §2.1a).
 import { COMPANION_REG, type MapId } from '../ids';
 import type { CharacterId, DiffIndex } from '../types';
 import { settlePay } from '../logic/economy';

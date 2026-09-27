@@ -17,7 +17,8 @@ export const MONSTERS: Readonly<Record<MonsterId, MonsterDef>> = {
   lotuspod: { id: 'lotuspod', map: 'lake', role: 'turret', ai: 'still', hp: 20, dmg: 3, speed: 0, armor: 0, cost: 2, from: 6, pack: 1, weight: 3, tags: [], resist: 1, shot: 'eSeed', p: { every: 3, tell: 0.7, n: 3, fan: 30, shotSpeed: 200 } },
   jelly: { id: 'jelly', map: 'lake', role: 'exploder', ai: 'chase', hp: 6, dmg: 6, speed: 130, armor: 0, cost: 1, from: 7, pack: 2, weight: 4, tags: [], resist: 0, p: { fuse: 0.8, r: 90 } },
   clam: { id: 'clam', map: 'lake', role: 'spawner', ai: 'chase', hp: 25, dmg: 0, speed: 40, armor: 1, cost: 3, from: 8, pack: 1, weight: 2, tags: [], resist: 0.5, r: 18, p: { every: 5, shut: 1, n: 3 } },
-  egret: { id: 'egret', map: 'lake', role: 'diver', ai: 'content', hp: 12, dmg: 6, speed: 900, armor: 0, cost: 2, from: 11, pack: 1, weight: 3, tags: [], resist: 0, p: { tell: 0.8, diveSpeed: 900, rest: 2 } },
+  // ⚖3: egret 6 → 5 (the harness's top killer in waves 11–19 on 月湖: a lane across the whole arena, every ~5 s each)
+  egret: { id: 'egret', map: 'lake', role: 'diver', ai: 'content', hp: 12, dmg: 5, speed: 900, armor: 0, cost: 2, from: 11, pack: 1, weight: 3, tags: [], resist: 0, p: { tell: 0.8, diveSpeed: 900, rest: 2 } },
   weed: { id: 'weed', map: 'lake', role: 'ambusher', ai: 'still', hp: 8, dmg: 2, speed: 0, armor: 0, cost: 1, from: 12, pack: 1, weight: 3, tags: [], resist: 1, p: { tell: 0.9, root: 0.8, life: 6, r: 40 } },
   drowned: { id: 'drowned', map: 'lake', role: 'blinker', ai: 'burrow', hp: 16, dmg: 4, speed: 120, armor: 0, cost: 2, from: 14, pack: 1, weight: 4, tags: ['ghost'], resist: 0, p: { under: 1.2, tell: 0.5, near: 150, every: 4 } },
   // 墨林

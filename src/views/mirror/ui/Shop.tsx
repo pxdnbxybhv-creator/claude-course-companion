@@ -120,7 +120,7 @@ export function Shop(props: {
 
       <div class="mj-shop-bar">
         <button type="button" class="btn" onClick={doReroll} disabled={!v.canReroll}>
-          {noReroll(run) ? t('破釜沉舟：不可重抽', 'No rerolls (破釜沉舟)') : v.freeRerolls > 0 ? t(`重抽 · 免费 ×${v.freeRerolls}`, `Reroll · free ×${v.freeRerolls}`) : <>{t('重抽', 'Reroll')} <span class="mj-moon-cost num">{v.rerollCost}</span></>}
+          {noReroll(run) ? t('破釜沉舟：不可重抽', 'No rerolls (Burn the Boats)') : v.freeRerolls > 0 ? t(`重抽 · 免费 ×${v.freeRerolls}`, `Reroll · free ×${v.freeRerolls}`) : <>{t('重抽', 'Reroll')} <span class="mj-moon-cost num">{v.rerollCost}</span></>}
           <kbd class="mj-hotkey-inline">R</kbd>
         </button>
         <span class="muted mj-keys-hint">{t('1–6 购买 · L+数字 锁定 · Enter 下一重', '1–6 buy · L+number lock · Enter next')}</span>

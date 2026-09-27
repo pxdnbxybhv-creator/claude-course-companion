@@ -75,12 +75,12 @@ export function buildDps(run: RunSave, s: Stats, d: number, armor: number): { ar
 }
 
 // ───────────────────────────────────────────── the policy
-function prefers(arch: ArchetypeId) {
+export function prefers(arch: ArchetypeId) {
   const a = ARCHETYPES[arch];
   return { weapons: new Set<WeaponId>(a.weapons), keys: new Set<ItemId>([...a.keys, ...(a.capstone ? [a.capstone] : [])]), scales: new Set<StatId>(a.scales) };
 }
 /** One number for how good a run is at the next wave: offence against the need, and survival. */
-function value(run: RunSave): number {
+export function value(run: RunSave): number {
   const s = computeStats(run);
   const w = run.wave + 1;
   const plan = wavePlan(run, Math.min(w, 60));
@@ -90,7 +90,7 @@ function value(run: RunSave): number {
   return Math.log(1 + dps / Math.max(1, need)) * 3 + Math.log(ehp) + 0.002 * s.harvest + 0.001 * s.luck;
 }
 
-function doCards(run: RunSave, rng: () => number, beginner: boolean, arch: ArchetypeId): RunSave {
+export function doCards(run: RunSave, rng: () => number, beginner: boolean, arch: ArchetypeId): RunSave {
   const pref = prefers(arch);
   while (run.pending.cards > 0) {
     const v = cardsView(run)!;
@@ -108,7 +108,7 @@ function doCards(run: RunSave, rng: () => number, beginner: boolean, arch: Arche
   }
   return run;
 }
-function doCrates(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
+export function doCrates(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
   while (run.pending.crates > 0) {
     const id = crateItem(run, u);
     const keep = beginner || value(resolveCrate(run, true, u)) >= value({ ...run, moon: run.moon + meltValue(run, id) }) - 0.01;
@@ -116,7 +116,7 @@ function doCrates(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
   }
   return run;
 }
-function doHearts(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
+export function doHearts(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
   while (run.pending.hearts.length) {
     const opts = heartOffer(run, u);
     if (!opts.length) { run = { ...run, pending: { ...run.pending, hearts: run.pending.hearts.slice(1) } }; continue; }
@@ -126,7 +126,7 @@ function doHearts(run: RunSave, u: Unlocks, beginner: boolean): RunSave {
   }
   return run;
 }
-function doShop(run: RunSave, u: Unlocks, rng: () => number, beginner: boolean, arch: ArchetypeId): RunSave {
+export function doShop(run: RunSave, u: Unlocks, rng: () => number, beginner: boolean, arch: ArchetypeId): RunSave {
   run = openShop(run, u);
   const pref = prefers(arch);
   const w = Math.max(1, run.wave);

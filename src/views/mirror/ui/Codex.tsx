@@ -118,7 +118,7 @@ function PageBody(props: { kind: string; id: string; stage: CodexStage; t: T; ta
       const it = ITEMS[id as ItemId];
       return (
         <div>
-          <p class="mj-small">{tierName(it.tier, t)}{it.tags.length ? ' · ' + it.tags.map((c) => className(c, t)).join(' ') : ''}{it.max ? t(` · 至多 ${it.max}`, ` · max ${it.max}`) : ''}</p>
+          <p class="mj-small">{tierName(it.tier, t)}{it.tags.length ? ' · ' + it.tags.map((c) => className(c, t)).join(' · ') : ''}{it.max ? t(` · 至多 ${it.max}`, ` · max ${it.max}`) : ''}</p>
           <p>{t(it.text.zh, it.text.en)}</p>
           {it.verse && <p class="mj-verse brush">{t(it.verse.zh, it.verse.en)}</p>}
           <p class="mj-small muted">{t(`持之照破 ${tally(`hold:${id}`)} 回`, `held in ${tally(`hold:${id}`)} clears`)}</p>

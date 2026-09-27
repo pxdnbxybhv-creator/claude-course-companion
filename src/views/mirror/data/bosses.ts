@@ -14,17 +14,23 @@ export const BOSSES: Readonly<Record<BossId, BossDef>> = {
   carp: {
     id: 'carp', map: 'lake', wave: 10, K: 1300, contact: 7, r: 56,
     phases: [
+      // ⚖3 (the real-engine harness, sim/realbal.ts): the first boss was a wall on 月湖 (28% of skilled
+      // bot runs alive at wave 10 died here; design 1.8%; 夔 and 吴刚 0–3%). The spirals thin from 8 to
+      // 6 bubbles a second (the gaps in an arm open from ~24 u to ~45 u); the leaps' rings open wider
+      // (40° → 60°), travel slower (300 → 260) and hit for 60%; the dragon's beam hits for 7, not 10
+      // (from the rim a 180° sweep covers nearly the whole arena: it is a toll, not a test). Measured,
+      // 13 companions × 6 seeds, godmode to wave 9: 22 → 12 deaths of 78 at the boss.
       { from: 1, move: 'rim', speed: 120, script: [
-        { pat: 'bubbleSpiral', at: 0.5, every: 6, tele: 0, dmg: 4, p: { rate: 8, spin: 60, speed: 160, dur: 6 } },
+        { pat: 'bubbleSpiral', at: 0.5, every: 6, tele: 0, dmg: 4, p: { rate: 6, spin: 60, speed: 160, dur: 6 } },
         { pat: 'tailSlap', at: 3, every: 6, tele: 0.9, dmg: 8, p: { deg: 90, r: 220 } },
       ] },
       { from: 0.6, move: 'leap', speed: 0, script: [
-        { pat: 'leapSplash', at: 0.5, every: 6, tele: 1.0, dmg: 8, n: 3, p: { r: 140, gap: 40, ringSpeed: 300 } },
+        { pat: 'leapSplash', at: 0.5, every: 6, tele: 1.0, dmg: 8, n: 3, p: { r: 140, gap: 60, ringSpeed: 260, ringK: 0.6 } },
         { pat: 'bubbleSpiral', at: 4, every: 8, tele: 0, dmg: 4, p: { rate: 6, spin: 60, speed: 160, dur: 3 } },
       ] },
       { from: 0.25, move: 'rim', speed: 140, script: [
-        { pat: 'sweepBeam', at: 1, every: 6, tele: 1.2, dmg: 10, p: { deg: 180, dur: 3, w: 36 } },
-        { pat: 'bubbleSpiral', at: 0, every: 6, tele: 0, dmg: 4, p: { rate: 8, spin: 60, speed: 160, dur: 6 } },
+        { pat: 'sweepBeam', at: 1, every: 6, tele: 1.2, dmg: 7, p: { deg: 180, dur: 3, w: 36 } },
+        { pat: 'bubbleSpiral', at: 0, every: 6, tele: 0, dmg: 4, p: { rate: 6, spin: 60, speed: 160, dur: 6 } },
         { pat: 'adds', at: 2, every: 8, tele: 0, dmg: 0, n: 6 },
       ] },
     ],

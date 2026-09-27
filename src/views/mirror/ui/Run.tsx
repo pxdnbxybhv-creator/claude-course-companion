@@ -407,8 +407,10 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const scr = stage === 'between' ? nextScreen(run) : null;
   const armorNow = useMemo(() => computeStats(run).armor, [run]);
   const midWave = stage === 'wave';
+  // 倒影: from wave 31 the arena is painted inverted (engine/index.ts), so the HUD turns paper-light
+  const inverted = (run.inWave ?? run.wave + 1) > 30;
   return (
-    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
+    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '') + (inverted ? ' is-inverted' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
       <canvas class="mj-canvas" ref={canvas} aria-hidden="true" />
       {stage === 'wave' && (
         <>

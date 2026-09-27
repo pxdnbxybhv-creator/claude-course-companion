@@ -60,7 +60,7 @@ export function GearCard(props: {
         <Icon id={`${isW ? 'wpn' : 'item'}:${props.id}`} px={props.px ?? 44} />
         <div class="mj-card-title">
           <b class="mj-card-name">{name}{isW && <span class="mj-tierroman num"> {TIER_ROMAN[tier]}</span>}</b>
-          <span class="mj-card-tier">{tierName(tier, t)}{tags.length ? ' · ' + tags.map((c) => className(c, t)).join(' ') : ''}</span>
+          <span class="mj-card-tier">{tierName(tier, t)}{tags.length ? ' · ' + tags.map((c) => className(c, t)).join(' · ') : ''}</span>
         </div>
         <span class={`mj-tierseal tier-${tier}`} aria-hidden="true">{TIER_ZH[tier]}</span>
       </div>
@@ -216,7 +216,7 @@ export function Ready(props: { run: RunSave; onGo: () => void; onPause: () => vo
       <button type="button" class="btn btn-seal mj-big mj-go" onClick={props.onGo} disabled={props.baking !== null}>
         {props.baking !== null ? t(`研墨 ${Math.round(props.baking * 100)}%`, `Grinding ink ${Math.round(props.baking * 100)}%`) : t('入此重', 'Begin')}
       </button>
-      <p class="mj-ready-keys">{t('移动：摇杆 / WASD · 镜技：技 / Q · 暂停：Esc', 'Move: stick / WASD · Skill: 技 / Q · Pause: Esc')}</p>
+      <p class="mj-ready-keys">{t('移动：摇杆 / WASD · 镜技：技 / Q · 暂停：Esc', 'Move: stick / WASD · Skill: glyph button / Q · Pause: Esc')}</p>
       {isBossWave(w) && <p class="mj-ready-note">{t('首领之重不计时；首领倒下即破。', 'Boss waves are untimed; the wave falls with the boss.')}</p>}
     </div>
   );

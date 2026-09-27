@@ -947,3 +947,38 @@ describe('engine-content: DEV hooks', () => {
 });
 
 void HAZARDS; void MAPS; void computeStats; void wavePlan; void ({} as TeleSpec);
+
+describe('engine-content: 点化 auto-aims at the crowd', () => {
+  // A kiting painter faces away from the crowd; the auto-cast must still sweep the crowd.
+  for (const behind of [true, false]) {
+    it(`walking east with the crowd ${behind ? 'behind' : 'in front'}: the auto-cast turns 5`, () => {
+      const { run, setup } = at(1, { char: 'painter', seed: 77 }, { weapons: [{ id: 'brush', t: 1 }] });
+      const { eng, log } = make(run);
+      eng.start(run, { ...setup, plan: { ...setup.plan, groups: [], elites: [], treasures: [] } });
+      const W = eng.world;
+      W.godmode = true;
+      step(eng, 30);
+      eng.input.move(1, 0);
+      step(eng, 10);
+      const sx = behind ? -1 : 1;
+      for (let k = 0; k < 10; k++) W.spawn('blot', W.px + sx * (120 + k * 8), W.py + (k - 5) * 18, { bloom: false });
+      step(eng, 2);
+      const calls = spy(eng);
+      eng.skill({ kind: 'auto' });
+      step(eng, 5);
+      expect(calls.filter((c) => c.fn === 'convert').length).toBe(5);
+      expect(errs(log)).toEqual([]);
+    });
+  }
+  it('nothing within reach: falls back to the facing and still casts', () => {
+    const { run, setup } = at(1, { char: 'painter', seed: 78 }, { weapons: [{ id: 'brush', t: 1 }] });
+    const { eng, log } = make(run);
+    eng.start(run, { ...setup, plan: { ...setup.plan, groups: [], elites: [], treasures: [] } });
+    eng.world.godmode = true;
+    step(eng, 30);
+    expect(CONTENT.skills.dianhua!.target(eng.world, SKILLS.dianhua)).toBeNull();
+    eng.skill({ kind: 'auto' });
+    step(eng, 2);
+    expect(errs(log)).toEqual([]);
+  });
+});

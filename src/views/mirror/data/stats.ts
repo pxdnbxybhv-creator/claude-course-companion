@@ -77,7 +77,10 @@ export const F = {
   heavyInk: { hpFrac: 0.8, grow: 0.08, max: 1.6 },
   // §5.2 ⚖
   hp: { slope: 0.3, grow: 1.28, from: 11 },
-  dmg: { slope: 0.15, grow: 1.08, from: 11 },
+  // ⚖3 (the real-engine harness, sim/realbal.ts): 1.08 → 1.06. Played for real, mid-run hits landed
+  // far more often than the reference sim assumed, and waves 14–27 killed in 4–7 hits (~25% of max HP a
+  // hit); ~−16% at wave 20, −30% at 30 (bosses scale to their home wave, so their own hits are unchanged)
+  dmg: { slope: 0.15, grow: 1.06, from: 11 },
   spd: { slope: 0.005, cap: 30 },
   bossK: { 10: 1300, 20: 1200, 30: 700 } as Readonly<Record<10 | 20 | 30, number>>,
   /** ⚖ 镜境 multipliers above ×1 ramp in over waves 1–20. */

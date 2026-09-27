@@ -263,9 +263,34 @@ const jiji: SkillImpl = {
 };
 
 // ─────────────────────────────────────────────── 画师 · 点化 (笔)
+/**
+ * 点化's auto-aim: the arc direction that catches the most, wherever you happen to be walking (a
+ * kiting player faces away from the crowd). Scores each enemy's bearing: non-elites it would turn
+ * (up to n) count 1, elites and bosses (60 + 200% 造化) 1.5, a nearer pick breaks ties. Nothing
+ * within reach: null, and the core falls back to your facing.
+ */
+function bestArc(w: WorldApi, reach: number, deg: number, n: number): Vec | null {
+  const x = w.player.x, y = w.player.y, half = (deg / 2) * DEG;
+  const mons = handles(w, x, y, reach, 'normal').filter((h) => !decoy(w, h));
+  const bigs = handles(w, x, y, reach, 'eliteOrBoss');
+  if (!mons.length && !bigs.length) return null;
+  const pts = (hs: number[]) => hs.map((h) => { const e = w.enemy(h); return { a: Math.atan2(e.y - y, e.x - x), d: Math.hypot(e.x - x, e.y - y), r: e.r }; });
+  const small = pts(mons), big = pts(bigs);
+  const inArc = (p: { a: number; d: number; r: number }, dir: number) => p.d < p.r + 4 || Math.abs(angDiff(p.a, dir)) <= half + Math.asin(Math.min(1, p.r / Math.max(1, p.d)));
+  let best = -1, bestDir = 0, bestD = Infinity;
+  for (const c of small.length ? small : big) {
+    let s = 0, b = 0;
+    for (const p of small) if (inArc(p, c.a)) s++;
+    for (const p of big) if (inArc(p, c.a)) b++;
+    const score = Math.min(n, s) + 1.5 * b;
+    if (score > best || (score === best && c.d < bestD)) { best = score; bestDir = c.a; bestD = c.d; }
+  }
+  return vec(x + Math.cos(bestDir) * 100, y + Math.sin(bestDir) * 100);
+}
+
 const dianhua: SkillImpl = {
-  // the arc in front of you (the core aims along your facing), or wherever you drag it
-  target: () => null,
+  // auto: the arc that turns the most (bestArc), else your facing; or wherever you drag it
+  target: (w, def) => bestArc(w, def.reach ?? def.p.r, def.p.deg, def.p.n),
   cast(w, def, at) {
     const p = def.p;
     const x = w.player.x, y = w.player.y;
