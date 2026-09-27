@@ -24,8 +24,8 @@ export const TAOYUAN_LETTERS: LetterDef[] = [
     seal: '羽',
     subject: { zh: '无名信', en: 'An Unsigned Letter' },
     body: {
-      zh: '印不在匣，人不在谷外。香知其时，花记其步。——子正已到，天不会亮，直到有人说出实话。',
-      en: 'The seal is not in the box, and the one who took it has not left the valley. The incense knows the hour; the petals remember the steps. — It is midnight, and dawn will not come until someone tells the truth.',
+      zh: '印不在匣里，拿它的人也没出谷。香灭在哪儿，花盖了多厚，去看。子正到了。没人说实话，天就亮不了。',
+      en: 'The seal is not in the box, and whoever took it has not left the valley. Go and see where the incense died and how deep the petals lie. It is midnight. Until someone tells the truth, it will not get light.',
     },
     note: { zh: '字迹歪斜，行与行叠在一处，像是摸着纸写的。信里夹着一根青鸟羽。', en: 'The writing slants, and the lines run into each other, as if written by touch. A bluebird feather is tucked inside.' },
     attach: { item: { kind: 'clue', id: 'feather', zh: '青鸟羽', en: 'A Bluebird Feather' } },
@@ -38,8 +38,8 @@ export const TAOYUAN_LETTERS: LetterDef[] = [
     seal: '满',
     subject: { zh: '小满的信', en: 'A Letter from Xiaoman' },
     body: {
-      zh: '{名}：阿爷说不能给外人写信，我是偷偷写的。字是葛姑教的，丑也不许笑。你走以后，花还是落，落得比从前慢一点，葛姑说是在等你。我夹了一片花瓣给你，你拿着它，瀑布后面的光就还在。你要是再来，我带你去看我的新树洞。——秦小满',
-      en: "{名}: Grandpa says we mustn't write to outside people, so I'm writing in secret. Ge Gu taught me the characters, so you're not allowed to laugh at them. Since you left the petals still fall, a little slower than before — Ge Gu says they're waiting for you. I've pressed a petal for you. Keep it, and the light behind the waterfall will still be there. If you come back, I'll show you my new hollow. — Qin Xiaoman",
+      zh: '{名}：阿爷说不能给外人写信，我是偷偷写的。字是葛姑教的，丑也不许笑。你走以后，花还是落，落得比从前慢一点，葛姑说她还没算明白为什么。我夹了一片花瓣给你，你拿着它，瀑布后面的光就还在。你要是再来，我带你去看我的新树洞。——秦小满',
+      en: "{名}: Grandpa says we mustn't write to outside people, so I'm writing in secret. Ge Gu taught me the characters, so you're not allowed to laugh at them. Since you left the petals still fall, a little slower than before. Ge Gu says she hasn't worked out why yet. I've pressed a petal for you. Keep it, and the light behind the waterfall will still be there. If you come back, I'll show you my new hollow. — Qin Xiaoman",
     },
     // (the first whose flag is set shows: the parked case first — B7 always leaves a wish behind it)
     ps: [
@@ -59,8 +59,8 @@ export const TAOYUAN_LETTERS: LetterDef[] = [
     seal: '桑',
     subject: { zh: '三娘的信', en: 'A Letter from Sang Sanniang' },
     body: {
-      zh: '{名}足下：那夜我走进殿里，手一直在抖，压香的时候却稳得很——人做错事，原来手是稳的。桃叶走的那天早上，回头看了我三回。桑远的那双草鞋，我今早拿出来晒了。二十年，鞋底还是新的。秦老让我把这方里印交给你：盖在哪里，哪里便算桃源。',
-      en: 'Dear {名}: That night, walking into the hall, my hands shook the whole time — but pressing the incense they were perfectly steady. It seems that when we do wrong, our hands are steady. The morning Taoye left, she looked back at me three times. This morning I took Sang Yuan\'s straw sandals out to air. Twenty years, and the soles are still new. Elder Qin asked me to give you this village seal: wherever you stamp it, that place counts as the Peach Spring.',
+      zh: '{名}足下：那夜进殿，我的手一直在抖。可那天下午压香，手稳得很。桃叶走的那天早上，回头看了我三回。桑远的那双草鞋，今早我拿出来晒了，二十年，鞋底还是新的。秦老让我把这方里印交给你，他说盖在哪里，哪里就算桃源。',
+      en: 'Dear {名}: That night, going into the hall, my hands shook the whole time. Yet that afternoon, pressing the incense, they were perfectly steady. The morning Taoye left, she looked back at me three times. This morning I put Sang Yuan\'s straw sandals out to air. Twenty years, and the soles are still new. Elder Qin asked me to give you this village seal. He says wherever you stamp it counts as the Peach Spring.',
     },
     note: { zh: '信纸有桑叶的清气。', en: 'The paper smells faintly of mulberry leaves.' },
     attach: { item: { kind: 'keep', id: 'taoyuanli', zh: '桃源里印', en: 'The Peach Spring Village Seal' } },
@@ -73,8 +73,8 @@ export const TAOYUAN_LETTERS: LetterDef[] = [
     seal: '归',
     subject: { zh: '山外来信', en: 'A Letter from Outside' },
     body: {
-      zh: '{名}兄台：我们在水乡茶楼落了脚。外头的人走路真快，说话也快，桃叶头一天就把桥上的人数了三遍。我在码头扛货，挣了头一笔工钱，附上二十文，桃叶说要请你喝茶。明年花朝，我们回去。印盖了，路就在。——阮青、桃叶同拜',
-      en: "Dear {名}: We have settled at the teahouse in the water town. People outside walk fast and talk fast — on the first day Taoye counted everyone crossing the bridge three times over. I carry cargo at the wharf and have earned my first wages; twenty coins are enclosed — Taoye says they're to buy you tea. Next Flowers' Birthday we're going back. The pass is stamped, so the road will be there. — With respect, Ruan Qing and Taoye",
+      zh: '{名}兄台：我们在水乡茶楼落了脚。外头的人走路真快，说话也快，桃叶头一天就把桥上的人数了三遍。我在码头扛货，挣了头一笔工钱，附上二十文，桃叶说要请你喝茶。明年花朝，我们回去。印盖过了，路一定找得着，真的。——阮青、桃叶同拜',
+      en: "Dear {名}: We've settled at the teahouse in the water town. People outside walk fast and talk fast. On the first day Taoye counted everyone crossing the bridge three times over. I carry cargo at the wharf and have earned my first wages; twenty coins are enclosed, and Taoye says they're to buy you tea. Next Flowers' Birthday we're coming back. The pass is stamped, so we'll find the road. Honest. — With respect, Ruan Qing and Taoye",
     },
     attach: { coins: 20 },
     due: (p, today) => !!p.done['case:hz'] && diffDays(p.done['case:hz'], today) >= 3,

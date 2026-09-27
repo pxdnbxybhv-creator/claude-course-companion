@@ -506,7 +506,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
         case 'feng': {
           if (who === 'cat') { await say('me', { zh: '土味。', en: 'Dirt.' }); flag(K.addFlag('feng:cat')); }
           await say('narr', K.WORLD.sniff);
-          await say('duer', K.WORLD.duerSays);
+          await lines('duer', K.WORLD.duerSays);
           await discover('feng');
           if (who === 'poet') { await say('me', K.TOOLS.poet.taste); flag(K.addFlag('feng')); }
           return;
@@ -515,7 +515,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
           await say('narr', K.WORLD.basin);
           await say('gegu', K.WORLD.gegu);
           await discover('hualou');
-          if (who === 'gardener') await say('me', { zh: '一个钟头一分——这盆，我认得。', en: 'One tenth an hour — I know this kind of basin.' });
+          if (who === 'gardener') await say('me', { zh: '这种盆，我认得。', en: 'I know this kind of basin.' });
           await say('gegu', K.WORLD.gegu2);
           flag(K.addFlag('hualou'));
           return;
@@ -623,13 +623,13 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
     const first = !has(K.heardFlag(w));
     let said: K.Line[] = first ? W0.opening : K.statementNow(w, flags());
     // (all but the last line; the last carries the choices)
-    for (let i = 0; i < said.length - 1; i++) { if (!st.alive) return; await say(w, said[i]); }
+    for (let i = 0; i < said.length - 1; i++) { if (!st.alive) return; await say(said[i].zh.startsWith('（') ? 'narr' : w, said[i]); }
     if (first) flag(K.heardFlag(w));
     let last = said[said.length - 1];
-    let lastBy: Speaker = w;
-    // (a companion's aside, after what they say: the talk's choices then hang on it)
-    if (w === 'sang' && (who === 'guan' || who === 'rabbit')) {
-      await say(w, last);
+    let lastBy: Speaker = last.zh.startsWith('（') ? 'narr' : w;
+    // (a companion's aside, after what they say: the talk's choices then hang on it; none once 三娘 has nothing left to hide)
+    if (w === 'sang' && (who === 'guan' || who === 'rabbit') && K.stageOf('sang', flags()) < W0.breaks.length) {
+      await say(last.zh.startsWith('（') ? 'narr' : w, last);
       if (!st.alive) return;
       if (who === 'rabbit') flag(K.addFlag('sang'));
       last = who === 'guan' ? K.TOOLS.guan.sang : K.TOOLS.rabbit.sang;
@@ -645,7 +645,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
         const ev = await pickEvidence(w);
         if (!st.alive || !ev) return 'end';
         const b = K.confront(w, ev, flags());
-        if (!b) { last = K.NOT_MINE; return 'again'; }
+        if (!b) { last = K.NOT_MINE[w]; return 'again'; }
         await breakLie(w, b);
         return 'end';
       } });
@@ -658,7 +658,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
         return 'again';
       } });
       if (w === 'duer' && !f[K.clueFlag('feng')]) opts.push({ l: K.WORLD.jars, run: async () => {
-        await say('duer', K.WORLD.duerSays);
+        await lines('duer', K.WORLD.duerSays);
         await discover('feng');
         if (who === 'poet') { await say('me', K.TOOLS.poet.taste); flag(K.addFlag('feng')); }
         last = K.statementNow(w, flags()).slice(-1)[0];
@@ -688,7 +688,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
     if (k < 0 || !st.alive) return;
     if (k === 1) await say('xiaoman', K.T6.frantic);
     if (who === 'rabbit') await say('narr', { zh: '（玉兔挨着他坐下，他才不抖了。）', en: '(The Jade Rabbit sits down beside him, and he stops shaking.)' });
-    await say('xiaoman', K.T6.testimony);
+    await lines('xiaoman', K.T6.testimony);
     flag(K.heardFlag('xiaoman'));
     flag(K.CASE_FLAGS.found);
     knollMark = false;
@@ -701,7 +701,7 @@ export const taoyuanCase = feature('taoyuan-case', (bag, ctx) => {
   async function geguTalk(who: CharacterId): Promise<void> {
     await say('gegu', K.WORLD.gegu);
     await discover('hualou');
-    if (who === 'gardener') await say('me', { zh: '一个钟头一分——这盆，我认得。', en: 'One tenth an hour — I know this kind of basin.' });
+    if (who === 'gardener') await say('me', { zh: '这种盆，我认得。', en: 'I know this kind of basin.' });
     await say('gegu', K.WORLD.gegu2);
     flag(K.addFlag('hualou'));
   }

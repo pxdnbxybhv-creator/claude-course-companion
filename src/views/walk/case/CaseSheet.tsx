@@ -152,7 +152,7 @@ function WordCard(props: { w: K.Witness; t: T; f: Readonly<Record<string, true |
   const q = (l: K.Line) => (lang.value === 'zh' ? `「${l.zh}」` : `“${l.en}”`);
   const rows: { l: K.Line; struck?: boolean; truth?: boolean; add?: boolean }[] = [];
   if (w.key === 'xiaoman') {
-    rows.push({ l: K.T6.testimony, truth: true });
+    for (const l of K.T6.testimony) rows.push({ l, truth: true });
     rows.push({ l: K.T6.pass });
   } else {
     rows.push({ l: w.opening[0], struck: stage > 0 });
@@ -179,7 +179,7 @@ function WordCard(props: { w: K.Witness; t: T; f: Readonly<Record<string, true |
         {props.pick && <button type="button" class="btn btn-seal case-show" onClick={() => showEvidence(`T:${w.key}`)}>{t('出示', 'Show')}</button>}
       </div>
       <div class="case-body">
-        {rows.map((r, i) => (
+        {rows.filter((r) => r.add || !r.l.zh.startsWith('（')).map((r, i) => (
           <p key={i} class={(r.struck ? 'is-struck' : '') + (r.truth ? ' is-truth' : '') + (r.add ? ' case-add' : '')}>{r.add || r.l.zh.startsWith('（') ? L(t, r.l) : q(r.l)}</p>
         ))}
       </div>

@@ -92,8 +92,8 @@ export const CLUES: readonly Clue[] = [
   {
     n: 1, key: 'xiang', name: t('香篆 · 灭在亥正', 'The Incense Seal, Dead at 亥正'), at: 'incense', where: t('供桌 · 香篆', 'The altar · the incense seal'),
     card: t(
-      '香篆自戌针燃起，行至亥正针处而熄。熄处往前一段香粉湿透，泛着酒气；往后已燃的香灰，干而完整，一丝未溅。',
-      'The incense trail started at the 戌 pin and died at the 亥正 pin (10 pm). The powder ahead of that point is soaked and smells of wine; the ash behind it, already burnt, is dry and whole — not a drop splashed on it.',
+      '香篆从戌针点起，烧到亥正那一针就灭了。灭处往前的一段香粉湿透了，有股酒气；往后烧过的香灰是干的，整整齐齐，一点没溅上。',
+      'The incense trail was lit at the 戌 pin and burned as far as the 亥正 pin (10 pm), where it went out. The powder ahead of that point is soaked through and smells of wine. The ash behind it, already burnt, is dry and whole — not a drop on it.',
     ),
     addenda: [{ flag: addFlag('xiang'), by: 'test', line: t('试香：泼上去的酒，前后都溅。', 'Tried on the spare tray: splashed wine lands on both sides.') }],
     routes: [{ by: 'examine', at: 'incense' }, { by: 'companion', who: 'player' }],
@@ -101,7 +101,7 @@ export const CLUES: readonly Clue[] = [
   {
     n: 2, key: 'tan', name: t('碎坛 · 陈酿', 'The Broken Jar'), at: 'shards', where: t('供桌前 · 碎坛', 'Before the altar · the shards'),
     card: t(
-      '供坛碎在供桌前。坛口的泥封是整块揭下的，放在一旁，并非摔裂。满地酒渍早已渗进砖缝，只剩边上一圈还湿。漆匣上的封泥被人整齐剥开，「守拙」二字完好。',
+      '供坛摔碎在供桌前。泥封是整块揭下来的，搁在一边，没摔裂。酒早渗进了砖缝，只剩边上一圈还湿。漆匣的封泥被人整整齐齐剥开，「守拙」两个字好好的。',
       'The offering jar lies smashed before the altar. Its mud cap was lifted off whole and set aside — it did not crack in the fall. The spilt wine has long since soaked into the brick joints; only the rim of the stain is still damp. The clay on the lacquer box was peeled away neatly, and the elder\'s seal, "Shouzhuo", is unbroken.',
     ),
     addenda: [],
@@ -110,8 +110,8 @@ export const CLUES: readonly Clue[] = [
   {
     n: 3, key: 'feng', name: t('泥封无香', 'A Sealed Jar Has No Smell'), at: 'cellarJar', where: t('酒窖 · 陈坛', 'The cellar · the sealed jars'),
     card: t(
-      '杜二窖里的陈坛，凑近了闻，只有泥土腥。杜二：「泥封的坛子，神仙也闻不着。今年开封的十年陈，只有供花神那一坛；场上喝的新醅，没那股香。」',
-      'Nose to a sealed jar in Du Er\'s cellar: only the smell of earth. Du Er: "A mud-sealed jar — not even a god could smell it. The only ten-year jar opened this year was the flower god\'s. The new brew at the square has no such scent."',
+      '杜二窖里的陈坛，凑近了闻，只有泥土腥。杜二：「泥封着的坛子，神仙来了也闻不着！今年开了封的十年陈就一坛，供花神那坛。场上喝的新醅，没那个香。」',
+      'Nose to a sealed jar in Du Er\'s cellar: only the smell of earth. Du Er: "A mud-sealed jar? Not even a god could smell it! Only one ten-year jar got opened this year — the flower god\'s. The new brew at the square hasn\'t got that smell."',
     ),
     addenda: [
       { flag: addFlag('feng'), by: 'poet', line: t('诗仙尝了一口场上的新醅：「淡！」', 'The Poet Immortal tasted the new brew from the square: "Thin!"') },
@@ -122,7 +122,7 @@ export const CLUES: readonly Clue[] = [
   {
     n: 4, key: 'menxiang', name: t('门外酒香', 'Wine at the Door'), at: null, where: t('记忆', 'A memory'),
     card: t(
-      '亥初，我与柳婆同到殿门挂灯。她没有进殿，只在门外说：「杜二那坛陈酿真香，隔着门都闻得到。」',
+      '亥初，我和柳婆一起到殿门口挂灯。她没进殿，站在门外说：「杜二那坛陈酿真香，隔着门都闻得到。」',
       'At 亥初 (9 pm) I hung the lantern at the hall door with Liu Po. She did not go in; standing outside she said, "That aged jar of Du Er\'s — you can smell it through the door."',
     ),
     addenda: [{ flag: CASE_FLAGS.catnose, by: 'cat', line: t('大橘也说：「酒味，好浓。」', 'Big Ginger said so too: "Wine. Strong."') }],
@@ -130,23 +130,23 @@ export const CLUES: readonly Clue[] = [
   },
   {
     n: 5, key: 'zuji', name: t('庭中足迹', 'Prints in the Courtyard'), at: 'courtyard', where: t('祠堂 · 庭中落花', 'The shrine · petals in the courtyard'),
-    card: t('庭中落花一层层铺着，足迹被压在不同的深浅里：', 'Petals lie in layers across the courtyard, and the footprints sit under them at different depths:'),
+    card: t('院子里的落花铺了一层又一层，底下的脚印，有的盖得厚，有的盖得薄：', 'Petals lie in layers across the courtyard, and the footprints sit under them at different depths:'),
     addenda: [{ flag: addFlag('zuji'), by: 'painter', line: t('画师的纸鹤落在那双补过的屐痕上：「屐齿一方一圆。」', 'The Painter\'s crane settled on the patched prints: "One tooth square, one round."') }],
     routes: [{ by: 'examine', at: 'courtyard' }, { by: 'companion', who: 'taoist' }],
   },
   {
     n: 6, key: 'hualou', name: t('花漏', 'The Petal Clock'), at: 'basin', where: t('药圃 · 石盆', 'The herb garden · the stone basin'),
     card: t(
-      '葛姑的花漏石盆，刻着十道圈。葛姑：「这谷里的花，落得比更漏还匀：半个时辰，覆地一分。今夜无风，祠堂的院子又四面有墙，更是一分不差。」',
-      'Ge Gu\'s petal-clock basin, ruled in ten rings. Ge Gu: "The petals here fall more evenly than any water-clock: half a double-hour covers the ground one tenth. There\'s no wind tonight, and the shrine yard is walled on all four sides — it won\'t be off by a hair."',
+      '葛姑的花漏石盆，刻着十道圈。葛姑：「谷里的花，落得比更漏还匀。半个时辰，盖地一分。今夜没风，祠堂院子四面又有墙，差不了。」',
+      'Ge Gu\'s petal-clock basin, ruled in ten rings. Ge Gu: "The petals in here fall more evenly than any water-clock. Half a double-hour, one tenth of the ground. No wind tonight, and the shrine yard\'s walled all round — it won\'t be off."',
     ),
-    addenda: [{ flag: addFlag('hualou'), line: t('葛姑：「子正往回数：一分一个钟头。」', 'Ge Gu: "Count back from midnight: one tenth per hour."') }],
+    addenda: [{ flag: addFlag('hualou'), line: t('葛姑：「盖了几分，就从子正往回数几个半时辰。」', 'Ge Gu: "However many tenths, count back that many hours from midnight."') }],
     routes: [{ by: 'examine', at: 'basin' }, { by: 'ask', who: 'gegu' }, { by: 'companion', who: 'gardener' }],
   },
   {
     n: 7, key: 'buchi', name: t('桃木补齿', 'The Peachwood Patch'), at: 'bench', where: t('鲁三的木案', 'Lu San\'s workbench'),
     card: t(
-      '鲁三案头压着今日的活计单：「桑三娘 屐一只 补后齿 桃木 辰时」。旁边的桃木边角料，削出的圆头与庭中那枚圆齿痕一般无二。',
+      '鲁三的木案上压着今天的活计单：「桑三娘 屐一只 补后齿 桃木 辰时」。旁边一块桃木边角料，削出来的圆头，跟院子里那个圆齿印一模一样。',
       'Under a weight on Lu San\'s bench, today\'s job list: "Sang Sanniang — one clog — rear tooth mended — peachwood — morning." A peachwood offcut beside it has the same rounded end as the round tooth-print in the courtyard.',
     ),
     addenda: [{ flag: addFlag('buchi'), by: 'guan', line: t('鲁三（当着关公）：「补得急，没上漆，走起来一齿响、一齿闷。」', 'Lu San (before Lord Guan): "I rushed it and didn\'t lacquer it — one tooth clicks, the other thuds."') }],
@@ -161,7 +161,7 @@ export const CLUES: readonly Clue[] = [
   {
     n: 9, key: 'bu', name: t('花朝簿', 'The Register and the Stele'), at: 'register', where: t('殿侧 · 花朝簿', 'The side table · the register'),
     card: t(
-      '花朝簿上，历年出谷者寥寥。二十年前一行：「桑远 出谷 未归」，行尾没有朱印。今年一行：「阮青」，空着等印。殿侧石碑（篆书，旁有秦守拙的楷书小注）：「花朝子正，钤印过所，方得复归。」',
+      '花朝簿上，出谷的人没几个。二十年前一行：「桑远 出谷 未归」，行尾没有朱印。今年一行：「阮青」，空着等印。殿侧石碑刻着篆书，秦守拙在旁边用楷书注了一遍：「花朝子正，钤印过所，方得复归。」',
       'In the Flower-Festival register, few have ever gone out. Twenty years ago: "Sang Yuan — went out — not returned." No red seal ends that line. This year: "Ruan Qing," waiting for its seal. The stele beside the hall, in seal script with Qin Shouzhuo\'s small regular-script gloss: "Only a pass sealed at midnight on the Flowers\' Birthday lets the traveller find the way back."',
     ),
     addenda: [{ flag: addFlag('bu'), by: 'scholar', line: t('书生：「这一行没有朱印……照碑上说，他是回不来的。」', 'The Scholar: "This line has no seal… By the stele\'s words, he couldn\'t come back."') }],
@@ -175,14 +175,14 @@ export const CLUES: readonly Clue[] = [
     ),
     addenda: [
       { flag: addFlag('can'), by: 'gardener', line: t('园丁：「蚕不吃这角的叶子。」', 'The Gardener: "The worms won\'t touch the leaves in that corner."') },
-      { flag: CASE_FLAGS.seal, line: t('玉印已由你收着。', 'You are keeping the jade seal.') },
+      { flag: CASE_FLAGS.seal, line: t('玉印在你身上收着。', 'You are keeping the jade seal.') },
     ],
     routes: [{ by: 'examine', at: 'silkTray' }, { by: 'companion', who: 'cat' }, { by: 'companion', who: 'change' }],
   },
   {
     n: 11, key: 'bitao', name: t('碧桃瓣', 'A White-Edged Petal'), at: null, where: t('阮郎的领口', 'Ruan Qing\'s collar'),
     card: t(
-      '阮郎领口沾着一片白边的桃瓣。谷中桃花都是一色粉红，只有西北坡那株老碧桃，花瓣镶白边。',
+      '阮郎领口沾着一片白边的桃瓣。谷里的桃花都是一样的粉红，只有西北坡那棵老碧桃，花瓣镶着白边。',
       'A peach petal with a white edge clings to Ruan Qing\'s collar. Every peach in the valley is one shade of pink — only the old white-edged peach on the north-west knoll has petals like that.',
     ),
     addenda: [
@@ -231,7 +231,7 @@ export const PRINTS: readonly PrintSet[] = [
     path: [[0, -17.6], [0, -22.2]], feet: 7, kind: 'mixed', back: true,
   },
   {
-    key: 'clogs', name: t('一双木屐，一齿方、一齿圆如补过；从西北侧门进来，沿西墙到殿门，又原路回去', 'A pair of clogs, one tooth square, one rounded as if patched; in by the north-west side gate, along the west wall to the hall door, and back the same way'),
+    key: 'clogs', name: t('一双木屐，一齿方、一齿圆，像是补过；从西北侧门进来，沿西墙到殿门，又原路回去', 'A pair of clogs, one tooth square, one rounded as if patched; in by the north-west side gate, along the west wall to the hall door, and back the same way'),
     cover: 4, coverName: t('四分', '4 tenths'), note: t('西边没被子正的人群踩过——他们走的是正中', 'the west side is untouched by the midnight procession, which kept to the middle'),
     path: [[-4.0, -21.2], [-3.5, -21.0], [-3.5, -21.9], [-0.6, -22.2]], feet: 1, kind: 'patched', back: true,
   },
@@ -298,63 +298,63 @@ export interface Witness {
 export const WITNESSES: readonly Witness[] = [
   {
     n: 1, key: 'liupo', where: t('祠堂门外', 'the shrine gate'), lie: true,
-    opening: [t('亥初我进殿看过，香好好的，坛也好好的。', 'At 亥初 (9 pm) I went into the hall and looked. The incense was fine, and so was the jar.')],
+    opening: [t('亥初我进殿看过了，香好好的，坛子也好好的。', 'At 亥初 (9 pm) I went into the hall and looked. The incense was fine, and so was the jar.')],
     breaks: [{
       flag: brokeFlag('liupo'), by: ['menxiang'],
-      says: [t('……我没进去。这两年，灯底下我连香针都看不清。我怕人说我老了，看不得香了。', "…I didn't go in. These two years I can't even see the pins by lamplight. I was afraid they'd say I'm too old to keep the incense.")],
+      says: [t('（柳婆的拐杖在砖上一顿。）', '(Liu Po plants her cane hard on the bricks.)'), t('没进去。你不就站在我边上？', "I didn't go in. You were standing right next to me, weren't you?"), t('这两年一上灯，那几根香针我就看不清了。', "These last two years, once the lamps are lit, I can't make out those pins."), t('这话传出去，香就轮不到我看了。', "If that gets about, the incense won't be mine to keep.")],
     }],
-    after: [t('压香那天，三娘问过我，亥正是哪一针。', 'The day we pressed the incense, Sanniang asked me which pin was 亥正 (10 pm).')],
+    after: [t('压香那天，三娘还问我亥正是哪一针。我当她是好学，教了她。', 'The day we pressed the incense, Sanniang asked me which pin was 亥正 (10 pm). I took it she wanted to learn, so I showed her.')],
   },
   {
     n: 2, key: 'duer', where: t('酒坊', 'the brewery'), lie: true,
     opening: [
       t('祭前我没碰过供桌！', 'I never touched the altar before the rite!'),
-      t('戌正我同阿黍回酒坊搬新醅，阿黍能作证。倒是这位客人，亥初就在殿门口！', 'At 戌正 (8 pm) A Shu and I went back to the brewery for more new brew — ask him. But this guest was at the hall door at 亥初 (9 pm)!'),
+      t('戌正我同阿黍回酒坊搬新醅——阿黍！你说是不是？', 'At 戌正 (8 pm) A Shu and I went back to the brewery for more new brew. A Shu! Tell them!'), t('倒是你，亥初在殿门口转悠什么？我杜二可都看见了。', 'And you: what were you doing hanging about the hall door at 亥初 (9 pm)? I saw you.'),
     ],
     breaks: [{
       flag: brokeFlag('duer'), by: ['beiyin'], companions: ['poet', 'guan'],
-      says: [t('……那杯茶是给我婆娘的。她生前最爱蜜渍桃花茶。花朝不许私祭，我……', "…That tea was for my wife. She loved honeyed peach-blossom tea. Private offerings aren't allowed on the Flowers' Birthday, so I…")],
+      says: [t('供桌左角那杯茶，是我搁的。给我婆娘的。', 'That cup on the left corner of the altar — I put it there. For my wife.'), t('蜜渍桃花茶。她就好这一口，一碗搁三勺蜜，甜得齁人。', 'Honeyed peach-blossom tea. Her favourite. Three spoons of honey a bowl, sweet enough to choke you.'), t('花朝不许私祭，我知道，我知道。……喝不喝？新醅。', "No private offerings on the Flowers' Birthday. I know, I know. …Drink? It's the new brew.")],
     }],
-    after: [t('戌正出花场，岔路口我看见三娘往西去了，说回去蒸糕。桃叶那丫头还在长桌边分糕呢。', 'When we left the square at 戌正 (8 pm), I saw Sanniang turn west at the fork — she said she was going home to steam cakes. Taoye was still at the long tables handing them out.')],
+    after: [t('对了，戌正我们出花场，到岔路口，我看见三娘往西去了。', 'Oh, and at 戌正 (8 pm), leaving the square, I saw Sanniang turn west at the fork.'), t('她走的时候说是回去蒸糕。桃叶那丫头还在长桌边上分糕呢。', "She'd said she was going home to steam cakes. Taoye was still at the long tables handing them out.")],
   },
   {
     n: 3, key: 'ruan', where: t('花场', 'the square'), lie: true,
-    opening: [t('我一整夜都在花场，哪儿也没去。', 'I was at the square all night. I went nowhere.')],
+    opening: [t('我？我一整夜都在花场，哪儿也没去。真的。不信你去问……问谁都行。', 'Me? I was at the square all night. Didn\'t go anywhere. Honest. Ask… ask anyone.')],
     breaks: [{
       flag: brokeFlag('ruan'), by: ['bitao'],
-      says: [t('……我在老碧桃底下，同桃叶。她要跟我一道走。亥初刚过去的，那时殿门口已挂上客灯了。树洞里好像有人打呼噜，我们以为是獾。', '…I was under the old white-edged peach, with Taoye. She wants to go out with me. We went just after 亥初 (9 pm) — the guest lantern was already hanging at the hall door. Something was snoring in the hollow; we thought it was a badger.')],
+      says: [t('（阮郎去拍领口，那片花瓣粘着，没拍掉。）', '(Ruan slaps at his collar, but the petal clings.)'), t('……我、我在老碧桃底下。跟桃叶一起，就我们俩。', '…I-I was under the old white-edged peach. With Taoye. Just the two of us.'), t('亥初刚过去的，殿门口的客灯已经挂上了，就是你挂的那盏。', 'Just after 亥初 (9 pm). The guest lantern was already up at the hall door — the one you hung.'), t('她要跟我一块儿走。你别跟三娘说，真的，别说。', "She wants to come with me. Don't tell Sanniang. Really. Don't."), t('哦，树洞里有东西打呼噜，我们当是獾，没敢过去。', 'Oh, and something was snoring in the hollow. We took it for a badger and kept away.')],
     }],
-    after: [t('其实我怕。怕出去了，就回不来。', "The truth is, I'm afraid. Afraid that once I'm out, I can't come back.")],
+    after: [t('你是从外头进来的。回来的路，好认吗？要不要做记号？', "You came in from outside. Is the way back in easy to find? Should I mark it?")],
   },
   {
     n: 4, key: 'taoye', where: t('桑家门口', 'the Sang doorstep'), lie: true,
-    opening: [t('我一整晚都在花场帮着分糕。', 'I was at the square all evening, handing out cakes.'), t('糕黄昏就蒸好送来了，最后一篮是我提的。', 'The cakes were all steamed and brought over at dusk — I carried the last basket myself.')],
+    opening: [t('我一晚上都在花场分糕。', 'I was at the square all evening. Handing out cakes.'), t('糕是黄昏就蒸好送过去的，一共四篮。最后一篮是我提的。', 'The cakes were steamed and taken over at dusk. Four baskets. I carried the last one.')],
     breaks: [{
       flag: brokeFlag('taoye'), by: ['bitao', 'T:ruan'], needs: { 'T:ruan': brokeFlag('ruan') },
-      says: [t('……我想跟他走。娘不知道——娘不能知道。', "…I want to go with him. Mother doesn't know — she mustn't.")],
+      says: [t('（桃叶把梭子攥得紧紧的。）', '(Taoye grips her shuttle tight.)'), t('我要跟他走。草鞋都给他缝好了。', "I'm going with him. I've already sewn his sandals."), t('我娘不知道。你也不许说。', "Mother doesn't know. And you're not to tell her.")],
     }],
-    after: [t('娘这些年，每晚都摆两只杯子。一只是给爹的。', 'Every evening for years, Mother has set out two cups. One is for Father.')],
+    after: [t('我娘每天晚上摆两只杯子，一只给我爹。我数过，一晚都没落下。', 'Every night Mother sets out two cups. One\'s for my father. I\'ve counted: she\'s never missed a night.')],
   },
   {
     n: 5, key: 'sang', where: t('蚕房', 'the silk room'), lie: true,
-    opening: [t('戌正我回家蒸了一笼新糕，蒸好就回来了。', 'At 戌正 (8 pm) I went home and steamed a fresh batch of cakes, then came back.')],
+    opening: [t('戌正我回家蒸了一笼新糕，蒸好就回来了。客人还有事？', 'At 戌正 (8 pm) I went home, steamed a fresh batch of cakes, and came back. Anything else, guest?')],
     breaks: [
       {
         flag: brokeFlag('sang'), by: ['lengzao', 'T:taoye'],
-        says: [t('……我记错了。我回去是换鞋，屐齿松了。', '…I misremembered. I went home to change shoes — a clog tooth had come loose.')],
+        says: [t('是我记岔了，回去是换鞋。', 'I had it wrong. I went back to change shoes.'), t('屐齿松了，一走一晃，采桑舞还怎么领？', 'A clog tooth had come loose. Wobbling about like that, how was I to lead the mulberry dance?')],
       },
       {
         flag: brokeFlag('sang2'), by: ['buchi'],
-        says: [t('……', '…'), t('客人问完了？我还要照看蚕。', 'Are you finished, guest? I have the silkworms to see to.')],
+        says: [t('鲁三的字，还是这么难看。', "Lu San's writing. Still as ugly as ever."), t('客人问完了？蚕该喂了。', 'Are you done, guest? The worms need feeding.')],
       },
     ],
-    after: [t('（三娘低头理着桑叶，不再说话。手在抖。）', '(Sanniang bends over the mulberry leaves and says nothing more. Her hands are shaking.)')],
+    after: [t('（三娘把同一摞桑叶理了三遍。）', '(Sanniang sorts the same pile of mulberry leaves three times over.)')],
   },
   {
     n: 6, key: 'xiaoman', where: t('老碧桃的树洞', 'the old peach\'s hollow'), lie: false,
-    opening: [t('我没偷印！我只是想看看它长什么样……', 'I didn\'t steal the seal! I only wanted to see what it looked like…')],
+    opening: [t('我没偷！我没偷印！我就是想看看它长什么样……', 'I didn\'t steal it! I didn\'t steal the seal! I only wanted to see what it looked like…')],
     breaks: [],
-    after: [t('那双屐，一只齿响，一只齿闷。我记得清清楚楚！', 'That pair of clogs — one tooth clicked, one thudded. I remember it clearly!')],
+    after: [t('那双木屐，一只齿响，一只齿闷。嗒、咚。我学得像不像？', 'Those clogs: one tooth clicked, one thudded. Click, thud. Did that sound like it?')],
   },
 ];
 export const WITNESS: Record<WitnessKey, Witness> = Object.fromEntries(WITNESSES.map((w) => [w.key, w])) as Record<WitnessKey, Witness>;
@@ -362,17 +362,21 @@ export const WITNESS: Record<WitnessKey, Witness> = Object.fromEntries(WITNESSES
 /** T6: finding 小满 in the hollow. */
 export const T6 = {
   choices: [t('我知道不是你。告诉我你看见了什么。', "I know it wasn't you. Tell me what you saw."), t('你阿爷急坏了。', 'Your grandfather is frantic.')],
-  frantic: t('……阿爷会不会骂我？', '…Will Grandpa be cross with me?'),
-  testimony: t(
-    '我躲在帘子后头。有人进来，我只看见一双木屐，一只齿响，一只齿闷。她一边弄一边哼《采桑》。后来『哐』一声，坛子碎了。我从后窗爬出去，回头看——香烟还是直直地往上冒。那会儿场上的鼓刚敲完头一通。',
-    'I hid behind the curtain. Someone came in — I only saw a pair of clogs, one tooth clicking, one thudding. She hummed "Picking Mulberry" while she worked. Then — crash — the jar broke. I climbed out the back window and looked back: the incense smoke was still rising straight up. The drums at the square had just finished their first round.',
-  ),
-  pass: t('（他从怀里掏出一张树皮「过所」，上头用炭画了个印。）等我长大，也要出去。', '(He pulls a bark "pass" from his shirt, with a seal drawn on it in charcoal.) When I\'m grown, I\'m going out too.'),
+  frantic: t('……阿爷会打我手心吗？', '…Is Grandpa going to smack my hand?'),
+  testimony: [t('我躲在帘子后头，想等人走光了，看看那方印。', 'I was hiding behind the curtain. I wanted to wait till everyone was gone and look at the seal.'), t('然后有人进来了！我就看见一双木屐，一只齿响，一只齿闷，嗒、咚，嗒、咚。', 'Then somebody came in! All I saw was a pair of clogs. One tooth clicked, one thudded. Click, thud, click, thud.'), t('她一边弄一边哼歌，哼的是《采桑》。', 'She was humming the whole time. It was "Picking Mulberry."'), t('然后『哐』！坛子碎了，我就从后窗爬出去了。', 'Then CRASH! The jar broke, and I climbed out the back window.'), t('我回头看了一眼，香烟还是直直地往上冒，一点都没歪。', 'I looked back once. The incense smoke was still going straight up. Not even wobbly.'), t('哦对，她进来那会儿，场上头一通鼓刚敲完。', 'Oh yeah — when she came in, the first drums at the square had just finished.')],
+  pass: t('你看，我的过所！树皮做的，印是我拿炭画的。等我长大，我也要出去。', 'Look, my pass! It\'s bark. I drew the seal on with charcoal. When I\'m big, I\'m going out too.'),
   home: t('（小满揉着眼睛，往花场他娘那儿去了。）', '(Rubbing his eyes, Xiaoman heads off to find his mother at the square.)'),
 };
 
 /** The line for evidence that has nothing to do with them (no penalty). */
-export const NOT_MINE = t('这与我何干？', 'What has that to do with me?');
+export const NOT_MINE: Record<WitnessKey, Line> = {
+  liupo: t('拿近点……这灯太暗。跟我不相干。还要我说几遍？', "Bring it closer… this lamp's too dim. Nothing to do with me. How many times do I have to tell you?"),
+  duer: t('这是什么？跟我杜二有什么相干！', "What's this? What's it got to do with me?"),
+  ruan: t('这……这个我真不知道。', "That… I really don't know about that."),
+  taoye: t('不知道。', "Don't know."),
+  sang: t('客人拿错了吧。', "I think you've picked up the wrong thing, guest."),
+  xiaoman: t('这个……我没见过。能给我摸摸吗？', "I've never seen that… Can I touch it?"),
+};
 
 /** The testimony card: available once heard, and (for some breaks) once it carries a broken lie. */
 export function evidenceAvailable(ev: EvidenceKey, f: Flags): boolean {
@@ -420,22 +424,22 @@ export interface Contradiction { id: string; name: Line; chain: Line; needs: Evi
 export const CONTRADICTIONS: readonly Contradiction[] = [
   {
     id: 'X1', name: t('香说亥正，鼻子说更早', 'The incense says 亥正; the nose says earlier'),
-    chain: t('泥封的坛子不香；谷里的陈酿只那一坛；亥初隔门已闻到酒香——坛子在亥初之前就开了，香灭的亥正不是作案之时。', 'A sealed jar has no smell; the only aged wine in the valley was that jar; it was smelled through the door at 亥初 (9 pm) — so it was open before 亥初, and 亥正 (10 pm) is not the moment of the crime.'),
+    chain: t('泥封的坛子闻不出香；谷里开了封的陈酿只那一坛；亥初隔着门已经闻到酒香——坛子亥初以前就开了，亥正香灭的时候，事早做完了。', 'A sealed jar has no smell; the only aged wine opened in the valley was that jar; it was smelled through the door at 亥初 (9 pm), so it was open before 亥初, and by the time the incense died at 亥正 (10 pm) the deed was long done.'),
     needs: ['feng', 'menxiang', 'xiang'],
   },
   {
     id: 'X2', name: t('泼了，却没溅', 'The splash that never splashed'),
-    chain: t('泼在香上的酒前后都溅；这里烧过的灰干而完整，泥封整块揭下，坛碎之后香烟还直直上冒——酒是先倒在火头前面的，坛子是后来摔给人看的。', 'Splashed wine spatters both ways; here the burnt ash is dry and whole, the cap came off whole, and the smoke still rose after the crash — the wine was laid ahead of the ember, and the jar smashed afterwards for show.'),
+    chain: t('泼在香上的酒，前后都会溅；这里烧过的灰又干又整，泥封是整块揭下的，坛子碎了香烟还直直往上冒——酒是先倒在火头前面的，坛子是后来摔给人看的。', 'Splashed wine spatters both ways; here the burnt ash is dry and whole, the cap came off whole, and the smoke still rose after the crash — the wine was laid ahead of the ember, and the jar smashed afterwards for show.'),
     needs: ['xiang', 'tan', 'T:xiaoman'],
   },
   {
     id: 'X3', name: t('落花记下了足迹的时辰', 'The petals date the prints'),
-    chain: t('一个钟头覆地一分，从子正往回数：补齿屐痕四分，约在戌正；那一双人二分半，约在亥初二刻；杜二的布靴五分半，在酉末，祭礼之前。', 'One tenth an hour, counting back from midnight: the patched clogs at 4 tenths are about 戌正 (8 pm); the pair at 2½ about half past 亥初 (9:30 pm); Du Er\'s boots at 5½ are 酉末 (6:30 pm), before the rite.'),
+    chain: t('半个时辰落一分，从子正往回数：补齿屐痕四分，约在戌正；那两人的脚印二分半，约在亥初二刻；杜二的布靴五分半，在酉末，祭礼以前。', 'One tenth an hour, counting back from midnight: the patched clogs at 4 tenths are about 戌正 (8 pm); the pair at 2½ about half past 亥初 (9:30 pm); Du Er\'s boots at 5½ are 酉末 (6:30 pm), before the rite.'),
     needs: ['zuji', 'hualou'],
   },
   {
     id: 'X4', name: t('三娘的两句谎话', "Sanniang's two lies"),
-    chain: t('她说回家蒸糕——灶是冷的，糕黄昏就送来了；她说回家换了松掉的屐——那屐早上才补好，她此刻还穿着。', 'She says she steamed cakes — the stove is cold and the cakes had gone at dusk; she says she changed a loose clog — it was mended that morning, and she is still wearing it.'),
+    chain: t('她说回家蒸糕，可灶是冷的，糕黄昏就送去了；她又说回家换松了的屐，可那屐早上才补好，她这会儿还穿着。', 'She says she steamed cakes — the stove is cold and the cakes had gone at dusk; she says she changed a loose clog — it was mended that morning, and she is still wearing it.'),
     needs: ['lengzao', 'buchi'],
   },
 ];
@@ -482,86 +486,86 @@ const C_ = (k: ClueKey) => clueFlag(k);
 
 export const QUESTIONS: readonly Question[] = [
   {
-    n: 1, key: 'when', title: t('何时', 'When'), ask: t('何时 —— 印是什么时辰被取走的？', 'When — at what hour was the seal taken?'),
-    options: [t('亥正香灭之时', 'At 亥正 (10 pm), when the incense died'), t('戌正前后', 'Around 戌正 (8 pm)'), t('亥初二刻', 'Around half past 亥初 (9:30 pm)'), t('戌初封匣之前', 'Before the box was sealed')],
+    n: 1, key: 'when', title: t('何时', 'When'), ask: t('先说时辰。印是什么时辰被拿走的？', 'The hour first. When was the seal taken?'),
+    options: [t('亥正，香灭的时候', 'At 亥正 (10 pm), when the incense died'), t('戌正前后', 'Around 戌正 (8 pm)'), t('亥初二刻', 'Around half past 亥初 (9:30 pm)'), t('戌初封匣以前', 'Before the box was sealed')],
     answer: 1,
     needs: [[C_('feng'), C_('menxiang')], [C_('zuji'), C_('hualou')]],
     ruledOut: { 0: ['feng', 'menxiang'], 2: ['zuji', 'hualou', 'T:ruan'], 3: ['memory'] },
-    wrong: { any: J('qin', '香会说谎，花不会。', 'Incense can lie. Petals cannot.'), 3: J('qin', '戌初封匣，客人亲眼看着的。', 'The box was sealed at 戌初 (7 pm) — you watched it with your own eyes.') },
+    wrong: { any: J('qin', '慢着。花落了几分？你看的是哪双脚印？', 'Hold on. How deep are the petals — and whose prints were you reading?'), 3: J('qin', '封匣以前？戌初封匣那会儿，客人就站在我旁边，亲眼看着的。', 'Before the box was sealed? At 戌初 (7 pm), when I sealed it, you were standing right beside me. You watched me do it.') },
     step: 'when',
-    right: [J('qin', '泥封不香，门外却闻得到酒香——坛子早开了。花也这么说：那双屐痕，覆花四分，正是戌正。', 'A sealed jar has no smell, yet the wine was smelled through the door — the jar was open long before. The petals say so too: four tenths over those prints. 戌正 (8 pm).')],
+    right: [J('liupo', '亥初我在门外就闻着了，杜二那坛陈酿的香。', "At 亥初 (9 pm), outside the door, I could smell Du Er's aged wine."), J('qin', '泥封着的坛子是闻不着的。那会儿，坛子早开了。', 'A mud-sealed jar gives off no smell. By then it was long open.'), J('qin', '再看花：补过的那双屐印，盖了四分。戌正。', "And the petals: four tenths over the mended clog's prints. That puts it at 戌正 (8 pm).")],
   },
   {
-    n: 2, key: 'who', title: t('何人', 'Who'), ask: t('何人 —— 是谁取走了印？', 'Who — who took the seal?'),
+    n: 2, key: 'who', title: t('何人', 'Who'), ask: t('那是谁拿的？', 'Then who took it?'),
     options: [t('桑三娘', 'Sang Sanniang'), t('桃叶', 'Taoye'), t('阮郎', 'Ruan Qing'), t('杜二', 'Du Er'), t('小满', 'Xiaoman'), t('外客', 'The stranger')],
     answer: 0,
     needs: [[C_('zuji'), C_('buchi'), brokeFlag('sang')]],
     ruledOut: { 1: ['zuji', 'T:duer', 'T:ruan'], 2: ['zuji', 'bitao', 'T:ruan'], 3: ['beiyin', 'zuji'], 4: ['tan', 'T:xiaoman'], 5: ['zuji', 'feng', 'menxiang'] },
     wrong: {
-      5: J('duer', '……是我看错了。', '…I was mistaken.'),
-      1: J('ruan', '那时她同我在一处！', 'She was with me!'),
-      4: J('guiniang', '一个孩子，揭得开泥封？', 'Could a child lift a sealed cap whole?'),
-      3: J('liupo', '那杯是甜的。', 'That cup was sweet.'),
-      2: J('qin', '偷自己的印？', 'Steal his own seal?'),
+      5: J('duer', '亥初柳婆也在门口……是我嘴快。', 'Liu Po was at the door at 亥初 too… Me and my big mouth.'),
+      1: J('ruan', '不是她！她那会儿跟我在一块儿，真的！', 'It wasn\'t her! She was with me then. Honest!'),
+      4: J('guiniang', '我家小满？他连腌菜坛子的泥封都揭不开，回回喊我！', 'My Xiaoman? He can\'t even get the mud cap off a pickle jar. He yells for me every time!'),
+      3: J('liupo', '杜二？那杯是甜的，是茶。你闻都没闻？', 'Du Er? That cup was sweet. It was tea. Didn\'t you even smell it?'),
+      2: J('qin', '阮郎？今夜最盼着那方印的，就是他。', 'Ruan? Nobody wanted that seal tonight more than he did.'),
     },
     step: 'who',
-    right: [J('narr', '（众人一齐望向三娘。她垂着眼，一言不发。）', '(Everyone turns to look at Sanniang. She keeps her eyes down and says nothing.)')],
+    right: [J('narr', '（大家一齐转过头看三娘。她垂着眼，一声不吭。）', '(Everyone turns to look at Sanniang. She keeps her eyes down and says nothing.)')],
   },
   {
-    n: 3, key: 'how', title: t('何法', 'How'), ask: t('何法 —— 她是怎么做的？', 'How — how was it done?'),
+    n: 3, key: 'how', title: t('何法', 'How'), ask: t('她是怎么弄的？', 'How did she do it?'),
     options: [
-      t('摔坛泼酒，浇灭香火', 'She smashed the jar; the splash put the incense out'),
-      t('先揭泥封，以酒湿透亥正一段香路；香行至此自灭；再摔坛作乱', 'She lifted the cap, soaked the groove from 亥正 (10 pm) on, let the ember die there by itself, then smashed the jar for show'),
-      t('吹灭旧香，另点新香', 'She blew out the incense and lit a fresh stick'),
-      t('使小满代取', 'She sent Xiaoman to fetch it'),
+      t('摔了坛子，酒泼上去，正好把香浇灭了', 'She smashed the jar, and the splash happened to put the incense out'),
+      t('先把酒倒在亥正往后的香上，再摔坛子做样子', 'She poured wine on the incense past 亥正 (10 pm) first, then smashed the jar for show'),
+      t('先把香吹灭，过后再点一炷新的接上', 'She blew the incense out, then lit a fresh one later to join it up'),
+      t('叫小满替她进殿去拿，自己不露面', 'She sent Xiaoman into the hall for it and kept out of sight'),
     ],
     answer: 1,
     needs: [[C_('xiang'), C_('tan'), CASE_FLAGS.found]],
     ruledOut: { 0: ['xiang', 'T:xiaoman'], 2: ['xiang'], 3: ['tan', 'T:xiaoman'] },
     wrong: {
-      0: J('liupo', '泼上去的，前后都溅。灰却是干的。', 'Splashed wine lands on both sides. But the ash is dry.'),
-      2: J('liupo', '香篆是一整盘压的，接不上新香。', 'An incense seal is pressed in one piece. You cannot join a fresh one on.'),
-      3: J('xiaoman', '我没有！我就躲在帘子后头……', "I didn't! I was only hiding behind the curtain…"),
+      0: J('liupo', '泼的？泼的话两边的灰都得溅湿。我那灰干干净净的。', 'Splashed? Then the ash on both sides would be wet. My ash was clean and dry.'),
+      2: J('liupo', '接新香？香篆是一整盘压出来的，哪儿接得上。当是插根香呢？', 'A fresh one? An incense seal is pressed in one piece. There\'s nothing to join it to. It isn\'t a stick you poke in.'),
+      3: J('xiaoman', '我没有！她都没看见我！我在帘子后头一动都没动……', "I didn't! She didn't even see me! I stayed behind the curtain and didn't move…"),
     },
     step: 'how',
-    right: [J('liupo', '……香是自己走到湿处灭的。老婆子看了六十年香，竟没看出来。', '…The ember walked into the wet and died by itself. Sixty years I have kept the incense, and I never saw it.')],
+    right: [J('liupo', '……是自己烧到湿的地方灭的。', '…It burned into the wet and went out by itself.'), J('narr', '（柳婆半天没出声。）', '(Liu Po says nothing for a long while.)'), J('liupo', '老婆子看了六十年香。压香那天，我还夸她压得匀。', "Sixty years I've kept the incense. The day we pressed it, I told her how nice and even she'd made it.")],
   },
   {
-    n: 4, key: 'why', title: t('何故', 'Why'), ask: t('何故 —— 她为什么这样做？', 'Why — why did she do it?'),
+    n: 4, key: 'why', title: t('何故', 'Why'), ask: t('她这么做，图的是什么？', 'And what was she after, doing this?'),
     options: [
-      t('换钱', 'To sell it'),
-      t('自己出谷寻夫', 'To go out herself and find her husband'),
-      t('不让阮郎今夜出谷：丈夫一去未归，她怕女儿也跟着走，或苦等一生', 'To stop Ruan Qing leaving tonight: her husband never came back, and she feared her daughter would follow him — or wait her whole life'),
-      t('嫁祸外客', 'To frame the stranger'),
+      t('拿印去卖，换些谷里没有的东西', 'To sell the seal for things the valley hasn\'t got'),
+      t('她自己想出谷，去外头把丈夫找回来', 'To go out herself and bring her husband home'),
+      t('不让阮郎今夜走，怕桃叶跟他走，或是等他一辈子', 'To keep Ruan here tonight, so Taoye won\'t follow him, or wait for him all her life'),
+      t('栽到外人头上，这样就没人疑心她', 'To pin it on the stranger so no one would suspect her'),
     ],
     answer: 2,
     needs: [[C_('bu'), brokeFlag('ruan')], [C_('bu'), brokeFlag('taoye')]],
     ruledOut: { 0: ['memory'], 1: ['bu'], 3: ['T:duer'] },
     wrong: {
-      0: J('duer', '谷里哪有钱？一文也没有。', 'Money? There isn\'t a single coin in the whole valley.'),
-      1: J('qin', '印没了，谁也出不去——她自己也出不去。', 'With the seal gone, nobody can leave — not even she.'),
-      3: J('duer', '冤枉客人的是我，不是她。', 'It was I who blamed the guest, not her.'),
+      0: J('duer', '卖？卖给谁？谷里一个钱都没有，我卖酒收的是鸡蛋。', 'Sell it? To who? There\'s not a coin in this valley. I get eggs for my wine.'),
+      1: J('qin', '她自己要出谷，还把印偷了？印一丢，今夜谁都走不成。', 'She wants out, so she steals the seal? With it gone, nobody leaves tonight.'),
+      3: J('duer', '栽到你头上？她从头到尾没提过你。满院子嚷嚷是你干的，是我。', 'Frame you? She never said a word about you. The one shouting all over the yard that you did it — that was me.'),
     },
     step: 'why',
-    right: [J('taoye', '娘……', 'Mother…'), J('narr', '（三娘的手在发抖。）', "(Sanniang's hands are shaking.)")],
+    right: [J('taoye', '娘……', 'Mother…'), J('narr', '（三娘没有回头。）', "(Sanniang doesn't turn round.)")],
   },
   {
-    n: 5, key: 'proof', title: t('何证', 'Proof'), ask: t('何证 —— 哪一件证物，能把她放进殿里、放在那个时辰？', 'Proof — which single piece of evidence puts her in the hall at the true time?'),
-    options: [t('《采桑》曲', 'The tune, "Picking Mulberry"'), t('覆花四分的补齿屐痕', 'The patched-clog prints under 4 tenths of petals'), t('蚕匾下的玉印', 'The seal under the silkworm leaves'), t('冷灶', 'The cold stove')],
+    n: 5, key: 'proof', title: t('何证', 'Proof'), ask: t('光说不行。拿哪一样东西，能证明那个时辰她就在殿里？', 'Saying so isn\'t enough. What one thing proves she was in the hall at that hour?'),
+    options: [t('那支《采桑》', 'The tune, "Picking Mulberry"'), t('覆花四分的补齿屐痕', 'The patched-clog prints under 4 tenths of petals'), t('蚕匾下的玉印', 'The seal under the silkworm leaves'), t('冷灶', 'The cold stove')],
     answer: 1,
     needs: [[C_('zuji'), C_('buchi')]],
     ruledOut: { 0: ['T:taoye'], 2: ['can', 'T:taoye'], 3: ['lengzao'] },
     wrong: {
-      0: J('ruan', '桃叶也哼这支曲子。', 'Taoye hums that tune too.'),
-      2: J('taoye', '那蚕房，我也天天进出。', "I'm in and out of that silk room every day too."),
-      3: J('qin', '冷灶只说她说了谎，不说她在哪里。', 'A cold stove says she lied — not where she was.'),
+      0: J('ruan', '《采桑》？桃叶天天哼，织布也哼，我都会了。', '"Picking Mulberry"? Taoye hums it all day at the loom. Even I know it by now.'),
+      2: J('taoye', '蚕房我也天天进。那我也是贼？', "I'm in the silk room every day too. Am I a thief as well?"),
+      3: J('qin', '灶是冷的，只说明她没蒸糕。那她上哪儿去了？', 'A cold stove only says she didn\'t steam any cakes. So where did she go?'),
     },
     step: null,
     hints: [
-      t('只要一件：既认得出人，又认得出时辰的。', 'Just one: something that names the person and the hour at once.'),
-      t('曲子桃叶也会哼，蚕房桃叶也进出，冷灶只证她说谎——只有那双屐痕，一齿方一齿圆，又压在四分落花底下。', 'Taoye hums the tune and walks in the silk room too, and the cold stove only proves a lie — only those prints are hers alone, one tooth square, one round, under four tenths of petals.'),
+      t('找一样东西：看得出是谁，也看得出是几时。', 'Find one thing that shows who, and when.'),
+      t('曲子、蚕房，桃叶也沾得上；冷灶说不出三娘去了哪儿。补过齿的屐印只有她有，还盖着四分花。', 'The tune and the silk room fit Taoye too, and the cold stove can\'t say where Sanniang went. Only she has the mended clog, and its prints lie under four tenths of petals.'),
     ],
-    right: [J('qin', '覆花四分，正是戌正；一齿方，一齿圆，谷里只此一双。', 'Four tenths of petals: 戌正 (8 pm) exactly. One tooth square, one round: there is only one such pair in the valley.')],
+    right: [J('qin', '四分，戌正。一齿方，一齿圆——鲁三，早上补的那只屐，是谁的？', 'Four tenths: 戌正 (8 pm). One tooth square, one round. Lu San, the clog you mended this morning: whose was it?'), J('lusan', '三娘的。', "Sanniang's.")],
   },
 ];
 
@@ -572,23 +576,23 @@ export function needsMet(q: Question, f: Flags): boolean {
 
 export const JUDGE = {
   gather: t('请众人到庭', 'Gather everyone'),
-  curtain: t('众人齐集祠堂，灯笼一盏一盏点起来。', 'Everyone gathers at the shrine, and the lanterns are lit one by one.'),
-  open: J('qin', '今夜之事，请客人当着众人，一一断来。', 'Guest — before everyone here, judge tonight\'s matter, point by point.'),
+  curtain: t('大家都到了祠堂，灯笼一盏一盏点了起来。', 'Everyone gathers at the shrine, and the lanterns are lit one by one.'),
+  open: J('qin', '人都齐了。客人，你说吧，一样一样来，我们都听着。', 'Everyone\'s here. Go on, guest. One thing at a time. We\'re listening.'),
   /** Esc on a question: nobody is hurried. */
-  pause: J('narr', '（众人静静地等你开口。）', '(Everyone waits quietly for you to speak.)'),
-  pauseChoices: [t('接着断', 'Go on'), t('容我再想想', 'Let me think a while longer')],
-  later: J('qin', '也罢。庭里的花，还等得起。', 'Very well. The petals in the courtyard can wait a while longer.'),
+  pause: J('narr', '（大家都等着，没人催你。）', '(Everyone waits. Nobody hurries you.)'),
+  pauseChoices: [t('接着说', 'Go on'), t('让我再想想', 'Let me think a while longer')],
+  later: J('qin', '不急。花没人扫，就在那儿。', 'No hurry. Nobody\'s sweeping those petals.'),
   /** 三娘 steps forward (Q2 answered wrong three times). */
   confess: J('sang', '不必问了，是我。', 'No need to ask any more. It was me.'),
-  truth: J('qin', '真相大白。……看这一夜，是怎么过去的。', 'The truth is out. …See how the night went.'),
+  truth: J('qin', '好。大家都看着，那一夜是怎么过去的。', 'Right. Everyone, watch how that night went.'),
   gradeLine: (g: Grade, coins: number) => t(`${GRADE_NAME[g].zh} · 得钱 ${coins} 文`, `${GRADE_NAME[g].en} · +${coins} coins`),
 };
 
 /** The ink-ghost replay of §4.1, in three shots. */
 export const GHOSTS: readonly Line[] = [
-  t('戌正，头通鼓响。三娘从西北侧门进庭，沿西墙入殿，揭开泥封，把酒倒进亥正往后的香路。', 'The first drums at 戌正 (8 pm). Sanniang comes in by the north-west side gate, along the west wall into the hall, lifts the mud cap and pours the wine into the incense groove from the 亥正 pin on.'),
-  t('她取出玉印，把坛子摔在供桌前。帘后的小满看见，那缕香烟，还直直地往上冒。', 'She takes the seal and smashes the jar before the altar. Behind the curtain, Xiaoman sees the thread of smoke still rising straight up.'),
-  t('她沿原路回去，屐齿一响一闷，两次走过石瞽的门廊；玉印藏进了蚕匾的桑叶底下。', 'She goes back the way she came, one tooth clicking, one thudding, twice past Shi Gu\'s porch; the seal goes under the mulberry leaves in a silkworm tray.'),
+  t('戌正，头一通鼓响了。三娘从西北侧门进了院子，贴着西墙进殿，揭开泥封，把酒倒进亥正往后的香路。', 'The first drums at 戌正 (8 pm). Sanniang comes in by the north-west side gate, along the west wall into the hall, lifts the mud cap and pours the wine into the incense groove from the 亥正 pin on.'),
+  t('她拿走玉印，把坛子摔在供桌前。帘子后头的小满看见，那缕香烟还直直地往上冒。', 'She takes the seal and smashes the jar before the altar. Behind the curtain, Xiaoman sees the thread of smoke still rising straight up.'),
+  t('她原路回去，屐齿一响一闷，两回走过石瞽的门廊。玉印藏进了蚕匾的桑叶底下。', 'She goes back the way she came, one tooth clicking, one thudding, twice past Shi Gu\'s porch; the seal goes under the mulberry leaves in a silkworm tray.'),
 ];
 
 /** Where the camera looks for each shot of the replay (valley-local). */
@@ -678,7 +682,7 @@ export const HINT_STEPS: readonly HintStep[] = [
   {
     key: 'when', name: t('何时', 'When'), done: (f) => has(f, C_('feng'), C_('menxiang'), C_('zuji'), C_('hualou')),
     tiers: [
-      t('香会说谎，花不会。', 'Incense can lie. Petals cannot.'),
+      t('香灭在亥正，手脚就一定是亥正动的吗？', 'The incense died at 亥正 (10 pm). Does that mean it was done then?'),
       t('把门外的酒香，同杜二的泥封放在一起想。', "Think of the wine at the door together with Du Er's mud seals."),
       t('泥封不香；亥初已闻酒香，坛早开了。去看庭中的花有多厚。', "Sealed jars don't smell; you smelled wine at 亥初 (9 pm), so the jar was already open. Go and see how deep the petals lie."),
     ],
@@ -772,12 +776,12 @@ export const WRITER = {
   ask: t('那封信是您写的。', 'You wrote that letter.'),
   listen: t('（坐下听一曲）', '(Sit and listen)'),
   tune: t('（琴声清冷，庭里的花也像停了一停。石瞽的手按在弦上，侧着耳朵，像在等你开口。）', '(The zither rings cool and clear, and even the petals in the courtyard seem to pause. Shi Gu rests his hand on the strings and tilts his head, as if waiting for you to speak.)'),
-  says: t('我是瞎子。瞎子听见的，当不得证。只好请一个看得见的人来。', "I'm blind. What a blind man hears counts for nothing as proof. So I had to ask someone who could see."),
-  musician: t('琴声里藏不住事。……那封信，是我写的。', 'Nothing hides in the sound of a zither. …That letter — I wrote it.'),
+  says: t('我是瞎子。瞎子说他听见了，谁信？只好写封信，请个看得见的来。', "I'm blind. A blind man says he heard something: who'd believe him? So I wrote a letter and asked for someone who can see."),
+  musician: t('你怀里抱着琴吧？弦一路都在响。弹琴的来找我，是为那封信。……是我写的。', 'You\'ve a qin in your arms, haven\'t you? The strings have been humming all the way. A musician come to see me: it\'s the letter. …I wrote it.'),
   scholar: t('这笔迹行行相叠，像是摸着写的——和先生曲谱上的字，一模一样。', 'These lines slant and overlap as if written by touch — just like the writing on your music, sir.'),
   bird: t('（一只青鸟落在你肩头，不肯走了。）', '(A bluebird settles on your shoulder and will not leave.)'),
   coins: (n: number) => t(`得钱 ${n} 文`, `+${n} coins`),
-  zibai: t('真相是自己走出来的，不是你找出来的。', "The truth walked out by itself; you didn't find it."),
+  zibai: t('她往前站那一步，我听见了。你呀，就差半步。', "I heard her step forward. You were half a step short, you know."),
 };
 
 // ───────────────────────────── the companions' tools (§4.6)
@@ -786,14 +790,14 @@ export const TOOLS = {
   cat: { glyph: '嗅', name: t('嗅', 'Scent'), note: t('琥珀色是酒，青绿色是桑叶。', 'Amber is wine; green is mulberry.'), hollow: t('大橘朝西北坡嗅了嗅：那边有个孩子的味儿。', 'Big Ginger sniffs toward the north-west knoll: there is a child over there.') },
   rabbit: { glyph: '听', name: t('听', 'Listen'), note: t('玉兔竖起耳朵：脚步声化作一圈圈墨痕。', 'The Jade Rabbit pricks up her ears: every footstep turns to a ring of ink.'), sang: t('三娘那边：嗒·咚，嗒·咚——一齿清，一齿闷。', 'From Sanniang: click-thud, click-thud — one tooth clear, one dull.'), addendum: t('玉兔听见三娘的脚步：嗒·咚，嗒·咚。', "The Jade Rabbit heard Sanniang's steps: click-thud, click-thud.") },
   painter: { glyph: '笔', name: t('纸鹤', 'Crane'), to: (w: Line) => t(`纸鹤飞向${w.zh}。`, `The crane flies toward ${w.en.charAt(0).toLowerCase() + w.en.slice(1)}.`), none: t('纸鹤绕你飞了一圈：此间的证物，都已找到。', 'The crane circles you once: every piece of evidence here is found.'), hollow: t('西北坡的老碧桃', 'the old peach on the north-west knoll') },
-  player: { glyph: '弈', name: t('复盘', 'Review'), far: t('复盘，须在供桌前。', 'The review must be done before the altar.'), line: t('这一步，不在谱上。', "This move isn't in the record."), replay: t('「亥正坛碎，酒泼香灭」——若是如此，前后的香灰都该溅湿。', '"The jar broke at 亥正 (10 pm) and the splash put the incense out" — if so, the ash on both sides would be spattered.') },
-  taoist: { glyph: '风', name: t('风', 'Wind'), far: t('风符，须在庭中。', 'The wind talisman must be used in the courtyard.'), line: t('风起，落花离地——每一行足迹都亮了，越旧越亮。', 'The wind lifts every petal — each line of prints shines, the older the brighter.') },
+  player: { glyph: '弈', name: t('复盘', 'Review'), far: t('复盘得在供桌前。', 'The review must be done before the altar.'), line: t('这一步，不在谱上。', "This move isn't in the record."), replay: t('「亥正坛碎，酒泼香灭」——真要是这样，前后的香灰都该溅湿。', '"The jar broke at 亥正 (10 pm) and the splash put the incense out" — if so, the ash on both sides would be spattered.') },
+  taoist: { glyph: '风', name: t('风', 'Wind'), far: t('风符得在院子里用。', 'The wind talisman must be used in the courtyard.'), line: t('风起，落花离地——每一行足迹都亮了，越旧越亮。', 'The wind lifts every petal — each line of prints shines, the older the brighter.') },
   swordsman: { window: t('窗台上有一双小手印……是个孩子，朝西北去了。', 'A pair of small handprints on the sill… a child, heading north-west.'), plain: t('后窗虚掩着，窗台上落着几片花瓣。', 'The back window stands ajar; a few petals lie on the sill.'), label: t('殿后 · 后窗', 'Behind the hall · the back window') },
   guan: {
     duer: t('（关公抚髯，只看着杜二。）', '(Lord Guan strokes his beard and simply looks at Du Er.)'),
     duerAsk: t('关某问你：祭前，可曾碰过供桌？', 'Guan asks you: before the rite — did you touch the altar?'),
-    sang: t('（三娘在关公面前只是发抖，一言不发。）', '(Before Lord Guan, Sanniang only trembles, and says nothing.)'),
-    lusan: t('（鲁三挺直了腰，竟说了一整句话。）', '(Lu San straightens up and manages a whole sentence.)'),
+    sang: t('（关公只看着她。三娘没再往下说，手在抖。）', '(Lord Guan only looks at her. Sanniang says no more; her hands are shaking.)'),
+    lusan: t('（鲁三挺直了腰，难得说了一整句话。）', '(Lu San straightens up and manages a whole sentence.)'),
   },
   poet: { duer: t('斗酒 · 来，先干一碗', 'Drink · a bowl first, then talk'), drank: t('（诗仙与杜二连干三大碗。杜二先醉了，眼圈也红了。）', '(The Poet Immortal and Du Er down three great bowls. Du Er is drunk first, and his eyes go red.)'), taste: t('淡！', 'Thin!') },
   fisher: { line: t('溪里漂下来的白边花瓣，都是从西北来的。', 'The white-edged petals on the stream all come down from the north-west.'), stream: t('渔翁看了看溪水：「白边的花瓣，都是从西北漂下来的。」', 'The Old Fisherman watches the stream: "The white-edged petals all come down from the north-west."') },
@@ -818,10 +822,10 @@ export const WORLD = {
   collar: t('（阮郎领口沾着一片白边的桃瓣。）', "(A white-edged peach petal clings to Ruan Qing's collar.)"),
   jars: t('问泥封', 'Ask about the seals'),
   sniff: t('（你凑近窖里的陈坛闻了闻：只有泥土腥。）', '(You put your nose to a sealed jar in the cellar: only the smell of earth.)'),
-  duerSays: t('泥封的坛子，神仙也闻不着。今年开封的十年陈，只有供花神那一坛；场上喝的新醅，没那股香。', "A mud-sealed jar — not even a god could smell it. The only ten-year jar opened this year was the flower god's. The new brew at the square has no such scent."),
+  duerSays: [t('泥封着的坛子，神仙来了也闻不着！', 'A mud-sealed jar? Not even a god could smell it!'), t('今年开了封的十年陈就一坛，供花神那坛。场上喝的新醅，没那个香。', "Only one ten-year jar got opened this year: the flower god's. The new brew at the square hasn't got that smell.")],
   basin: t('（葛姑的花漏石盆，刻着十道圈，盆底一层薄薄的落花。）', "(Ge Gu's petal-clock basin, ruled in ten rings, with a thin, even layer of petals in the bottom.)"),
-  gegu: t('这谷里的花，落得比更漏还匀：半个时辰，覆地一分。今夜无风，祠堂的院子又四面有墙，更是一分不差。', "The petals here fall more evenly than any water-clock: half a double-hour covers the ground one tenth. There's no wind tonight, and the shrine yard is walled on all four sides — it won't be off by a hair."),
-  gegu2: t('子正往回数：一分一个钟头。', 'Count back from midnight: one tenth per hour.'),
+  gegu: t('谷里的花，落得比更漏还匀。半个时辰，盖地一分。今夜没风，祠堂院子四面又有墙，差不了。', "The petals in here fall more evenly than any water-clock. Half a double-hour, one tenth of the ground. No wind tonight, and the shrine yard's walled all round. It won't be off."),
+  gegu2: t('脚印盖了几分，就从子正往回数几个半时辰。数了十年，头一回派上用场。', 'However many tenths cover a print, count back that many hours from midnight. Ten years of counting, and it\'s finally good for something.'),
   sealAsk: t('取出玉印？', 'Take the jade seal?'),
   sealTake: t('收起玉印', 'Take the seal'),
   sealLeave: t('留在原处', 'Leave it where it is'),
