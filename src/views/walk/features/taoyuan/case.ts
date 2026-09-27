@@ -313,7 +313,7 @@ export const WITNESSES: readonly Witness[] = [
     ],
     breaks: [{
       flag: brokeFlag('duer'), by: ['beiyin'], companions: ['poet', 'guan'],
-      says: [t('供桌左角那杯茶，是我搁的。给我婆娘的。', 'That cup on the left corner of the altar — I put it there. For my wife.'), t('蜜渍桃花茶。她就好这一口，一碗搁三勺蜜，甜得齁人。', 'Honeyed peach-blossom tea. Her favourite. Three spoons of honey a bowl, sweet enough to choke you.'), t('花朝不许私祭，我知道，我知道。……喝不喝？新醅。', "No private offerings on the Flowers' Birthday. I know, I know. …Drink? It's the new brew.")],
+      says: [t('供桌左角那杯茶，是我搁的。给我婆娘的。', 'That cup on the left corner of the altar — I put it there. For my wife.'), t('蜜渍桃花茶。她就好这一口，一碗搁三勺蜜，甜得发腻。', 'Honeyed peach-blossom tea. Her favourite. Three spoons of honey a bowl, sweet enough to choke you.'), t('花朝不许私祭，我知道，我知道。……喝不喝？新醅。', "No private offerings on the Flowers' Birthday. I know, I know. …Drink? It's the new brew.")],
     }],
     after: [t('对了，戌正我们出花场，到岔路口，我看见三娘往西去了。', 'Oh, and at 戌正 (8 pm), leaving the square, I saw Sanniang turn west at the fork.'), t('她走的时候说是回去蒸糕。桃叶那丫头还在长桌边上分糕呢。', "She'd said she was going home to steam cakes. Taoye was still at the long tables handing them out.")],
   },
