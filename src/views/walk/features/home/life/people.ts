@@ -11,6 +11,7 @@ import { inked } from '../../kit';
 import { merge, part } from '../../geo';
 import { figure, speechMark, talk, type Figure, type FigureSpec, type Hat } from '../../minigames/npc';
 import { begin, end } from '../../minigames/ui';
+import { stallFolk } from '../../npcs/talk';
 import { home, type Resident } from '../../../../../app/home';
 import { earn, record, unlocked } from '../../../../../app/play';
 import { today } from '../../../../../app/store';
@@ -812,6 +813,9 @@ export class Seller {
     this.cart.rotation.set(0, 0, 0);
   }
 
+  /** Who he is (甘九): his name once you have met, his introduction and his stories. */
+  private folk = stallFolk('n.pets');
+
   /** Set the baskets down beside him and open for business. */
   private setDown(): void {
     const fig = this.fig!, cart = this.cart!;
@@ -825,7 +829,8 @@ export class Seller {
     fig.faceTo = this.face;
     this.state = 'here';
     this.pos.set(this.at.x, y, this.at.z);
-    this.off = this.bag.interact({ id: 'home-seller', position: this.pos, radius: 2.2, labelZh: '宠物贩', labelEn: 'Pet seller', actionZh: '看看', actionEn: 'Browse', act: () => this.browse() });
+    const l = this.folk.label();
+    this.off = this.bag.interact(this.folk.prompt({ id: 'home-seller', position: this.pos, radius: 2.2, labelZh: l.zh, labelEn: l.en, actionZh: '看看', actionEn: 'Browse', act: () => this.browse() }));
   }
 
   /** The market is over: pole up, and off home. */
@@ -868,7 +873,8 @@ export class Seller {
       const sp = SPECIES.find((s) => s.id === this.special)!;
       const off = Math.round(sp.price * 0.8);
       const list = SPECIES.map((s) => ({ s, price: s.id === this.special ? off : s.price }));
-      const i = await talk(ctx, this.fig, { zh: '宠物贩', en: 'Pet seller' }, [
+      if ((await this.folk.story(ctx)) === null) return;
+      const i = await talk(ctx, this.fig, this.folk.name(), [
         { zh: '瞧一瞧看一看！小狗小猫、兔子鸭子，还有会说话的鹦鹉！', en: 'Come and see! Puppies, kittens, rabbits, ducks — and a talking parrot!' },
         { zh: `今天${sp.zh}便宜，只要 ${off} 文。先说好：得有窝才能领回去。`, en: `The ${sp.en.toLowerCase()} is cheap today — only ${off}. Mind you, it needs a home of its own first.`, choices: [...list.map((x) => ({ zh: `${x.s.zh} · ${x.price} 文`, en: `${x.s.en} · ${x.price}` })), { zh: '只是看看', en: 'Just looking' }] },
       ]);

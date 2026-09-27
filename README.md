@@ -105,7 +105,13 @@ and branches, where only a jump reaches them (a few need a double jump, a high j
 The bamboo grove has a course of plum-blossom poles (梅花桩) with a best time to beat; stepping
 stones cross the river west of the town; rocks on Plum Ridge climb to a hidden lookout.
 
-**People.** The places are busy: townsfolk stroll the lanes, vendors call from their stalls,
+**People.** Every one of them has a name and can be talked to. Walk up to anyone and 「搭话」:
+they stop what they are doing, turn to you, and introduce themselves; after three talks they
+greet you by the name you chose. What they say depends on who you walk as: the watchman 老吴
+admits to 关公 that he is afraid of the dark lanes, tells 嫦娥 about the night he saw someone
+step off the moon, and grumbles at 大橘 about toppled lanterns. Some have stories that unfold a
+little each day, and a few end with a letter in your mailbox.
+The places are busy: townsfolk stroll the lanes, vendors call from their stalls,
 washerwomen kneel at the river steps, boatmen pole along, monks sweep the temple court. After
 dark there is a night market, lantern-viewers, a lantern boat, and a watchman calling
 「天干物燥，小心火烛」. Some people you can talk to: a peddler (货郎) who sells things you can carry
@@ -126,7 +132,7 @@ not met. They are kept in the quest book's 奇遇录.
 
 **同伴 Companions.** You can walk as any of thirteen companions: the scholar, a gardener, an old
 fisherman, a qin player, a wandering swordsman, a Taoist child, a painter, a go master, Big
-Ginger the cat, the jade rabbit, a poet, 关公, and 嫦娥 herself. Each walks, idles and moves in
+Ginger the cat, the jade rabbit (sent down by 嫦娥 in your first letter), a poet, 关公, and 嫦娥 herself. Each walks, idles and moves in
 their own way, and each has a skill: the scholar brushes a line of verse into the air, the
 gardener makes flowers burst up around him, the fisher casts a net into any water, the qin
 player's music draws birds, koi and passers-by, the swordsman dashes and can double-jump, the
@@ -140,6 +146,21 @@ of incense all the way through and the qin player does. Others come from play: c
 ring the temple bell, visit all six places, beat the Club level at gomoku or xiangqi, find the
 cat three times, eat all eight mooncakes, chain ten lines of 飞花令, solve 横刀立马. When all
 twelve have joined you, 嫦娥 comes down from the moon.
+
+**信 Letters.** A mailbox (信) sits in the garden's top bar and in 入画. The first letter, 初见礼,
+comes from 嫦娥 herself: she sends the Jade Rabbit down to keep you company, with three hundred
+coins, and asks what to call you. The name you write (名号, also in Settings) is used by everyone
+in the painting. Other letters follow the stories you live through.
+
+**桃源 The Peach Blossom Spring.** Someone at the mountain temple writes that there is light behind
+the waterfall. Step into it: 「初极狭，才通人」 — a narrow cleft, then 「豁然开朗」, a hidden valley
+blooming into colour, where thirteen villagers keep a spring that never ends, have not heard of
+the Han, and are about to celebrate the Flowers' Birthday. The valley keeps its own hour, from
+honey-light afternoon to a night of sky lanterns. On that night something goes missing, and a
+blind man's letter asks you to find out who took it: **《落花为证》**, a fair-play mystery with
+twelve clues, six witnesses who each hide something, a case book (案卷) with hints, and a
+judgement of five questions. Every clue can be found by anyone; companions only find some of
+them faster. The way in closes behind you when you leave — but a pressed petal may open it again.
 
 **家园 The homestead.** West of the garden is a plot that is yours. Build mode (营造) looks down on
 it: pick from about thirty things (a thatched cottage, a tiled house, a study, a pavilion, a

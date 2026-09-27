@@ -56,15 +56,21 @@ src/
                music*.ts is the generative BGM (composer, themes, instruments, conductor)
   app/         store (signals + localStorage, cross-tab sync), router, i18n, App shell, demo data,
                PWA registration, hostSave (downloads when embedded in a host page)
-  ui/          shared kit: Sheet, Segmented, Toggle, toast (with Undo), PlantGlyph
+  ui/          shared kit: Sheet (stacked: Esc closes the topmost; openSheets), Segmented, Toggle, toast (with Undo;
+               dismissToast), PlantGlyph
   views/       Garden, Focus, Almanac, Scroll, Settings; games/* (gomoku, xiangqi, klotski, tangram,
-               feihua, snake, tictactoe); quests/ (quest book, celebrations)
+               feihua, snake, tictactoe); quests/ (quest book, celebrations, keepsakes);
+               mail/ (信: the mailbox, the letter, the name sheet — app/mail.ts, data/letters.ts)
     walk/        入画, the 3D world (three.js):
       map.ts         the one source of truth for where things are (regions, river, lake, paths, anchors)
       types.ts       the WorldCtx contract every region and feature builds against
       world/         core: terrain, water, bridges, scatter, garden, player, camera, HUD, travel
-      regions/       the five places (water town, lotus lake, bamboo, plum ridge, temple)
-      features/      festivals, everyday life, mini-games and NPCs (features/minigames/)
+      regions/       the places (water town, lotus lake, bamboo, plum ridge, temple, homestead) and the
+                     pocket valley 桃源 (regions/taoyuan.ts; built lazily, entered through the waterfall)
+      features/      festivals, everyday life, mini-games and NPCs (features/minigames/); the folk
+                     (features/npcs/: crowd.ts, folk.ts names, folk-lines.ts / folk-arcs.ts talk and
+                     stories, talk.ts); 桃源 (features/taoyuan/: valley, fx, door, story, villagers, the
+                     case 落花为证 — see features/taoyuan/API.md)
       characters/    the thirteen companions (models, portraits, the picker)
   data/        also characters.ts (the cast) and quests.ts; app/play.ts keeps play progress
   lab/         visual test bench: /lab.html?scene=<name> (scenes in src/lab/scenes/*.ts)

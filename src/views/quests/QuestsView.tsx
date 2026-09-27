@@ -1,7 +1,8 @@
 // 任务簿 · Quest Book — the purse (钱囊: what's in it, what came in today and from where, and
 // what coins are for), today's three errands, the companions' gallery (who you can walk the
 // painting as, their skills, and what brings the others), every quest with its progress or its
-// stamp and its coins, the seal album (印谱) and the book of chance encounters (奇遇录).
+// stamp and its coins, the seal album (印谱), the book of chance encounters (奇遇录) and the 案卷 of the
+// 桃源 case (walk/case/CaseBook.tsx).
 import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import { GameShell } from '../games/GameShell';
@@ -9,18 +10,22 @@ import { useT } from '../../app/i18n';
 import { go } from '../../app/router';
 import { lang, state as appState, today } from '../../app/store';
 import {
-  CHECKIN_COINS, ERRAND_COINS, ERRANDS_ALL_COINS, INCENSE_COINS, daily, encounterMet, play, questCoins, questTarget, questValue, selectCharacter,
+  CHECKIN_COINS, ERRAND_COINS, ERRANDS_ALL_COINS, INCENSE_COINS, daily, encounterMet, play, questCoins, questPaid, questTarget, questValue, selectCharacter,
 } from '../../app/play';
 import { CHARACTERS, CHARACTER, type CharacterDef } from '../../data/characters';
 import { QUEST, QUESTS, type QuestDef } from '../../data/quests';
+import { LETTER } from '../../data/letters';
+import { heldKeepsakes } from '../../data/keepsakes';
+import { openMail } from '../../app/mail';
 import { ENCOUNTERS, type EncounterDef } from '../../data/encounters';
 import { REGION } from '../walk/map';
 import { CharacterSelect } from '../walk/characters/Select';
+import { CaseBook } from '../walk/case/CaseBook';
 import { CoinBadge, CoinIcon, fmtCoins } from '../../ui/coins';
 import { BrushBar, PaperPage, Portrait, Seal, Tally } from './bits';
 import {
   COMPANION_QUESTS, SEAL_QUESTS, albumRequest, cnCount, companionCount, dayHeading, doneDate, encounterDay, isUnlocked,
-  OTHER_SOURCES, ledgerToday, routeForKey, routeForQuest, sealCount, stampText,
+  OTHER_SOURCES, ledgerToday, namedSources, routeForKey, routeForQuest, sealCount, stampText,
 } from './helpers';
 import { GAMES_PAY_LEAST, GAMES_PAY_TOP } from '../games/economy';
 import './quests.css';
@@ -56,6 +61,8 @@ export function QuestsView() {
       <Quests t={t} />
       <Album t={t} />
       <Encounters t={t} />
+      <CaseBook t={t} />
+      <Keepsakes t={t} />
       <p class="qb-colophon" aria-hidden="true">
         <span class="brush">半亩</span>
         <span>{t('做事，交友，盖印。', 'Do things. Make friends. Collect seals.')}</span>
@@ -202,6 +209,12 @@ function Hero(props: { c: CharacterDef; t: T }) {
   );
 }
 
+/** A companion a letter brings: 「初见礼 · 在信中」. */
+function giftLine(c: CharacterDef, t: T): string {
+  const l = c.letter ? LETTER[c.letter] : undefined;
+  return t(`${l?.subject.zh ?? '书信'} · 在信中`, `${l?.subject.en ?? 'A letter'} · in your letters`);
+}
+
 function CompanionCard(props: { c: CharacterDef; t: T }) {
   const { c, t } = props;
   const p = play.value;
@@ -229,6 +242,13 @@ function CompanionCard(props: { c: CharacterDef; t: T }) {
             <span class="qb-prog-n num">{prog.value}/{prog.target}</span>
           </div>
           <p class="qb-hint">{t(q.hintZh, q.hintEn)}</p>
+        </div>
+      ) : c.unlock === 'gift' ? (
+        <div class="qb-lock">
+          <Skill c={c} t={t} locked />
+          <p class="qb-lock-q"><span class="qb-lock-mark" aria-hidden="true">信</span>{giftLine(c, t)}</p>
+          <p class="qb-lock-desc">{t('随一封信而来：拆开信匣里的来信，收下便是。', 'Comes with a letter: open it in your letters and accept it.')}</p>
+          <button type="button" class="btn btn-small qb-comp-go" onClick={() => openMail(c.letter)}>{t('拆信', 'Open the letter')}</button>
         </div>
       ) : null}
     </article>
@@ -279,7 +299,7 @@ function QuestItem(props: { q: QuestDef; t: T }) {
             ) : 'seal' in q.reward ? (
               <><span class="qb-q-sealmark" aria-hidden="true">印</span>{t(`得印 · ${q.reward.seal}`, `Seal · ${q.reward.sealEn}`)}</>
             ) : null}
-            <CoinChip n={questCoins(q)} got={!!doneOn} t={t} />
+            <CoinChip n={doneOn ? questPaid(q, play.value) : questCoins(q)} got={!!doneOn} t={t} />
           </p>
           {!doneOn && (
             // the bar and its count wrap as one
@@ -423,6 +443,7 @@ function Purse(props: { t: T }) {
     ['游艺', 'Games', `${GAMES_PAY_LEAST}–${GAMES_PAY_TOP}`],
     ['打卡', 'Check-ins', `${CHECKIN_COINS}`],
     ['燃香', 'Incense', `${INCENSE_COINS}`],
+    ...namedSources(p),
     ...OTHER_SOURCES,
   ];
   return (
@@ -481,6 +502,36 @@ function Purse(props: { t: T }) {
           </div>
         </div>
       </div>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------------------------------ 信物
+
+/** The keepsakes and clues the letters and 桃源 gave (shown once there is one). */
+function Keepsakes(props: { t: T }) {
+  const { t } = props;
+  const l = lang.value;
+  const held = heldKeepsakes(play.value.flags);
+  if (!held.length) return null;
+  return (
+    <section class="qb-sec" aria-labelledby="qb-keep-h" id="keepsakes">
+      <div id="qb-keep-h">
+        <SectionHead t={t} zh="信物" en="Keepsakes" count={`${held.length}`} />
+      </div>
+      <ul class="qb-qy">
+        {held.map(({ id, kind, k }) => (
+          <li key={kind + id} class="qb-qy-card is-met">
+            <div class="qb-qy-seal"><Seal text={k?.seal ?? '信'} size={46} earned /></div>
+            <h3 class="qb-qy-name">
+              <span class={l === 'zh' ? 'brush' : 'latin'}>{k ? t(k.zh, k.en) : id}</span>
+              {l === 'zh' && k && <small class="latin">{k.en}</small>}
+            </h3>
+            <p class="qb-qy-meta">{kind === 'clue' ? t('线索', 'A clue') : t('信物', 'A keepsake')}</p>
+            {k && <blockquote class="qb-qy-note">{t(k.noteZh, k.noteEn)}</blockquote>}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

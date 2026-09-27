@@ -23,6 +23,31 @@ export function special<T>(m: PerCompanion<T>, who: CharacterId): boolean {
   return m[who] !== undefined;
 }
 
+/**
+ * Companions in kinds, so a line can be written once for a kind and still differ by companion:
+ * 文 the lettered, 农 those who work the land and water, 武 the fighters, 仙 the unworldly, 兽 the animals.
+ */
+export type CompanionGroup = 'wen' | 'nong' | 'wu' | 'xian' | 'shou';
+export const GROUPS_OF: Record<CharacterId, CompanionGroup[]> = {
+  scholar: ['wen'], poet: ['wen', 'xian'], painter: ['wen'], player: ['wen'], musician: ['wen'],
+  gardener: ['nong'], fisher: ['nong'], swordsman: ['wu'], guan: ['wu'],
+  taoist: ['xian'], change: ['xian'], rabbit: ['shou', 'xian'], cat: ['shou'],
+};
+
+/** Like PerCompanion, but a line may also be keyed by a companion group (`@wen` …): own → groups → any. */
+export type Voiced<T> = { any: T } & Partial<Record<CharacterId | `@${CompanionGroup}`, T>>;
+
+/** What `m` holds for `who`: their own entry, else their groups' (in order), else the fallback. */
+export function voiced<T>(m: Voiced<T>, who: CharacterId): T {
+  const own = m[who];
+  if (own !== undefined) return own;
+  for (const g of GROUPS_OF[who] ?? []) {
+    const v = m[`@${g}`];
+    if (v !== undefined) return v;
+  }
+  return m.any;
+}
+
 /** One of `list`, the same all day for this salt, moving on with each talk (n). */
 export function pickDaily<T>(list: readonly T[], day: string, salt: string, n = 0): T {
   const base = Math.floor(makeRng(hashString(`${day}:${salt}`))() * list.length);

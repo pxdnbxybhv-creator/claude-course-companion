@@ -6,7 +6,7 @@
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { XZ } from '../../map';
-import { Bag, inked, reducedMotion } from '../kit';
+import { Bag, outlineMat, propMat, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { onSkillEvent } from '../npcs/events';
 import { walkableNear } from './cat';
@@ -31,9 +31,10 @@ export interface FigureSpec {
 
 export interface Figure {
   root: T.Group;
-  head: T.Group;
-  armL: T.Group;
-  armR: T.Group;
+  /** The head's and the arms' pivots (bones of the one skinned mesh: hang things on them as on groups). */
+  head: T.Object3D;
+  armL: T.Object3D;
+  armR: T.Object3D;
   /** Hand position (local to the right arm group) for props. */
   hand: T.Vector3;
   /** Height of the top of the head (m). */
@@ -43,6 +44,8 @@ export interface Figure {
   wave(): void;
   /** Face (turn the whole body) toward a point, smoothly. */
   faceTo: { x: number; z: number } | null;
+  /** Turn the head toward this point, and tilt it up or down to its `y` if given (null: toward the walker, when near). */
+  lookAt?: { x: number; y?: number; z: number } | null;
   /** Walking (0 = still … 1 = a stride): the figure bobs and swings its arms; set by whoever moves it. */
   walking?: number;
   /** A reaction under way ('listen' | 'bow' | 'sniff'), if any. */
@@ -74,7 +77,9 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   root.name = 'npc-figure';
   root.position.copy(at);
   root.rotation.y = heading;
-  const body = new THREE.Group();
+  // (the body, the head and the arms are bones: the figure is one skinned mesh and one outline hull,
+  // two draws where eight separate meshes and hulls were)
+  const body = new THREE.Bone();
   body.scale.setScalar(S);
   root.add(body);
   const sitDrop = spec.sit ? 0.3 : 0;
@@ -103,11 +108,10 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   }
   if (spec.apron) parts.push(part(THREE, new THREE.BoxGeometry(0.26, 0.42, 0.02), spec.apron, { p: [0, 0.48 - sitDrop, 0.2], r: [-0.18, 0, 0] }));
   if (spec.cape) parts.push(part(THREE, robeLathe([[0, 0.1], [0.3, 0.1], [0.27, 0.3], [0.2, 0.5], [0.12, 0.62], [0, 0.64]]), spec.cape, { p: [0, 0.4 - sitDrop * 0.7, -0.02], s: [1, 0.95, 0.95] }));
-  const trunk = inked(ctx, merge(THREE, parts), { width: 0.012 });
-  body.add(trunk);
+  const trunkGeo = merge(THREE, parts);
 
   // head
-  const head = new THREE.Group();
+  const head = new THREE.Bone();
   head.position.set(0, 1.04 - sitDrop, 0);
   const hp: T.BufferGeometry[] = [
     part(THREE, new THREE.SphereGeometry(0.17, 16, 12), skin, { s: [1, 0.98, 0.95] }),
@@ -148,24 +152,50 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       hp.push(part(THREE, new THREE.SphereGeometry(0.175, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), hair, { p: [0, 0.01, -0.01] }));
   }
   if (spec.beard) hp.push(part(THREE, new THREE.ConeGeometry(0.07, 0.2, 8), spec.beard, { p: [0, -0.2, 0.1], r: [Math.PI + 0.25, 0, 0] }));
-  head.add(inked(ctx, merge(THREE, hp), { width: 0.01 }));
+  const headGeo = merge(THREE, hp);
   body.add(head);
 
   // arms: wide sleeves on shoulder pivots, a small hand at the end
+  const armGeos: T.BufferGeometry[] = [];
   const arm = (sx: number) => {
-    const g = new THREE.Group();
+    const g = new THREE.Bone();
     g.position.set(0.15 * sx, 0.92 - sitDrop, 0);
-    const geo = merge(THREE, [
+    armGeos.push(merge(THREE, [
       part(THREE, new THREE.CylinderGeometry(0.045, 0.085, 0.34, 10), spec.robe, { p: [0, -0.17, 0] }),
       part(THREE, new THREE.TorusGeometry(0.083, 0.012, 4, 12), spec.trim, { p: [0, -0.335, 0], r: [Math.PI / 2, 0, 0] }),
       part(THREE, new THREE.SphereGeometry(0.04, 8, 6), skin, { p: [0, -0.37, 0.01] }),
-    ]);
-    g.add(inked(ctx, geo, { width: 0.01 }));
+    ]));
     g.rotation.z = 0.18 * sx;
     body.add(g);
     return g;
   };
   const armL = arm(1), armR = arm(-1);
+  // each part laid out as its bone holds it at rest (in the root's space), and riding that bone alone
+  const bones = [body, head, armL, armR];
+  const geos = [trunkGeo, headGeo, ...armGeos];
+  const counts = geos.map((g) => g.attributes.position.count);
+  for (const b of bones) b.updateMatrix();
+  geos.forEach((g, i) => g.applyMatrix4(i === 0 ? body.matrix : new THREE.Matrix4().multiplyMatrices(body.matrix, bones[i].matrix)));
+  const geo = merge(THREE, geos);
+  const n = geo.attributes.position.count;
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  for (let i = 0, o = 0; i < counts.length; o += counts[i], i++) for (let v = o; v < o + counts[i]; v++) { si[v * 4] = i; sw[v * 4] = 1; }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+  const mesh = new THREE.SkinnedMesh(geo, propMat(ctx));
+  const hull = new THREE.SkinnedMesh(geo, outlineMat(ctx, 0.011 * S));
+  hull.name = 'outline';
+  hull.raycast = () => {};
+  root.add(mesh, hull);
+  const skeleton = new THREE.Skeleton(bones);
+  root.updateMatrixWorld(true);
+  mesh.bind(skeleton);
+  hull.bind(skeleton);
+  // (culled as the figure at rest, with room for a turned head, a bow and a waving arm)
+  const sphere = geo.boundingSphere!.clone();
+  sphere.radius += 0.3 * S;
+  mesh.boundingSphere = sphere;
+  hull.boundingSphere = sphere.clone();
   bag.add(root, parent);
 
   const still = reducedMotion();
@@ -181,6 +211,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     root, head, armL, armR, hand: new THREE.Vector3(0, -0.37, 0.01), height: (1.24 - sitDrop) * S, talking: false,
     wave() { if (waveT < 0) rest.copy(armR.rotation); waveT = 0; },
     faceTo: null,
+    lookAt: null,
     walking: 0,
     get reacting() { return react; },
     get disposed() { return dead; },
@@ -202,7 +233,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     reactDelay = d * 0.06;
     src.x = e.x; src.z = e.z;
   }));
-  let nod = 0, yaw = 0, lean = 0, sway = 0, strode = false, turned = false, farLod = false;
+  let nod = 0, yaw = 0, tilt = 0, lean = 0, sway = 0, strode = false, turned = false, farLod = false;
   const hulls: T.Object3D[] = [];
   root.traverse((o) => { if (o.name === 'outline') hulls.push(o); });
   // where they looked before a reaction turned them (to turn back to)
@@ -236,13 +267,21 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       if (face === restAt && Math.abs(dd) < 0.01) turned = false;
     }
     let wantYaw = 0;
-    if (d < 6 && !acting) {
-      let a = Math.atan2(dx, dz) - root.rotation.y;
+    const la = fig.lookAt;
+    if (!acting && (la || d < 6)) {
+      let a = (la ? Math.atan2(la.x - root.position.x, la.z - root.position.z) : Math.atan2(dx, dz)) - root.rotation.y;
       a = Math.atan2(Math.sin(a), Math.cos(a));
       wantYaw = Math.max(-0.9, Math.min(0.9, a));
     }
     yaw += (wantYaw - yaw) * Math.min(1, dt * 4);
     head.rotation.y = yaw;
+    // (looking up at someone, or down: a wide brim no longer hides the face from them)
+    let wantTilt = 0;
+    if (la && la.y !== undefined && !acting) {
+      const hd = Math.hypot(la.x - root.position.x, la.z - root.position.z);
+      wantTilt = Math.max(-0.45, Math.min(0.25, -Math.atan2(la.y - (root.position.y + fig.height - 0.2 * S), hd)));
+    }
+    tilt += (wantTilt - tilt) * Math.min(1, dt * 4);
     nod = fig.talking && !still ? Math.sin(t * 7) * 0.06 : nod * 0.9;
     const k = still ? 0 : 1;
     const wantLean = acting === 'bow' ? 0.55 * Math.min(1, reactT / 0.5) : acting === 'sniff' ? 0.2 : 0;
@@ -251,7 +290,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     const wantSway = acting === 'listen' ? Math.sin(t * 1.9 + seed) * 0.08 * k : 0;
     sway += (wantSway - sway) * Math.min(1, dt * 4);
     body.rotation.z = sway;
-    head.rotation.x = nod + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02) + (acting === 'sniff' ? 0.22 : acting === 'listen' ? -0.06 : 0);
+    head.rotation.x = nod + tilt + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02) + (acting === 'sniff' ? 0.22 : acting === 'listen' ? -0.06 : 0);
     // arms swing when walking; a raised hand to the nose when sniffing
     // (only for figures that walk: the others keep the poses their feature gave their arms)
     if (waveT < 0 && w > 0.01 && !fig.talking) {
@@ -342,14 +381,23 @@ export function speechMark(bag: Bag, fig: Figure, glyph: string): { set(on: bool
   return { set(v) { on = v; } };
 }
 
-/** A few lines in a row from an NPC (each waits for a tap); resolves with the last choice. */
-export async function talk(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string }, lines: { zh: string; en: string; choices?: { zh: string; en: string }[] }[]): Promise<number> {
+/**
+ * A few lines in a row from an NPC (each waits for a tap); resolves with the last choice. They turn to
+ * the walker, unless `o.face` says where (null: they stay as they are); `o.look` turns their head
+ * toward a point while they speak (a camera on them).
+ */
+export async function talk(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string }, lines: { zh: string; en: string; choices?: { zh: string; en: string }[] }[], o: { face?: { x: number; z: number } | null; look?: { x: number; y?: number; z: number } } = {}): Promise<number> {
   let last = -1;
-  if (fig) { fig.talking = true; fig.faceTo = { x: ctx.player.position.x, z: ctx.player.position.z }; }
+  const looked = fig?.lookAt ?? null;
+  if (fig) {
+    fig.talking = true;
+    if (o.face !== null) fig.faceTo = o.face ?? { x: ctx.player.position.x, z: ctx.player.position.z };
+    if (o.look) fig.lookAt = o.look;
+  }
   try {
     for (const l of lines) last = await ctx.hud.say({ nameZh: name.zh, nameEn: name.en, zh: l.zh, en: l.en, choices: l.choices });
   } finally {
-    if (fig) fig.talking = false;
+    if (fig) { fig.talking = false; if (o.look && fig.lookAt === o.look) fig.lookAt = looked; }
   }
   return last;
 }

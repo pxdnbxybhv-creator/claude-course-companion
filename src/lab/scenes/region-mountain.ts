@@ -3,7 +3,7 @@
 // (REGIONS elevations, the lake, the river), paper sky and fog, a fake WorldCtx, preset cameras.
 // Lets the regions be iterated on while the real world core is being rebuilt.
 import * as THREE from 'three';
-import { ANCHORS, LAKE, REGION, REGIONS, RIVER, RIVER_LAKE_BREAK, type RegionId, type XZ } from '../../views/walk/map';
+import { ANCHORS, LAKE, REGION, GROUND_REGIONS as REGIONS, RIVER, RIVER_LAKE_BREAK, type RegionId, type XZ } from '../../views/walk/map';
 import type { RegionModule, WorldCtx } from '../../views/walk/types';
 import { PIGMENTS } from '../../ink/types';
 import { makeNoise2, makeRng } from '../../core/rng';

@@ -1,6 +1,10 @@
 /* 设置 · Settings */
 .settings-view .topbar { max-width: 680px; }
 .settings-view .topbar-title { align-items: center; gap: 6px; }
+/* on a phone the list of what is here may take two short lines rather than lose its end */
+@media (max-width: 480px) {
+  .settings-view .topbar-sub { white-space: normal; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-left: 4px; }
+}
 .set-back { margin-left: -10px; }
 .set-page { padding-bottom: 28px; }
 .set-section .section-title { margin-top: 26px; }
@@ -23,6 +27,10 @@
 .set-hint { display: block; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
 
 /* seal */
+/* 名号: the name field and its 拟号 button, above the seal */
+.set-name { display: flex; align-items: flex-end; gap: 10px; padding: 0 0 10px; border-bottom: 1px dashed var(--line); }
+.set-name-field { flex: 1 1 auto; min-width: 0; margin: 4px 0 0; }
+.set-hao { flex: none; margin-bottom: 30px; }
 .set-seal { display: flex; align-items: center; gap: 18px; padding: 6px 0 12px; flex-wrap: wrap; }
 .set-seal-field { flex: 1 1 180px; margin: 8px 0; }
 .set-seal-field input { font-size: 26px; letter-spacing: 0.3em; font-family: var(--font-brush); }

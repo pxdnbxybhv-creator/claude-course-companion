@@ -10,7 +10,27 @@ import {
 describe('quest book helpers', () => {
   it('splits the quests into companion and seal groups, covering all of them', () => {
     expect(COMPANION_QUESTS.length + SEAL_QUESTS.length).toBe(QUESTS.length);
-    expect(COMPANION_QUESTS.length).toBe(CHARACTERS.length - 1);
+    // everyone but the scholar (from the start) and 玉兔 (the 初见礼 letter) comes with a quest
+    expect(COMPANION_QUESTS.length).toBe(CHARACTERS.filter((c) => c.unlock !== 'default' && c.unlock !== 'gift').length);
+    expect(COMPANION_QUESTS.length).toBe(CHARACTERS.length - 2);
+    // 八月十五 now earns the seal 团圆
+    expect(SEAL_QUESTS.some((q) => q.id === 'q-mooncake' && 'seal' in q.reward && q.reward.seal === '团圆')).toBe(true);
+  });
+
+  it('the ledger names coins from letters and from 桃源, and any other named source', async () => {
+    const { ledgerToday, namedSources } = await import('../src/views/quests/helpers');
+    const p = emptyPlay();
+    p.daily = { day: '2026-09-26', picks: [], counts: { 'src:mail': 300, 'src:taoyuan': 120, 'src:kite': 5, earned: 425 }, visited: [], paid: [] };
+    const { rows, total } = ledgerToday(p, '2026-09-26');
+    expect(rows.find((r) => r.key === 'src:mail')).toMatchObject({ zh: '书信', en: 'Letters', coins: 300 });
+    expect(rows.find((r) => r.key === 'src:taoyuan')).toMatchObject({ zh: '桃源', en: 'Peach Spring', coins: 120 });
+    expect(rows.find((r) => r.key === 'src:kite')?.coins).toBe(5);
+    expect(rows.some((r) => r.key === 'other')).toBe(false);
+    expect(total).toBe(425);
+    // 桃源 is named where coins come from only once you have been there
+    expect(namedSources(p).map((r) => r[0])).toEqual(['书信']);
+    p.flags['visit:taoyuan'] = true;
+    expect(namedSources(p).map((r) => r[0])).toEqual(['书信', '桃源']);
   });
 
   it('counts companions and seals for the hall stat line', () => {

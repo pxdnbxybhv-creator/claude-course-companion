@@ -8,6 +8,8 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { CHARACTERS, CHARACTER, type CharacterId } from '../../../data/characters';
 import { QUEST } from '../../../data/quests';
+import { LETTER } from '../../../data/letters';
+import { openMail } from '../../../app/mail';
 import { play, questTarget, questValue, selectCharacter, unlocked } from '../../../app/play';
 import { state as appState, today } from '../../../app/store';
 import { Sheet, toast } from '../../../ui/kit';
@@ -57,6 +59,12 @@ const PROPER_NAMES = new Set<CharacterId>(['cat', 'guan', 'change']);
 const enWho = (id: CharacterId) => (PROPER_NAMES.has(id) ? CHARACTER[id].en : `the ${CHARACTER[id].en}`);
 // the roster's small tiles take a short English name (the full one is in the label and above)
 const SHORT_EN: Partial<Record<CharacterId, string>> = { swordsman: 'Swordsman', player: 'Go Master', fisher: 'Fisherman' };
+
+/** A companion a letter brings: 「初见礼 · 在信中」. */
+function giftLine(letter: string | undefined, t: (zh: string, en: string) => string): string {
+  const l = letter ? LETTER[letter] : undefined;
+  return t(`${l?.subject.zh ?? '书信'} · 在信中`, `${l?.subject.en ?? 'A letter'} · in your letters`);
+}
 
 export function CharacterSelect(props: { open: boolean; onClose: () => void }) {
   const t = useT();
@@ -205,6 +213,13 @@ function SelectBody(props: { onClose: () => void }) {
             </div>
             <p class="cs-prog num">{progress.value} / {progress.target}</p>
           </div>
+        ) : def.unlock === 'gift' ? (
+          <div class="cs-quest cs-gift">
+            <p class="cs-qtitle"><span class="cs-tag">{t('书信', 'Letter')}</span>{giftLine(def.letter, t)}</p>
+            <p class="cs-desc">{t('她随一封信而来：拆开信匣里的来信，收下便是。', 'She comes with a letter: open it in your letters and accept it.')}</p>
+            <p class="cs-lockskill"><span class="cs-tag cs-tag-skill">{t('技', 'Skill')}</span>{t(`结伴后可用「${def.skill.zh}」`, `Brings “${def.skill.en}”`)}</p>
+            <button type="button" class="btn btn-primary cs-go" onClick={() => { props.onClose(); openMail(def.letter); }}>{t('拆信', 'Open the letter')}</button>
+          </div>
         ) : null}
       </div>
 
@@ -220,7 +235,9 @@ function SelectBody(props: { onClose: () => void }) {
               role="option"
               aria-selected={c.id === focus}
               tabIndex={c.id === focus ? 0 : -1}
-              aria-label={has ? t(`${c.zh}，${c.titleZh}`, `${c.en}, ${c.titleEn}`) : t(`${c.zh}，未结伴，任务：${q?.zh ?? ''}`, `${c.en}, locked — quest: ${q?.en ?? ''}`)}
+              aria-label={has ? t(`${c.zh}，${c.titleZh}`, `${c.en}, ${c.titleEn}`)
+                : c.unlock === 'gift' ? t(`${c.zh}，未结伴，${giftLine(c.letter, t)}`, `${c.en}, locked — ${giftLine(c.letter, t)}`)
+                : t(`${c.zh}，未结伴，任务：${q?.zh ?? ''}`, `${c.en}, locked — quest: ${q?.en ?? ''}`)}
               onClick={() => setFocus(c.id)}
               onDblClick={() => choose(c.id)}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (c.id === focus) choose(c.id); else setFocus(c.id); } }}

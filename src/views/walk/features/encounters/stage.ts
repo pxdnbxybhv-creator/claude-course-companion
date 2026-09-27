@@ -44,37 +44,36 @@ export interface FinishOpts {
   seal?: string;
 }
 
-export class Stage {
+/**
+ * The stagehand: a scene's own things (a Bag), the claim on the world while it plays, and the small
+ * tools every scene needs — people, lines, prompts, waits, words brushed in the air, soft light, a
+ * drizzle, a borrowed night, a music override, a paper curtain. It has no ending of its own: the 奇遇
+ * Stage below adds the card that remembers an encounter; the 桃源 story (features/taoyuan/stagehand.ts)
+ * saves its own beats.
+ */
+export class Stagehand {
   readonly bag: Bag;
   readonly group: T.Group;
-  readonly rng: Rng;
-  /** The walker has begun the encounter (the director keeps it while they are anywhere near). */
+  /** The walker has begun taking part (a director keeps the scene while they are anywhere near). */
   engaged = false;
-  finished = false;
-  /** The scene gave up for now (the star fell and no wish was made): the director takes it down. */
-  abandoned = false;
-  private claimed = false;
-  private musicHeld = false;
+  protected claimed = false;
+  protected musicHeld = false;
   private nightHeld = false;
   private rain: { stop(): void } | null = null;
   readonly still = reducedMotion();
-  /** The scene's own music while the walker takes part (played from the first claim; handed back a little after the end). */
-  theme: MusicTheme | null = null;
 
-  constructor(
-    readonly ctx: WorldCtx, readonly def: EncounterDef, parent: T.Object3D, readonly day: string,
-    private done: (s: Stage) => void, private later: (key: string) => void = () => {},
-  ) {
+  /**
+   * `claimId`: the slot this scene claims in the world (one game, talk or scene at a time, see
+   * minigames/ui.ts begin); `salt` seeds its small randomness (the drizzle).
+   */
+  constructor(readonly ctx: WorldCtx, parent: T.Object3D, name: string, readonly claimId = 'qiyu', protected salt = name) {
     this.bag = new Bag(ctx);
     this.group = this.bag.add(new ctx.THREE.Group(), parent);
-    this.group.name = `qiyu:${def.id}`;
-    this.rng = makeRng(hashString(`qiyu-stage:${day}:${def.id}`));
+    this.group.name = name;
   }
 
   get THREE() { return this.ctx.THREE; }
   get who(): CharacterId { return this.ctx.player.character; }
-  /** This companion's own version, or null. */
-  get variant(): CharacterId | null { return variantFor(this.def, this.who); }
   tr(zh: string, en: string): string { return this.ctx.lang === 'zh' ? zh : en; }
 
   /** A point on open ground near (x, z), y on the ground (or deck). */
@@ -104,17 +103,18 @@ export class Stage {
   /** Claim the world for the length of a scene (no mini-game starts meanwhile). False if one is running. */
   claim(): boolean {
     if (this.claimed) return true;
-    if (!begin(this.ctx, 'qiyu')) return false;
+    if (!begin(this.ctx, this.claimId)) return false;
     this.claimed = true;
     this.engaged = true;
-    if (this.theme && !this.musicHeld && !this.finished) this.music(this.theme);
     return true;
   }
   unclaim(): void {
     if (!this.claimed) return;
     this.claimed = false;
-    end(this.ctx, 'qiyu');
+    end(this.ctx, this.claimId);
   }
+  /** The scene holds the world's claim now. */
+  get holding(): boolean { return this.claimed; }
 
   /** The scene's prompts that are up now (the dev hook lists them). */
   readonly prompts: Interactable[] = [];
@@ -256,7 +256,7 @@ export class Stage {
     const lines = new THREE.LineSegments(geo, mat);
     lines.frustumCulled = false;
     this.bag.add(lines, ctx.scene);
-    const rng = makeRng(hashString(`rain:${this.def.id}`));
+    const rng = makeRng(hashString(`rain:${this.salt}`));
     const B = 11, H = 9, len = 0.42, slant = 0.12;
     const drops = new Float32Array(n * 3);
     const p0 = ctx.player.position;
@@ -328,6 +328,43 @@ export class Stage {
     return remove;
   }
 
+  /** Take everything down: the claim, the music, the night, the rain, every object and listener. */
+  dispose(): void {
+    this.unclaim();
+    this.releaseMusic();
+    this.night(false);
+    this.rain?.stop();
+    this.bag.dispose();
+  }
+}
+
+/** One 奇遇 set in the world: the stagehand's tools, plus the encounter's own ending (the card). */
+export class Stage extends Stagehand {
+  readonly rng: Rng;
+  finished = false;
+  /** The scene gave up for now (the star fell and no wish was made): the director takes it down. */
+  abandoned = false;
+  /** The scene's own music while the walker takes part (played from the first claim; handed back a little after the end). */
+  theme: MusicTheme | null = null;
+
+  constructor(
+    ctx: WorldCtx, readonly def: EncounterDef, parent: T.Object3D, readonly day: string,
+    private done: (s: Stage) => void, private later: (key: string) => void = () => {},
+  ) {
+    super(ctx, parent, `qiyu:${def.id}`, 'qiyu', def.id);
+    this.rng = makeRng(hashString(`qiyu-stage:${day}:${def.id}`));
+  }
+
+  /** This companion's own version, or null. */
+  get variant(): CharacterId | null { return variantFor(this.def, this.who); }
+
+  override claim(): boolean {
+    const was = this.claimed;
+    if (!super.claim()) return false;
+    if (!was && this.theme && !this.musicHeld && !this.finished) this.music(this.theme);
+    return true;
+  }
+
   abandon(): void { this.abandoned = true; }
 
   private doneFns: (() => void)[] = [];
@@ -374,11 +411,4 @@ export class Stage {
     this.done(this);
   }
 
-  dispose(): void {
-    this.unclaim();
-    this.releaseMusic();
-    this.night(false);
-    this.rain?.stop();
-    this.bag.dispose();
-  }
 }

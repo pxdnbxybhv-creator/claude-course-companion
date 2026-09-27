@@ -14,6 +14,8 @@ import { SKILLS_FEATURES } from './skills';
 import { PARKOUR_FEATURES } from './parkour';
 import { NPCS_FEATURES } from './npcs';
 import { ENCOUNTERS_FEATURES } from './encounters';
+import { TAOYUAN_FEATURES } from './taoyuan/story';
+import { TAOYUAN_CASE_FEATURES } from './taoyuan/case-world';
 import { HOME_FEATURES } from './home';
 
 export { FESTIVALS };
@@ -51,7 +53,9 @@ function finale(): WorldFeature {
 
 const LIST: WorldFeature[] = [
   ...LIFE, ...HIDDEN, midautumn, ...FESTIVE, ...SEASONAL, ...MINIGAME_FEATURES,
-  ...SKILLS_FEATURES, ...PARKOUR_FEATURES, ...NPCS_FEATURES, ...ENCOUNTERS_FEATURES, ...HOME_FEATURES,
+  ...SKILLS_FEATURES, ...PARKOUR_FEATURES, ...NPCS_FEATURES, ...ENCOUNTERS_FEATURES,
+  // the 桃源 story first, then its case (the case hooks into the story's director), both before home
+  ...TAOYUAN_FEATURES, ...TAOYUAN_CASE_FEATURES, ...HOME_FEATURES,
 ];
 
 /** A fresh, independent instance of every feature (their Bags never cross worlds). */

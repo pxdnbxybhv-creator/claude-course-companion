@@ -49,6 +49,18 @@ export function clampPhotoCam(
 }
 
 /**
+ * A fence for the free camera inside a pocket valley (桃源): within `r` of the centre (x, z) and no
+ * higher than `yMax`, so it never looks over the ring of hills into the void beyond. Mutates `p`.
+ */
+export function fenceDisc(p: V3, c: { x: number; z: number }, r: number, yMax: number): V3 {
+  const dx = p.x - c.x, dz = p.z - c.z;
+  const d = Math.hypot(dx, dz);
+  if (d > r) { p.x = c.x + (dx / d) * r; p.z = c.z + (dz / d) * r; }
+  if (p.y > yMax) p.y = yMax;
+  return p;
+}
+
+/**
  * The pixel ratio to render a photograph at: its long side near `longSide` pixels, within the GPU's
  * largest surface (`maxDim`), and never below the ratio the screen already uses (so a photo is never
  * softer or smaller than the view). The pixel budget bounds only what a photograph adds beyond the

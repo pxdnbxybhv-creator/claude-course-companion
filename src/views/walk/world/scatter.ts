@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import type { Season } from '../../../ink/scene-types';
 import { makeNoise2, makeRng, type Rng } from '../../../core/rng';
-import { REGIONS, WORLD_RADIUS } from '../map';
+import { GROUND_REGIONS, WORLD_RADIUS } from '../map';
 import { Bag, canvas, canvasTexture, outlineMaterial, toon } from './kit';
 import { terrain } from './terrain';
 import { terrainY, waterAt } from './site';
@@ -318,7 +318,7 @@ export function buildScatter(bag: Bag, season: Season, reduced: boolean, detail:
   // keep the places' own hearts for the region builders; the garden is walled and dressed already
   const core = (x: number, z: number, k: number) => {
     if (x * x + z * z < 31 * 31) return true;
-    for (const r of REGIONS) {
+    for (const r of GROUND_REGIONS) {
       if (r.id === 'garden' || r.id === 'lake') continue;
       const d = Math.hypot(x - r.center.x, z - r.center.z);
       if (d < r.radius * k) return true;

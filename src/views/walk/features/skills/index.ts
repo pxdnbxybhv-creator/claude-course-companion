@@ -24,6 +24,18 @@ import { makeGuan } from './horse';
 import { Trails } from './passive';
 import { closeSkillSound } from './sound';
 
+/**
+ * A feature may lend a companion's 技 another use for a while — the 桃源 case inside the valley (大橘's
+ * nose, 玉兔's ears, 画师's crane to a clue, 棋士's review at the altar, 道童's wind in the courtyard).
+ * `label` puts its glyph on the button (null: the companion's own); `start` runs in place of the
+ * companion's own skill, or returns null to let theirs run. The cooldown is the companion's own.
+ */
+export interface SkillLoan {
+  label(id: CharacterId): { glyph: string; zh: string; en: string } | null;
+  start(id: CharacterId, env: SkillEnv): Running | null;
+}
+export const skillLoan: { current: SkillLoan | null } = { current: null };
+
 /** Characters whose glyphs the skills brush (fetched early so the first stroke is in brush). */
 const BRUSH_SAMPLE = '题诗酒月花风云山水春秋醉梦仙鹤松竹梅兰菊荷';
 
@@ -119,7 +131,8 @@ function build(bag: Bag, ctx: WorldCtx): void {
       if (run) run.press?.();
       else if (cds.ready(id, t)) {
         let r: Running | null = null;
-        try { r = START[id](t); } catch (e) { console.error('[walk] skill start failed', e); }
+        try { r = skillLoan.current?.start(id, env) ?? null; } catch (e) { console.error('[walk] lent skill failed', e); }
+        try { if (!r) r = START[id](t); } catch (e) { console.error('[walk] skill start failed', e); }
         if (r) {
           run = r;
           runId = id;
@@ -150,7 +163,9 @@ function build(bag: Bag, ctx: WorldCtx): void {
       if (hudShown) { ctx.hud.skill(null); hudShown = false; }
       return;
     }
-    const def = CHARACTER[id].skill;
+    let lent: ReturnType<SkillLoan['label']> = null;
+    try { lent = skillLoan.current?.label(id) ?? null; } catch { lent = null; }
+    const def = lent ?? CHARACTER[id].skill;
     hud.glyph = def.glyph;
     hud.zh = def.zh;
     hud.en = def.en;

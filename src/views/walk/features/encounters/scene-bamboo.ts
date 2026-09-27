@@ -21,7 +21,8 @@ export function zhiyin(s: Stage): Scene {
   wood.rotation.set(0.1, 0, 0.12);
   f.root.add(wood);
   const m = mark(s, f);
-  const name = C('樵夫', 'Woodcutter');
+  // 樵夫 to everyone; to the one who plays for him and is understood, 钟子期 (he says so himself)
+  let name = C('樵夫', 'Woodcutter');
   let heard = false;
   s.theme = 'quiet'; // the place's music hushes, so the qin can be heard
 
@@ -69,6 +70,7 @@ export function zhiyin(s: Stage): Scene {
             k === 0 ? L('洋洋兮若江河！', 'And now — the rivers, rolling on!') : L('峨峨兮若泰山！', 'And now — the mountain, towering!'),
             L('我姓钟，名子期，打柴为生。姑娘心里想着什么，琴里就有什么。', 'My name is Zhong Ziqi; I cut wood for a living. Whatever is in your heart is in your qin.'),
           ]);
+          name = C('钟子期', 'Zhong Ziqi');
           await s.say(null, C('琴师', 'Qin Player'), [L('……我找了很久的人，原来在这里打柴。', '…The one I have searched for so long was here all along, cutting wood.')]);
           await s.say(f, name, [L('这截老桐木，我留了好些年，送给姑娘——拿去做一张新琴。', 'I have kept this old paulownia log for years. Take it — make a new qin.')]);
           s.finish({ zh: '钟子期把一截老桐木留给了你。高山流水，今日终于有人听懂。', en: 'Zhong Ziqi gave you an old paulownia log. High mountains, flowing water — today someone understood.', bonus: 80, seal: '音' });

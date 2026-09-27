@@ -2,6 +2,7 @@
 // done, a leaf of xuan paper bleeds in like ink dropped on paper: a new companion's portrait on a
 // spreading wash (with 「与之同游」), or a seal slamming down with a wooden thud. Tap, Esc or ~6 s
 // dismiss it; several finish at once → shown one after another. Renders nothing when idle.
+// A companion who came in a letter (`gift:<letter id>`, e.g. 「初见礼 · 玉兔」) is announced the same way.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { celebrations, nextCelebration, questCoins, selectCharacter } from '../../app/play';
 import { CoinIcon, fmtCoins } from '../../ui/coins';
@@ -11,6 +12,7 @@ import { lang } from '../../app/store';
 import { audio } from '../../audio/engine';
 import { QUEST, type QuestDef } from '../../data/quests';
 import { CHARACTER, type CharacterDef } from '../../data/characters';
+import { LETTER } from '../../data/letters';
 import { hashString, makeRng } from '../../core/rng';
 import { Portrait, Seal } from './bits';
 import { paintBloom, paintPaper, dprOf } from './paint';
@@ -38,6 +40,21 @@ if (typeof window !== 'undefined') window.addEventListener('keydown', (e) => mod
 
 let seq = 0;
 
+/** What a celebration id stands for: a quest, or a letter's gift (its coins came with the letter). */
+interface Occasion { q: QuestDef; coins: number; letter?: { zh: string; en: string } }
+function occasion(id: string): Occasion | null {
+  if (QUEST[id]) return { q: QUEST[id], coins: questCoins(QUEST[id]) };
+  if (!id.startsWith('gift:')) return null;
+  const l = LETTER[id.slice(5)];
+  const who = l?.attach?.character;
+  if (!l || !who || !CHARACTER[who]) return null;
+  const q: QuestDef = {
+    id, zh: l.subject.zh, en: l.subject.en, descZh: '', descEn: '', hintZh: '', hintEn: '',
+    goal: { kind: 'flag', key: `mail:${l.id}` }, reward: { character: who },
+  };
+  return { q, coins: Math.max(0, Math.floor(l.attach?.coins ?? 0)), letter: l.from };
+}
+
 export function Celebrate() {
   const pending = celebrations.value.length;
   const [cur, setCur] = useState<{ id: string; key: number } | null>(null);
@@ -53,17 +70,18 @@ export function Celebrate() {
     // A breath first, so the moment that finished the quest (a solved puzzle, a caught fish) is seen.
     const tm = setTimeout(() => {
       let id = nextCelebration();
-      while (id && !QUEST[id]) id = nextCelebration();
+      while (id && !occasion(id)) id = nextCelebration();
       if (id) setCur({ id, key: ++seq });
     }, seq === 0 ? 700 : 450);
     return () => clearTimeout(tm);
   }, [cur, pending, visible]);
-  if (!cur) return null;
-  return <Card key={cur.key} q={QUEST[cur.id]} onGone={() => setCur(null)} />;
+  const o = cur ? occasion(cur.id) : null;
+  if (!cur || !o) return null;
+  return <Card key={cur.key} q={o.q} coins={o.coins} letter={o.letter} onGone={() => setCur(null)} />;
 }
 
-function Card(props: { q: QuestDef; onGone: () => void }) {
-  const { q } = props;
+function Card(props: { q: QuestDef; coins: number; letter?: { zh: string; en: string }; onGone: () => void }) {
+  const { q, letter } = props;
   const t = useT();
   const zh = lang.value === 'zh';
   const reduced = useRef(reducedMotion()).current;
@@ -254,8 +272,10 @@ function Card(props: { q: QuestDef; onGone: () => void }) {
             {petals.map((p, i) => <i key={i} style={p} />)}
           </div>
         )}
-        <p class="cel-kicker">{t('任务完成', 'Quest complete')}</p>
-        <h2 id="cel-title" class={'cel-quest ' + (zh ? 'brush' : 'latin')}>{zh ? `「${q.zh}」` : q.en}</h2>
+        <p class="cel-kicker">{letter ? t(`来信 · ${letter.zh}`, `A letter · ${letter.en}`) : t('任务完成', 'Quest complete')}</p>
+        <h2 id="cel-title" class={'cel-quest ' + (zh ? 'brush' : 'latin')}>
+          {zh ? (letter && companion ? `「${q.zh} · ${companion.zh}」` : `「${q.zh}」`) : letter && companion ? `${q.en} · ${companion.en}` : q.en}
+        </h2>
 
         {companion ? (
           <>
@@ -273,7 +293,9 @@ function Card(props: { q: QuestDef; onGone: () => void }) {
             {companion.skill && (
               <p class="cel-skill"><b aria-hidden="true">{companion.skill.glyph}</b>{t(`技 · ${companion.skill.zh}`, `Skill · ${companion.skill.en}`)}</p>
             )}
-            <p class="cel-coins"><CoinIcon size={16} />{t(`赏钱 ${fmtCoins(questCoins(q))} 文`, `${fmtCoins(questCoins(q))} coins`)}</p>
+            {props.coins > 0 && (
+              <p class="cel-coins"><CoinIcon size={16} />{letter ? t(`随信 ${fmtCoins(props.coins)} 文`, `${fmtCoins(props.coins)} coins enclosed`) : t(`赏钱 ${fmtCoins(props.coins)} 文`, `${fmtCoins(props.coins)} coins`)}</p>
+            )}
             <div class="cel-actions">
               <button type="button" class="cel-btn is-seal" onClick={walk}>{t('与之同游', 'Walk together')}</button>
               <button type="button" class="cel-btn" onClick={later2}>{t('稍后', 'Later')}</button>
@@ -288,7 +310,7 @@ function Card(props: { q: QuestDef; onGone: () => void }) {
             <p id="cel-desc" class="cel-sealnote">
               {t(`得印「${sealText ?? ''}」，已收入印谱。`, `Seal earned: ${'seal' in q.reward ? q.reward.sealEn : ''}. Added to your album.`)}
             </p>
-            <p class="cel-coins"><CoinIcon size={16} />{t(`赏钱 ${fmtCoins(questCoins(q))} 文`, `${fmtCoins(questCoins(q))} coins`)}</p>
+            <p class="cel-coins"><CoinIcon size={16} />{t(`赏钱 ${fmtCoins(props.coins)} 文`, `${fmtCoins(props.coins)} coins`)}</p>
             <div class="cel-actions">
               <button type="button" class="cel-btn is-seal" onClick={album}>{t('翻看印谱', 'Open the album')}</button>
               <button type="button" class="cel-btn" onClick={later2}>{t('好', 'OK')}</button>

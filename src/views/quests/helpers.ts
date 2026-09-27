@@ -2,7 +2,7 @@
 // seal styles and the brush-stroke outline used by the progress bars.
 import { CHARACTER, CHARACTERS, type CharacterId } from '../../data/characters';
 import { QUESTS, type QuestDef } from '../../data/quests';
-import { ERRAND_COINS, ERRANDS_ALL_COINS, isUnlockedIn, questCoins, type PlayState } from '../../app/play';
+import { ERRAND_COINS, ERRANDS_ALL_COINS, isUnlockedIn, questPaid, type PlayState } from '../../app/play';
 import type { Route } from '../../app/router';
 import type { DateKey } from '../../core/types';
 import { hashString, makeRng } from '../../core/rng';
@@ -213,8 +213,15 @@ export function ledgerToday(p: PlayState, day: DateKey): { rows: LedgerRow[]; to
     const errands = p.daily.paid.filter((x) => x !== 'all').length * ERRAND_COINS + (p.daily.paid.includes('all') ? ERRANDS_ALL_COINS : 0);
     push('errands', '日课', 'Errands', errands);
   }
-  push('quests', '任务', 'Quests', QUESTS.filter((q) => p.done[q.id] === day).reduce((n, q) => n + questCoins(q), 0));
+  push('quests', '任务', 'Quests', QUESTS.filter((q) => p.done[q.id] === day).reduce((n, q) => n + questPaid(q, p), 0));
   push('qiyu', '奇遇', 'Encounters', ENCOUNTERS.filter((e) => p.flags[`qy:${e.id}`] && encounterDay(p, e.id) === day).reduce((n, e) => n + e.coins, 0));
+  // coins with a name (play.earnFrom, a letter's claim): counted under `src:<source>`
+  for (const [k, n] of Object.entries(counts)) {
+    if (!k.startsWith('src:')) continue;
+    const src = k.slice(4);
+    const name = SOURCE_NAMES[src];
+    push(k, name?.[0] ?? src, name?.[1] ?? src, n);
+  }
   rows.sort((x, y) => y.coins - x.coins);
   const named = rows.reduce((n, r) => n + r.coins, 0);
   const earned = Math.max(0, Math.floor(counts.earned ?? 0));
@@ -225,6 +232,23 @@ export function ledgerToday(p: PlayState, day: DateKey): { rows: LedgerRow[]; to
     });
   }
   return { rows, total: Math.max(earned, named) };
+}
+
+/** What a named source (`src:<source>`, see play.earnFrom) is called in the ledger. */
+export const SOURCE_NAMES: Record<string, [string, string]> = {
+  mail: ['书信', 'Letters'],
+  taoyuan: ['桃源', 'Peach Spring'],
+  npcs: ['乡邻', 'Neighbours'],
+};
+
+/**
+ * 「钱从何来」 rows for the named sources: letters (阮郎's 20 to the 初见礼's 300), and 桃源 (the
+ * story's 120, the case's 60–300, the letter-writer's 40) — that one only once you have been there.
+ */
+export function namedSources(p: PlayState): [string, string, string][] {
+  const out: [string, string, string][] = [['书信', 'Letters', '20–300']];
+  if (p.flags['visit:taoyuan']) out.push(['桃源', 'Peach Spring', '40–300']);
+  return out;
 }
 
 /**

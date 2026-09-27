@@ -8,7 +8,11 @@ import { lang as langSig, setSettings, state as appState, today } from '../../ap
 import { ERRAND_COINS, play } from '../../app/play';
 import { ledgerToday } from '../quests/helpers';
 import { CoinBadge, fmtCoins } from '../../ui/coins';
-import { Sheet, Segmented } from '../../ui/kit';
+import { Sheet, Segmented, Toggle } from '../../ui/kit';
+import { deliverDue, mailUi, openMail } from '../../app/mail';
+import { nameAsk, provideNameScope } from '../../app/nameAsk';
+import { fillName, type NameScope } from '../../app/name';
+import { MailGlyph, mailLabel } from '../mail/MailHost';
 import { toLunar, festivalsOn as coreFestivals } from '../../core/lunar';
 import { FESTIVALS } from './features';
 import { CharacterSelect } from './characters/Select';
@@ -17,6 +21,9 @@ import { CHARACTER } from '../../data/characters';
 import type { FestivalKey } from './types';
 import type { Arrival, HudBridge, Prompt, SayOpts, WaypointInfo, WorldHandle } from './world';
 import { PhotoMode } from './photo/PhotoMode';
+import { CaseSheet } from './case/CaseSheet';
+import { caseHere, caseSheet, openCaseSheet } from './case/state';
+import { caseIsOpen, progress as caseProgress, ready as caseReady } from './features/taoyuan/case';
 import './walk.css';
 
 type Phase = 'loading' | 'ready' | 'nowebgl' | 'error';
@@ -62,6 +69,13 @@ function queryFestival(): FestivalKey | null {
   } catch {
     return null;
   }
+}
+
+
+/** A long action label in the round button (证据未足, 请众人到庭) breaks evenly (2+2, 3+2) in a smaller hand. */
+function actLen(zh: string | undefined): string {
+  const n = zh ? [...zh].length : 0;
+  return n >= 5 ? ' walk-act-l5' : n === 4 ? ' walk-act-l4' : '';
 }
 
 export function WalkView() {
@@ -113,6 +127,19 @@ export function WalkView() {
   const [lockBlocked, setLockBlocked] = useState(false);
   const musicOn = appState.value.settings.music;
   const dialog = dialogs[0] ?? null;
+  // the letters (信) and the name sheet (askName) are app-wide sheets over the walk
+  const mailOpen = mailUi.value !== null || nameAsk.value !== null;
+  // 案卷 · the casebook of the 桃源 case (its chip shows while the case is open)
+  const caseUi = caseSheet.value !== null;
+  const caseFlags = play.value.flags;
+  const caseOn = caseIsOpen(caseFlags);
+  /** A sheet over the walk (a letter, the name sheet) or a text field has the keyboard: the walk's keys wait. */
+  const keysElsewhere = (e: KeyboardEvent) => {
+    // read at the key press itself: a sheet opened a moment ago counts before the walk re-renders
+    if (mailUi.peek() !== null || nameAsk.peek() !== null || caseSheet.peek() !== null) return true;
+    const tg = e.target as HTMLElement | null;
+    return !!tg?.closest?.('.sheet, input, textarea, select, [contenteditable]');
+  };
   const answer = (i: number) => {
     setDialogs((ds) => {
       const [head, ...rest] = ds;
@@ -180,6 +207,8 @@ export function WalkView() {
           world = w;
           worldRef.current = w;
           setPhase('ready');
+          // letters that fell due while walking elsewhere (拾得's, after the temple…) come now
+          deliverDue();
         },
         (err: unknown) => {
           if (cancelled) return;
@@ -220,6 +249,7 @@ export function WalkView() {
   useEffect(() => {
     if (!dialog) return;
     const onKey = (e: KeyboardEvent) => {
+      if (keysElsewhere(e)) return;
       const n = dialog.choices?.length ?? 0;
       if (e.code === 'Escape') { e.preventDefault(); e.stopPropagation(); answer(-1); return; }
       if (!n && ['Enter', 'Space', 'KeyE', 'NumpadEnter'].includes(e.code)) { e.preventDefault(); e.stopPropagation(); answer(0); return; }
@@ -228,7 +258,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [dialog]);
+  }, [dialog, mailOpen]);
 
   useEffect(() => () => clearTimeout(toastTimer.current), []);
 
@@ -278,8 +308,8 @@ export function WalkView() {
 
   // pause walking while a card, a dialogue, the map or a picker is open (or the photo's own card)
   useEffect(() => {
-    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal);
-  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal]);
+    worldRef.current?.setPaused(!!card || sheet || purseOpen || mapOpen || charOpen || !!dialog || photoModal || mailOpen || caseUi);
+  }, [card, sheet, purseOpen, phase, mapOpen, charOpen, dialog, photoModal, mailOpen, caseUi]);
 
   // the way of looking reaches the world (again after every rebuild) and is remembered for the session
   useEffect(() => {
@@ -310,7 +340,7 @@ export function WalkView() {
   // M opens the map (not over a card, a dialogue, a sheet or the picker, nor while a game or the
   // homestead's building holds the walker: the map closes itself with M or Esc)
   useEffect(() => {
-    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn) return;
+    if (phase !== 'ready' || card || dialog || sheet || purseOpen || charOpen || heldByOther || mapOpen || photoOn || mailOpen || caseUi) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyM' || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -319,13 +349,13 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn]);
+  }, [phase, card, dialog, sheet, purseOpen, charOpen, heldByOther, mapOpen, photoOn, mailOpen, caseUi]);
 
   // V: over the shoulder / through the eyes; P: the photo camera (not over a card, a dialogue, a
   // sheet, the map or a picker; the homestead's building keeps its own V). In photo mode its own
   // keys (Esc, P) put the camera away.
   useEffect(() => {
-    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen) return;
+    if (phase !== 'ready' || photoOn || card || dialog || sheet || purseOpen || charOpen || mapOpen || mailOpen || caseUi) return;
     const onKey = (e: KeyboardEvent) => {
       if ((e.code !== 'KeyV' && e.code !== 'KeyP') || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const t = e.target as HTMLElement | null;
@@ -337,12 +367,13 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther]);
+  }, [phase, photoOn, card, dialog, sheet, purseOpen, charOpen, mapOpen, heldByOther, mailOpen, caseUi]);
 
   // close the card with Esc / Enter / E / Space
   useEffect(() => {
     if (!card) return;
     const onKey = (e: KeyboardEvent) => {
+      if (keysElsewhere(e)) return;
       if (['Escape', 'Enter', 'KeyE', 'Space', 'NumpadEnter'].includes(e.code) || e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
@@ -351,7 +382,7 @@ export function WalkView() {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [card]);
+  }, [card, mailOpen]);
 
   // the first-visit hint fades after a while, or once you start moving: a walking key, the joystick,
   // or dragging the view round
@@ -393,6 +424,11 @@ export function WalkView() {
   const todayFest = coreFestivals(new Date())[0];
   const preview = festival ? FESTIVALS.find((f) => f.key === festival) : null;
   const leave = (e: Event) => go('garden', e);
+  // 名号 at render: `{名}` in any line becomes what the player is called (in 桃源 the unnamed are 客)
+  const nameScope: NameScope = phase === 'ready' && worldRef.current?.where().region === 'taoyuan' ? 'valley' : 'world';
+  const f = (zh: string, en: string) => fillName(t(zh, en), lang, nameScope);
+  // and the name sheet (askName) asked in the valley offers 客 as the name left blank
+  useEffect(() => provideNameScope(() => (worldRef.current?.where().region === 'taoyuan' ? 'valley' : 'world')), []);
   const blurAfter = (e: Event) => (e.currentTarget as HTMLElement | null)?.blur?.();
 
   return (
@@ -418,6 +454,10 @@ export function WalkView() {
           </small>
         </div>
         <div class="walk-tools">
+          <button type="button" class="walk-chip walk-tool walk-mail" disabled={busy} onClick={(e) => { blurAfter(e); openMail(); }} aria-haspopup="dialog" aria-label={mailLabel(t)} title={mailLabel(t)}>
+            <MailGlyph />
+            <span class="walk-tool-label">{t('书信', 'Letters')}</span>
+          </button>
           <button type="button" class="walk-chip walk-tool" disabled={busy} onClick={(e) => { blurAfter(e); setCharOpen(true); }} aria-haspopup="dialog" aria-label={t('同伴', 'Companions')} title={t('同伴', 'Companions')}>
             <span class="brush" aria-hidden="true">{CHARACTER[play.value.character].zh.slice(0, 1)}</span>
             <span class="walk-tool-label">{t('同伴', 'Companions')}</span>
@@ -443,6 +483,20 @@ export function WalkView() {
         </div>
       </header>}
 
+      {/* (only in the valley, and not while a game or a scene holds the walker: its ✕ sits in this slot) */}
+      {phase === 'ready' && caseOn && caseHere.value && !photoOn && !heldByOther && (() => {
+        const pr = caseProgress(caseFlags);
+        const ok = caseReady(caseFlags).ok;
+        return (
+          <button type="button" class={'walk-case-chip' + (ok ? ' is-ready' : '')} disabled={busy} onClick={(e) => { blurAfter(e); openCaseSheet(); }} aria-haspopup="dialog"
+            aria-label={t(`案卷 · 物证 ${pr.clues}/12${ok ? ' · 证据已足' : ''}`, `Casebook · evidence ${pr.clues}/12${ok ? ' · enough to judge' : ''}`)}>
+            <span class="brush" aria-hidden="true">案</span>
+            <span class="case-chip-label">{t('案卷', 'Casebook')}</span>
+            <small aria-hidden="true">{pr.clues}/12</small>
+          </button>
+        );
+      })()}
+
       {preview && !photoOn && (
         <div class="walk-banner" role="status">
           <span>{t(`预览 · ${preview.zh}`, `Preview · ${preview.en}`)}</span>
@@ -460,9 +514,9 @@ export function WalkView() {
 
       {toast && (
         <div class="walk-toast" key={toast.id} role="status">
-          <span>{t(toast.zh, toast.en)}</span>
+          <span>{f(toast.zh, toast.en)}</span>
           {toast.action && (
-            <button type="button" onClick={() => { toast.action!.run(); setToast(null); }}>{t(toast.action.zh, toast.action.en)}</button>
+            <button type="button" onClick={() => { toast.action!.run(); setToast(null); }}>{f(toast.action.zh, toast.action.en)}</button>
           )}
         </div>
       )}
@@ -470,7 +524,7 @@ export function WalkView() {
       {/* --- what you can do here */}
       {phase === 'ready' && prompt && !card && !dialog && !photoOn && (
         <div class="walk-prompt" aria-live="polite">
-          <span class="walk-prompt-label">{t(prompt.labelZh, prompt.labelEn)}</span>
+          <span class="walk-prompt-label">{f(prompt.labelZh, prompt.labelEn)}</span>
           {!touch && (
             <button type="button" class="walk-prompt-act" onClick={(e) => { blurAfter(e); worldRef.current?.act(); }}>
               <kbd>E</kbd> {t(prompt.actionZh, prompt.actionEn)}
@@ -519,7 +573,7 @@ export function WalkView() {
             onClick={() => worldRef.current?.act()}
             aria-label={prompt ? t(prompt.actionZh, prompt.actionEn) : t('互动', 'Interact')}
           >
-            <span class={lang === 'zh' ? 'brush' : 'latin'}>{prompt ? t(prompt.actionZh, prompt.actionEn) : '·'}</span>
+            <span class={lang === 'zh' ? 'brush' + actLen(prompt?.actionZh) : 'latin'}>{prompt ? t(prompt.actionZh, prompt.actionEn) : '·'}</span>
           </button>
         </div>
       )}
@@ -558,7 +612,7 @@ export function WalkView() {
 
       {/* --- through the eyes: a faint aim point; on a desk, how to lock the mouse to the view */}
       {phase === 'ready' && camMode === 'first' && !photoOn && <div class={'walk-reticle' + (locked ? ' is-locked' : '')} aria-hidden="true" />}
-      {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && (
+      {phase === 'ready' && !touch && camMode === 'first' && !locked && !photoOn && !card && !dialog && !sheet && !mapOpen && !purseOpen && !charOpen && !caseUi && (
         <div class="walk-lockhint" role="status">{lockBlocked ? t('拖动画面环顾', 'Drag the view to look')
           : t('点一下画面即可用鼠标环顾 · Esc 松开', 'Click the view to look with the mouse · Esc to let go')}</div>
       )}
@@ -605,7 +659,7 @@ export function WalkView() {
         <div class="walk-arrive" key={arrival.key} role="status" aria-live="polite">
           <span class="walk-arrive-name brush">{arrival.zh}</span>
           <span class="walk-arrive-en latin">{arrival.en}</span>
-          <span class="walk-arrive-blurb">{t(arrival.blurbZh, arrival.blurbEn)}</span>
+          <span class="walk-arrive-blurb">{f(arrival.blurbZh, arrival.blurbEn)}</span>
           {arrival.first && <span class="walk-arrive-seal brush" aria-hidden="true">初至</span>}
         </div>
       )}
@@ -613,14 +667,14 @@ export function WalkView() {
       {/* --- somebody speaks */}
       {dialog && (
         <div class="walk-say-wrap">
-          <div class="walk-say" role="dialog" aria-modal="false" aria-label={t(dialog.nameZh, dialog.nameEn)} key={dialog.id}>
-            <div class="walk-say-name"><span class={lang === 'zh' ? 'brush' : 'latin'}>{t(dialog.nameZh, dialog.nameEn)}</span></div>
-            <p class="walk-say-text">{t(dialog.zh, dialog.en)}</p>
+          <div class="walk-say" role="dialog" aria-modal="false" aria-label={f(dialog.nameZh, dialog.nameEn)} key={dialog.id}>
+            <div class="walk-say-name"><span class={lang === 'zh' ? 'brush' : 'latin'}>{f(dialog.nameZh, dialog.nameEn)}</span></div>
+            <p class="walk-say-text">{f(dialog.zh, dialog.en)}</p>
             {dialog.choices && dialog.choices.length > 0 ? (
               <div class="walk-say-choices">
                 {dialog.choices.map((c, i) => (
                   <button type="button" key={i} class="walk-say-choice" onClick={() => answer(i)} autoFocus={i === 0}>
-                    {!touch && <kbd>{i + 1}</kbd>} {t(c.zh, c.en)}
+                    {!touch && <kbd>{i + 1}</kbd>} {f(c.zh, c.en)}
                   </button>
                 ))}
               </div>
@@ -649,14 +703,15 @@ export function WalkView() {
       )}
       <CharacterSelect open={charOpen} onClose={() => setCharOpen(false)} />
       <PurseSheet open={purseOpen} onClose={() => setPurseOpen(false)} />
+      <CaseSheet />
 
       {/* --- a small hanging scroll */}
       {card && (
         <div class="walk-card-wrap" onClick={(e) => e.target === e.currentTarget && setCard(null)}>
-          <div class="walk-card" role="dialog" aria-modal="true" aria-label={t(card.titleZh, card.titleEn)}>
+          <div class="walk-card" role="dialog" aria-modal="true" aria-label={f(card.titleZh, card.titleEn)}>
             <div class="walk-card-rod" aria-hidden="true" />
-            <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{t(card.titleZh, card.titleEn)}</h2>
-            <p class="walk-card-body">{t(card.bodyZh, card.bodyEn)}</p>
+            <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{f(card.titleZh, card.titleEn)}</h2>
+            <p class="walk-card-body">{f(card.bodyZh, card.bodyEn)}</p>
             {card.seal && <span class="walk-seal brush" aria-hidden="true">{card.seal}</span>}
             <button type="button" class="btn walk-card-close" onClick={() => setCard(null)} autoFocus>{t('收起', 'Close')}</button>
             <div class="walk-card-rod is-bottom" aria-hidden="true" />
@@ -693,6 +748,11 @@ export function WalkView() {
             label={t('时辰', 'Time')}
             options={[{ value: 'now', label: t('此刻', 'Now') }, { value: 'day', label: t('昼', 'Day') }, { value: 'night', label: t('夜', 'Night') }]}
           />
+        </div>
+        {/* on a narrow phone the top bar has no room for 乐: the music switch lives here instead */}
+        <div class="walk-sheet-row walk-sheet-music">
+          <span class="walk-sheet-label">{t('音乐', 'Music')}</span>
+          <Toggle checked={musicOn} onChange={(v) => setSettings({ music: v })} label={t('音乐', 'Music')} />
         </div>
         <div class="walk-fest-grid">
           <button type="button" class={'walk-fest-item' + (!festival ? ' is-on' : '')} aria-pressed={!festival} onClick={() => { setFestival(null); setSheet(false); }}>
@@ -828,8 +888,8 @@ function PurseSheet(props: { open: boolean; onClose(): void }) {
         )}
         <p class="walk-purse-how">
           <b>{t('钱从何来', 'Where coins come from')}</b>
-          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，都能进账。`,
-            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips and the homestead's harvest.`)}
+          {t(`日课每件 ${ERRAND_COINS} 文，任务、奇遇各有赏钱；游艺、打卡、燃香，屋檐高处拾遗，乡邻打赏，家园收成，随信附来，都能进账。`,
+            `Errands (${ERRAND_COINS} each), quests and chance encounters pay; so do games, check-ins and incense, finds up on the roofs, the neighbours' tips, the homestead's harvest and coins sent with letters.`)}
         </p>
         <p class="walk-purse-how">
           <b>{t('钱往何处', 'What coins are for')}</b>

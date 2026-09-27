@@ -14,6 +14,8 @@ describe('play progress', () => {
   it('every quest reward and every character unlock refer to each other', () => {
     for (const c of CHARACTERS) {
       if (c.unlock === 'default') continue;
+      // a gift comes in a letter of the catalog, not with a quest
+      if (c.unlock === 'gift') { expect(c.letter, `letter for ${c.id}`).toBeTruthy(); continue; }
       const q = QUEST[c.unlock];
       expect(q, `quest ${c.unlock} for ${c.id}`).toBeTruthy();
       expect('character' in q.reward && q.reward.character).toBe(c.id);
@@ -87,8 +89,16 @@ describe('play progress', () => {
 
   it('gathering twelve companions brings the thirteenth', () => {
     const p = emptyPlay();
-    for (const c of CHARACTERS) if (c.unlock !== 'default' && c.id !== 'change') p.done[c.unlock] = '2026-09-25';
+    for (const c of CHARACTERS) if (c.unlock !== 'default' && c.unlock !== 'gift' && c.id !== 'change') p.done[c.unlock] = '2026-09-25';
+    // 玉兔 comes in the 初见礼 letter: without it, eleven
     play.value = p;
+    record('noop');
+    expect(unlocked.value).not.toContain('change');
+    expect(unlocked.value).not.toContain('rabbit');
+    // a done['gift'] (no such quest) brings nobody
+    play.value = { ...play.value, done: { ...play.value.done, gift: '2026-09-25' } };
+    expect(isUnlockedIn(play.value, 'rabbit')).toBe(false);
+    play.value = { ...play.value, flags: { ...play.value.flags, 'char:rabbit': true } };
     record('noop');
     expect(unlocked.value).toContain('change');
   });

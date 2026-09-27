@@ -1,0 +1,211 @@
+/* 案卷 · the casebook sheet, the courtyard's petals (拂花), 棋士's review, the chip on the walk, and the
+   quest book's card. The sheet follows the app's theme (tokens); the overlays over the painting are
+   always paper, like the walk's own cards. */
+
+/* ---------- the chip on the walk (while the case is open) */
+.walk-case-chip {
+  position: absolute;
+  /* under the 今日 chip (minigames/errands.ts), clear of the toasts' row */
+  top: calc(env(safe-area-inset-top) + 102px);
+  left: calc(env(safe-area-inset-left) + 12px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px 0 6px;
+  border-radius: 999px;
+  background: var(--walk-paper, rgba(244, 238, 226, 0.9));
+  border: 1px solid var(--walk-line, rgba(27, 25, 22, 0.22));
+  color: var(--walk-ink, #1b1916);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  box-shadow: 0 6px 18px -12px rgba(40, 30, 10, 0.5);
+  pointer-events: auto;
+  z-index: 2;
+}
+.walk-case-chip:disabled { opacity: 0.5; }
+.walk-case-chip:active { transform: scale(0.96); }
+.walk-case-chip .brush {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 28% 40% 34% 38%;
+  background: #b93a2b;
+  color: #fbf5ea;
+  font-size: 17px;
+  transform: rotate(-4deg);
+}
+.walk-case-chip small { font-family: var(--font-latin); font-size: 13px; color: rgba(27, 25, 22, 0.6); letter-spacing: 0.02em; }
+.walk-case-chip.is-ready { border-color: rgba(185, 58, 43, 0.6); }
+.walk-case-chip.is-ready::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #b93a2b;
+  box-shadow: 0 0 0 2px rgba(244, 238, 226, 0.95);
+}
+@media (max-width: 700px) {
+  /* (the toasts drop to this row on a narrow screen: the chip sits just under them) */
+  .walk-case-chip { top: calc(env(safe-area-inset-top) + 150px); padding-right: 10px; }
+  .walk-case-chip .case-chip-label { display: none; }
+}
+/* the 行囊 bag (npcs.css: 108px, 46px tall) shares the left edge once anything is carried: the chip
+   steps down under it, on any width */
+.walk:has(.npc-bag:not([style*="none"])) .walk-case-chip { top: calc(env(safe-area-inset-top) + 164px); }
+
+/* ---------- the sheet */
+.case-sheet { display: flex; flex-direction: column; gap: 12px; padding-bottom: 4px; }
+.case-lead { display: flex; flex-direction: column; gap: 2px; margin: 0; font-size: 13.5px; color: var(--ink-3); line-height: 1.55; }
+.case-lead b { font-weight: 500; font-size: 16px; color: var(--ink); letter-spacing: 0.06em; }
+.case-pickline {
+  display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--cinnabar) 9%, transparent); color: var(--ink); font-size: 14.5px; line-height: 1.5;
+}
+.case-pick-seal {
+  flex: none; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 30% 42% 36% 40%;
+  background: var(--cinnabar); color: #fbf5ea; font-size: 17px; transform: rotate(-5deg);
+}
+.case-sheet .seg { align-self: flex-start; max-width: 100%; overflow-x: auto; }
+.case-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.case-card {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--paper-2); min-width: 0;
+}
+.case-card.is-hidden { flex-direction: row; align-items: center; gap: 12px; border-style: dashed; background: transparent; color: var(--ink-3); }
+/* the clues not yet found: small tiles, a ？ each (nothing named) */
+.case-unfound { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; }
+.case-unfound .case-card.is-hidden { padding: 6px 8px; gap: 6px; justify-content: center; border-radius: 8px; }
+.case-unfound .case-n { min-width: 22px; height: 22px; font-size: 11.5px; }
+.case-q { font-weight: 400; font-size: 15px; letter-spacing: 0.1em; }
+.case-n {
+  flex: none; display: inline-grid; place-items: center; min-width: 26px; height: 26px; padding: 0 4px; border-radius: 6px;
+  border: 1px solid var(--line-strong); font-size: 12.5px; color: var(--ink-2); font-family: var(--font-text);
+}
+.case-head {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 32px; padding: 0; text-align: left; color: var(--ink);
+  background: none; border: 0; font: inherit;
+}
+.case-head b { font-weight: 500; font-size: 15.5px; letter-spacing: 0.04em; flex: 1 1 auto; min-width: 0; }
+.case-head small { flex: none; font-size: 12px; color: var(--ink-3); letter-spacing: 0.06em; }
+.case-stamp {
+  flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 4px;
+  background: var(--cinnabar); color: #fbf5ea; font-size: 15px; transform: rotate(-6deg); opacity: 0.9;
+}
+.case-stamp.is-po { width: 30px; height: 30px; font-size: 19px; border-radius: 30% 40% 34% 38%; transform: rotate(8deg); }
+.case-body { display: flex; flex-direction: column; gap: 6px; padding-left: 36px; }
+.case-body p { margin: 0; font-size: 14.5px; line-height: 1.75; color: var(--ink); }
+.case-body p.is-struck { color: var(--ink-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--cinnabar) 80%, transparent); text-decoration-thickness: 1.5px; }
+.case-body p.is-truth { padding-left: 10px; border-left: 2px solid color-mix(in srgb, var(--cinnabar) 55%, transparent); }
+.case-add { font-size: 13.5px !important; color: var(--ink-2) !important; padding-left: 10px; border-left: 2px dotted var(--line-strong); }
+.case-prints { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.5; margin: 2px 0; }
+.case-prints th { text-align: left; font-weight: 500; color: var(--ink-3); font-size: 12px; letter-spacing: 0.08em; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.case-prints td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink); }
+.case-prints td small { display: block; color: var(--ink-3); font-size: 12px; }
+.case-prints td.num { white-space: nowrap; text-align: right; font-family: var(--font-text); }
+.case-prints tr.is-key td { background: color-mix(in srgb, var(--cinnabar) 7%, transparent); }
+.case-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.case-row > .case-head { flex: 1 1 auto; min-width: 0; }
+.case-show { flex: none; min-height: 36px; min-width: 0; padding: 0 16px; font-size: 14px; }
+.case-empty { margin: 4px 0; font-size: 14px; color: var(--ink-3); }
+.case-nopick { align-self: center; }
+.case-card.is-found.is-open { background: linear-gradient(135deg, color-mix(in srgb, #e8c77a 8%, transparent), transparent 50%), var(--paper-2); }
+
+/* the bluebird's notes */
+.case-bird { display: flex; flex-direction: column; gap: 12px; }
+.case-bird-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.case-ask { gap: 8px; }
+.case-bird-note { margin: 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; flex: 1 1 180px; }
+.case-birdmark { flex: none; }
+.case-note {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: 10px;
+  background: #f4ecdb; color: #1b1916; border: 1px solid rgba(27, 25, 22, 0.14); box-shadow: 0 10px 22px -18px rgba(20, 15, 5, 0.6);
+}
+.case-note p { margin: 0; font-size: 15px; line-height: 1.7; }
+.case-note.is-new { animation: case-note-in 0.9s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)) both; }
+.case-note.is-new .case-birdmark { animation: case-bird-land 0.9s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1)) both; }
+@keyframes case-note-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes case-bird-land { 0% { transform: translate(40px, -26px) rotate(-18deg); opacity: 0; } 60% { opacity: 1; } 100% { transform: none; } }
+.case-notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.case-notes li { display: flex; flex-direction: column; gap: 1px; padding: 6px 0 6px 12px; border-left: 2px solid color-mix(in srgb, #3d6fb0 45%, transparent); }
+.case-notes small { font-size: 11.5px; color: var(--ink-3); letter-spacing: 0.08em; }
+.case-notes span { font-size: 14px; line-height: 1.6; color: var(--ink); }
+
+/* ---------- 拂花: the courtyard seen from above, under its petals */
+.case-brush {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  background: rgba(16, 18, 30, 0.55); pointer-events: auto; opacity: 0; transition: opacity 0.35s ease;
+  z-index: 4;
+}
+.case-brush.is-on { opacity: 1; }
+.case-brush.is-out { opacity: 0; }
+.case-brush-panel {
+  width: min(100%, 580px); max-height: calc(100% - 8px); overflow: auto; display: flex; flex-direction: column; gap: 10px;
+  padding: 16px 16px 14px; border-radius: 14px; color: #1b1916;
+  background: radial-gradient(ellipse at 30% 10%, rgba(255, 255, 255, 0.4), transparent 60%), #f3ecdc;
+  box-shadow: 0 26px 60px -26px rgba(10, 8, 4, 0.8);
+  transform: translateY(8px); transition: transform 0.45s var(--ease, cubic-bezier(0.2, 0.7, 0.2, 1));
+}
+.case-brush.is-on .case-brush-panel { transform: none; }
+.case-brush-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.case-brush-head h3 { margin: 0; font-family: var(--font-brush); font-weight: 400; font-size: 24px; letter-spacing: 0.08em; }
+:lang(en) .case-brush-head h3 { font-family: var(--font-latin); font-size: 21px; font-weight: 600; letter-spacing: 0.02em; }
+.case-brush-x { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(27, 25, 22, 0.2); color: #1b1916; font-size: 15px; }
+.case-brush-panel > p { margin: 0; font-size: 13.5px; line-height: 1.6; color: rgba(27, 25, 22, 0.72); }
+.case-brush-canvas {
+  width: 100%; height: auto; aspect-ratio: 840 / 500; border-radius: 6px; touch-action: none; cursor: crosshair;
+  box-shadow: inset 0 0 0 1px rgba(27, 25, 22, 0.25); background: #d8d0c0;
+}
+.case-brush-legend { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 3px; counter-reset: pr; }
+.case-brush-legend li { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; line-height: 1.45; color: rgba(27, 25, 22, 0.5); }
+.case-brush-legend li b { flex: none; min-width: 3.4em; font-weight: 500; color: rgba(27, 25, 22, 0.5); }
+.case-brush-legend li.is-seen { color: #1b1916; }
+.case-brush-legend li.is-seen b { color: #b93a2b; }
+.case-brush-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.case-brush-hold {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 20px 0 8px; border-radius: 999px;
+  border: 1px solid rgba(27, 25, 22, 0.3); background: rgba(255, 255, 255, 0.4); color: #1b1916; font-size: 15px; letter-spacing: 0.08em;
+  touch-action: none; user-select: none; -webkit-user-select: none; transition: background 0.2s, transform 0.15s;
+}
+.case-brush-hold .brush {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #1b1916; color: #f3ecdc; font-size: 19px;
+}
+.case-brush-hold.is-on { background: rgba(185, 58, 43, 0.14); transform: scale(0.97); }
+.case-brush-hold.is-on .brush { background: #b93a2b; }
+.case-brush-status { margin: 0; font-size: 13px; color: rgba(27, 25, 22, 0.7); }
+.case-brush.is-done .case-brush-status { color: #b93a2b; font-weight: 500; }
+@media (max-width: 420px) {
+  .case-brush { padding: 8px; }
+  .case-brush-panel { padding: 12px 12px 10px; gap: 8px; }
+  .case-brush-legend li { font-size: 12px; }
+}
+
+/* ---------- 棋士's review: the hall in ink, the record replayed */
+.case-review {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.7s ease;
+  -webkit-backdrop-filter: grayscale(1) contrast(1.15) brightness(1.05);
+  backdrop-filter: grayscale(1) contrast(1.15) brightness(1.05);
+  background: radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(20, 18, 16, 0.4));
+  display: flex; align-items: flex-end; justify-content: center; padding: 0 16px calc(env(safe-area-inset-bottom) + 196px);
+}
+.case-review.is-on { opacity: 1; }
+.case-review p {
+  margin: 0; max-width: 520px; padding: 8px 16px; border-radius: 10px; background: rgba(244, 238, 226, 0.92); color: #1b1916;
+  font-size: 15px; line-height: 1.6; text-align: center; box-shadow: 0 10px 24px -16px rgba(0, 0, 0, 0.6);
+}
+@supports not ((backdrop-filter: grayscale(1)) or (-webkit-backdrop-filter: grayscale(1))) {
+  .case-review { background: radial-gradient(ellipse at 50% 55%, rgba(120, 120, 120, 0.25) 30%, rgba(20, 18, 16, 0.55)); }
+}
+
+/* ---------- the quest book's card */
+.case-book-tally { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 64px 0 0; padding: 0; }
+.case-book-tally li { display: flex; align-items: baseline; gap: 2px; color: var(--ink-3); font-size: 13px; }
+.case-book-tally b { font-size: 22px; font-weight: 500; color: var(--ink); }
+.case-book-tally small { margin-left: 6px; font-size: 12px; letter-spacing: 0.08em; }
+.case-book-coins { font-size: 13px; color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .case-note.is-new, .case-note.is-new .case-birdmark { animation: none; }
+  .case-brush, .case-brush-panel, .case-review { transition: none; }
+}

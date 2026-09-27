@@ -10,12 +10,14 @@
 //                                incense, games and 奇遇; spent in the homestead and at stalls
 //   unlockWaypoint('lake')     — a waypoint stele lit (the map can send you there)
 //   markEncounter('zhiyin')    — a 奇遇 happened
+//   claimGift('chujian', …)    — a letter's gift taken (app/mail.ts claimLetter): coins, companion, item
 //
 // Quests are re-evaluated after every change (and whenever habit data changes, for the real-life
 // quests); newly finished ones are queued in `celebrations` for the app to announce.
 import { computed, effect, signal } from '@preact/signals';
 import type { CharacterId } from '../data/characters';
 import { CHARACTERS } from '../data/characters';
+import type { Attachments } from '../data/letters';
 import { DAILY_POOL, QUESTS, type DailyDef, type QuestDef } from '../data/quests';
 import type { AppState, DateKey } from '../core/types';
 import { statsFor } from '../core/habits';
@@ -26,7 +28,8 @@ import { backupExtras, state as appState, today } from './store';
 const KEY = 'banmu.play.v1';
 
 export interface PlayState {
-  v: 1;
+  /** 2 since wave 6 (玉兔 moved to the 初见礼); a save without it, or with 1, is older. */
+  v: 2;
   character: CharacterId;
   /** Lifetime counters. */
   counters: Record<string, number>;
@@ -45,7 +48,7 @@ export interface PlayState {
 }
 
 export function emptyPlay(): PlayState {
-  return { v: 1, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [], paid: [] }, coins: 0, life: null };
+  return { v: 2, character: 'scholar', counters: {}, best: {}, flags: {}, done: {}, daily: { day: '', picks: [], counts: {}, visited: [], paid: [] }, coins: 0, life: null };
 }
 
 const CHAR_IDS = new Set(CHARACTERS.map((c) => c.id));
@@ -65,9 +68,16 @@ export function sanitizePlay(raw: unknown): PlayState {
   if (r.flags && typeof r.flags === 'object') for (const [k, v] of Object.entries(r.flags)) if (v) flags[k.slice(0, 64)] = true;
   const done: Record<string, DateKey> = {};
   if (r.done && typeof r.done === 'object') for (const [k, v] of Object.entries(r.done)) if (typeof v === 'string') done[k] = v;
+  // 玉兔 used to come with 八月十五; she now comes in the 初见礼 letter. Whoever earned her before
+  // this build keeps her (and a saved character:'rabbit' stays valid); their letter still pays, with a
+  // postscript. Only a save written before v2 migrates: someone who eats the mooncakes now still
+  // meets her in the letter, with its own celebration.
+  // (and it paid a companion's coins then: the quest book goes on saying so, see questPaid)
+  const legacy = !(typeof r.v === 'number' && r.v >= 2);
+  if (legacy && done['q-mooncake']) { flags['char:rabbit'] = true; flags[paidAsCompanion('q-mooncake')] = true; }
   const d = (r.daily ?? {}) as Partial<PlayState['daily']>;
   return {
-    v: 1,
+    v: 2,
     character: CHAR_IDS.has(r.character as CharacterId) ? (r.character as CharacterId) : 'scholar',
     counters: rec(r.counters),
     best: rec(r.best),
@@ -181,9 +191,13 @@ export function questTarget(q: QuestDef): number {
 /** The flag a code sets (see redeemCode). */
 export const CODE_FLAG = 'code:all';
 
-/** Companions earned through their quests (what 群贤毕至 counts). */
+/** Earned: the scholar, a finished quest, or a gift received (a letter's `char:<id>`). Never the code. */
+const earnedIn = (p: PlayState, c: (typeof CHARACTERS)[number]): boolean =>
+  c.unlock === 'default' || (c.unlock !== 'gift' && !!p.done[c.unlock]) || !!p.flags[`char:${c.id}`];
+
+/** Companions earned through their quests or received as gifts (what 群贤毕至 counts). */
 function earnedFrom(p: PlayState): CharacterId[] {
-  return CHARACTERS.filter((c) => c.unlock === 'default' || p.done[c.unlock]).map((c) => c.id);
+  return CHARACTERS.filter((c) => earnedIn(p, c)).map((c) => c.id);
 }
 
 function unlockedFrom(p: PlayState): CharacterId[] {
@@ -193,7 +207,7 @@ function unlockedFrom(p: PlayState): CharacterId[] {
 /** Can you walk as `id` with this progress? */
 export function isUnlockedIn(p: PlayState, id: CharacterId): boolean {
   const c = CHARACTERS.find((x) => x.id === id);
-  return !!c && (!!p.flags[CODE_FLAG] || c.unlock === 'default' || !!p.done[c.unlock]);
+  return !!c && (!!p.flags[CODE_FLAG] || earnedIn(p, c));
 }
 
 /** Characters you can walk as. */
@@ -207,6 +221,14 @@ export const celebrations = signal<string[]>([]);
 /** Coins for finishing a quest: a companion's is worth more than a seal's. */
 export function questCoins(q: QuestDef): number {
   return 'character' in q.reward ? 120 : 80;
+}
+/** The flag of a quest finished when its reward was a companion (paid 120 then), set as an old save migrates. */
+export function paidAsCompanion(id: string): string {
+  return `paid120:${id}`;
+}
+/** Coins a finished quest brought this player: what it paid then (a companion's, before it became a seal). */
+export function questPaid(q: QuestDef, p: PlayState): number {
+  return p.flags[paidAsCompanion(q.id)] ? 120 : questCoins(q);
 }
 /** Coins for each of today's errands, and for doing all three. */
 export const ERRAND_COINS = 30;
@@ -323,6 +345,65 @@ export function record(key: string, n = 1): void {
     counters: { ...p.counters, [key]: (p.counters[key] ?? 0) + n },
     daily: { ...p.daily, counts: { ...p.daily.counts, [key]: (p.daily.counts[key] ?? 0) + n } },
   }));
+}
+
+/** Remember the day something happened (first time only): `done[key] = today`. Story beats use it for next-day letters. */
+export function markDay(key: string): void {
+  if (play.value.done[key]) return;
+  update((p) => ({ ...p, done: { ...p.done, [key]: today.value } }));
+}
+
+/**
+ * Coins with a name: they count as today's income under `src:<source>` (the purse's 「钱从何来」
+ * rows read that counter), in one change with the coins themselves.
+ */
+export function earnFrom(source: string, n: number): void {
+  if (!(n > 0)) return;
+  update((p) => ({
+    ...p,
+    coins: Math.min(1e9, p.coins + Math.floor(n)),
+    counters: { ...p.counters, [`src:${source}`]: (p.counters[`src:${source}`] ?? 0) + Math.floor(n) },
+    daily: { ...p.daily, counts: { ...p.daily.counts, [`src:${source}`]: (p.daily.counts[`src:${source}`] ?? 0) + Math.floor(n) } },
+  }));
+}
+
+/**
+ * A letter's gift taken (see app/mail.ts claimLetter): in ONE change, guarded by `flags['mail:<id>']`,
+ * the coins (today's income, named `src:mail`), the companion (`char:<id>`, which counts as earned),
+ * the item (`item:<kind>:<id>`) and the letter's own flags. A new companion is announced as
+ * `gift:<id>` ahead of anything the same step finishes (群贤毕至, if she was the twelfth). Returns
+ * false if it had already been taken.
+ */
+export function claimGift(id: string, a: Attachments = {}, sets: readonly string[] = []): boolean {
+  const key = `mail:${id}`.slice(0, 64);
+  if (play.value.flags[key]) return false;
+  let ok = false;
+  update((p) => {
+    if (p.flags[key]) return p;
+    ok = true;
+    const flags: Record<string, true> = { ...p.flags, [key]: true };
+    const who = a.character && CHAR_IDS.has(a.character) ? a.character : null;
+    if (who) {
+      // someone who already had them (玉兔 from the old 八月十五) is not announced again; the letter
+      // remembers it for its postscript
+      if (flags[`char:${who}`]) flags[`mail:${id}:had`.slice(0, 64)] = true;
+      else celebrations.value = [...celebrations.value, `gift:${id}`];
+      flags[`char:${who}`] = true;
+    }
+    if (a.item) flags[`item:${a.item.kind}:${a.item.id}`.slice(0, 64)] = true;
+    for (const f of sets) if (f) flags[f.slice(0, 64)] = true;
+    const n = Math.max(0, Math.floor(a.coins ?? 0));
+    if (!n) return { ...p, flags };
+    const src = 'src:mail';
+    return {
+      ...p,
+      flags,
+      coins: Math.min(1e9, p.coins + n),
+      counters: { ...p.counters, [src]: (p.counters[src] ?? 0) + n },
+      daily: { ...p.daily, counts: { ...p.daily.counts, [src]: (p.daily.counts[src] ?? 0) + n } },
+    };
+  });
+  return ok;
 }
 
 /** Remember a best score (only ever goes up). */

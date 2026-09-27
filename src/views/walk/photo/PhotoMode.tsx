@@ -8,7 +8,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { lang as langSig, state as appState } from '../../../app/store';
-import { record } from '../../../app/play';
+import { play, record } from '../../../app/play';
 import { hostSave } from '../../../app/hostSave';
 import { audio } from '../../../audio/engine';
 import type { WorldHandle } from '../world';
@@ -155,7 +155,10 @@ export function PhotoMode(props: PhotoModeProps) {
     try {
       const { compose } = await import('./compose');
       const seal = (appState.value.settings.sealName || '').trim() || '半亩';
-      const out = await compose(shot.canvas, { filter, frame, inscribe, lang, seal, place: shot.place, at: shot.at, touch: coarse() });
+      // 三娘's 桃源里印 (a keepsake from her letter): pressed wherever the picture is signed; gold after 神断
+      const fl = play.peek().flags;
+      const keepSeal = fl['item:keep:taoyuanli'] ? { text: '桃源里', color: fl['case:hz:grade:shen'] ? '#b8892c' : '#c0412f' } : null;
+      const out = await compose(shot.canvas, { filter, frame, inscribe, lang, seal, place: shot.place, at: shot.at, touch: coarse(), keepSeal });
       shot.canvas.width = shot.canvas.height = 1;
       const kept = await addPhoto({ at: shot.at.getTime(), name: out.name, w: out.w, h: out.h, blob: out.blob, thumb: out.thumb });
       record('photo');

@@ -25,6 +25,11 @@ const SLOT = { always: 0, hat: 1, hand: 2, back: 3, beard: 4, cape: 5 } as const
 export const PIVOT = { shoulderY: 0.92, shoulderX: 0.15, neckY: 0.98, waistY: 0.62 };
 /** Local offset of a lantern's paper (for the glow halo), arm hanging down. */
 export const LANTERN_AT = { x: -0.19, y: 0.66, z: 0.62 };
+/**
+ * The rouge on the cheeks: a soft oval wash painted onto the face in the fragment shader (in the
+ * figure's rest pose), centred `x` either side of the nose and `dy` below the head's centre.
+ */
+const CHEEK = { headY: 1.04, x: 0.095, dy: -0.05, w: 0.048, h: 0.03, k: 0.5 };
 
 interface Xf { p?: [number, number, number]; r?: [number, number, number]; s?: [number, number, number] | number }
 
@@ -75,13 +80,12 @@ export function crowdGeometry(THREE: Three): T.BufferGeometry {
   add(sph(0.06, 7, 5), ROLE.ink, RIG.footL, 0, 0, { p: [0.08, 0.04, 0.06], s: [1, 0.7, 1.6] });
   add(sph(0.06, 7, 5), ROLE.ink, RIG.footR, 0, 0, { p: [-0.08, 0.04, 0.06], s: [1, 0.7, 1.6] });
 
-  // ── head: face, eyes, cheeks, hair; the hats
-  const HY = 1.04;
+  // ── head: face, eyes, hair; the hats
+  const HY = CHEEK.headY;
   add(sph(0.17, 12, 9), ROLE.skin, RIG.head, 0, 0, { p: [0, HY, 0], s: [1, 0.98, 0.95] });
   add(sph(0.018, 5, 4), ROLE.ink, RIG.head, 0, 0, { p: [-0.058, HY, 0.155] });
   add(sph(0.018, 5, 4), ROLE.ink, RIG.head, 0, 0, { p: [0.058, HY, 0.155] });
-  add(sph(0.03, 5, 4), ROLE.cheek, RIG.head, 0, 0, { p: [-0.095, HY - 0.05, 0.13], s: [1, 0.55, 0.4] });
-  add(sph(0.03, 5, 4), ROLE.cheek, RIG.head, 0, 0, { p: [0.095, HY - 0.05, 0.13], s: [1, 0.55, 0.4] });
+  // (the cheeks' rouge is painted onto the face in the shader, not stuck on: see CHEEK below)
   add(new THREE.SphereGeometry(0.175, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2), ROLE.hair, RIG.head, 0, 0, { p: [0, HY + 0.01, -0.01] });
   // 斗笠 bamboo hat
   add(new THREE.ConeGeometry(0.4, 0.2, 14, 1, true), ROLE.hat, RIG.head, S.hat, HAT.bamboo, { p: [0, HY + 0.17, 0] });
@@ -253,6 +257,14 @@ vec3 crowdColour() {
 }
 `;
 
+/** The cheeks' wash: an oval either side of the nose, soft at the rim, on the front of the face only. */
+const CHEEK_GLSL = /* glsl */ `
+if (vFace > 0.5) {
+  vec2 cheekE = vec2((abs(vRest.x) - ${CHEEK.x.toFixed(3)}) / ${CHEEK.w.toFixed(3)}, (vRest.y - ${(CHEEK.headY + CHEEK.dy).toFixed(3)}) / ${CHEEK.h.toFixed(3)});
+  float cheekW = (1.0 - smoothstep(0.2, 1.0, length(cheekE))) * smoothstep(0.05, 0.1, vRest.z);
+  diffuseColor.rgb = mix(diffuseColor.rgb, uCheek, cheekW * ${CHEEK.k.toFixed(2)});
+}`;
+
 export interface CrowdMats {
   body: T.MeshToonMaterial;
   outline: T.MeshBasicMaterial;
@@ -264,13 +276,14 @@ export function crowdMaterials(THREE: Three, gradient: T.Texture | null, ink: st
   const body = new THREE.MeshToonMaterial({ color: '#ffffff', gradientMap: gradient ?? undefined });
   body.onBeforeCompile = (sh) => {
     sh.uniforms.uFixed = { value: fixed };
+    sh.uniforms.uCheek = { value: fixed[ROLE.cheek] };
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', `#include <common>\n${CROWD_GLSL}\nvarying vec3 vCrowd;\nvarying float vGlow;`)
+      .replace('#include <common>', `#include <common>\n${CROWD_GLSL}\nvarying vec3 vCrowd;\nvarying float vGlow;\nvarying vec3 vRest;\nvarying float vFace;`)
       .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>\nvec3 crowdP = position;\ncrowdXf(crowdP, objectNormal);`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed = crowdP;\nvCrowd = crowdColour();\nvGlow = (aPart.x > 5.5 && aPart.x < 6.5) ? aMisc.y : 0.0;`);
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\ntransformed = crowdP;\nvCrowd = crowdColour();\nvGlow = (aPart.x > 5.5 && aPart.x < 6.5) ? aMisc.y : 0.0;\nvRest = position;\nvFace = (aPart.x > 1.5 && aPart.x < 2.5 && aPart.y > 1.5 && aPart.y < 2.5) ? 1.0 : 0.0;`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vCrowd;\nvarying float vGlow;`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb *= vCrowd;`)
+      .replace('#include <common>', `#include <common>\nvarying vec3 vCrowd;\nvarying float vGlow;\nvarying vec3 vRest;\nvarying float vFace;\nuniform vec3 uCheek;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\ndiffuseColor.rgb *= vCrowd;\n${CHEEK_GLSL}`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance += vGlow * vec3(1.0, 0.62, 0.3);`);
   };
   body.customProgramCacheKey = () => 'npc-crowd';
