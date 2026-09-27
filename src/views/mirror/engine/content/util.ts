@@ -164,6 +164,8 @@ export interface Shared {
   pools: { x: number; y: number; r: number; until: number; dr: number }[];
   /** 墨潮: live ink puddles (capped). */
   puddles: number[];
+  /** 芒种: healing flowers waiting (capped). */
+  flowers: number[];
   /** The charm glyph: controls reversed until, and the last input we wrote. */
   reverseUntil: number;
   revX: number; revY: number;
@@ -187,7 +189,7 @@ export function shared(w: WorldApi): Shared {
   const W = core(w);
   let s = SHARED.get(W);
   if (!s || s.plan !== W.plan) {
-    s = { plan: W.plan, nets: new Map(), beds: [], pools: [], puddles: [], reverseUntil: 0, revX: 0, revY: 0, bosses: new Map(), said: new Set(), phantoms: new Set(), copies: new Set(), devour: new Set(), wall: null, dark: null };
+    s = { plan: W.plan, nets: new Map(), beds: [], pools: [], puddles: [], flowers: [], reverseUntil: 0, revX: 0, revY: 0, bosses: new Map(), said: new Set(), phantoms: new Set(), copies: new Set(), devour: new Set(), wall: null, dark: null };
     SHARED.set(W, s);
   }
   return s;

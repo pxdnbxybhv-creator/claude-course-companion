@@ -413,6 +413,118 @@ describe('engine-content: the nine bosses', () => {
     });
   }
 
+  it('吴刚\'s 桂树 has 800 HP at wave 10; felling it stuns him 4 s and his chops stop healing', () => {
+    const f = fight('wugang');
+    const W = f.eng.world;
+    const st = bossState(W, f.h[0])!;
+    expect(st.trees).toHaveLength(1);
+    const tree = st.trees[0];
+    expect(W.enemy(tree).hpMax).toBeCloseTo(800, 0);
+    W.hit(tree, { base: 5000, src: 'weapon', noArmor: true, crit: false });
+    step(f.eng, 3);
+    expect(W.alive(tree)).toBe(false);
+    expect(st.felled).toBe(true);
+    expect(st.stunT).toBeGreaterThan(3.5);
+    expect(W.kills).toBe(0);
+    f.eng.dispose();
+  });
+
+  it('金蟾王 eats floor 月华 (growing) and gives it back ×1.5 when it dies', () => {
+    const f = fight('goldtoad');
+    const W = f.eng.world, h = f.h[0];
+    const e = W.enemy(h);
+    W.dropMoon(e.x + 60, e.y, 40);
+    step(f.eng, 60 * 3);
+    const st = bossState(W, h)!;
+    expect(st.eaten).toBeGreaterThanOrEqual(40);
+    expect(W.enemy(h).r).toBeGreaterThan(BOSSES.goldtoad.r);
+    const d0 = W.D.count;
+    W.kill(h, true);
+    expect(W.D.count - d0).toBeGreaterThanOrEqual(Math.floor(st.eaten * 1.5) - 1);
+    f.eng.dispose();
+  });
+
+  it('九尾狐\'s charm reverses your controls for 1.5 s (a slow instead under reduced motion)', () => {
+    for (const rm of [false, true]) {
+      const def = BOSSES.fox;
+      const { run, setup } = at(def.wave, { map: def.map });
+      const { eng } = make(run, { settings: { reduceMotion: rm } });
+      eng.start(run, setup); step(eng, 2);
+      const W = eng.world, h = W.bossH[0];
+      const call = def.phases[0].script.find((c) => c.pat === 'charmGlyph')!;
+      CONTENT.patterns.charmGlyph!.start(W, h, call);
+      const run2 = CONTENT.patterns.charmGlyph!.start(W, h, call);
+      W.godmode = true;
+      for (let i = 0; i < 80; i++) { W.px = W.px; run2.tick(W, W.dt); eng.stepN(1); if (eng.paused) eng.resume(); }
+      eng.input.move(1, 0);
+      step(eng, 2);
+      if (rm) { expect(W.moveX).toBe(1); expect(W.pslowV).toBeCloseTo(0.4, 5); }
+      else expect(W.moveX).toBe(-1);
+      step(eng, 60 * 2);
+      eng.input.move(1, 0);
+      step(eng, 2);
+      expect(W.moveX).toBe(1);
+      eng.dispose();
+    }
+  });
+
+  it('夔: two gaps turning 45° a beat, then one gap stepping to either side of you; 8 stomps crack the drum (×2 for 4 s)', () => {
+    const f = fight('kui');
+    const W = f.eng.world, h = f.h[0];
+    const st = bossState(W, h)!;
+    runPhase(f, 4);
+    expect(st.stomps).toBeGreaterThanOrEqual(2);
+    forcePhase(W, h, 2);
+    st.stomps = 8;
+    runPhase(f, 2);
+    expect(st.crackT).toBeGreaterThan(0);
+    expect(W.E.vulnV[W.E.slotOf(h)]).toBe(100);
+    f.eng.dispose();
+  });
+
+  it('月影 gives +10% 伤害 and +2 回气 inside it; 墨雨\'s puddles slow 30% (not 嫦娥)', () => {
+    {
+      const { run, setup } = at(2, { map: 'lake' });
+      const { eng } = make(run);
+      eng.start(run, setup); step(eng, 2);
+      const W = eng.world;
+      const z = W.Z;
+      let i = 0; for (; i < z.n; i++) if (z.alive[i] && z.look[i] === 'moonCircle') break;
+      W.px = z.x[i]; W.py = z.y[i];
+      step(eng, 2);
+      expect(W.stats.dmg - setup.stats.dmg).toBeCloseTo(10, 5);
+      expect(W.stats.regen - setup.stats.regen).toBeCloseTo(2, 5);
+      eng.dispose();
+    }
+    for (const char of ['scholar', 'change'] as CharacterId[]) {
+      const { run, setup } = at(9, { map: 'forest', char });
+      const { eng } = make(run);
+      eng.start(run, setup); eng.world.godmode = true;
+      step(eng, 60 * 12);
+      const W = eng.world;
+      let i = 0; for (; i < W.Z.n; i++) if (W.Z.alive[i] && W.Z.look[i] === 'inkPuddle' && W.Z.side[i] === 0) break;
+      expect(i).toBeLessThan(W.Z.n);
+      expect(W.Z.slow[i]).toBe(char === 'change' ? 0 : 30);
+      eng.dispose();
+    }
+  });
+
+  it('蜃\'s wall hurts past its inner edge except in the turning gap, and is gone when the clam dies', () => {
+    const f = fight('mirage');
+    const W = f.eng.world, h = f.h[0];
+    forcePhase(W, h, 2);
+    const calls = spy(f.eng);
+    W.godmode = false;
+    for (let i = 0; i < 60 * 6; i++) { W.px = 0; W.py = 700; W.iframes = 0; W.hp = W.hpMax; step(f.eng, 1); }
+    const wall = calls.filter((c) => c.fn === 'hurt' && (c.args[1] as { src?: string }).src === 'mirage' && (c.args[1] as { undodgeable?: boolean }).undodgeable);
+    expect(wall.length).toBeGreaterThan(3);
+    W.kill(h, true);
+    step(f.eng, 2);
+    let towers = 0; for (let i = 0; i < W.Z.n; i++) if (W.Z.alive[i] && W.Z.look[i] === 'mirageWall') towers++;
+    expect(towers).toBe(0);
+    f.eng.dispose();
+  });
+
   it('HP never skips a phase: a huge hit holds at the threshold until the break', () => {
     const f = fight('carp');
     const W = f.eng.world, h = f.h[0];

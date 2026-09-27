@@ -5,7 +5,7 @@
 import type { SkillId, WeaponId } from '../../ids';
 import type { GameEvent, HitPacket, SkillImpl, SkillRun, StatId, StatMods, Vec, WorldApi } from '../../types';
 import { WEAPONS } from '../../data';
-import { charMult, luckMult, maxHp, rawDamage } from '../../logic/formulas';
+import { charMult, luckMult, rawDamage } from '../../logic/formulas';
 import { costOf, fxLine, fxSprite, restoreHp, setMoon } from './bridge';
 import { CoRun, DEG, TAU, angDiff, shared, type Co } from './util';
 
@@ -197,7 +197,9 @@ const yijian: SkillImpl = {
       const ex = w.player.x, ey = w.player.y, len = Math.hypot(ex - sx, ey - sy), ang = Math.atan2(ey - sy, ex - sx);
       const pk = sw.n > 0 ? hit(sw.sum * p.streak, undefined, { knock: 20 }) : hit(10 * p.streak, { ranged: p.streak }, { knock: 20 });
       w.hitLine(sx, sy, ang, Math.max(40, len), 56, pk);
-      for (let k = 0; k < Math.max(1, Math.min(6, sw.n)); k++) fxLine(w, 'swordStreak', sx + (k - 2) * 3 * -dy, sy + (k - 2) * 3 * dx, ang, Math.max(40, len), 0.35, 1);
+      const nS = Math.max(1, Math.min(6, sw.n));
+      for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; fxLine(w, 'swordStreak', sx - dy * o, sy + dx * o, ang, Math.max(40, len), 0.45, 1.8); }
+      w.fx('critSpark', ex, ey, { r: 40, life: 0.3 });
       // then the orbiting swords spin fast for 3 s, 40% on contact
       if (sw.n > 0) {
         const per = (sw.sum / sw.n) * p.spin;
@@ -260,7 +262,8 @@ const jiji: SkillImpl = {
 
 // ─────────────────────────────────────────────── 画师 · 点化 (笔)
 const dianhua: SkillImpl = {
-  target: (w, def) => cluster(w, def.p.r, 90),
+  // the arc in front of you (the core aims along your facing), or wherever you drag it
+  target: () => null,
   cast(w, def, at) {
     const p = def.p;
     const x = w.player.x, y = w.player.y;
@@ -395,7 +398,7 @@ const daoyao: SkillImpl = {
       }
       // the elixir: heal 15% of max HP, +20% 伤害 for 6 s
       const w = c.w;
-      w.heal(maxHp(w.stats as never) * p.heal);
+      w.heal(w.player.hpMax * p.heal);
       w.buff('daoyao', { dmg: p.buff }, p.buffDur);
       w.fx('shieldBubble', w.player.x, w.player.y, { r: 30, life: 0.6 });
       w.sfx('levelUp');
@@ -455,12 +458,8 @@ const tuodao: SkillImpl = {
   target: () => null,
   cast(w0, def, _at, dir) {
     const p = def.p;
-    let dx = dir.x, dy = dir.y;
-    if (!w0.player.moving) {
-      // standing still: retreat away from the nearest foe
-      const h = w0.nearest(w0.player.x, w0.player.y, 400);
-      if (h >= 0) { const e = w0.enemy(h); dx = w0.player.x - e.x; dy = w0.player.y - e.y; }
-    }
+    // the feigned retreat: backward from the way you face (or aim), then turn and sweep
+    const dx = -dir.x, dy = -dir.y;
     const d = Math.hypot(dx, dy) || 1;
     w0.dash(dx / d, dy / d, p.back, 0.2, p.iframe);
     // the best 重器 you hold

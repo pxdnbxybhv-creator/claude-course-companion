@@ -66,7 +66,6 @@ export interface BossState {
   phantoms: number[];
   /** The charm glyph's reversal is ours to undo. */
   reversing: boolean;
-  lastPhantomHit: number;
   dead: boolean;
 }
 interface Eff { tick(w: WorldApi, dt: number): boolean; end(w: WorldApi): void }
@@ -177,10 +176,10 @@ const lead = (w: WorldApi, sec: number, m = 30): Vec => w.clampToArena({ x: w.pl
 interface Phantom {
   owner: number; kind: 'mirage' | 'illusion' | 'reflection' | 'monkey' | 'tree';
   hits: number; maxHits: number; life: number; t: number; attack: number; k: number; a: number;
-  moon: number; call: PatternCall | null; tree: boolean; felled: boolean;
+  moon: number; call: PatternCall | null; tree: boolean; felled: boolean; lastRipple: number;
 }
 const PHANTOM: ActorImpl<Phantom> = {
-  init() { return { owner: -1, kind: 'mirage', hits: 0, maxHits: 3, life: 1e9, t: 0, attack: 0, k: 1, a: 0, moon: -1, call: null, tree: false, felled: false }; },
+  init() { return { owner: -1, kind: 'mirage', hits: 0, maxHits: 3, life: 1e9, t: 0, attack: 0, k: 1, a: 0, moon: -1, call: null, tree: false, felled: false, lastRipple: -9 }; },
   tick(w, h, s, dt) {
     const e = w.enemy(h);
     s.t += dt; s.life -= dt;
@@ -222,12 +221,13 @@ const PHANTOM: ActorImpl<Phantom> = {
     if (ev.dmg <= 0) return;
     s.hits++;
     if (s.kind === 'reflection') {
-      // hitting a false moon sends out ripples
+      // hitting a false moon sends out ripples (each false moon at most every 2.5 s: auto-aim
+      // finds them too, so the lesson must not become a flood)
       const st = shared(w).bosses.get(s.owner) as BossState | undefined;
-      if (st && s.call && w.t - st.lastPhantomHit > 0.8) {
-        st.lastPhantomHit = w.t;
+      if (st && s.call && s.t - s.lastRipple > 2.5) {
+        s.lastRipple = s.t;
         const c: PatCtx = { w, h, st, call: s.call, p: s.call.p ?? {}, teles: [], ended: false };
-        waveRing(c, e.x, e.y, 260, 520, gapsAt([w.rng() * TAU], 70), 1, 22);
+        waveRing(c, e.x, e.y, 220, 520, gapsAt([w.rng() * TAU], 90), 0.6, 22);
       }
     }
   },
@@ -306,9 +306,9 @@ function moonMark(w: WorldApi, x: number, y: number, phase: number): void {
 
 // ═════════════════════════════════════════════ 吴刚's trees
 
-/** The tree's HP: 800 × HP(w)/HP(10), with the 镜境 and map factors. */
+/** The tree's HP: 800 × HP(w)/HP(10) (800 at wave 10 on any 镜境; it grows with the wave in endless). */
 function treeHp(w: WorldApi): number {
-  return (BOSSES.wugang.p.treeHp ?? 800) * (hpMul(w.wave) / hpMul(10)) * dmx(w.diff.hp, w.wave) * w.map.hp;
+  return (BOSSES.wugang.p.treeHp ?? 800) * (hpMul(w.wave) / hpMul(10)) * (dmx(w.diff.hp, w.wave) / dmx(w.diff.hp, 10));
 }
 function spawnTree(c: PatCtx, x: number, y: number, central: boolean): number {
   const h = phantom(c, x, y, { kind: 'tree', tree: true, maxHits: 0, look: central ? 'fx:petalBurst' : 'mon:guihua', r0: central ? 60 : 16, r: central ? 120 : 40 });
@@ -756,13 +756,14 @@ const PATS: Record<BossPatternId, PatFn> = {
     })());
   },
   *axeDance(c) {
-    const w0 = c.w, arcs = c.p.arcs ?? 3, spin = (c.p.spin ?? 90) * DEG * (w0.rng() < 0.5 ? -1 : 1);
+    // at most 60°/s, three axes a spoke: you can ride between the spokes at your own speed
+    const w0 = c.w, arcs = c.p.arcs ?? 3, spin = Math.min(60, c.p.spin ?? 90) * DEG * (w0.rng() < 0.5 ? -1 : 1);
     const e0 = w0.enemy(c.h);
     let a0 = toPlayer(w0, e0.x, e0.y);
-    for (let k = 0; k < arcs; k++) tele(c, { kind: 'line', x: e0.x, y: e0.y, dir: a0 + (k * TAU) / arcs, len: 270, w: 34 }, c.call.tele);
+    for (let k = 0; k < arcs; k++) tele(c, { kind: 'line', x: e0.x, y: e0.y, dir: a0 + (k * TAU) / arcs, len: 255, w: 34 }, c.call.tele);
     yield c.call.tele;
     if (c.p.ring) { const v = c.w.enemy(c.h); waveRing(c, v.x, v.y, 340, 720, gapsAt([c.w.rng() * TAU, c.w.rng() * TAU + Math.PI], 50), 0.8); }
-    const radii = [80, 140, 200, 260];
+    const radii = [90, 165, 240];
     const axes: { i: number; tag: number; k: number; rr: number }[] = [];
     for (let k = 0; k < arcs; k++) for (const rr of radii) {
       const v = c.w.enemy(c.h), a = a0 + (k * TAU) / arcs;
@@ -1005,7 +1006,7 @@ function newState(w: WorldApi, h: number, id: BossId): BossState {
     id, def, h, home: homeOf(id), phase: 0, phaseT: 0, fightT: 0, invulnT: 0, stunT: 0, enrage: 0, busy: 0, calls: [], next: [], unionUntil: 0,
     running: [], fx: [], contact0: e.dmg, spdK: 1, anchor: { x: e.x, y: e.y }, rimA: Math.atan2(e.y, e.x), rimDir: w.rng() < 0.5 ? -1 : 1,
     shadow: -1, eaten: 0, tails: def.p.tails ?? 9, stomps: 0, crackT: 0, beatN: 0, gapA: w.rng() * TAU, trees: [], felled: false, phantoms: [],
-    reversing: false, lastPhantomHit: -9, dead: false,
+    reversing: false, dead: false,
   };
 }
 /** The phase thresholds: 60%, 25%, and 10% under 倒悬. */

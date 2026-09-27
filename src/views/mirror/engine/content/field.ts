@@ -10,7 +10,7 @@ import {
   addCrate, core, copyShot, dotsOf, dropMoon, drunkNow, freshCoreShots, lightNow, livesLeft, moveZone, mods, nudgePlayer,
   pullPlayer, pushPlayer, restoreHp, scaleShot, sky, waveLen, waveTime, zonePos,
 } from './bridge';
-import { TAU, b, hurtPlayer, openPoint, rimR, shared } from './util';
+import { TAU, b, hurtPlayer, openPoint, poolFactor, rimR, shared } from './util';
 
 const change = (w: WorldApi) => w.run.char === 'change';
 /** The first periodic event of a hazard comes at 40% of its period, then every period. */
@@ -196,7 +196,10 @@ export const HAZARD_IMPLS: Partial<Record<HazardId, Behaviour>> = {
 
 // ═════════════════════════════════════════════ passives (the core does most; these are the rest)
 
-/** 阴晴圆缺: on the real 满月 day she gets +10 福缘 (her cycle already starts full, in the core). */
+/**
+ * 阴晴圆缺: on the real 满月 day she gets +10 福缘 (her cycle already starts full, in the core). Her
+ * moon pool (广寒清辉) takes 30% off contact blows from foes standing in it (content hits apply it themselves).
+ */
 const yinqing: Behaviour<null> = {
   start(w) {
     if (sky(w).fullMoonDay) {
@@ -204,6 +207,12 @@ const yinqing: Behaviour<null> = {
       if (w.wave === 1 || w.run.wave === 0) w.title(b('今夜满月', 'Tonight the moon is full'), 'edge');
     }
     return null;
+  },
+  on(w, _s, ev) {
+    if (ev.type !== 'hurt' || ev.e < 0 || ev.dmg <= 0 || !w.alive(ev.e)) return;
+    const e = w.enemy(ev.e);
+    const k = poolFactor(w, e.x, e.y);
+    if (k < 1) restoreHp(w, ev.dmg * (1 - k));
   },
 };
 /** 愿者上钩 + 一网打尽: netted kills drop ×2 月华 (the second share, paid here). */
@@ -407,7 +416,11 @@ const mangzhong: Behaviour<null> = {
   on(w, _s, ev) {
     if (ev.type !== 'kill' || w.rng() >= T('mangzhong').flower) return;
     const x = ev.x, y = ev.y;
-    w.zone({
+    // at most 12 flowers wait on the paper (the zone pool is shared with the skills)
+    const sh = shared(w);
+    sh.flowers = sh.flowers.filter((id) => zonePos(w, id));
+    if (sh.flowers.length >= 12) w.endZone(sh.flowers.shift()!);
+    const fid = w.zone({
       side: 'player', look: 'flowerbed', x, y, r: 18, life: 12, tick: 0.15,
       onTick: (ww, id) => {
         if ((ww.player.x - x) ** 2 + (ww.player.y - y) ** 2 > (24 + ww.player.r) ** 2) return;
@@ -417,6 +430,7 @@ const mangzhong: Behaviour<null> = {
         ww.endZone(id);
       },
     });
+    if (fid >= 0) sh.flowers.push(fid);
   },
 };
 /** 处暑: take −30% damage for the first 10 s of each wave. */

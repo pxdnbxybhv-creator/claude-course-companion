@@ -3,7 +3,7 @@
 // build here and nowhere else. Each helper is listed as a CHANGE REQUEST to promote it into WorldApi
 // (types.ts §6): sky/plan, setMoon, player pushes and slows, body looks and kinds, quiet expiry,
 // live telegraphs, moving zones, raw enemy shots, floor 月华, crates and the event-free HP restore.
-import type { FxName } from '../../ids';
+import type { AffixId, FxName } from '../../ids';
 import type { AffixImpl, ActorImpl, AtlasId, SpawnPlan, TeleShape, WaveSetup, WorldApi } from '../../types';
 import type { World } from '../world';
 import { BLEED_MAX, BURN_MAX, EKind, SMode } from '../pools';
@@ -125,6 +125,8 @@ export function isAlly(w: WorldApi, h: number): boolean {
   const E = core(w).E;
   return E.kind[i] === EKind.Ally || E.charmT[i] > 0;
 }
+/** The 镜印 a body carries. */
+export function affixesOf(w: WorldApi, h: number): readonly AffixId[] { const i = slot(w, h); return i < 0 ? [] : core(w).E.affixes[i] ?? []; }
 /** Every live body's handle (for sweeps over the whole field). */
 export function eachEnemy(w: WorldApi, fn: (h: number) => void): void {
   const E = core(w).E;

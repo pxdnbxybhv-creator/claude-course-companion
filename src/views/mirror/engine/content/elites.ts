@@ -2,11 +2,11 @@
 // core already scales an elite's HP, damage and speed, gives it the elite knockback resist and pays
 // its 12 月华, 镜奁 and planned 铜钱 on death; content moves it and makes it attack. Every attack is
 // announced in wet vermilion ink first. Damage is the elite's own scaled contact damage × a factor.
-import type { AffixId, EliteId, TreasureId } from '../../ids';
+import { AFFIX_REG, ELITE_REG, type AffixId, type EliteId, type TreasureId } from '../../ids';
 import type { ActorImpl, AffixImpl, TeleShape, WorldApi } from '../../types';
 import { AFFIXES, ELITES, TREASURES } from '../../data';
 import { armorMult } from '../../logic/formulas';
-import { contactT, expire, fxLine, nearestSummon, setAir, setLook, setReflect, slowPlayer } from './bridge';
+import { affixesOf, contactT, expire, fxLine, nearestSummon, setAir, setLook, setReflect, slowPlayer } from './bridge';
 import { CoRun, TAU, b, dist, hurtPlayer, playerIn, rayToWall, reflect, rimR, shared, swarmOf, toPlayer, type Co } from './util';
 
 // ─────────────────────────────────────────────── helpers
@@ -40,7 +40,11 @@ function strikeTele(w: WorldApi, h: number, shape: TeleShape, dur: number, fn: (
 interface ES { run: CoRun; c: { w: WorldApi; h: number; dt: number }; t: number }
 function coActor(body: (c: { w: WorldApi; h: number; dt: number }) => Co, extra?: { hit?: ActorImpl['hit'] }): ActorImpl<ES> {
   return {
-    init(w, h) { const c = { w, h, dt: w.dt }; return { run: new CoRun(body(c)), c, t: 0 }; },
+    init(w, h) {
+      announce(w, h);
+      const c = { w, h, dt: w.dt };
+      return { run: new CoRun(body(c)), c, t: 0 };
+    },
     tick(w, h, s, dt) {
       s.c.w = w; s.c.h = h; s.c.dt = dt; s.t += dt;
       if (!s.run.tick(dt)) s.run = new CoRun(body(s.c));
@@ -48,6 +52,18 @@ function coActor(body: (c: { w: WorldApi; h: number; dt: number }) => Co, extra?
     hit: extra?.hit as ActorImpl<ES>['hit'],
     death(_w, _h, s) { s.run.stop(); },
   };
+}
+/** Set while 裂 spawns its copies (they arrive without a fanfare). */
+let spawningCopies = false;
+/** A named elite enters with its name (and its 镜印) brushed at the screen's edge; 裂 copies stay quiet. */
+function announce(w: WorldApi, h: number): void {
+  const e = w.enemy(h);
+  const row = ELITE_REG.find((r) => r.id === e.id);
+  if (!row || spawningCopies) return;
+  const affs = affixesOf(w, h).map((a) => AFFIX_REG.find((r) => r.id === a)!);
+  const zh = affs.length ? `${row.zh} · ${affs.map((a) => a.zh).join('')}` : row.zh;
+  const en = affs.length ? `${row.en} · ${affs.map((a) => a.en).join(', ')}` : row.en;
+  w.title(b(zh, en), 'edge');
 }
 /** Chase for `sec` seconds (or until `until` says stop). */
 function* chase(c: { w: WorldApi; h: number }, sec: number, speedK = 1, keepAt = 0, until?: () => boolean): Co {
@@ -378,7 +394,9 @@ const splitting: AffixImpl<null> = {
     const sh = shared(w);
     for (let k = 0; k < p.n; k++) {
       const a = (k / p.n) * TAU;
-      const c = w.spawn(id, x + Math.cos(a) * r, y + Math.sin(a) * r, { hpX: p.hp, noDrops: true });
+      spawningCopies = true;
+      let c = -1;
+      try { c = w.spawn(id, x + Math.cos(a) * r, y + Math.sin(a) * r, { hpX: p.hp, noDrops: true }); } finally { spawningCopies = false; }
       if (c < 0) continue;
       sh.copies.add(c);
       const v = w.enemy(c);
