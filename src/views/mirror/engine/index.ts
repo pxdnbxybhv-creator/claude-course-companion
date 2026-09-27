@@ -4,7 +4,7 @@
 // offending entity; a second within 5 s is fatal). DOM-free apart from its canvas: the UI owns every
 // listener and feeds `engine.input`.
 import type {
-  Camera, CreateEngine, Engine, EngineDeps, EngineInput, EnginePhase, EngineSettings, Painter, RunSave, SkillTarget, WaveSetup,
+  Camera, CreateEngine, Engine, EngineDeps, EngineInput, EnginePhase, EngineSettings, Painter, RunSave, SkillTarget, WaveResult, WaveSetup,
 } from '../types';
 import { World } from './world';
 import { Renderer } from './render';
@@ -66,6 +66,8 @@ class MirrorEngine implements Engine {
     return this.world.phase;
   }
   get paused(): boolean { return this._paused; }
+  /** The last won wave's result, kept in case the UI's waveEnd handler failed (null until one is won). */
+  get lastResult(): WaveResult | null { return this.world.lastResult; }
 
   start(run: RunSave, setup: WaveSetup): void {
     if (this.disposed) return;
@@ -88,7 +90,9 @@ class MirrorEngine implements Engine {
   pause(): void {
     if (this._paused) return;
     this._paused = true;
-    this.world.moveX = 0; this.world.moveY = 0;
+    // held movement is kept: the simulation does not step while paused, and a key or finger still
+    // held when the boss card or the pause sheet closes must keep moving you (the UI clears its held
+    // keys on blur and sends move(0, 0) on release)
   }
   resume(): void {
     if (!this._paused || this.disposed) return;
@@ -190,6 +194,8 @@ class MirrorEngine implements Engine {
   frame(now: number): void {
     const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
     let dt = this.last ? (now - this.last) / 1000 : STEP;
+    // the unclamped frame interval in ms (0 on the first frame after start/resume)
+    const interval = this.last ? now - this.last : 0;
     this.last = now;
     if (hidden) return;
     dt = Math.min(DT_CLAMP, Math.max(0, dt));
@@ -209,20 +215,34 @@ class MirrorEngine implements Engine {
     if (this.acc > STEP * MAX_STEPS) this.acc = 0;
     const t1 = performanceNow();
     this.drawFrame(dt);
-    const t2 = performanceNow();
-    // perf: EMA of simulation ms per step and draw ms per frame
+    w.perf.canvasMs = w.perf.canvasMs * 0.95 + (performanceNow() - t1) * 0.05;
+    // perf: EMA of simulation ms per step; the draw figure is the whole frame interval (the raster
+    // work happens after our canvas calls return, so timing them alone says nothing on a slow phone)
     if (steps) w.perf.lastSim = (t1 - t0) / steps;
     w.perf.simMs = w.perf.simMs * 0.95 + w.perf.lastSim * 0.05;
-    w.perf.lastDraw = t2 - t1;
-    w.perf.drawMs = w.perf.drawMs * 0.95 + w.perf.lastDraw * 0.05;
-    // the frame-time guard: > 20 ms for 2 s drops particles and fades player effects
-    const cost = t2 - t0;
-    if (cost > 20) { this.slowFor += dt || STEP; this.fastFor = 0; } else { this.fastFor += dt || STEP; if (this.fastFor > 3) this.slowFor = 0; }
-    if (this.slowFor > 2 && !w.degrade) w.degrade = 1;
-    if (w.degrade && this.fastFor > 8) w.degrade = 0;
+    this.guard(interval);
     this.fpsAcc += dt; this.fpsN++;
     if (this.fpsAcc >= 0.5) { w.fps = this.fpsN / this.fpsAcc; this.fpsAcc = 0; this.fpsN = 0; }
   }
+
+  /**
+   * The frame-time guard (GDD §24.3): when frames arrive more than 20 ms apart (under ~50 fps) for
+   * 2 s, drop particles and fade player effects; recover after 8 s of fast frames. It is based on
+   * the real interval between animation frames, so a device limited by rasterising trips it too.
+   * Intervals over 250 ms (a tab switch, a GC pause, a breakpoint) are ignored.
+   */
+  private guard(ms: number): void {
+    const w = this.world;
+    if (ms <= 0 || ms > 250) return;
+    w.perf.lastDraw = ms;
+    w.perf.drawMs = w.perf.drawMs * 0.95 + ms * 0.05;
+    this.frameMs = this.frameMs * 0.9 + ms * 0.1;
+    const s = ms / 1000;
+    if (this.frameMs > 20) { this.slowFor += s; this.fastFor = 0; } else { this.fastFor += s; if (this.fastFor > 3) this.slowFor = 0; }
+    if (this.slowFor > 2 && !w.degrade) w.degrade = 1;
+    if (w.degrade && this.fastFor > 8) w.degrade = 0;
+  }
+  private frameMs = 16.7;
 
   /** One step inside the error rules; false when the run must stop. */
   private safeStep(): boolean {

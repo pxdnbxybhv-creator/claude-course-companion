@@ -149,7 +149,7 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
 }
 
 /** The touch layer: floating stick, 技 button, and (手瞄) an aim stick. Desktop mouse moves feed cursor(). */
-export function Controls(props: { engine: () => Engine | null; left: boolean; manualAim: boolean; skill: SkillId; enabled: boolean }) {
+export function Controls(props: { engine: () => Engine | null; left: boolean; manualAim: boolean; skill: SkillId; skillLive?: boolean; enabled: boolean }) {
   const t = useT();
   const layer = useRef<HTMLDivElement>(null);
   const base = useRef<HTMLDivElement>(null);
@@ -290,8 +290,9 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       <div class="mj-stick mj-aimstick" ref={aimBase} aria-hidden="true"><div class="mj-stick-knob" ref={aimKnob} /></div>
       <button
         type="button"
-        class="mj-skill brush"
+        class={'mj-skill brush' + (props.skillLive === false ? ' is-off' : '')}
         ref={skillBtn}
+        aria-disabled={props.skillLive === false ? 'true' : undefined}
         aria-label={t(`镜技「${SKILL_REG.find((s) => s.id === props.skill)?.zh ?? ''}」（Q / 空格）`, `Mirror skill ${SKILL_REG.find((s) => s.id === props.skill)?.en ?? ''} (Q / Space)`)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); opts.current.engine()?.skill({ kind: 'auto' }); } }}
       >

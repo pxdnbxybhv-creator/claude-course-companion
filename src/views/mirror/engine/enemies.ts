@@ -669,18 +669,33 @@ function orbitDive(W: World, i: number, dt: number, tx: number, ty: number, p: R
   }
 }
 
-/** 竹鼠 travel under a ripple of earth (untargetable) until within 200, then surface. */
+/**
+ * 竹鼠 travel under a ripple of earth (untargetable) at their full 240 until within 200, then
+ * surface: a puff of dust and a 0.45 s shake-off (targetable, still), then the chase at 80% (192,
+ * still fast but slower than you). Untargetable bodies arriving at full speed made 墨林's wave 1
+ * far harsher than the other maps (QA w1 probe: 81% HP left against 98%).
+ */
+const RAT_SURFACE = 0.45;
+const RAT_CHASE = 0.8;
 function burrowSwarm(W: World, i: number, dt: number, tx: number, ty: number, dist: number, sp: number): void {
   const E = W.E;
-  void dt;
   const m = MONSTERS.rat.p;
   if (E.st[i] === ST.under) {
     E.untarget[i] = 1;
     steer(W, i, tx, ty, sp);
-    if (dist < (m.surface ?? 200)) { E.st[i] = ST.move; E.untarget[i] = 0; W.fx('dustPuff', E.x[i], E.y[i], { r: 14, life: 0.3 }); }
+    if (dist < (m.surface ?? 200)) {
+      E.st[i] = ST.tell; E.stT[i] = RAT_SURFACE; E.untarget[i] = 0; E.vx[i] = 0; E.vy[i] = 0;
+      W.fx('dustPuff', E.x[i], E.y[i], { r: 16, life: RAT_SURFACE });
+    }
     return;
   }
-  steer(W, i, tx, ty, sp);
+  if (E.st[i] === ST.tell) {
+    E.vx[i] = 0; E.vy[i] = 0;
+    E.stT[i] -= dt;
+    if (E.stT[i] <= 0) { E.st[i] = ST.move; E.stT[i] = 0; }
+    return;
+  }
+  steer(W, i, tx, ty, sp * RAT_CHASE);
 }
 
 /** 溺影 submerges (untargetable) for 1.2 s, then resurfaces 150 u from you after a 0.5 s ripple. */
@@ -726,7 +741,8 @@ function ambusherRole(W: World, i: number, dt: number, dist: number, p: Readonly
   if (E.id[i] === 'weed') {
     E.vx[i] = 0; E.vy[i] = 0;
     E.stT[i] -= dt;
-    if (E.stT[i] <= 0 && E.st[i] === ST.move) { E.noDrops[i] = 1; W.killSlot(i, false, false); }
+    // wilting is not a kill: no tally, no 醉, no kill event, no coin counter
+    if (E.stT[i] <= 0 && E.st[i] === ST.move) W.expireSlot(i, 'leafGust');
     return;
   }
   switch (E.st[i]) {

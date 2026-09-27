@@ -62,7 +62,11 @@ export default function MirrorView() {
       toast(res.reason === 'short' ? t('囊中铜钱不够。', 'Not enough coins in your purse.') : t('镜中尚有一照未了：先续镜或弃镜。', 'A run is still waiting: return to it or give it up first.'));
       return;
     }
-    aud().sfx(res.run.free ? 'ritualGlint' : 'ritualCoins');
+    // the tap unlocks the context and starts rendering the voices (研墨 waits for the rest); the
+    // ritual's sound plays once its voice exists, and not at all if that takes longer than the ritual
+    const a = aud();
+    const t0 = performance.now();
+    void a.prime().then(() => { if (performance.now() - t0 < 650) a.sfx(res.run.free ? 'ritualGlint' : 'ritualCoins'); });
     setScene({ kind: 'run', run: res.run, ritual: res.run.free ? 'free' : 'paid', key: Date.now() });
   };
   const resume = () => {

@@ -190,9 +190,13 @@ export class Shots extends Pool {
   /** Target / lob landing / boomerang origin. */
   readonly tx: Float32Array; readonly ty: Float32Array;
   readonly target: Int32Array;
-  /** Last 4 bodies hit (pierce never hits the same body twice in a row). */
-  readonly hits: Int32Array;
-  readonly nHits: Uint8Array;
+  /**
+   * Bodies this shot has hit: one bit per enemy slot (words per shot = ⌈enemy cap / 32⌉). A shot
+   * hits a body at most once per pass; a boomerang or a returning sword forgets on the turn. The
+   * world clears a slot's bit in every shot when a new body takes that slot.
+   */
+  readonly hitBits: Uint32Array;
+  readonly words: number;
   /** Bit flags, see SF. */
   readonly flags: Uint32Array;
   readonly src: Uint8Array;
@@ -202,14 +206,17 @@ export class Shots extends Pool {
   /** Enemy side: raw scaled damage, status to apply. */
   readonly status: Uint8Array; readonly statusDur: Float32Array; readonly statusV: Float32Array;
   readonly owner: Int32Array;
-  constructor(cap: number) {
+  /** `bodies` is the enemy pool's capacity (0 for enemy shots, which keep no hit set). */
+  constructor(cap: number, bodies = 0) {
     super(cap);
     const F = () => new Float32Array(cap);
+    this.words = Math.ceil(bodies / 32);
+    this.hitBits = new Uint32Array(cap * this.words);
     this.x = F(); this.y = F(); this.vx = F(); this.vy = F(); this.r = F(); this.life = F(); this.life0 = F();
     this.kind = new Uint8Array(cap); this.mode = new Uint8Array(cap); this.slot = new Int16Array(cap);
     this.dmg = F(); this.critP = F(); this.critM = F(); this.knock = F(); this.proc = F();
     this.pierce = new Int16Array(cap); this.bounce = new Int16Array(cap); this.homing = F(); this.speed = F();
-    this.tx = F(); this.ty = F(); this.target = new Int32Array(cap); this.hits = new Int32Array(cap * 4); this.nHits = new Uint8Array(cap);
+    this.tx = F(); this.ty = F(); this.target = new Int32Array(cap);
     this.flags = new Uint32Array(cap); this.src = new Uint8Array(cap); this.aux = F(); this.trailT = F(); this.px = F(); this.py = F();
     this.status = new Uint8Array(cap); this.statusDur = F(); this.statusV = F(); this.owner = new Int32Array(cap);
   }
@@ -218,20 +225,33 @@ export class Shots extends Pool {
     if (i < 0) return -1;
     this.vx[i] = this.vy[i] = 0; this.r[i] = 6; this.life[i] = this.life0[i] = 1; this.kind[i] = 0; this.mode[i] = 0; this.slot[i] = -1;
     this.dmg[i] = 0; this.critP[i] = 0; this.critM[i] = 1.5; this.knock[i] = 0; this.proc[i] = 1; this.pierce[i] = 0; this.bounce[i] = 0;
-    this.homing[i] = 0; this.speed[i] = 0; this.tx[i] = this.ty[i] = 0; this.target[i] = -1; this.nHits[i] = 0; this.flags[i] = 0;
+    this.homing[i] = 0; this.speed[i] = 0; this.tx[i] = this.ty[i] = 0; this.target[i] = -1; this.flags[i] = 0;
+    this.forgetHits(i);
     this.src[i] = 0; this.aux[i] = 0; this.trailT[i] = 0; this.px[i] = this.x[i]; this.py[i] = this.y[i];
     this.status[i] = 0; this.statusDur[i] = 0; this.statusV[i] = 0; this.owner[i] = -1;
     return i;
   }
+  /** Has shot i already hit the body with handle h (slot = h mod 1024)? */
   hitBefore(i: number, h: number): boolean {
-    const n = this.nHits[i], o = i * 4;
-    for (let k = 0; k < n && k < 4; k++) if (this.hits[o + k] === h) return true;
-    return false;
+    const e = h & 1023;
+    if (e >= this.words * 32) return false;
+    return ((this.hitBits[i * this.words + (e >> 5)] >>> (e & 31)) & 1) === 1;
   }
   remember(i: number, h: number): void {
-    const n = this.nHits[i];
-    this.hits[i * 4 + (n % 4)] = h;
-    this.nHits[i] = n + 1 > 250 ? 4 + ((n + 1) % 4) : n + 1;
+    const e = h & 1023;
+    if (e >= this.words * 32) return;
+    this.hitBits[i * this.words + (e >> 5)] |= 1 << (e & 31);
+  }
+  /** Shot i forgets every body (spawn, and the turn of a boomerang or a returning sword). */
+  forgetHits(i: number): void {
+    if (this.words) this.hitBits.fill(0, i * this.words, (i + 1) * this.words);
+  }
+  /** Every live shot forgets enemy slot e (a new body has taken it). */
+  forgetBody(e: number): void {
+    const W = this.words;
+    if (e >= W * 32) return;
+    const o = e >> 5, m = ~(1 << (e & 31));
+    for (let j = 0; j < this.n; j++) if (this.alive[j]) this.hitBits[j * W + o] &= m;
   }
 }
 /** Shot flags. */

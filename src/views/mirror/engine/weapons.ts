@@ -37,6 +37,8 @@ export interface WeaponSlot {
   flareT: number;
   echoT: number; echoDir: number;
   waitBeat: number;
+  /** Set by an attack that resets its own cooldown (醉拳 IV on a crit). */
+  resetCd: boolean;
   hit: number;
   /** Per-enemy contact timers for orbit blades. */
   touch: Float32Array | null;
@@ -57,7 +59,7 @@ export function initWeapons(W: World): void {
       stats: emptyStats(),
       music: def.classes.includes('music'), talisman: def.classes.includes('talisman'), heavy: def.classes.includes('heavy'),
       flying: def.classes.includes('flying'), ink: def.classes.includes('ink'), wine: def.classes.includes('wine'), sword: def.classes.includes('sword'),
-      stack: 0, stackT: 0, queue: 0, queueT: 0, qDir: 0, qX: 1, familiar: -1, flareT: 0, echoT: 0, echoDir: 0, waitBeat: 0, hit: 0,
+      stack: 0, stackT: 0, queue: 0, queueT: 0, qDir: 0, qX: 1, familiar: -1, flareT: 0, echoT: 0, echoDir: 0, waitBeat: 0, resetCd: false, hit: 0,
       touch: def.kind === 'orbit' ? new Float32Array(W.E.cap) : null, swords: 0,
     };
     return s;
@@ -101,8 +103,16 @@ function areaOf(W: World, s: WeaponSlot, st: Stats): number {
     if (W.mods.flags.has('musicArea30')) a += 30; else if (W.mods.flags.has('musicArea20')) a += 20; else if (W.mods.flags.has('musicArea10')) a += 10;
     if (W.run.char === 'musician') a += PASSIVES.zhiyin.p.area;
   }
-  if (s.kind === 'mine' && W.mods.flags.has('goArea25')) a += 25;
   return Math.max(0.2, 1 + a / 100);
+}
+/**
+ * A 棋罐 blast's radius, as the balance sim has it: r × √(1 + 范围) × (1 + (go 6-set 25 + 棋谱 20 each)/100).
+ * 棋谱's +20 范围 reaches the go sheet through its class cond, so it is taken out of the square root.
+ */
+function stoneRadius(W: World, s: WeaponSlot, st: Stats): number {
+  const manual = 20 * (W.run.items.gomanual ?? 0);
+  const lin = (W.mods.flags.has('goArea25') ? 25 : 0) + manual;
+  return F.stone.r * Math.sqrt(Math.max(0.2, 1 + (st.area - manual) / 100)) * (1 + lin / 100);
 }
 function rangeOf(W: World, s: WeaponSlot, st: Stats): number {
   const pct = W.run.char === 'rabbit' ? PASSIVES.yaoxiang.p.rangePct : 0;
@@ -132,9 +142,15 @@ export function fireWeapons(W: World, dt: number): void {
     if (manual && (s.kind === 'projectile' || s.kind === 'beam' || s.kind === 'launch' || s.kind === 'boomerang' || s.kind === 'burst')) dir = aimDir(W);
     let xm = 1;
     if (W.mods.every && s.cls.includes(W.mods.every.cls)) { heavyCount++; if (heavyCount % W.mods.every.n === 0) xm *= W.mods.every.x; }
+    s.resetCd = false;
     const fired = fireKind(W, s, dir, xm, false);
     if (!fired) { s.cd = 0.1; continue; }
-    s.cd = cdv;
+    // 醉拳 IV: a crit resets the cooldown. As in the balance sim (aps ÷ max(0.5, 1 − crit)), the
+    // attack rate at most doubles: up to 50% crit a reset is immediate, above it the reset leaves
+    // 1 − 0.5/crit of the cooldown (100% crit: every attack at half the cooldown).
+    if (s.resetCd) { const c = critPOf(s, st); s.cd = Math.max(0.05, cdv * Math.max(0, 1 - 0.5 / Math.max(0.5, c))); }
+    else s.cd = cdv;
+    s.resetCd = false;
     s.n++;
     if (s.music && W.mods.echo) { s.echoT = W.mods.echo.delay; s.echoDir = W.lastDir; }
     // 十面埋伏: every 4th 乐器/符箓 attack fires every other 乐器 and 符箓 weapon at 40%
@@ -205,7 +221,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       } else if (s.kind === 'combo') {
         const spin = t === 4 && s.id === 'longquan' && (s.n + 1) % ((p.spinEvery as number) ?? 3) === 0;
         s.queue = ((p.hits as number) ?? 2) - 1; s.queueT = 0.09; s.qDir = dir; s.qX = xm;
-        swipe(W, s, dir, range, spin ? 360 : (p.deg as number) ?? 90, d, cp, cm, knock);
+        swipe(W, s, dir, range * areaOf(W, s, st) ** 0.5, spin ? 360 : (p.deg as number) ?? 90, d, cp, cm, knock);
       } else if (s.kind === 'sweep') {
         const big = t === 4 && (s.n + 1) % ((p.bigEvery as number) ?? 4) === 0;
         swipe(W, s, dir, range * areaOf(W, s, st) ** 0.5, (p.deg as number) ?? 140, d * (big ? 2 : 1), cp, cm, knock);
@@ -214,9 +230,11 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
         swipe(W, s, dir, range * areaOf(W, s, st) ** 0.5, (p.deg as number) ?? 90, d, cp, cm, knock);
       } else {
         // 醉拳: a 70° arc that sways ±25°; +3 醉 per hit; IV: a crit resets the cooldown
-        const hits = swipe(W, s, dir, range, (p.deg as number) ?? 70, d, cp, cm, knock);
+        const c0 = W.critN;
+        const hits = swipe(W, s, dir, range * areaOf(W, s, st) ** 0.5, (p.deg as number) ?? 70, d, cp, cm, knock);
         if (hits) W.addDrunk(((p.drunk as number) ?? 3) * hits * s.proc);
-        if (t === 4 && W.lastCrit) s.cd = -1;
+        // IV: any crit in the swing resets the cooldown (bonus attacks do not)
+        if (t === 4 && !extra && W.critN > c0) s.resetCd = true;
       }
       return true;
     }
@@ -227,7 +245,8 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       }
       const tx = target >= 0 ? E.x[target] : px + Math.cos(dir) * range * 0.7, ty = target >= 0 ? E.y[target] : py + Math.sin(dir) * range * 0.7;
       W.lastDir = Math.atan2(ty - py, tx - px);
-      const r = ((p.r as number) ?? 80) * areaOf(W, s, st);
+      // the sim's smashAt: r × √(1 + 范围)
+      const r = ((p.r as number) ?? 80) * areaOf(W, s, st) ** 0.5;
       const n = areaStrike(W, tx, ty, r, d, s.i, SRCI.weapon, HF.melee, knock, cp, cm);
       W.fx('shockRing', tx, ty, { r, life: 0.3 });
       if (n && W.erng() < ((p.healChance as number) ?? 0.1) * s.proc) W.heal(1);
@@ -458,7 +477,7 @@ function fireQueued(W: World, s: WeaponSlot): void {
   } else {
     const t = W.nearestSlot(W.px, W.py, rangeOf(W, s, st), 'any');
     const dir = t >= 0 ? Math.atan2(W.E.y[t] - W.py, W.E.x[t] - W.px) : s.qDir;
-    swipe(W, s, dir, rangeOf(W, s, st), (s.def.p.deg as number) ?? 60, d, cp, cm, s.def.knock);
+    swipe(W, s, dir, rangeOf(W, s, st) * areaOf(W, s, st) ** 0.5, (s.def.p.deg as number) ?? 60, d, cp, cm, s.def.knock);
     s.queueT = 0.09;
   }
 }
@@ -684,9 +703,9 @@ export function tickPlayerShots(W: World, dt: number): void {
       continue;
     }
     // boomerang / sword return
-    if (mode === SMode.BoomOut && PS.life[i] < PS.life0[i] / 2) { PS.mode[i] = SMode.BoomBack; PS.nHits[i] = 0; }
+    if (mode === SMode.BoomOut && PS.life[i] < PS.life0[i] / 2) { PS.mode[i] = SMode.BoomBack; PS.forgetHits(i); }
     if (mode === SMode.SwordLead && PS.life[i] <= 0) {
-      PS.mode[i] = SMode.SwordBack; PS.life[i] = 3; PS.nHits[i] = 0; PS.dmg[i] *= PS.aux[i]; continue;
+      PS.mode[i] = SMode.SwordBack; PS.life[i] = 3; PS.forgetHits(i); PS.dmg[i] *= PS.aux[i]; continue;
     }
     if (mode === SMode.BoomBack || mode === SMode.SwordBack || mode === SMode.HookBack) {
       const dx = W.px - PS.x[i], dy = W.py - PS.y[i], dd = Math.hypot(dx, dy) || 1;
@@ -757,8 +776,9 @@ function shotHit(W: World, i: number, e: number, h: number): void {
   const PS = W.PS, E = W.E;
   const flags = PS.flags[i];
   const tg = E.tags[e];
-  // 纸伞妖's front deflects projectiles and flying swords; 霓裳 spinning sends them back at 50%
-  if ((tg & TAG_BIT.deflect) && !(flags & SF.noDeflect)) {
+  // 纸伞妖's front deflects projectiles and flying swords (summons' shots get through, GDD §13);
+  // 霓裳 spinning sends projectiles back at 50%
+  if ((tg & TAG_BIT.deflect) && !(flags & SF.noDeflect) && PS.src[i] !== SRCI.summon) {
     const toShot = Math.atan2(PS.y[i] - E.y[e], PS.x[i] - E.x[e]);
     if (Math.abs(angDiff(toShot, E.face[e])) < 45 * DEG) {
       W.fx('hitSpark', PS.x[i], PS.y[i], { r: 10, life: 0.15 });
@@ -822,7 +842,7 @@ function shotHit(W: World, i: number, e: number, h: number): void {
   }
   if (flags & SF.pierceAll) return;
   if (PS.pierce[i] > 0) { PS.pierce[i]--; return; }
-  if (PS.mode[i] === SMode.SwordLead) { PS.mode[i] = SMode.SwordBack; PS.life[i] = 3; PS.nHits[i] = 0; PS.dmg[i] *= PS.aux[i]; return; }
+  if (PS.mode[i] === SMode.SwordLead) { PS.mode[i] = SMode.SwordBack; PS.life[i] = 3; PS.forgetHits(i); PS.dmg[i] *= PS.aux[i]; return; }
   PS.release(i);
 }
 const STATUS_OF = ['burn', 'bleed', 'slow', 'root', 'stun', 'charm', 'shred', 'vuln', 'stagger'] as const;
@@ -1233,12 +1253,19 @@ export function tickStones(W: World, dt: number): void {
       break;
     }
   }
-  // 提子: an enemy within 90 of 3+ stones is captured (300% stone damage, ignoring 甲)
+  // 提子: an enemy within 90 of 3+ stones is captured (300% stone damage, ignoring 甲). A capture is
+  // an event, as in Go: one body per capture, then the board rests. The rate is the balance sim's,
+  // 0.35/s × min(2, 棋子/8) (sim/model.js SH_CAPTURE): one capture every 2.9 s at 8 stones, 1.4 s at 16.
   const cap = W.mods.special.capture;
-  if (cap && ST.count >= (cap.n ?? 3)) {
-    W.captureT -= dt;
-    if (W.captureT <= 0) { W.captureT = 0.25; capture(W, cap.r ?? 90, cap.n ?? 3, cap.x ?? 3); }
+  if (W.captureT > 0) W.captureT -= dt;
+  if (cap && ST.count >= (cap.n ?? 3) && W.captureT <= 0) {
+    if (capture(W, cap.r ?? 90, cap.n ?? 3, cap.x ?? 3)) W.captureT = captureGap(W);
+    else W.captureT = 0.25;
   }
+}
+/** Seconds between 提子 captures. */
+export function captureGap(W: World): number {
+  return 1 / (0.35 * Math.min(2, Math.max(1, stonesOf(W.stats)) / 8));
 }
 
 function blast(W: World, i: number, x: number): void {
@@ -1250,7 +1277,7 @@ function blast(W: World, i: number, x: number): void {
   ST.release(i);
   if (!s) return;
   const st = sheet(W, s);
-  const r = F.stone.r * areaOf(W, s, st);
+  const r = stoneRadius(W, s, st);
   // IV: blasts pull enemies 60 u inward first
   if (s.t === 4) {
     const buf = W.q1;
@@ -1269,26 +1296,52 @@ function blast(W: World, i: number, x: number): void {
   }
 }
 
-function capture(W: World, r: number, need: number, x: number): void {
+let capMark = new Uint32Array(0);
+let capPass = 0;
+/**
+ * One 提子 pass: the body with the most armed stones within r (at least `need`; bosses exempt) is
+ * struck once for x × stone damage, ignoring 甲. Returns whether anything was captured.
+ */
+function capture(W: World, r: number, need: number, x: number): boolean {
   const ST = W.ST, E = W.E, buf = W.q1;
   let s: WeaponSlot | null = null;
   for (const o of W.slots) if (o.kind === 'mine') { s = o; break; }
-  if (!s) return;
+  if (!s) return false;
+  if (capMark.length < E.cap) capMark = new Uint32Array(E.cap);
+  capPass = (capPass + 1) >>> 0 || 1;
+  let best = -1, bestC = 0, bestHp = 0;
+  const r2 = r * r;
   for (let k = 0; k < ST.n; k++) {
     if (!ST.alive[k] || ST.arm[k] > 0) continue;
     const n = W.hash.gather(ST.x[k], ST.y[k], r + 64, buf);
     for (let q = 0; q < n; q++) {
       const e = buf[q];
+      if (capMark[e] === capPass) continue;
+      capMark[e] = capPass;
       if (!W.targetable(e) || E.kind[e] === EKind.Boss) continue;
       let c = 0;
-      for (let m = 0; m < ST.n; m++) if (ST.alive[m] && Math.hypot(ST.x[m] - E.x[e], ST.y[m] - E.y[e]) <= r) c++;
+      for (let m = 0; m < ST.n; m++) {
+        if (!ST.alive[m] || ST.arm[m] > 0) continue;
+        const dx = ST.x[m] - E.x[e], dy = ST.y[m] - E.y[e];
+        if (dx * dx + dy * dy <= r2) c++;
+      }
       if (c < need) continue;
-      const st = sheet(W, s);
-      W.strike(e, dmgOf(W, s, st) * x, 0, 1, 0, E.x[e], E.y[e], s.i, SRCI.weapon, HF.noArmor);
-      W.fx('stoneWhite', E.x[e], E.y[e], { r: 20, life: 0.3 });
-      W.title({ zh: '提子', en: 'Capture' }, 'edge');
+      if (c > bestC || (c === bestC && E.hp[e] > bestHp)) { best = e; bestC = c; bestHp = E.hp[e]; }
     }
   }
+  if (best < 0) return false;
+  const ex = E.x[best], ey = E.y[best];
+  // the stones that closed the ring flash white
+  for (let m = 0; m < ST.n; m++) {
+    if (!ST.alive[m] || ST.arm[m] > 0) continue;
+    const dx = ST.x[m] - ex, dy = ST.y[m] - ey;
+    if (dx * dx + dy * dy <= r2) W.fx('stoneWhite', ST.x[m], ST.y[m], { r: 14, life: 0.3 });
+  }
+  const st = sheet(W, s);
+  W.strike(best, dmgOf(W, s, st) * x, 0, 1, 0, ex, ey, s.i, SRCI.weapon, HF.noArmor);
+  W.fx('stoneWhite', ex, ey, { r: 26, life: 0.35 });
+  W.title({ zh: '提子', en: 'Capture' }, 'edge');
+  return true;
 }
 
 // ─────────────────────────────────────────────────────────────── swords: blades, 剑冢, idle, 万剑

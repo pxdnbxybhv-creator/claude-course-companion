@@ -102,9 +102,23 @@ export class Renderer {
     this.drawSwords(W, ctx, cam);
     // the player
     this.drawPlayer(W, ctx, cam);
+    // effects (kill bursts, rings, slashes, sparks) go under both kinds of shot: the vermilion
+    // enemy shots that decide whether you get hit stay the brightest thing on screen (API.md §3)
+    const FX = W.P;
+    const pa = W.degrade ? 0.6 : 1;
+    for (let i = 0; i < FX.n; i++) {
+      if (!FX.alive[i]) continue;
+      const k = FX.life[i] / FX.life0[i];
+      const name = FX.kind[i];
+      const s = this.sprite(this.fxId(name));
+      if (!s) continue;
+      if (FX.len[i] > 0) blitRot(ctx, cam, s, FX.x[i], FX.y[i], FX.dir[i], FX.r[i], k * pa, FX.len[i] / (FX_BASE[name] ?? 32) / Math.max(0.2, FX.r[i]));
+      else if (name === 'levelRing' || name === 'shockRing' || name === 'pulseRing' || name === 'rippleRing' || name === 'coinRipple') blit(ctx, cam, s, FX.x[i], FX.y[i], (FX.r[i] / 32) * (0.4 + 0.6 * (1 - k)), false, k * pa);
+      else if (name === 'slashArc') blitRot(ctx, cam, s, FX.x[i], FX.y[i], FX.dir[i], FX.r[i] / 32, k * pa);
+      else blit(ctx, cam, s, FX.x[i], FX.y[i], FX.r[i] / 32, false, Math.min(1, k * 1.5) * pa);
+    }
     // player shots
     const PS = W.PS;
-    const pa = W.degrade ? 0.6 : 1;
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) continue;
       const id = PROJ_ATLAS[PS.kind[i]];
@@ -133,19 +147,6 @@ export class Renderer {
       }
       if (s) blitRot(ctx, cam, s, ES.x[i], y, Math.atan2(ES.vy[i], ES.vx[i]), 1.5);
       else { circle(ctx, cam, ES.x[i], y, ES.r[i], '#c0412f'); circle(ctx, cam, ES.x[i], y, ES.r[i] * 0.55, '#fff'); }
-    }
-    // effects
-    const FX = W.P;
-    for (let i = 0; i < FX.n; i++) {
-      if (!FX.alive[i]) continue;
-      const k = FX.life[i] / FX.life0[i];
-      const name = FX.kind[i];
-      const s = this.sprite(this.fxId(name));
-      if (!s) continue;
-      if (FX.len[i] > 0) blitRot(ctx, cam, s, FX.x[i], FX.y[i], FX.dir[i], FX.r[i], k * pa, FX.len[i] / (FX_BASE[name] ?? 32) / Math.max(0.2, FX.r[i]));
-      else if (name === 'levelRing' || name === 'shockRing' || name === 'pulseRing' || name === 'rippleRing' || name === 'coinRipple') blit(ctx, cam, s, FX.x[i], FX.y[i], (FX.r[i] / 32) * (0.4 + 0.6 * (1 - k)), false, k * pa);
-      else if (name === 'slashArc') blitRot(ctx, cam, s, FX.x[i], FX.y[i], FX.dir[i], FX.r[i] / 32, k * pa);
-      else blit(ctx, cam, s, FX.x[i], FX.y[i], FX.r[i] / 32, false, Math.min(1, k * 1.5) * pa);
     }
     // numbers
     const N = W.N;

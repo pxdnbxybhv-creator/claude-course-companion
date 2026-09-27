@@ -147,7 +147,9 @@
 /* ───────────────────────── the run */
 .mj-run { position: fixed; inset: 0; z-index: 10; overflow: hidden; background: #efe6d2; outline: none; touch-action: none; user-select: none; -webkit-user-select: none; }
 .mj-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.mj-run.is-between .mj-canvas { filter: saturate(0.7); opacity: 0.55; }
+/* between waves the frozen arena sits behind paper: blurred, so the last frame's brush titles do not read through the cards */
+.mj-run.is-between .mj-canvas { filter: saturate(0.7) blur(2px); opacity: 0.55; }
+.mj-run.is-between.is-lowq .mj-canvas { filter: saturate(0.7); }
 .mj-hud { position: absolute; inset: 0; pointer-events: none; z-index: 3; padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) 0 calc(env(safe-area-inset-left) + 10px); color: #1b1916; }
 .mj-hud button { pointer-events: auto; }
 .mj-hud-tl { position: absolute; left: calc(env(safe-area-inset-left) + 10px); top: calc(env(safe-area-inset-top) + 8px); width: min(33vw, 200px); display: flex; flex-direction: column; gap: 4px; }
@@ -203,6 +205,7 @@
 .mj-skill-ring { fill: none; stroke: #c0412f; stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.12s linear; }
 .mj-skill span { position: relative; }
 .mj-skill.is-cd span { opacity: 0.45; }
+.mj-skill.is-off { opacity: 0.4; filter: grayscale(1); }
 .mj-skill.is-active { box-shadow: 0 0 0 4px rgba(192, 65, 47, 0.5); }
 .mj-skill.is-held { transform: scale(0.95); }
 .mj-skill-aim { position: absolute; left: 50%; top: 50%; width: 120px; height: 3px; margin-top: -1.5px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(192, 65, 47, 0.8), rgba(192, 65, 47, 0)); opacity: 0; pointer-events: none; }
@@ -234,7 +237,7 @@
 .mj-panel-head { position: relative; text-align: center; padding: 8px 48px; }
 .mj-panel-head h2 { margin: 0; font-size: 34px; font-weight: 400; }
 .mj-panel-sub { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2); }
-.mj-pause-panel { position: absolute; top: 6px; right: 0; background: var(--paper-2); }
+.mj-pause-panel { position: absolute; top: 6px; right: 0; background: var(--paper-2); color: var(--ink); border-color: color-mix(in srgb, var(--ink) 35%, transparent); }
 .mj-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; margin-top: 12px; }
 .mj-cards-lv { grid-template-columns: repeat(auto-fit, minmax(min(46%, 150px), 1fr)); }
 .mj-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 12px; border-radius: 8px; text-align: left; color: var(--ink); background: var(--paper); border: 1px solid var(--line-strong); border-top: 3px solid var(--tier, var(--line-strong)); box-shadow: var(--shadow); font: inherit; }

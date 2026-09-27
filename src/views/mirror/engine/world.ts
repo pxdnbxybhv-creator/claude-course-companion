@@ -37,6 +37,28 @@ interface Running { b: Behaviour; s: unknown; failed: boolean }
 /** A reusable scratch vector for queries that return a point. */
 const V: Vec = { x: 0, y: 0 };
 
+/**
+ * The UI's hooks, each behind a guard: a throw in UI code is logged (at most once per hook per 5 s)
+ * and never reaches the engine's error rules, so a broken HUD cannot void or settle a run.
+ */
+function guardHooks(h: EngineHooks): EngineHooks {
+  const last: Record<string, number> = {};
+  const report = (name: string, e: unknown) => {
+    const now = Date.now();
+    if (now - (last[name] ?? -1e9) < 5000) return;
+    last[name] = now;
+    console.error(`[mirror engine] the UI's ${name} hook threw`, e);
+  };
+  const wrap = <K extends keyof EngineHooks>(name: K): EngineHooks[K] => {
+    const fn = h[name] as (...a: unknown[]) => void;
+    return ((...a: unknown[]) => { try { fn.apply(h, a); } catch (e) { report(name, e); } }) as EngineHooks[K];
+  };
+  return {
+    hud: wrap('hud'), levelUp: wrap('levelUp'), crate: wrap('crate'), coin: wrap('coin'),
+    boss: wrap('boss'), waveEnd: wrap('waveEnd'), death: wrap('death'), error: wrap('error'),
+  };
+}
+
 export interface WorldOpts {
   painter: Painter | null;
   audio: MirrorAudio | null;
@@ -56,7 +78,10 @@ export class World implements WorldApi {
   private arenaKey = '';
   quality: Quality;
   settings: EngineSettings;
-  hooks: EngineHooks;
+  /** The UI's hooks; whatever is assigned is wrapped so a throw in UI code never reaches the error rules. */
+  get hooks(): EngineHooks { return this._hooks; }
+  set hooks(h: EngineHooks) { this._hooks = guardHooks(h); }
+  private _hooks!: EngineHooks;
   content: ContentRegistry;
   painter: Painter | null;
   audio: MirrorAudio | null;
@@ -96,10 +121,23 @@ export class World implements WorldApi {
   N: Numbers;
   TM: Timers;
   hash!: SpatialHash;
-  /** Scratch index buffers for hash queries (nested queries use different ones). */
-  q0 = new Int32Array(512);
-  q1 = new Int32Array(512);
+  /**
+   * Scratch index buffers for hash queries. q0 and q1 are held by loops that strike, and a strike
+   * can re-enter the world (kill handlers, affixes, actor deaths, a level-up's push ring): every
+   * strike, kill and event runs one level deeper, and each level has its own pair, so a nested query
+   * never overwrites the list an outer loop is still reading. q2 is for leaf queries that call
+   * nothing back (nearest, strongest, countNear, query).
+   */
+  get q0(): Int32Array { return this.qs[this.qd * 2] ?? this.growQ(0); }
+  get q1(): Int32Array { return this.qs[this.qd * 2 + 1] ?? this.growQ(1); }
   q2 = new Int32Array(512);
+  private qs: Int32Array[] = [new Int32Array(512), new Int32Array(512)];
+  /** Re-entry depth of strike / kill / emit. */
+  qd = 0;
+  private growQ(k: number): Int32Array {
+    while (this.qs.length <= this.qd * 2 + 1) this.qs.push(new Int32Array(512));
+    return this.qs[this.qd * 2 + k];
+  }
   capEnemies: number;
 
   // ── the player
@@ -201,13 +239,17 @@ export class World implements WorldApi {
   /** Titles for the renderer: text, where, time left. */
   titles: { text: Bilingual; where: 'edge' | 'centre'; t: number }[] = [];
   titleGate = 0;
-  perf = { steps: 0, simMs: 0, drawMs: 0, lastSim: 0, lastDraw: 0 };
+  /** simMs: ms per step; drawMs/lastDraw: the frame interval (ms, EMA/last); canvasMs: JS time of the draw calls. */
+  perf = { steps: 0, simMs: 0, drawMs: 0, lastSim: 0, lastDraw: 0, canvasMs: 0 };
 
   /** Reused view objects handed to content. */
-  private ev: GameEvent = { type: 'hit', e: -1, dmg: 0, crit: false, src: 'weapon', x: 0, y: 0, slot: -1 };
+  private evs: GameEvent[] = [];
   private eview: EnemyViewImpl;
   player: PlayerView;
   lastCrit = false;
+  /** Crits dealt so far (a weapon checks whether any hit of one attack crit). */
+  critN = 0;
+  private eliteStopT = -1;
 
   constructor(o: WorldOpts) {
     this.settings = o.settings;
@@ -219,7 +261,7 @@ export class World implements WorldApi {
     const caps = CAPS[this.quality];
     this.capEnemies = caps.enemies;
     this.E = new Enemies(400);
-    this.PS = new Shots(caps.pshots);
+    this.PS = new Shots(caps.pshots, this.E.cap);
     this.ES = new Shots(ENEMY_SHOTS);
     this.D = new Drops(DROPS_CAP);
     this.S = new Summons(40);
@@ -246,6 +288,8 @@ export class World implements WorldApi {
     this.run = run;
     this.setup = setup;
     this.plan = setup.plan;
+    this.lastResult = null;
+    this.eliteStopT = -1;
     this.wave = setup.wave;
     this.map = MAPS[run.map];
     this.diff = DIFFS[run.diff];
@@ -336,6 +380,7 @@ export class World implements WorldApi {
   /** One fixed 60 Hz step. */
   step(dt: number): void {
     if (this.phase !== 'wave' && this.phase !== 'ending') return;
+    this.qd = 0;
     this.dt = dt;
     this.t += dt;
     const beatBefore = Math.floor((this.t - dt) * 2);
@@ -658,11 +703,16 @@ export class World implements WorldApi {
     const E = this.E;
     let pick = -1, seen = 0;
     for (let i = 0; i < E.n; i++) {
-      if (!E.alive[i] || E.kind[i] !== EKind.Mon || E.hidden[i]) continue;
+      // the target gets all the drops (§5.1), so never a body that drops nothing or fights for you
+      if (!E.alive[i] || E.kind[i] !== EKind.Mon || E.hidden[i] || E.noDrops[i] || E.charmT[i] > 0) continue;
       seen++;
       if (this.erng() * seen < 1) pick = i;
     }
-    if (pick < 0) return false;
+    if (pick < 0) {
+      // nothing can carry it: the 月华 goes to 蓄月 rather than vanishing
+      if (cost > 0) this.store += cost * (1 + 0.03 * Math.max(0, this.stats.curse) + this.mods.moonPct / 100);
+      return false;
+    }
     E.hp[pick] += hp * F.heavyInk.hpFrac;
     E.hpMax[pick] += hp * F.heavyInk.hpFrac;
     E.cost[pick] += cost;
@@ -688,6 +738,7 @@ export class World implements WorldApi {
     const E = this.E;
     const i = E.spawnSlot();
     if (i < 0) return -1;
+    this.PS.forgetBody(i);
     E.capped[i] = capped ? 1 : 0;
     if (x === null || y === null) {
       this.spawnPoint(this.pt, mon?.r ?? eli?.r ?? 14);
@@ -761,6 +812,7 @@ export class World implements WorldApi {
     const E = this.E;
     const i = E.spawnSlot();
     if (i < 0) return -1;
+    this.PS.forgetBody(i);
     E.capped[i] = 0;
     E.kind[i] = EKind.Boss;
     E.id[i] = id;
@@ -1078,6 +1130,10 @@ export class World implements WorldApi {
    * `dmg` is raw × mult (before crit and armour).
    */
   strike(i: number, dmg: number, critP: number, critM: number, knock: number, fx: number, fy: number, slot: number, src: number, flags: number, proc = 1): number {
+    this.qd++;
+    try { return this.strikeIn(i, dmg, critP, critM, knock, fx, fy, slot, src, flags, proc); } finally { this.qd--; }
+  }
+  private strikeIn(i: number, dmg: number, critP: number, critM: number, knock: number, fx: number, fy: number, slot: number, src: number, flags: number, proc: number): number {
     const E = this.E;
     if (!E.alive[i] || E.invuln[i] || E.hidden[i]) return 0;
     let crit = false;
@@ -1106,6 +1162,7 @@ export class World implements WorldApi {
     E.lastSlot[i] = slot;
     E.lastSrc[i] = src;
     this.lastCrit = crit;
+    if (crit) this.critN++;
     // numbers merge per target every 0.25 s
     E.numAcc[i] += d;
     if (crit) E.numCrit[i] = 1;
@@ -1127,7 +1184,13 @@ export class World implements WorldApi {
         E.kx[i] = (dx * dist) / F.knockDur; E.ky[i] = (dy * dist) / F.knockDur; E.kT[i] = F.knockDur;
       }
     }
-    if (E.kind[i] === EKind.Elite && !(flags & HF.dot)) this.hitstop(30);
+    // 30 ms on elite hits (§4.2), rate-limited: at most one per 0.5 s, and only for a crit or a hit
+    // worth 3% of its HP — unlimited, fast builds froze the game every 80 ms (61–78% speed); now
+    // the worst case costs about 6% of game speed while an elite is under fire
+    if (E.kind[i] === EKind.Elite && !(flags & HF.dot) && this.t - this.eliteStopT >= 0.5 && (crit || d >= E.hpMax[i] * 0.03)) {
+      this.eliteStopT = this.t;
+      this.hitstop(30);
+    }
     const srcName = SRC[src];
     if (!(flags & HF.quiet)) {
       if (!(flags & HF.dot) && this.P.count < this.P.cap * 0.8) this.fx(crit ? 'critSpark' : 'hitSpark', E.x[i], E.y[i], { r: 10, life: 0.18 });
@@ -1322,10 +1385,16 @@ export class World implements WorldApi {
 
   /** Death of slot i: tallies, drops, coins, events, splat. */
   killSlot(i: number, drops: boolean, crit: boolean): void {
+    if (!this.E.alive[i]) return;
+    this.qd++;
+    try { this.killIn(i, drops, crit); } finally { this.qd--; }
+  }
+  private killIn(i: number, drops: boolean, crit: boolean): void {
     const E = this.E;
-    if (!E.alive[i]) return;
     const h = E.handle(i);
     const k = E.kind[i], id = E.id[i], x = E.x[i], y = E.y[i];
+    // everything read after release is taken now: a splitter's first child reuses slot i
+    const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], role = E.role[i], r = E.r[i], burning = E.burnN[i] > 0;
     E.hp[i] = Math.min(E.hp[i], 0);
     this.flushNumber(i);
     // content death hooks run while the body still exists
@@ -1338,7 +1407,7 @@ export class World implements WorldApi {
       this.kills++;
       this.addStat('kills', 1);
       this.killsBy[id] = (this.killsBy[id] ?? 0) + 1;
-      const slot = E.lastSlot[i];
+      const slot = lastSlot;
       if (slot >= 0 && slot < this.slots.length) {
         const sl = this.slots[slot];
         const b = this.byWeapon[sl.id] ?? (this.byWeapon[sl.id] = { dmg: 0, kills: 0 });
@@ -1348,7 +1417,7 @@ export class World implements WorldApi {
         if (cls.includes('flying')) { this.addStat('killsFlying', 1); this.swordKills++; }
         if (cls.includes('ink')) this.addStat('killsInk', 1);
       }
-      if (E.lastSrc[i] === SRCI.summon) this.addStat('killsInk', 1);
+      if (lastSrc === SRCI.summon) this.addStat('killsInk', 1);
       if (E.tags[i] & TAG_BIT.ghost) this.addStat('killsGhost', 1);
       if (this.drunkOn) this.addDrunk(F.drunk.perKill);
     }
@@ -1360,16 +1429,25 @@ export class World implements WorldApi {
       if (id === 'mirrorflower') { this.addStat('flowers', 1); this.hearts.push('flower'); this.sfx('bell'); }
     }
     if (drops && !E.noDrops[i] && !ally && k !== EKind.Demon) this.killDrops(i, k, id, x, y);
-    if (!ally) onWeaponKill(this, E.lastSlot[i], x, y, crit, E.burnN[i] > 0);
+    if (!ally) onWeaponKill(this, lastSlot, x, y, crit, burning);
     if (k === EKind.Demon && drops) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
     onEnemyDeath(this, i, k, id, x, y, crit);
     // 60 ms of hitstop on crit kills of tanks (§4.2)
-    if (crit && k === EKind.Mon && E.role[i] === ROLE.tank) this.hitstop(60);
-    this.emit('kill', h, 0, crit, SRC[E.lastSrc[i]] ?? 'weapon', x, y, E.lastSlot[i]);
+    if (crit && k === EKind.Mon && role === ROLE.tank) this.hitstop(60);
+    this.emit('kill', h, 0, crit, SRC[lastSrc] ?? 'weapon', x, y, lastSlot);
     // ink: a burst, then a stain stamped into the paper
-    this.fx('inkBurst', x, y, { r: E.r[i] * 1.6, life: 0.35 });
-    try { this.painter?.stamp('splat', x, y, E.r[i] * 1.2, (h * 2654435761) >>> 0); } catch { /* painter optional */ }
+    this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
+    try { this.painter?.stamp('splat', x, y, r * 1.2, (h * 2654435761) >>> 0); } catch { /* painter optional */ }
     this.sfx('kill');
+  }
+
+  /** A body leaves without being killed (a wilted 水草缠, an expired summon): no tallies, drops or events. */
+  expireSlot(i: number, look: FxName = 'inkBurst'): void {
+    const E = this.E;
+    if (!E.alive[i]) return;
+    this.flushNumber(i);
+    this.fx(look, E.x[i], E.y[i], { r: E.r[i] * 1.2, life: 0.4 });
+    E.release(i);
   }
 
   private killDrops(i: number, k: number, id: string, x: number, y: number): void {
@@ -1701,7 +1779,9 @@ export class World implements WorldApi {
   // ═══════════════════════════════════════════════════════════ events and tallies
 
   fillEv(type: GameEvent['type'], e: number, dmg: number, crit: boolean, src: DamageSrc, x: number, y: number, slot: number): GameEvent {
-    const ev = this.ev;
+    // one reused event object per re-entry depth, so a nested emit cannot rewrite the event the
+    // outer handlers are still reading
+    const ev = this.evs[this.qd] ?? (this.evs[this.qd] = { type: 'hit', e: -1, dmg: 0, crit: false, src: 'weapon', x: 0, y: 0, slot: -1 });
     ev.type = type; ev.e = e; ev.dmg = dmg; ev.crit = crit; ev.src = src; ev.x = x; ev.y = y; ev.slot = slot;
     return ev;
   }
@@ -1710,12 +1790,15 @@ export class World implements WorldApi {
     const n = this.running.length;
     if (!n && !this.skillRun?.on) return;
     const ev = this.fillEv(type, e, dmg, crit, src, x, y, slot);
-    for (let k = 0; k < n; k++) {
-      const r = this.running[k];
-      if (r.failed || !r.b.on) continue;
-      try { r.b.on(this, r.s, ev); } catch (err) { r.failed = true; this.hooks.error(err, false); }
-    }
-    if (this.skillRun?.on) { try { this.skillRun.on(this, ev); } catch (err) { this.hooks.error(err, false); } }
+    this.qd++;
+    try {
+      for (let k = 0; k < n; k++) {
+        const r = this.running[k];
+        if (r.failed || !r.b.on) continue;
+        try { r.b.on(this, r.s, ev); } catch (err) { r.failed = true; this.hooks.error(err, false); }
+      }
+      if (this.skillRun?.on) { try { this.skillRun.on(this, ev); } catch (err) { this.hooks.error(err, false); } }
+    } finally { this.qd--; }
   }
   addStat(k: RunStatKey, v: number): void { this.rs[k] = (this.rs[k] ?? 0) + v; }
   maxStat(k: RunStatKey, v: number): void { if (v > (this.rs[k] ?? 0)) this.rs[k] = v; }
@@ -1751,10 +1834,28 @@ export class World implements WorldApi {
         return;
       }
     }
-    const i = D.take();
+    let i = D.take();
     if (i < 0) {
-      if (kind === DK.moonDrop || kind === DK.moonThick) { this.collectMoon(worth); }
-      return;
+      // the pool is full: 月华 (and gold that is only 月华) is collected at once …
+      if (kind === DK.moonDrop || kind === DK.moonThick || kind === DK.goldShard || kind === DK.carpGold) { this.collectMoon(worth); return; }
+      // … and anything else takes the slot of the oldest 月华 on the ground, which is collected
+      // (a planned 铜钱 is real money and must never be lost)
+      let old = -1, oa = -1;
+      for (let j = 0; j < D.n; j++) {
+        if (!D.alive[j]) continue;
+        const kj = D.kind[j];
+        if ((kj === DK.moonDrop || kj === DK.moonThick || kj === DK.goldShard || kj === DK.carpGold) && D.age[j] > oa) { oa = D.age[j]; old = j; }
+      }
+      if (old < 0) {
+        // nothing to evict (the ground is all coins, seeds and crates): a coin goes straight to the sleeve
+        if (coin >= 0 && coin < this.setup.coins.length) this.sleeveCoin(this.setup.coins[coin], kind);
+        return;
+      }
+      const w = D.worth[old];
+      D.release(old);
+      this.collectMoon(w);
+      i = D.take();
+      if (i < 0) return;
     }
     const a = this.erng() * TAU, s = 60 + 80 * this.erng();
     D.kind[i] = kind; D.x[i] = x; D.y[i] = y; D.vx[i] = Math.cos(a) * s; D.vy[i] = Math.sin(a) * s;
@@ -1797,16 +1898,20 @@ export class World implements WorldApi {
       case DK.cashCoin: case DK.cashString: case DK.cashTen: {
         const c = D.coin[i];
         const drop = c >= 0 && c < this.setup.coins.length ? this.setup.coins[c] : { kind: 'cashCoin', worth: 1, src: 'wave' } as CoinDrop;
-        this.sleeve.push(drop);
-        let s = 0;
-        for (const x of this.sleeve) s += x.worth;
-        this.hooks.coin(drop, s);
-        this.sfx(k === DK.cashTen ? 'coinTen' : k === DK.cashString ? 'coinString' : 'coin');
-        this.addNum(drop.worth, this.px, this.py - 24, 4);
+        this.sleeveCoin(drop, k);
         break;
       }
     }
     this.emit('pickup', -1, worth, false, 'item', this.px, this.py, -1);
+  }
+  /** A 铜钱 goes into the sleeve (picked up, or straight in when there is nowhere to drop it). */
+  private sleeveCoin(drop: CoinDrop, k: number): void {
+    this.sleeve.push(drop);
+    let s = 0;
+    for (const x of this.sleeve) s += x.worth;
+    this.hooks.coin(drop, s);
+    this.sfx(k === DK.cashTen ? 'coinTen' : k === DK.cashString ? 'coinString' : 'coin');
+    this.addNum(drop.worth, this.px, this.py - 24, 4);
   }
   private pickCombo = 0;
   private pickT = 0;
@@ -2036,6 +2141,8 @@ export class World implements WorldApi {
   }
 
   fieldMoon = 0;
+  /** The last won wave's result (null until a wave is won; cleared by begin). */
+  lastResult: WaveResult | null = null;
   beginEnding(): void {
     if (this.phase !== 'wave') return;
     this.phase = 'ending';
@@ -2078,6 +2185,8 @@ export class World implements WorldApi {
     for (let i = 0; i < D.n; i++) if (D.alive[i]) this.pickup(i);
     this.phase = 'idle';
     const r = this.result();
+    // kept so the UI can ask again if its waveEnd handler failed (engine.lastResult)
+    this.lastResult = r;
     this.pushHud(true);
     this.hooks.waveEnd(r);
   }
@@ -2147,6 +2256,7 @@ export class World implements WorldApi {
 
   /** After a throw: drop the offending entity (the enemy or summon being processed). */
   recover(): void {
+    this.qd = 0;
     if (this.curWhat === 'enemy' && this.cur >= 0 && this.E.alive[this.cur]) { this.E.actor[this.cur] = null; this.E.release(this.cur); }
     else if (this.curWhat === 'summon' && this.cur >= 0) this.S.release(this.cur);
     else if (this.curWhat === 'skill') { this.skillRun = null; this.skillCd = this.skillCdMax; }

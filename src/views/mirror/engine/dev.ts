@@ -16,7 +16,7 @@ export interface MirrorDev {
   wave(w: number): void;
   give(id: ItemId | WeaponId, t?: Tier): void;
   god(on?: boolean): boolean;
-  perf(): { simMs: number; drawMs: number; lastSim: number; lastDraw: number; steps: number; enemies: number; pshots: number; eshots: number; swords: number; summons: number; fps: number };
+  perf(): { simMs: number; drawMs: number; canvasMs: number; lastSim: number; lastDraw: number; steps: number; enemies: number; pshots: number; eshots: number; swords: number; summons: number; fps: number };
   /** Fill the field to a load: enemies, player shots, swords, summons (for measuring). */
   load(o: { enemies?: number; shots?: number; eshots?: number; swords?: number; summons?: number }): void;
   step(n: number): number;
@@ -58,7 +58,7 @@ export function devApi(engine: MirrorEngine): MirrorDev {
       let swords = W.blades + W.canjian + W.idleSwords;
       for (let i = 0; i < W.PS.n; i++) if (W.PS.alive[i] && (W.PS.flags[i] & SF.sword)) swords++;
       return {
-        simMs: W.perf.simMs, drawMs: W.perf.drawMs, lastSim: W.perf.lastSim, lastDraw: W.perf.lastDraw, steps: W.perf.steps,
+        simMs: W.perf.simMs, drawMs: W.perf.drawMs, canvasMs: W.perf.canvasMs, lastSim: W.perf.lastSim, lastDraw: W.perf.lastDraw, steps: W.perf.steps,
         enemies: W.E.count, pshots: W.PS.count, eshots: W.ES.count, swords, summons: W.S.count, fps: W.fps,
       };
     },

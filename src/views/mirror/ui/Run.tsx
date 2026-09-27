@@ -64,11 +64,17 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const [paused, setPausedState] = useState(false);
   const pausedRef = useRef(false);
   const setPaused = (p: boolean) => { pausedRef.current = p; setPausedState(p); };
+  /** A pause asked for during the engine's 1.2 s wave end: the wave is already won, so it finishes and
+   *  the sheet opens over the next screen (pausing there would turn a won wave into a replay). */
+  const pauseAfterEnd = useRef(false);
   const [confirm, setConfirm] = useState<'leave' | 'abandon' | null>(null);
   const [intro, setIntroState] = useState<(BossEvent & { kind: 'intro' }) | null>(null);
   const introRef = useRef<typeof intro>(null);
   const setIntro = (v: typeof intro) => { introRef.current = v; setIntroState(v); };
   const [statsOpen, setStatsOpen] = useState(false);
+  /** False when the loaded content has no 镜技 for this companion (its lane failed to load): the 技
+   *  button then shows as spent instead of looking live and doing nothing. */
+  const [skillLive, setSkillLive] = useState(true);
   /** 文 that sank with the glass (the fatal wave's sleeve), for the 镜碎 overlay. */
   const [sank, setSank] = useState(0);
   const wrap = useRef<HTMLDivElement>(null);
@@ -83,6 +89,21 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const unlocks = useMemo(() => unlocksOf(mirror.value), []);
   const settings = mirror.value.settings;
   const reduced = prefersReduced();
+  const lowQ = useMemo(() => qualityOf(settings.quality) === 'low', []);
+
+  /** Until this engine has drawn a wave its canvas is blank (opaque black): the screens before the
+   *  first wave of a sitting (择器, 第 1 重, or the shop after 续镜) sit on the pond the painter
+   *  already inked behind 研墨 instead. The engine's first frame paints over it. */
+  const waveDrawn = useRef(false);
+  const backdrop = () => {
+    const c = canvas.current, p = painter.current;
+    if (waveDrawn.current || !c || !p || c.width < 2 || c.height < 2) return;
+    try {
+      const ctx = c.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(p.arenaImage(c.width, c.height), 0, 0);
+    } catch { /* the plain paper shows */ }
+  };
 
   // ── the arena ink so far (画卷 and 存画)
   const snap = (): HTMLCanvasElement | null => {
@@ -107,6 +128,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     }
     setRun(r);
     setStage('between');
+    if (pauseAfterEnd.current) { pauseAfterEnd.current = false; setPaused(true); }
     P.current.audio.music('shop', r.map);
   };
   /** The next boss in the wave-9/19/29/39 shops; the other rosters (倒影) in the wave-30 shop. */
@@ -149,7 +171,9 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     setRun(r);
     setStage('wave');
     setPaused(false);
+    pauseAfterEnd.current = false;
     rememberPlayed(todayKey(), r.seed);
+    waveDrawn.current = true;
     try {
       eng.start(r, setup);
     } catch (e) {
@@ -251,6 +275,8 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
         onError(e, true);
         return;
       }
+      backdrop();
+      setSkillLive(mod.stub || !!mod.content.skills[COMPANIONS[r.char].skill]);
       between(runRef.current);
     })();
     return () => { dead = true; };
@@ -269,6 +295,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const pause = () => {
     const s = stageRef.current;
     if ((s !== 'wave' && s !== 'between') || pausedRef.current) return;
+    if (s === 'wave' && engine.current?.phase === 'ending') { pauseAfterEnd.current = true; return; }
     engine.current?.pause();
     setPaused(true);
   };
@@ -366,7 +393,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   useEffect(() => {
     const el = wrap.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => engine.current?.resize());
+    const ro = new ResizeObserver(() => { engine.current?.resize(); backdrop(); });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
@@ -381,12 +408,12 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const armorNow = useMemo(() => computeStats(run).armor, [run]);
   const midWave = stage === 'wave';
   return (
-    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
+    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
       <canvas class="mj-canvas" ref={canvas} aria-hidden="true" />
       {stage === 'wave' && (
         <>
           <Hud api={hud} onPause={pause} wave={run.wave + 1} skill={COMPANIONS[run.char].skill} showSleeve={run.coins > 0} armor={armorNow} />
-          <Controls engine={() => engine.current} left={settings.left} manualAim={settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} enabled={!paused && !intro} />
+          <Controls engine={() => engine.current} left={settings.left} manualAim={settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={!paused && !intro} />
         </>
       )}
       {stage === 'ritual' && props.ritual && <Ritual kind={props.ritual} reduced={reduced} onDone={() => { if (stageRef.current === 'ritual') setStage('bake'); }} />}
