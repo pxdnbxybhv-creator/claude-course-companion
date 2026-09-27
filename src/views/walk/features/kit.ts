@@ -187,6 +187,9 @@ export function freeTree(root: T.Object3D, seen = new Set<unknown>()): void {
     else if (mat) freeMaterial(mat, seen);
     const inst = o as T.InstancedMesh;
     if (inst.isInstancedMesh && !seen.has(inst)) { seen.add(inst); inst.dispose(); }
+    // (a skinned figure's bones live in a small texture of their own)
+    const sk = (o as T.SkinnedMesh).isSkinnedMesh ? (o as T.SkinnedMesh).skeleton : null;
+    if (sk && !seen.has(sk)) { seen.add(sk); sk.dispose(); }
   });
 }
 

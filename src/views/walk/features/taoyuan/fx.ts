@@ -7,6 +7,7 @@ import './taoyuan.css';
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import { BRUSH_FONT, canvasTexture, loadBrush, reducedMotion } from '../kit';
+import { merge, part } from '../geo';
 import { plop } from '../sfx';
 import { makeRng } from '../../../../core/rng';
 import type { Valley } from './valley';
@@ -1207,13 +1208,11 @@ export class IncenseSeal {
     this.group.position.copy(at);
     this.group.name = 'taoyuan:incense';
     fx.group.add(this.group);
-    // the tray: a shallow bronze box of pale ash
-    const tray = new TH.Mesh(new TH.BoxGeometry(size, 0.04, size), new TH.MeshLambertMaterial({ color: '#6b5a3c' }));
-    tray.position.y = -0.02;
-    this.group.add(tray);
-    const bed = new TH.Mesh(new TH.PlaneGeometry(size * 0.9, size * 0.9).rotateX(-Math.PI / 2), new TH.MeshLambertMaterial({ color: '#cfc7b8' }));
-    bed.position.y = 0.001;
-    this.group.add(bed);
+    // the tray: a shallow bronze box of pale ash (one mesh with its nine pins, below)
+    const still: T.BufferGeometry[] = [
+      part(TH, new TH.BoxGeometry(size, 0.04, size), '#6b5a3c', { p: [0, -0.02, 0] }),
+      part(TH, new TH.PlaneGeometry(size * 0.9, size * 0.9).rotateX(-Math.PI / 2), '#cfc7b8', { p: [0, 0.001, 0] }),
+    ];
     // the meander (a 回 pattern, the old 篆 of incense seals)
     const s = size * 0.4, pts: [number, number][] = [];
     const turns = 5;
@@ -1247,14 +1246,11 @@ export class IncenseSeal {
     this.mat = new TH.ShaderMaterial({ vertexShader: INCENSE_VS, fragmentShader: INCENSE_FS, side: TH.DoubleSide, uniforms: { uBurn: { value: 0 }, uWet: { value: 2 }, uTint: fx.tintU } });
     this.group.add(new TH.Mesh(g, this.mat));
     // the pins
-    const pinGeo = new TH.CylinderGeometry(0.003, 0.003, 0.05, 4);
-    const pinMat = new TH.MeshLambertMaterial({ color: '#c9a45a' });
     for (const p of this.pins) {
       const q = this.at(p);
-      const m = new TH.Mesh(pinGeo, pinMat);
-      m.position.set(q.x, 0.035, q.z);
-      this.group.add(m);
+      still.push(part(TH, new TH.CylinderGeometry(0.003, 0.003, 0.05, 4), '#c9a45a', { p: [q.x, 0.035, q.z] }));
     }
+    this.group.add(new TH.Mesh(merge(TH, still), new TH.MeshLambertMaterial({ vertexColors: true })));
     // the ember and the smoke
     const ember = new Cloud(fx, 2, 'glow');
     const smoke = new Cloud(fx, 28, 'glow');

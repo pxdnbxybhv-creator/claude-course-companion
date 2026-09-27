@@ -1002,17 +1002,29 @@ export function buildValley(ctx: WorldCtx): Valley {
   viewCyl(0, S.south, S.gate.w / 2 + 0.8, sy + 2.6, sy + 3.8);
   for (const ex of [-2.2, 0, 2.2]) viewCyl(ex, S.hall.z0 + 0.3, 1.35, hallY + S.hall.eave - 0.3, hallY + S.hall.eave + 1.9);
   // (and the follow camera pulls in short of them, never sitting inside the gate's roof or under the eave
-  // with the walker out of the frame; the gate's from just over the wall's coping, lintel and all)
-  h.occlude({ x: G.x, z: G.z + S.south, r: S.gate.w / 2 + 0.8, y0: Y_T + sy + 2.3, y1: Y_T + sy + 3.8 });
+  // with the walker out of the frame: the gate's roof and lintel as a row of five, the hall's eave as three)
+  for (const ex of [-1.2, -0.6, 0, 0.6, 1.2]) h.occlude({ x: G.x + ex, z: G.z + S.south, r: 0.85, y0: Y_T + sy + 2.6, y1: Y_T + sy + 3.8 });
   for (const ex of [-2.2, 0, 2.2]) h.occlude({ x: G.x + ex, z: G.z + S.hall.z0 + 0.3, r: 1.35, y0: Y_T + hallY + S.hall.eave - 0.3, y1: Y_T + hallY + S.hall.eave + 1.9 });
 
+  /** How far (local, level) from (x, z) along (dx, dz) the courtyard's south or side wall is (not the gateway). */
+  const wallBehind = (x: number, z: number, dx: number, dz: number): number => {
+    let d = Infinity;
+    if (dz > 1e-3) { const k = (S.south - z) / dz; if (k >= 0 && Math.abs(x + dx * k) > S.gate.w / 2) d = k; }
+    if (Math.abs(dx) > 1e-3) { const k = (Math.sign(dx) * S.wallX - x) / dx; const wz = z + dz * k; if (k >= 0 && wz < S.south && wz > S.sideN) d = Math.min(d, k); }
+    return d;
+  };
   // the walled courtyard and the hall: the follow camera comes in closer and looks down over the walls,
-  // not up from under an eave or from out in the gateway
-  engine(ctx).followLimit((t) => {
+  // not up from under an eave or from out in the gateway; with a wall close behind the walker it stays
+  // this side of the coping, as high, looking down more steeply (not pulled in against the back of their
+  // head by the wall, nor out over it with the wall hiding them)
+  engine(ctx).followLimit((t, yaw) => {
     if (t.y < Y_T - 5 || t.y > Y_T + 20) return null;
     const lx = t.x - G.x, lz = t.z - G.z;
     if (Math.abs(lx) > S.wallX + 0.2 || lz > S.south + 0.4 || lz < S.hall.z1 - 0.2) return null;
-    return lz < S.hall.z0 ? { dist: 3.1, pitch: 0.5 } : { dist: 3.9, pitch: 0.68 };
+    if (lz < S.hall.z0) return { dist: 3.1, pitch: 0.5 };
+    // (3.9 at 0.68 is 3.03 back and 2.45 up; the coping reaches 0.31 this side of the wall's line)
+    const back = Math.max(0.2, Math.min(3.03, wallBehind(lx, lz, Math.sin(yaw), Math.cos(yaw)) - 0.45));
+    return { dist: Math.min(3.9, Math.hypot(back, 2.45)), pitch: Math.max(0.68, Math.atan2(2.45, back)) };
   });
 
   // the doors start shut? (open: the valley at rest; the story shuts them for the rite)

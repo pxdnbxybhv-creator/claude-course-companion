@@ -160,8 +160,9 @@ export class Controls {
   /**
    * A place may ask the follow camera to come in closer and look down more (a pocket valley's walled
    * courtyard, where the eaves and the walls would crowd it): at most `dist`, at least `pitch`. Set by the world.
+   * (`yaw`: which side of the target the camera is on, as `this.yaw`.)
    */
-  followLimit: ((target: THREE.Vector3) => { dist: number; pitch: number } | null) | null = null;
+  followLimit: ((target: THREE.Vector3, yaw: number) => { dist: number; pitch: number } | null) | null = null;
   private limK = 0;
   private limWant = { dist: 99, pitch: 0 };
   private saved: { yaw: number; pitch: number; dist: number; look: number; fov: number } | null = null;
@@ -466,7 +467,7 @@ export class Controls {
     }
 
     // a place that asks for it (a walled courtyard): closer, and looking down more, eased in and out
-    const lim = this.followLimit?.(this.target) ?? null;
+    const lim = this.followLimit?.(this.target, this.yaw) ?? null;
     if (lim) { this.limWant.dist = lim.dist; this.limWant.pitch = lim.pitch; }
     this.limK = snap || this.reduced ? (lim ? 1 : 0) : damp(this.limK, lim ? 1 : 0, 2.2, dt);
     let pitchNow = this.pitch, distNow = this.dist;

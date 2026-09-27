@@ -6,7 +6,7 @@
 import type * as T from 'three';
 import type { WorldCtx } from '../../types';
 import type { XZ } from '../../map';
-import { Bag, inked, reducedMotion } from '../kit';
+import { Bag, outlineMat, propMat, reducedMotion } from '../kit';
 import { merge, part } from '../geo';
 import { onSkillEvent } from '../npcs/events';
 import { walkableNear } from './cat';
@@ -31,9 +31,10 @@ export interface FigureSpec {
 
 export interface Figure {
   root: T.Group;
-  head: T.Group;
-  armL: T.Group;
-  armR: T.Group;
+  /** The head's and the arms' pivots (bones of the one skinned mesh: hang things on them as on groups). */
+  head: T.Object3D;
+  armL: T.Object3D;
+  armR: T.Object3D;
   /** Hand position (local to the right arm group) for props. */
   hand: T.Vector3;
   /** Height of the top of the head (m). */
@@ -76,7 +77,9 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   root.name = 'npc-figure';
   root.position.copy(at);
   root.rotation.y = heading;
-  const body = new THREE.Group();
+  // (the body, the head and the arms are bones: the figure is one skinned mesh and one outline hull,
+  // two draws where eight separate meshes and hulls were)
+  const body = new THREE.Bone();
   body.scale.setScalar(S);
   root.add(body);
   const sitDrop = spec.sit ? 0.3 : 0;
@@ -105,11 +108,10 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
   }
   if (spec.apron) parts.push(part(THREE, new THREE.BoxGeometry(0.26, 0.42, 0.02), spec.apron, { p: [0, 0.48 - sitDrop, 0.2], r: [-0.18, 0, 0] }));
   if (spec.cape) parts.push(part(THREE, robeLathe([[0, 0.1], [0.3, 0.1], [0.27, 0.3], [0.2, 0.5], [0.12, 0.62], [0, 0.64]]), spec.cape, { p: [0, 0.4 - sitDrop * 0.7, -0.02], s: [1, 0.95, 0.95] }));
-  const trunk = inked(ctx, merge(THREE, parts), { width: 0.012 });
-  body.add(trunk);
+  const trunkGeo = merge(THREE, parts);
 
   // head
-  const head = new THREE.Group();
+  const head = new THREE.Bone();
   head.position.set(0, 1.04 - sitDrop, 0);
   const hp: T.BufferGeometry[] = [
     part(THREE, new THREE.SphereGeometry(0.17, 16, 12), skin, { s: [1, 0.98, 0.95] }),
@@ -150,24 +152,50 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       hp.push(part(THREE, new THREE.SphereGeometry(0.175, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), hair, { p: [0, 0.01, -0.01] }));
   }
   if (spec.beard) hp.push(part(THREE, new THREE.ConeGeometry(0.07, 0.2, 8), spec.beard, { p: [0, -0.2, 0.1], r: [Math.PI + 0.25, 0, 0] }));
-  head.add(inked(ctx, merge(THREE, hp), { width: 0.01 }));
+  const headGeo = merge(THREE, hp);
   body.add(head);
 
   // arms: wide sleeves on shoulder pivots, a small hand at the end
+  const armGeos: T.BufferGeometry[] = [];
   const arm = (sx: number) => {
-    const g = new THREE.Group();
+    const g = new THREE.Bone();
     g.position.set(0.15 * sx, 0.92 - sitDrop, 0);
-    const geo = merge(THREE, [
+    armGeos.push(merge(THREE, [
       part(THREE, new THREE.CylinderGeometry(0.045, 0.085, 0.34, 10), spec.robe, { p: [0, -0.17, 0] }),
       part(THREE, new THREE.TorusGeometry(0.083, 0.012, 4, 12), spec.trim, { p: [0, -0.335, 0], r: [Math.PI / 2, 0, 0] }),
       part(THREE, new THREE.SphereGeometry(0.04, 8, 6), skin, { p: [0, -0.37, 0.01] }),
-    ]);
-    g.add(inked(ctx, geo, { width: 0.01 }));
+    ]));
     g.rotation.z = 0.18 * sx;
     body.add(g);
     return g;
   };
   const armL = arm(1), armR = arm(-1);
+  // each part laid out as its bone holds it at rest (in the root's space), and riding that bone alone
+  const bones = [body, head, armL, armR];
+  const geos = [trunkGeo, headGeo, ...armGeos];
+  const counts = geos.map((g) => g.attributes.position.count);
+  for (const b of bones) b.updateMatrix();
+  geos.forEach((g, i) => g.applyMatrix4(i === 0 ? body.matrix : new THREE.Matrix4().multiplyMatrices(body.matrix, bones[i].matrix)));
+  const geo = merge(THREE, geos);
+  const n = geo.attributes.position.count;
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  for (let i = 0, o = 0; i < counts.length; o += counts[i], i++) for (let v = o; v < o + counts[i]; v++) { si[v * 4] = i; sw[v * 4] = 1; }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+  const mesh = new THREE.SkinnedMesh(geo, propMat(ctx));
+  const hull = new THREE.SkinnedMesh(geo, outlineMat(ctx, 0.011 * S));
+  hull.name = 'outline';
+  hull.raycast = () => {};
+  root.add(mesh, hull);
+  const skeleton = new THREE.Skeleton(bones);
+  root.updateMatrixWorld(true);
+  mesh.bind(skeleton);
+  hull.bind(skeleton);
+  // (culled as the figure at rest, with room for a turned head, a bow and a waving arm)
+  const sphere = geo.boundingSphere!.clone();
+  sphere.radius += 0.3 * S;
+  mesh.boundingSphere = sphere;
+  hull.boundingSphere = sphere.clone();
   bag.add(root, parent);
 
   const still = reducedMotion();
