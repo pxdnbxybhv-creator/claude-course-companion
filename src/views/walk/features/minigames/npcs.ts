@@ -66,7 +66,7 @@ export const teahouse = feature('npc-teahouse', (bag, ctx) => {
       try {
         record('npc:tea');
         if (await offerFlower(ctx, f, name, 'tea')) { served++; ctx.player.emote('eat'); return; }
-        await folk.story(ctx, isNight(ctx));
+        if ((await folk.story(ctx, isNight(ctx))) === null) return;
         const cat = todaysCat(ctx);
         const hi = served ? { zh: '客官又来啦！再来一壶？', en: 'Welcome back! Another pot?' } : hello(ctx, TEA_HELLO, { zh: '客官里边请！走了一路，喝口茶歇歇脚？', en: 'Come in, come in! A long walk — sit and have some tea?' });
         if (!served && ctx.player.character === 'guan') f.wave();
@@ -132,7 +132,7 @@ export const oldFisherman = feature('npc-fisherman', (bag, ctx) => {
       try {
         record('npc:fisher');
         if (await offerFlower(ctx, f, name, 'fisher')) return;
-        await folk.story(ctx, isNight(ctx));
+        if ((await folk.story(ctx, isNight(ctx))) === null) return;
         const n = play.value.counters.fish ?? 0;
         const hi = hello(ctx, FISHER_HELLO, n >= 5 ? { zh: '哟，你如今也是个老把式了。', en: 'Well now, you’re an old hand yourself these days.' } : { zh: '年轻人，也想试试这一竿风月？', en: 'Young one — fancy a try at the rod?' });
         const c = await talk(ctx, f, name, [{
@@ -190,7 +190,7 @@ export const monk = feature('npc-monk', (bag, ctx) => {
       try {
         record('npc:monk');
         if (await offerFlower(ctx, f, name, 'monk')) return;
-        await folk.story(ctx, isNight(ctx));
+        if ((await folk.story(ctx, isNight(ctx))) === null) return;
         const koan = KOANS[k++ % KOANS.length];
         const rang = !!play.value.flags.bell;
         const cat = todaysCat(ctx);
@@ -257,7 +257,7 @@ export const poet = feature('npc-poet', (bag, ctx) => {
       try {
         record('npc:poet');
         if (await offerFlower(ctx, f, name, 'poet')) return;
-        await folk.story(ctx, isNight(ctx));
+        if ((await folk.story(ctx, isNight(ctx))) === null) return;
         const own = forCompanion(POET_NPC_HELLO, ctx.player.character);
         if (own) await talk(ctx, f, name, [own]);
         const go = await talk(ctx, f, name, [{
@@ -394,7 +394,7 @@ export const kiteChild = feature('npc-kite', (bag, ctx) => {
       try {
         record('npc:kite');
         if (await offerFlower(ctx, f, name, 'kite')) return;
-        await folk.story(ctx, isNight(ctx));
+        if ((await folk.story(ctx, isNight(ctx))) === null) return;
         if (returned) {
           await talk(ctx, f, name, [{ zh: '你看！两只都飞起来啦！', en: 'Look! Both of them are flying!' }]);
         } else if (carrying) {

@@ -10,7 +10,7 @@ import { useT } from '../../app/i18n';
 import { go } from '../../app/router';
 import { lang, state as appState, today } from '../../app/store';
 import {
-  CHECKIN_COINS, ERRAND_COINS, ERRANDS_ALL_COINS, INCENSE_COINS, daily, encounterMet, play, questCoins, questTarget, questValue, selectCharacter,
+  CHECKIN_COINS, ERRAND_COINS, ERRANDS_ALL_COINS, INCENSE_COINS, daily, encounterMet, play, questCoins, questPaid, questTarget, questValue, selectCharacter,
 } from '../../app/play';
 import { CHARACTERS, CHARACTER, type CharacterDef } from '../../data/characters';
 import { QUEST, QUESTS, type QuestDef } from '../../data/quests';
@@ -299,7 +299,7 @@ function QuestItem(props: { q: QuestDef; t: T }) {
             ) : 'seal' in q.reward ? (
               <><span class="qb-q-sealmark" aria-hidden="true">印</span>{t(`得印 · ${q.reward.seal}`, `Seal · ${q.reward.sealEn}`)}</>
             ) : null}
-            <CoinChip n={questCoins(q)} got={!!doneOn} t={t} />
+            <CoinChip n={doneOn ? questPaid(q, play.value) : questCoins(q)} got={!!doneOn} t={t} />
           </p>
           {!doneOn && (
             // the bar and its count wrap as one

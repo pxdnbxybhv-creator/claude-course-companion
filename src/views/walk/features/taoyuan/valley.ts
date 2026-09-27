@@ -1001,6 +1001,10 @@ export function buildValley(ctx: WorldCtx): Valley {
   // the shrine's eaves: the gate's little roof and the hall's front eave
   viewCyl(0, S.south, S.gate.w / 2 + 0.8, sy + 2.6, sy + 3.8);
   for (const ex of [-2.2, 0, 2.2]) viewCyl(ex, S.hall.z0 + 0.3, 1.35, hallY + S.hall.eave - 0.3, hallY + S.hall.eave + 1.9);
+  // (and the follow camera pulls in short of them, never sitting inside the gate's roof or under the eave
+  // with the walker out of the frame; the gate's from just over the wall's coping, lintel and all)
+  h.occlude({ x: G.x, z: G.z + S.south, r: S.gate.w / 2 + 0.8, y0: Y_T + sy + 2.3, y1: Y_T + sy + 3.8 });
+  for (const ex of [-2.2, 0, 2.2]) h.occlude({ x: G.x + ex, z: G.z + S.hall.z0 + 0.3, r: 1.35, y0: Y_T + hallY + S.hall.eave - 0.3, y1: Y_T + hallY + S.hall.eave + 1.9 });
 
   // the walled courtyard and the hall: the follow camera comes in closer and looks down over the walls,
   // not up from under an eave or from out in the gateway

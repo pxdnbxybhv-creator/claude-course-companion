@@ -60,6 +60,8 @@ export class StoryStage extends Stagehand {
   /** Lines are said only while this holds (the story closes it when a beat is cut short). */
   gate: () => boolean = () => true;
   private pending = new Set<() => void>();
+  /** The villager the camera is on (shotOn), and where it stands, until another move or the hand-back. */
+  private onCam: { k: VillagerKey; at: XYZ } | null = null;
 
   constructor(ctx: WorldCtx, parent: T.Object3D, readonly tv: TaoyuanWorld, readonly cast: Cast) {
     super(ctx, parent, 'taoyuan:story', 'taoyuan-story', 'taoyuan');
@@ -103,8 +105,21 @@ export class StoryStage extends Stagehand {
     const met = !!play.peek().flags[metFlag(k)];
     const n = nameOf(k, met);
     this.cast.speaker = k;
+    // (the camera on them was placed across from their face: they keep facing it, and not swivel round
+    // to the walker; their head turns to the lens; if the shot had to come from behind, the whole of them)
+    const f = this.cast.fig(k);
+    const cam = this.onCam?.k === k ? this.onCam.at : null;
+    let o: Parameters<typeof talk>[4] = {};
+    if (f && cam) {
+      const r = f.root.position;
+      let fx: number, fz: number;
+      if (f.faceTo) { fx = f.faceTo.x - r.x; fz = f.faceTo.z - r.z; } else { fx = Math.sin(f.root.rotation.y); fz = Math.cos(f.root.rotation.y); }
+      const cx = cam.x - r.x, cz = cam.z - r.z;
+      const cos = (fx * cx + fz * cz) / ((Math.hypot(fx, fz) * Math.hypot(cx, cz)) || 1);
+      o = { face: cos < 0.5 ? { x: cam.x, z: cam.z } : null, look: cam };
+    }
     try {
-      return await talk(this.ctx, this.cast.fig(k), n, [l]);
+      return await talk(this.ctx, f, n, [l], o);
     } finally {
       if (this.cast.speaker === k) this.cast.speaker = null;
     }
@@ -128,6 +143,7 @@ export class StoryStage extends Stagehand {
 
   /** The camera to `to`, looking at `look`, for a while (not awaited: a newer move ends it). */
   shot(to: XYZ, look: XYZ, secs = 1.2, hold = 30): Promise<void> {
+    this.onCam = null;
     // (the peaches clear the view to whoever the shot is on, not to the walker)
     const at = { ...look };
     seeFocus.at = at;
@@ -136,7 +152,11 @@ export class StoryStage extends Stagehand {
   /** Look at a villager's face, from in front of them, with nobody (and no rock or wall) in the way. */
   shotOn(k: VillagerKey, secs = 1.2, hold = 30, d = 2.4): Promise<void> {
     const v = this.frameOn(k, d);
-    return v ? this.shot(v.to, v.look, secs, hold) : Promise.resolve();
+    if (!v) return Promise.resolve();
+    const p = this.shot(v.to, v.look, secs, hold);
+    const cam = { k, at: { ...v.to } };
+    this.onCam = cam;
+    return p.finally(() => { if (this.onCam === cam) this.onCam = null; });
   }
   /**
    * Where to look at someone from: across from their face (the way they face, or are turning), a
@@ -179,7 +199,7 @@ export class StoryStage extends Stagehand {
     // (nothing clear: from higher up, in front of them)
     return { to: { x: look.x + fx * d, y: look.y + 2.4, z: look.z + fz * d }, look };
   }
-  endShot(): void { engine(this.ctx).endCinematic(); }
+  endShot(): void { this.onCam = null; engine(this.ctx).endCinematic(); }
 
   /** Hold the walker still (for camera work); undone by free() or when the stage goes. */
   hold(on: boolean): void {

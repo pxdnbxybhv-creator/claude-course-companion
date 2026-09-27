@@ -23,18 +23,23 @@ export function isMet(id: string): boolean {
   return !!play.value.flags[metFlag(id)];
 }
 
-/** Say `lines` as `name` (a companion's own lines under the companion's name; replies to choices). */
-export async function sayLines(ctx: WorldCtx, name: Line, lines: readonly DLine[]): Promise<void> {
+/**
+ * Say `lines` as `name` (a companion's own lines under the companion's name; replies to choices).
+ * False as soon as the walker leaves (✕ 离开 or Esc: a line answered −1): nothing more is said.
+ */
+export async function sayLines(ctx: WorldCtx, name: Line, lines: readonly DLine[]): Promise<boolean> {
   for (const l of lines) {
     if (l.by === 'me') {
       const c = CHARACTER[ctx.player.character];
-      await ctx.hud.say({ nameZh: c.zh, nameEn: c.en, zh: l.zh, en: l.en });
+      if (await ctx.hud.say({ nameZh: c.zh, nameEn: c.en, zh: l.zh, en: l.en }) < 0) return false;
       continue;
     }
     const k = await ctx.hud.say({ nameZh: name.zh, nameEn: name.en, zh: l.zh, en: l.en, choices: l.choices });
-    const r = k >= 0 ? l.replies?.[k] : undefined;
-    if (r) await ctx.hud.say({ nameZh: name.zh, nameEn: name.en, zh: r.zh, en: r.en });
+    if (k < 0) return false;
+    const r = l.replies?.[k];
+    if (r && await ctx.hud.say({ nameZh: name.zh, nameEn: name.en, zh: r.zh, en: r.en }) < 0) return false;
   }
+  return true;
 }
 
 const COIN_TOAST_MS = 1800;
@@ -83,21 +88,26 @@ export interface ConverseOpts {
   storyOnly?: boolean;
 }
 
-/** One talk with `x`. Resolves true if a story beat was told. */
-export async function converse(ctx: WorldCtx, x: Folk, o: ConverseOpts): Promise<boolean> {
+/**
+ * One talk with `x`. Resolves true if a story beat was told, false if not, null if the walker left
+ * part-way (✕ 离开 or Esc): the rest goes unsaid, and a beat cut short is not told (it waits for
+ * another talk). The name, once heard, stays heard.
+ */
+export async function converse(ctx: WorldCtx, x: Folk, o: ConverseOpts): Promise<boolean | null> {
   const plan = planTalk(x, ctx.player.character, talkState(o.night));
   record(talkKey(x.id));
   let met = isMet(x.id);
   if (plan.intro) {
-    await sayLines(ctx, folkName(x, false), [plan.intro]);
+    const on = await sayLines(ctx, folkName(x, false), [plan.intro]);
     flag(metFlag(x.id));
     met = true;
     o.onMet?.();
+    if (!on) return null;
   }
   const name = folkName(x, met);
-  if (plan.regular) await sayLines(ctx, name, [plan.regular]);
+  if (plan.regular && !await sayLines(ctx, name, [plan.regular])) return null;
   if (o.storyOnly && !plan.beat) return false;
-  if (plan.lines.length) await sayLines(ctx, name, plan.lines);
+  if (plan.lines.length && !await sayLines(ctx, name, plan.lines)) return null;
   if (plan.beat) { settle(ctx, x, plan.beat); return true; }
   return false;
 }
@@ -128,8 +138,11 @@ export function stallFolk(id: string) {
     /** The prompt's label now (set once when building the interactable). */
     label: (): Line => folkLabel(x, isMet(id)),
     prompt(i: Interactable): Interactable { prompt = i; relabel(); return i; },
-    /** The introduction (first time) and today's story beat, if any: true if a beat was told. */
-    story: (ctx: WorldCtx, night = false): Promise<boolean> => {
+    /**
+     * The introduction (first time) and today's story beat, if any: true if a beat was told; null if
+     * the walker left part-way (✕ 离开 or Esc), and then their usual talk should not follow either.
+     */
+    story: (ctx: WorldCtx, night = false): Promise<boolean | null> => {
       const told = converse(ctx, x, { night, storyOnly: true, onMet: relabel });
       return told.finally(relabel);
     },

@@ -72,8 +72,9 @@ export function sanitizePlay(raw: unknown): PlayState {
   // this build keeps her (and a saved character:'rabbit' stays valid); their letter still pays, with a
   // postscript. Only a save written before v2 migrates: someone who eats the mooncakes now still
   // meets her in the letter, with its own celebration.
+  // (and it paid a companion's coins then: the quest book goes on saying so, see questPaid)
   const legacy = !(typeof r.v === 'number' && r.v >= 2);
-  if (legacy && done['q-mooncake']) flags['char:rabbit'] = true;
+  if (legacy && done['q-mooncake']) { flags['char:rabbit'] = true; flags[paidAsCompanion('q-mooncake')] = true; }
   const d = (r.daily ?? {}) as Partial<PlayState['daily']>;
   return {
     v: 2,
@@ -220,6 +221,14 @@ export const celebrations = signal<string[]>([]);
 /** Coins for finishing a quest: a companion's is worth more than a seal's. */
 export function questCoins(q: QuestDef): number {
   return 'character' in q.reward ? 120 : 80;
+}
+/** The flag of a quest finished when its reward was a companion (paid 120 then), set as an old save migrates. */
+export function paidAsCompanion(id: string): string {
+  return `paid120:${id}`;
+}
+/** Coins a finished quest brought this player: what it paid then (a companion's, before it became a seal). */
+export function questPaid(q: QuestDef, p: PlayState): number {
+  return p.flags[paidAsCompanion(q.id)] ? 120 : questCoins(q);
 }
 /** Coins for each of today's errands, and for doing all three. */
 export const ERRAND_COINS = 30;

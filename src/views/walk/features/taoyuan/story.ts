@@ -1088,6 +1088,7 @@ export const taoyuanStory = feature('taoyuan-story', (bag, ctx) => {
       seat: () => { for (const k of VILLAGER_KEYS) { const sp = B3_SEATS[k]; if (sp) { cast.script(k, true); cast.stand(k, sp.x, sp.z, sp.face, sp.sit); } } },
       unseat: () => { for (const k of VILLAGER_KEYS) cast.script(k, false); refresh(true); },
       shot: (k: VillagerKey) => st.frameOn(k),
+      fig: (k: VillagerKey) => cast.fig(k),
       props: () => props.state(),
     };
     bag.onDispose(() => { if (w.__tystory) delete w.__tystory; });

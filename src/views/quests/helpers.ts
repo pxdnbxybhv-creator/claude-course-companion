@@ -2,7 +2,7 @@
 // seal styles and the brush-stroke outline used by the progress bars.
 import { CHARACTER, CHARACTERS, type CharacterId } from '../../data/characters';
 import { QUESTS, type QuestDef } from '../../data/quests';
-import { ERRAND_COINS, ERRANDS_ALL_COINS, isUnlockedIn, questCoins, type PlayState } from '../../app/play';
+import { ERRAND_COINS, ERRANDS_ALL_COINS, isUnlockedIn, questPaid, type PlayState } from '../../app/play';
 import type { Route } from '../../app/router';
 import type { DateKey } from '../../core/types';
 import { hashString, makeRng } from '../../core/rng';
@@ -213,7 +213,7 @@ export function ledgerToday(p: PlayState, day: DateKey): { rows: LedgerRow[]; to
     const errands = p.daily.paid.filter((x) => x !== 'all').length * ERRAND_COINS + (p.daily.paid.includes('all') ? ERRANDS_ALL_COINS : 0);
     push('errands', '日课', 'Errands', errands);
   }
-  push('quests', '任务', 'Quests', QUESTS.filter((q) => p.done[q.id] === day).reduce((n, q) => n + questCoins(q), 0));
+  push('quests', '任务', 'Quests', QUESTS.filter((q) => p.done[q.id] === day).reduce((n, q) => n + questPaid(q, p), 0));
   push('qiyu', '奇遇', 'Encounters', ENCOUNTERS.filter((e) => p.flags[`qy:${e.id}`] && encounterDay(p, e.id) === day).reduce((n, e) => n + e.coins, 0));
   // coins with a name (play.earnFrom, a letter's claim): counted under `src:<source>`
   for (const [k, n] of Object.entries(counts)) {

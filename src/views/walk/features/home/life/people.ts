@@ -873,7 +873,7 @@ export class Seller {
       const sp = SPECIES.find((s) => s.id === this.special)!;
       const off = Math.round(sp.price * 0.8);
       const list = SPECIES.map((s) => ({ s, price: s.id === this.special ? off : s.price }));
-      await this.folk.story(ctx);
+      if ((await this.folk.story(ctx)) === null) return;
       const i = await talk(ctx, this.fig, this.folk.name(), [
         { zh: '瞧一瞧看一看！小狗小猫、兔子鸭子，还有会说话的鹦鹉！', en: 'Come and see! Puppies, kittens, rabbits, ducks — and a talking parrot!' },
         { zh: `今天${sp.zh}便宜，只要 ${off} 文。先说好：得有窝才能领回去。`, en: `The ${sp.en.toLowerCase()} is cheap today — only ${off}. Mind you, it needs a home of its own first.`, choices: [...list.map((x) => ({ zh: `${x.s.zh} · ${x.price} 文`, en: `${x.s.en} · ${x.price}` })), { zh: '只是看看', en: 'Just looking' }] },

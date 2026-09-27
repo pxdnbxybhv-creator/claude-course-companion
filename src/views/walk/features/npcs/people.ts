@@ -138,7 +138,7 @@ export const peddler = feature('npc-peddler', async (bag, ctx) => {
           if (gift === 'first') { receive('haws'); ctx.hud.toast('得了一串糖葫芦', 'A stick of candied haws for you', 1800); }
           return;
         }
-        await folk.story(ctx, night(ctx));
+        if ((await folk.story(ctx, night(ctx))) === null) return;
         let first = true;
         for (;;) {
           const choices = WARES.map((w) => {
@@ -238,7 +238,7 @@ export const storyteller = feature('npc-storyteller', (bag, ctx) => {
       try {
         record('npc:storyteller');
         if (await offerFlower(ctx, f, name, 'storyteller')) return;
-        await folk.story(ctx, night(ctx));
+        if ((await folk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         const tale = taleFor(TALES, day, me, n++);
         const spotted = forCompanion(TALE_SPOTTED, me);
@@ -348,7 +348,7 @@ export const fortuneTeller = feature('npc-fortune', async (bag, ctx) => {
         record('npc:fortune');
         const gift = await offerFlower(ctx, f, name, 'fortune');
         if (gift) { if (gift === 'first') await drawSlip(); return; }
-        await folk.story(ctx, night(ctx));
+        if ((await folk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         const hello = forCompanion(FORTUNE_HELLO, me);
         if (me === 'guan') {
@@ -397,7 +397,7 @@ export const sugarStall = feature('npc-sugar', (bag, ctx) => {
         const me = who(ctx);
         // a sugar figure free for the first flower of the day; after that, flowers are only thanked
         const free = (await offerFlower(ctx, f, name, 'sugar')) === 'first';
-        if (!free) await folk.story(ctx, night(ctx));
+        if (!free && (await folk.story(ctx, night(ctx))) === null) return;
         if (!free) {
           const hi = forCompanion(SUGAR_HELLO, me);
           const c = await talk(ctx, f, name, [{ zh: `${hi.zh}（囊中 ${coinsNow()} 文）`, en: `${hi.en} (Purse: ${coinsNow()})`, choices: [{ zh: `来一个 · ${SUGAR_PRICE}文`, en: `One, please · ${SUGAR_PRICE}` }, { zh: '看看就好', en: 'Just looking' }] }]);
@@ -466,7 +466,7 @@ export const flowerGirl = feature('npc-flower', (bag, ctx) => {
       mark.set(false);
       try {
         record('npc:flower');
-        await folk.story(ctx, night(ctx));
+        if ((await folk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         // 嫦娥 and the gardener get one flower a day for nothing
         const fond = me === 'change' || me === 'gardener';
@@ -519,7 +519,7 @@ export const oldFarmer = feature('npc-farmer', (bag, ctx) => {
       try {
         record('npc:farmer');
         if (await offerFlower(ctx, f, name, 'farmer')) return;
-        await folk.story(ctx, night(ctx));
+        if ((await folk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         for (;;) {
           const c = await talk(ctx, f, name, [{ zh: forCompanion(FARMER_HELLO, me).zh, en: forCompanion(FARMER_HELLO, me).en, choices: [{ zh: '请老伯指点', en: 'Any advice?' }, { zh: '告辞', en: 'Goodbye' }] }]);
@@ -574,7 +574,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
       if (!begin(ctx, 'talk')) return;
       try {
         record('npc:shutong');
-        await kfolk.story(ctx, night(ctx));
+        if ((await kfolk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         if (stage === 'done') { await talk(ctx, kid, kname, [{ zh: '先生说，下回出门一定牵着我的手。', en: 'Master says next time he’ll hold my hand when we go out.' }]); return; }
         if (stage === 'note') {
@@ -607,7 +607,7 @@ export const shutong = feature('npc-shutong', (bag, ctx) => {
       try {
         record('npc:master');
         if (await offerFlower(ctx, master, mname, 'master')) return;
-        await mfolk.story(ctx, night(ctx));
+        if ((await mfolk.story(ctx, night(ctx))) === null) return;
         const me = who(ctx);
         if (stage === 'seeking') {
           await talk(ctx, master, mname, [L2(forCompanion(MASTER_FOUND, me))]);

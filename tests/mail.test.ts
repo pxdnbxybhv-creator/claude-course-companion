@@ -3,7 +3,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   play, emptyPlay, celebrations, unlocked, isUnlockedIn, selectCharacter, redeemCode, revokeCode, _acceptCodeForTests,
-  sanitizePlay, questValue, CODE_FLAG,
+  sanitizePlay, questValue, questCoins, questPaid, CODE_FLAG,
 } from '../src/app/play';
 import { state, emptyState, exportJSON, importJSON, resetAll, replaceState, setSettings, today, backupExtras } from '../src/app/store';
 import {
@@ -226,6 +226,17 @@ describe('玉兔 from the old 八月十五', () => {
     expect(QUEST['q-mooncake'].reward).toEqual({ seal: '团圆', sealEn: 'Reunion' });
     // without it, a saved rabbit falls back to the scholar
     expect(sanitizePlay({ character: 'rabbit' }).flags['char:rabbit']).toBeUndefined();
+  });
+
+  it('the quest book still says what 八月十五 paid them then (120, a companion’s), and 80 to everyone since', () => {
+    const q = QUEST['q-mooncake'];
+    const old = sanitizePlay({ character: 'rabbit', done: { 'q-mooncake': '2025-10-06' } });
+    expect(questPaid(q, old)).toBe(120);
+    // (it survives the next load: the flag is kept)
+    expect(questPaid(q, sanitizePlay(JSON.parse(JSON.stringify(old)))), 'reloaded').toBe(120);
+    const now = sanitizePlay({ v: 2, done: { 'q-mooncake': DAY } });
+    expect(questCoins(q)).toBe(80);
+    expect(questPaid(q, now)).toBe(80);
   });
 
   it('her letter still pays, with the postscript about carrots, and she is not announced again', () => {

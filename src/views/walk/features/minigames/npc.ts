@@ -43,6 +43,8 @@ export interface Figure {
   wave(): void;
   /** Face (turn the whole body) toward a point, smoothly. */
   faceTo: { x: number; z: number } | null;
+  /** Turn the head toward this point, and tilt it up or down to its `y` if given (null: toward the walker, when near). */
+  lookAt?: { x: number; y?: number; z: number } | null;
   /** Walking (0 = still … 1 = a stride): the figure bobs and swings its arms; set by whoever moves it. */
   walking?: number;
   /** A reaction under way ('listen' | 'bow' | 'sniff'), if any. */
@@ -181,6 +183,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     root, head, armL, armR, hand: new THREE.Vector3(0, -0.37, 0.01), height: (1.24 - sitDrop) * S, talking: false,
     wave() { if (waveT < 0) rest.copy(armR.rotation); waveT = 0; },
     faceTo: null,
+    lookAt: null,
     walking: 0,
     get reacting() { return react; },
     get disposed() { return dead; },
@@ -202,7 +205,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     reactDelay = d * 0.06;
     src.x = e.x; src.z = e.z;
   }));
-  let nod = 0, yaw = 0, lean = 0, sway = 0, strode = false, turned = false, farLod = false;
+  let nod = 0, yaw = 0, tilt = 0, lean = 0, sway = 0, strode = false, turned = false, farLod = false;
   const hulls: T.Object3D[] = [];
   root.traverse((o) => { if (o.name === 'outline') hulls.push(o); });
   // where they looked before a reaction turned them (to turn back to)
@@ -236,13 +239,21 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
       if (face === restAt && Math.abs(dd) < 0.01) turned = false;
     }
     let wantYaw = 0;
-    if (d < 6 && !acting) {
-      let a = Math.atan2(dx, dz) - root.rotation.y;
+    const la = fig.lookAt;
+    if (!acting && (la || d < 6)) {
+      let a = (la ? Math.atan2(la.x - root.position.x, la.z - root.position.z) : Math.atan2(dx, dz)) - root.rotation.y;
       a = Math.atan2(Math.sin(a), Math.cos(a));
       wantYaw = Math.max(-0.9, Math.min(0.9, a));
     }
     yaw += (wantYaw - yaw) * Math.min(1, dt * 4);
     head.rotation.y = yaw;
+    // (looking up at someone, or down: a wide brim no longer hides the face from them)
+    let wantTilt = 0;
+    if (la && la.y !== undefined && !acting) {
+      const hd = Math.hypot(la.x - root.position.x, la.z - root.position.z);
+      wantTilt = Math.max(-0.45, Math.min(0.25, -Math.atan2(la.y - (root.position.y + fig.height - 0.2 * S), hd)));
+    }
+    tilt += (wantTilt - tilt) * Math.min(1, dt * 4);
     nod = fig.talking && !still ? Math.sin(t * 7) * 0.06 : nod * 0.9;
     const k = still ? 0 : 1;
     const wantLean = acting === 'bow' ? 0.55 * Math.min(1, reactT / 0.5) : acting === 'sniff' ? 0.2 : 0;
@@ -251,7 +262,7 @@ export function figure(bag: Bag, parent: T.Object3D, spec: FigureSpec, at: T.Vec
     const wantSway = acting === 'listen' ? Math.sin(t * 1.9 + seed) * 0.08 * k : 0;
     sway += (wantSway - sway) * Math.min(1, dt * 4);
     body.rotation.z = sway;
-    head.rotation.x = nod + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02) + (acting === 'sniff' ? 0.22 : acting === 'listen' ? -0.06 : 0);
+    head.rotation.x = nod + tilt + (still ? 0 : Math.sin(t * 0.7 + seed) * 0.02) + (acting === 'sniff' ? 0.22 : acting === 'listen' ? -0.06 : 0);
     // arms swing when walking; a raised hand to the nose when sniffing
     // (only for figures that walk: the others keep the poses their feature gave their arms)
     if (waveT < 0 && w > 0.01 && !fig.talking) {
@@ -342,14 +353,23 @@ export function speechMark(bag: Bag, fig: Figure, glyph: string): { set(on: bool
   return { set(v) { on = v; } };
 }
 
-/** A few lines in a row from an NPC (each waits for a tap); resolves with the last choice. */
-export async function talk(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string }, lines: { zh: string; en: string; choices?: { zh: string; en: string }[] }[]): Promise<number> {
+/**
+ * A few lines in a row from an NPC (each waits for a tap); resolves with the last choice. They turn to
+ * the walker, unless `o.face` says where (null: they stay as they are); `o.look` turns their head
+ * toward a point while they speak (a camera on them).
+ */
+export async function talk(ctx: WorldCtx, fig: Figure | null, name: { zh: string; en: string }, lines: { zh: string; en: string; choices?: { zh: string; en: string }[] }[], o: { face?: { x: number; z: number } | null; look?: { x: number; y?: number; z: number } } = {}): Promise<number> {
   let last = -1;
-  if (fig) { fig.talking = true; fig.faceTo = { x: ctx.player.position.x, z: ctx.player.position.z }; }
+  const looked = fig?.lookAt ?? null;
+  if (fig) {
+    fig.talking = true;
+    if (o.face !== null) fig.faceTo = o.face ?? { x: ctx.player.position.x, z: ctx.player.position.z };
+    if (o.look) fig.lookAt = o.look;
+  }
   try {
     for (const l of lines) last = await ctx.hud.say({ nameZh: name.zh, nameEn: name.en, zh: l.zh, en: l.en, choices: l.choices });
   } finally {
-    if (fig) fig.talking = false;
+    if (fig) { fig.talking = false; if (o.look && fig.lookAt === o.look) fig.lookAt = looked; }
   }
   return last;
 }
