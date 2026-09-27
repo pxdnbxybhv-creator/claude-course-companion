@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   PAY_RULES, PAY_SOURCES, applyRate, bellPay, boardWinPay, catPay, feihuaPay, fishPay, klotskiCoins, klotskiPay, lanternPay,
-  lotusPay, pitchpotPay, rateFor, rateNote, settle, snakePay, tangramPay, tictactoePay,
+  lotusPay, pitchpotPay, rateFor, rateNote, settle, snakePay, tangramPay, tictactoePay, tyxiPay, TYXI_GAMES, TYXI_ROUND_TOP, TYXI_YUE_COINS,
 } from '../src/views/games/economy';
 
 describe('economy · payout amounts', () => {
@@ -122,13 +122,32 @@ describe('economy · the daily soft cap', () => {
   });
 
   it('has a rule, a name and a sane cap for every game', () => {
-    expect(PAY_SOURCES.length).toBe(13);
+    expect(PAY_SOURCES.length).toBe(14);
+    expect(PAY_RULES.tyxi.full).toBe(6);
+    expect(PAY_RULES.tyxi.where).toBe('walk');
     for (const s of PAY_SOURCES) {
       const r = PAY_RULES[s];
       expect(r.full, s).toBeGreaterThanOrEqual(1);
       if (r.max !== undefined) expect(r.max).toBeGreaterThanOrEqual(r.full);
       expect(r.zh && r.en).toBeTruthy();
     }
+  });
+
+  it("桃源's valley games share one source, capped per round, named per game", () => {
+    const p = tyxiPay('qu', 16.7, '熟', 'Good');
+    expect(p.source).toBe('tyxi');
+    expect(p.base).toBe(16);
+    expect(p.zh).toBe('踩曲 · 熟');
+    expect(p.en).toBe('Treading the yeast · Good');
+    expect(p.exempt).toBeFalsy();
+    expect(tyxiPay('shang', 999, '', '').base).toBe(TYXI_ROUND_TOP);
+    expect(tyxiPay('mo', -4, '', '').base).toBe(0);
+    expect(tyxiPay('mo', Number.NaN, '', '').base).toBe(0);
+    expect(tyxiPay('yuan', TYXI_YUE_COINS, '今日之约', "Today's challenge", true).exempt).toBe(true);
+    expect(Object.keys(TYXI_GAMES)).toEqual(['qu', 'mo', 'can', 'yuan', 'ying', 'shang']);
+    // six full-rate rounds a day, then half: the day's ceiling stays near pitch-pot's
+    expect(settle(tyxiPay('qu', 30, '', ''), 5).coins).toBe(30);
+    expect(settle(tyxiPay('qu', 30, '', ''), 6).coins).toBe(15);
   });
 
   it('says why a payout was cut', () => {

@@ -3,6 +3,7 @@
 // glyphs go into the walk's font.
 import type { LetterDef } from '../../../../data/letters';
 import { diffDays } from '../../../../core/date';
+import { dayNumber } from './life/keys';
 
 const before = (d: string | undefined, today: string) => !!d && diffDays(d, today) >= 1;
 
@@ -78,5 +79,23 @@ export const TAOYUAN_LETTERS: LetterDef[] = [
     },
     attach: { coins: 20 },
     due: (p, today) => !!p.done['case:hz'] && diffDays(p.done['case:hz'], today) >= 3,
+  },
+  // 二期「常住」: once you have come back (tyl:back) and then stayed away a week (best['tyl:lastday'],
+  // the day number of the last visit, written on every way in); delivered once, like every letter
+  {
+    id: 'ty-guiniang',
+    from: { zh: '桂娘', en: 'Gui Niang' },
+    seal: '桂',
+    subject: { zh: '锅里给你留着', en: 'Kept Warm for You' },
+    body: {
+      zh: '{名}：粥熬多了。小满非说你今天来，天没亮就去台子上等着。得空就来一趟，锅里给你留着。——桂娘',
+      en: "{名}: I made too much congee. Xiaoman swore you'd come today, and he was up on the terrace before dawn waiting. Come by when you can. There's some kept warm for you. — Gui Niang",
+    },
+    note: { zh: '字是葛姑的，一笔一画，像在记账。', en: 'The handwriting is Ge Gu\'s, every stroke careful, like an account book.' },
+    scope: 'valley',
+    due: (p, today) => {
+      const last = p.best['tyl:lastday'];
+      return !!p.flags['tyl:back'] && typeof last === 'number' && last > 0 && dayNumber(today) - last >= 7;
+    },
   },
 ];

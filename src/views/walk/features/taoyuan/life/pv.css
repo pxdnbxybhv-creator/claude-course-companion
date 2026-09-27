@@ -1,0 +1,166 @@
+/* 桃源 · 二期: the tasting close-up 特写 (spec §4). A food shot inside an ink painting: letterbox bars,
+   an ink vignette, the ink → colour bleed with no flash, a vertical title card with the cook's seal,
+   the cook's voice as subtitles, the reaction bubble, and a fake shallow focus on 高. Everything is
+   pointer-transparent but the layer itself (a tap skips). Owner: P (特写). */
+
+.mg-pv {
+  --pv-bar: min(12.8vh, max(0px, calc((100vh - 100vw / 2.39) / 2)));
+  --pv-ink: #16130f;
+  --pv-red: #b93a2b;
+  pointer-events: auto;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mg-pv > * { pointer-events: none; }
+
+/* the walk's own chrome steps aside while the 特写 plays */
+.walk:has(.walk-layer > .mg-pv) :is(.walk-top, .walk-left, .walk-progress, .walk-stick, .walk-buttons, .walk-prompt, .walk-rail,
+  .walk-counters, .walk-hint, .walk-skill-wrap, .walk-case-chip, .walk-chip, .walk-banner, .walk-reticle, .walk-arrive) {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ---------- the frame: vignette, bars */
+.tyl-pv-vig {
+  position: absolute; inset: 0;
+  background: radial-gradient(ellipse 78% 70% at 50% 50%, transparent 58%, rgba(22, 18, 14, 0.34) 100%);
+  opacity: 0; transition: opacity 0.4s ease;
+}
+.mg-pv.is-on .tyl-pv-vig { opacity: 1; }
+.tyl-pv-bar {
+  position: absolute; left: 0; right: 0; height: var(--pv-bar); background: var(--pv-ink);
+  transition: transform 0.3s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.tyl-pv-bar.is-top { top: 0; transform: translateY(-101%); }
+.tyl-pv-bar.is-bottom { bottom: 0; transform: translateY(101%); }
+.mg-pv.is-bars .tyl-pv-bar { transform: none; }
+
+/* ---------- ink: the dip (开), the bleed (落), the plain fade (低, reduced motion) */
+.tyl-pv-dip { position: absolute; inset: 0; background: var(--pv-ink); opacity: 0; }
+.tyl-pv-ink {
+  position: absolute; inset: 0;
+  -webkit-backdrop-filter: grayscale(1) contrast(1.08) sepia(0.14);
+  backdrop-filter: grayscale(1) contrast(1.08) sepia(0.14);
+  --r: 0%;
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent calc(var(--r) - 14%), #000 var(--r));
+  mask-image: radial-gradient(circle at 50% 50%, transparent calc(var(--r) - 14%), #000 var(--r));
+}
+/* 蒸: the lid lifts into a white-out of steam */
+.tyl-pv-white { position: absolute; inset: 0; background: radial-gradient(70% 60% at 50% 55%, #fffaf0 0%, #f7efe0 70%, #efe4cf 100%); opacity: 0; }
+/* 高 · 身临其境: a fake shallow focus, clear at the centre */
+.tyl-pv-ring {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 0.35s ease;
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  -webkit-mask-image: radial-gradient(ellipse 34% 38% at 50% 52%, transparent 40%, #000 100%);
+  mask-image: radial-gradient(ellipse 34% 38% at 50% 52%, transparent 40%, #000 100%);
+}
+.tyl-pv-ring.is-on { opacity: 1; }
+/* 题: the dish's warm light (no new lights in the world) */
+.tyl-pv-warm {
+  position: absolute; inset: 0; opacity: 0; transition: opacity 0.6s ease;
+  background: radial-gradient(46% 40% at 50% 54%, rgba(255, 190, 110, 0.26), rgba(255, 190, 110, 0) 72%);
+  mix-blend-mode: soft-light;
+}
+.tyl-pv-warm.is-on { opacity: 1; }
+
+/* ---------- words: 「山外 · 秋」, the title card, the subtitles */
+.tyl-pv-season {
+  position: absolute; left: 9%; top: calc(var(--pv-bar) + 6%);
+  font-family: var(--font-brush); font-size: clamp(34px, 7vw, 64px); line-height: 1.1; color: var(--pv-ink);
+  writing-mode: vertical-rl; letter-spacing: 0.12em; opacity: 0; transition: opacity 0.5s ease;
+}
+.tyl-pv-season.is-on { opacity: 0.25; }
+.mg-pv:not(:lang(zh)) .tyl-pv-season { writing-mode: horizontal-tb; font-family: var(--font-text); font-size: clamp(22px, 4vw, 36px); font-style: italic; }
+
+.tyl-pv-title {
+  position: absolute; right: 11%; top: calc(var(--pv-bar) + 5%);
+  display: flex; flex-direction: row-reverse; align-items: flex-start; gap: 10px;
+  color: #fbf6ec; text-shadow: 0 0 14px rgba(20, 14, 8, 0.55), 0 1px 2px rgba(20, 14, 8, 0.6);
+  opacity: 0; transition: opacity 0.45s ease, transform 0.9s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+.tyl-pv-title.is-on { opacity: 1; }
+.tyl-pv-title.is-rise { transform: translateY(12px); }
+.tyl-pv-title.is-rise.is-on { transform: none; }
+.tyl-pv-title .tyl-pv-name {
+  font-family: var(--font-brush); font-size: clamp(34px, 6.4vw, 58px); line-height: 1.05; letter-spacing: 0.08em;
+  writing-mode: vertical-rl; clip-path: inset(0 0 100% 0); transition: clip-path 0.7s cubic-bezier(0.4, 0.1, 0.3, 1);
+}
+.tyl-pv-title.is-on .tyl-pv-name { clip-path: inset(0 0 0 0); }
+.tyl-pv-title .tyl-pv-cap {
+  font-family: var(--font-text); font-size: clamp(14px, 2.2vw, 18px); letter-spacing: 0.22em; writing-mode: vertical-rl;
+  margin-top: 1.4em; opacity: 0; transition: opacity 0.5s ease 0.5s;
+}
+.tyl-pv-title.is-on .tyl-pv-cap { opacity: 0.95; }
+.tyl-pv-title .tyl-pv-seal {
+  align-self: flex-end; margin-top: 6px; width: 34px; height: 34px; display: grid; place-items: center;
+  font-family: var(--font-brush); font-size: 22px; line-height: 1; color: #fbf5ea; text-shadow: none;
+  background: var(--pv-red); border-radius: 26% 38% 32% 36%; transform: rotate(-6deg) scale(1.6); opacity: 0;
+  transition: transform 0.22s cubic-bezier(0.5, 0, 0.7, 1.4), opacity 0.12s ease;
+}
+.tyl-pv-title .tyl-pv-seal.is-on { transform: rotate(-6deg) scale(1); opacity: 0.92; }
+/* English: the name across, the caption under it */
+.mg-pv:not(:lang(zh)) .tyl-pv-title { flex-direction: column; align-items: flex-end; right: 7%; max-width: 46%; text-align: right; }
+.mg-pv:not(:lang(zh)) .tyl-pv-title :is(.tyl-pv-name, .tyl-pv-cap) { writing-mode: horizontal-tb; }
+.mg-pv:not(:lang(zh)) .tyl-pv-title .tyl-pv-name { font-family: var(--font-text); font-size: clamp(24px, 4vw, 36px); clip-path: none; }
+.mg-pv:not(:lang(zh)) .tyl-pv-title .tyl-pv-cap { margin-top: 0; font-style: italic; letter-spacing: 0.04em; }
+
+.tyl-pv-sub {
+  position: absolute; left: 50%; bottom: calc(var(--pv-bar) + 14px); transform: translateX(-50%);
+  width: min(88vw, 36em); text-align: center;
+  font-family: var(--font-text); font-size: clamp(15px, 2.3vw, 18px); line-height: 1.55; color: #fbf6ec;
+  text-shadow: 0 0 10px rgba(12, 10, 8, 0.85), 0 1px 2px rgba(12, 10, 8, 0.9);
+  opacity: 0; transition: opacity 0.25s ease;
+}
+.tyl-pv-sub.is-on { opacity: 1; }
+.tyl-pv-sub b { font-weight: 500; color: #f3c9a8; margin-right: 0.5em; letter-spacing: 0.08em; }
+
+/* ---------- the skip chip */
+.mg-pv > .tyl-pv-skip {
+  pointer-events: auto; position: absolute; right: max(12px, env(safe-area-inset-right)); bottom: calc(var(--pv-bar) + 10px);
+  padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(251, 246, 236, 0.5); background: rgba(22, 18, 14, 0.45);
+  color: #fbf6ec; font: 14px/1.2 var(--font-text); letter-spacing: 0.1em; cursor: pointer; opacity: 0; transition: opacity 0.3s ease;
+}
+.mg-pv.is-skip > .tyl-pv-skip { opacity: 0.85; }
+.mg-pv > .tyl-pv-skip:focus-visible { outline: 2px solid #f3c9a8; outline-offset: 2px; }
+
+/* ---------- the reaction: a bubble with the companion's name, and its puff (it lingers after the 特写) */
+.tyl-pv-say {
+  position: absolute; left: 50%; top: 30%; transform: translate(-50%, 6px); pointer-events: none;
+  max-width: min(80vw, 24em); padding: 10px 16px 11px; border-radius: 16px 18px 17px 15px;
+  background: rgba(251, 247, 238, 0.95); color: #2a2622; box-shadow: 0 6px 22px rgba(20, 14, 8, 0.22);
+  font: clamp(15px, 2.2vw, 17px)/1.55 var(--font-text); opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.tyl-pv-say::after {
+  content: ''; position: absolute; left: 50%; bottom: -7px; width: 14px; height: 14px; margin-left: -7px;
+  background: inherit; transform: rotate(45deg); border-radius: 0 0 3px 0;
+}
+.tyl-pv-say.is-on { opacity: 1; transform: translate(-50%, 0); }
+.tyl-pv-say b { display: block; font-weight: 500; font-size: 0.8em; color: #8b5a3c; letter-spacing: 0.1em; margin-bottom: 2px; }
+.tyl-pv-say.is-narr { font-style: italic; color: #4b443c; background: rgba(246, 240, 228, 0.9); }
+.tyl-pv-say.is-narr::after { display: none; }
+.tyl-pv-puff { position: absolute; left: 50%; top: -6px; width: 0; height: 0; }
+.tyl-pv-puff i { position: absolute; left: 0; top: 0; display: block; border-radius: 50%; opacity: 0; animation: tyl-pv-puff 1.1s ease-out forwards; }
+.tyl-pv-puff.is-热 i { width: 16px; height: 16px; background: rgba(255, 255, 255, 0.9); filter: blur(3px); }
+.tyl-pv-puff.is-甜 i { width: 9px; height: 12px; background: #f2a3b6; border-radius: 60% 60% 50% 50% / 80% 80% 30% 30%; }
+.tyl-pv-puff.is-脆 i { width: 5px; height: 5px; background: #a8743f; border-radius: 30%; }
+.tyl-pv-puff.is-茶 i { width: 12px; height: 7px; background: #8fae6a; border-radius: 0 80% 0 80%; animation-duration: 1.8s; }
+.tyl-pv-puff.is-酒 i { display: none; }
+@keyframes tyl-pv-puff {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4) rotate(0deg); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx, 0), var(--dy, -30px)) scale(1) rotate(var(--rot, 40deg)); }
+}
+/* 酒: a pink blush pulse at the edges */
+.tyl-pv-blush {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(ellipse 80% 75% at 50% 50%, transparent 55%, rgba(236, 120, 140, 0.34) 100%);
+  animation: tyl-pv-blush 1.6s ease-in-out forwards;
+}
+@keyframes tyl-pv-blush { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-pv *, .tyl-pv-say, .tyl-pv-say * { transition-duration: 0.01s !important; animation: none !important; }
+  .tyl-pv-title .tyl-pv-name { clip-path: none; }
+  .tyl-pv-title.is-rise { transform: none; }
+}

@@ -44,6 +44,16 @@ export interface Engine {
   setFog(o: { near: number; far: number; color?: string } | null): void;
   /** The light falling on painted things now (the sky's tint), if the core says. */
   skyTint(): T.Color | null;
+  /**
+   * 二期 · the 特写's lens: hold the camera's field of view at `fov` degrees (the core honours it on
+   * resize, the run kick and the photo camera's end); null gives back the walk's own lens.
+   */
+  lens(fov: number | null): void;
+  /**
+   * 二期 · a pocket region's door for fast travel: after travel(id)'s curtain lifts at the region's
+   * arrival point, the core calls `fn` (the story's door()). null: none.
+   */
+  pocketDoor(id: RegionId, fn: (() => void | Promise<void>) | null): void;
 }
 
 type Extras = Partial<Omit<Engine, 'setMood' | 'moodNow' | 'moodTod' | 'setFog' | 'skyTint'>>;
@@ -57,6 +67,7 @@ export function engine(ctx: WorldCtx): Engine {
   if (e) return e;
   const x = ctx as WorldCtx & Extras;
   const sky = ctx.sky as WorldCtx['sky'] & SkyX;
+  let lensWas: number | null = null;
   e = {
     cinematic: (o) => {
       if (x.cinematic) return x.cinematic(o);
@@ -77,6 +88,21 @@ export function engine(ctx: WorldCtx): Engine {
     moodTod: () => sky.moodTod ?? null,
     setFog: (o) => sky.setFog?.(o),
     skyTint: () => sky.tint ?? null,
+    lens: (fov) => {
+      if (x.lens) { x.lens(fov); return; }
+      // (a core without a lens: set the camera's own, and give back the one it had before)
+      const cam = ctx.camera as T.PerspectiveCamera;
+      if (!cam || typeof cam.fov !== 'number') return;
+      if (fov !== null && Number.isFinite(fov)) {
+        if (lensWas === null) lensWas = cam.fov;
+        cam.fov = Math.max(10, Math.min(90, fov));
+      } else if (lensWas !== null) {
+        cam.fov = lensWas;
+        lensWas = null;
+      } else return;
+      try { cam.updateProjectionMatrix(); } catch { /* a fake camera */ }
+    },
+    pocketDoor: (id, fn) => x.pocketDoor?.(id, fn),
   };
   cache.set(ctx, e);
   return e;

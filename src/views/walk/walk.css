@@ -793,6 +793,8 @@
 .walk-map-wp.is-lit { color: #1b1916; border-color: rgba(27, 25, 22, 0.35); background: rgba(255, 250, 240, 0.7); }
 .walk-map-wp.is-lit i { background: #ffb86b; border-color: #b0701f; box-shadow: 0 0 6px 1px rgba(255, 184, 107, 0.8); }
 .walk-map-wp.is-picked { border-color: #b93a2b; box-shadow: inset 0 0 0 1px #b93a2b; }
+/* 二期: 小满's pressed petal (桃源's door), not a stele */
+.walk-map-wp.is-petal i { border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: #eca0b2; border-color: #96465a; box-shadow: 0 0 6px 1px rgba(255, 214, 224, 0.9); }
 .walk-map-place b small { font-family: var(--font-text); font-size: 13px; letter-spacing: 0.04em; color: #6a5f50; }
 .walk-map-place.is-dim b { color: rgba(27, 25, 22, 0.45); }
 .walk-map-go .brush { font-size: 17px; margin-right: 2px; }

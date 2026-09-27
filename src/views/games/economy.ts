@@ -12,7 +12,9 @@
 
 export type PaySource =
   | 'fish' | 'pitchpot' | 'lotus' | 'bell' | 'cat' | 'lantern'
-  | 'gomoku' | 'xiangqi' | 'klotski' | 'tangram' | 'feihua' | 'snake' | 'tictactoe';
+  | 'gomoku' | 'xiangqi' | 'klotski' | 'tangram' | 'feihua' | 'snake' | 'tictactoe'
+  // 桃源's six valley games (谷中六戏) share one source
+  | 'tyxi';
 
 export interface PayRule {
   zh: string;
@@ -39,6 +41,7 @@ export const PAY_RULES: Record<PaySource, PayRule> = {
   feihua: { zh: '飞花令', en: 'Flying Flowers', where: 'games', full: 3 },
   snake: { zh: '贪吃蛇', en: 'Snake', where: 'games', full: 3 },
   tictactoe: { zh: '井字棋', en: 'Tic-tac-toe', where: 'games', full: 3 },
+  tyxi: { zh: '谷中小戏', en: 'Valley games', where: 'walk', full: 6 },
 };
 
 export const PAY_SOURCES = Object.keys(PAY_RULES) as PaySource[];
@@ -138,6 +141,34 @@ export const catPay = (): Pay => ({ source: 'cat', base: CAT_COINS, zh: '寻猫�
 
 export const LANTERN_COINS = 5;
 export const lanternPay = (): Pay => ({ source: 'lantern', base: LANTERN_COINS, zh: '河灯寄愿', en: 'A wish floated' });
+
+// ------------------------------------------------------------------------------ 桃源 · 谷中六戏
+
+/** The six valley games (the same ids as the walk's life/types.ts GameId). */
+export type TyxiGame = 'qu' | 'mo' | 'can' | 'yuan' | 'ying' | 'shang';
+export const TYXI_GAMES: Record<TyxiGame, { zh: string; en: string }> = {
+  qu: { zh: '踩曲', en: 'Treading the yeast' },
+  mo: { zh: '摸鱼', en: 'Fishing by hand' },
+  can: { zh: '采桑喂蚕', en: 'Feeding the silkworms' },
+  yuan: { zh: '纸鸢', en: 'The singing kite' },
+  ying: { zh: '捉萤', en: 'Catching fireflies' },
+  shang: { zh: '流觞', en: 'Steering the cup' },
+};
+/** No round of a valley game pays more than this (each game's own formula caps lower or equal: 30–35). */
+export const TYXI_ROUND_TOP = 35;
+/** 今日之约 beaten: 20 more, never cut (once a day; the game's frame holds it to that). */
+export const TYXI_YUE_COINS = 20;
+
+/**
+ * A valley game's payout: `base` from the game's own formula (whole coins, clamped to 0…35), with the
+ * reason line prefixed with the game's name: 「踩曲 · <zh>」 / "Treading the yeast · <en>".
+ * `exempt` spares it the daily soft cap (今日之约's +20).
+ */
+export function tyxiPay(game: TyxiGame, base: number, zh: string, en: string, exempt = false): Pay {
+  const b = Number.isFinite(base) ? Math.max(0, Math.min(TYXI_ROUND_TOP, Math.floor(base))) : 0;
+  const g = TYXI_GAMES[game];
+  return { source: 'tyxi', base: b, zh: zh ? `${g.zh} · ${zh}` : g.zh, en: en ? `${g.en} · ${en}` : g.en, exempt: exempt || undefined };
+}
 
 // ------------------------------------------------------------------------------ on the shelf
 

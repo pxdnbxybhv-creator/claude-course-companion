@@ -18,6 +18,7 @@ import { play } from '../../../../app/play';
 import { inBox } from '../../../../app/mail';
 import { ANCHORS, CAVE, CLEFT_END, G, L, W, Y_T, standAt } from './places';
 import { engine } from './engine';
+import { LETTER_WAITS } from './life/life-text';
 import type { TaoyuanWorld } from './world';
 
 import { doorStateFor, type DoorState } from './places';
@@ -85,7 +86,14 @@ export function buildDoor(ctx: WorldCtx, tv: TaoyuanWorld): Door {
     id: 'taoyuan:door', position: new THREE.Vector3(sx, sy, sz), radius: 2.8,
     labelZh: '飞瀑', labelEn: 'The waterfall', actionZh: '寻', actionEn: 'Search',
     act: async () => {
-      if (state === 'closed') { ctx.hud.toast('寻向所志，遂迷，不复得路。', 'You look for the marks you left, and lose your way. The path is not found again.', 4600); return; }
+      if (state === 'closed') {
+        ctx.hud.toast('寻向所志，遂迷，不复得路。', 'You look for the marks you left, and lose your way. The path is not found again.', 4600);
+        // 二期: 小满's letter is waiting in the box, unopened (its petal is the way back in)
+        if (safeInBox('ty-xiaoman') && !play.peek().flags['mail:ty-xiaoman']) {
+          setTimeout(() => ctx.hud.toast(LETTER_WAITS.zh, LETTER_WAITS.en, 4200), 4700);
+        }
+        return;
+      }
       if (state === 'hidden') return;
       if (handler) await handler();
       else await tv.enter();

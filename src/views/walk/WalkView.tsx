@@ -23,6 +23,8 @@ import type { Arrival, HudBridge, Prompt, SayOpts, WaypointInfo, WorldHandle } f
 import { PhotoMode } from './photo/PhotoMode';
 import { CaseSheet } from './case/CaseSheet';
 import { caseHere, caseSheet, openCaseSheet } from './case/state';
+import { ShidanChip, ShidanSheet } from './shidan/ShidanSheet';
+import { shidanSheet } from './shidan/state';
 import { caseIsOpen, progress as caseProgress, ready as caseReady } from './features/taoyuan/case';
 import './walk.css';
 
@@ -130,13 +132,14 @@ export function WalkView() {
   // the letters (信) and the name sheet (askName) are app-wide sheets over the walk
   const mailOpen = mailUi.value !== null || nameAsk.value !== null;
   // 案卷 · the casebook of the 桃源 case (its chip shows while the case is open)
-  const caseUi = caseSheet.value !== null;
+  // (二期: the 食单 sheet of the valley counts as the casebook does: the walk pauses, the keys wait)
+  const caseUi = caseSheet.value !== null || shidanSheet.value !== null;
   const caseFlags = play.value.flags;
   const caseOn = caseIsOpen(caseFlags);
   /** A sheet over the walk (a letter, the name sheet) or a text field has the keyboard: the walk's keys wait. */
   const keysElsewhere = (e: KeyboardEvent) => {
     // read at the key press itself: a sheet opened a moment ago counts before the walk re-renders
-    if (mailUi.peek() !== null || nameAsk.peek() !== null || caseSheet.peek() !== null) return true;
+    if (mailUi.peek() !== null || nameAsk.peek() !== null || caseSheet.peek() !== null || shidanSheet.peek() !== null) return true;
     const tg = e.target as HTMLElement | null;
     return !!tg?.closest?.('.sheet, input, textarea, select, [contenteditable]');
   };
@@ -496,6 +499,8 @@ export function WalkView() {
           </button>
         );
       })()}
+      {/* 二期 · 食单: the same slot, in the valley while everyday life is open and the case is not */}
+      {phase === 'ready' && !caseOn && !photoOn && !heldByOther && <ShidanChip disabled={busy} />}
 
       {preview && !photoOn && (
         <div class="walk-banner" role="status">
@@ -704,6 +709,7 @@ export function WalkView() {
       <CharacterSelect open={charOpen} onClose={() => setCharOpen(false)} />
       <PurseSheet open={purseOpen} onClose={() => setPurseOpen(false)} />
       <CaseSheet />
+      <ShidanSheet />
 
       {/* --- a small hanging scroll */}
       {card && (
@@ -785,7 +791,9 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
   const visited = new Set<RegionId>((Object.keys(REGION) as RegionId[]).filter((id) => flags[`visit:${id}`]));
   const here = props.world.where();
   const wps: WaypointInfo[] = props.world.waypoints();
-  const litN = wps.filter((w) => w.lit).length;
+  // (二期: 小满's petal is a door, not a stele: it is listed, but never counted among the steles lit)
+  const steles = wps.filter((w) => w.kind !== 'petal');
+  const litN = steles.filter((w) => w.lit).length;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -800,6 +808,8 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
   /** Standing at that very stele (in its place and within a few steps): nowhere to travel. */
   const isHere = (id: RegionId | null) => {
     const w = id ? wps.find((x) => x.id === id) : null;
+    // (the petal: anywhere inside the valley is already there)
+    if (w?.kind === 'petal') return here.region === id;
     return !!w && id === here.region && Math.hypot(here.x - w.x, here.z - w.z) < 12;
   };
   useEffect(() => {
@@ -830,15 +840,15 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
       <div class="walk-map" role="dialog" aria-modal="true" aria-label={t('舆图', 'Map of the world')}>
         <header class="walk-map-head">
           <h2 class={lang === 'zh' ? 'brush' : 'latin'}>{t('舆图', 'Map')}</h2>
-          <small>{t(`驿站已通 ${litN} / ${wps.length}`, `${litN} of ${wps.length} waypoints lit`)}{here.region ? ' · ' + t(`此处：${REGION[here.region].zh}`, `Here: ${REGION[here.region].en}`) : ''}</small>
+          <small>{t(`驿站已通 ${litN} / ${steles.length}`, `${litN} of ${steles.length} waypoints lit`)}{here.region ? ' · ' + t(`此处：${REGION[here.region].zh}`, `Here: ${REGION[here.region].en}`) : ''}</small>
           <button type="button" class="walk-map-close" onClick={props.onClose} aria-label={t('收起', 'Close')}>✕</button>
         </header>
         <canvas ref={ref} class="walk-map-canvas" onClick={onTap} role="img" aria-label={t('一幅水墨舆图：驿碑标在各处', 'An ink map of the world, with its waypoint steles')} />
         <ul class="walk-map-list" aria-label={t('驿站', 'Waypoints')}>
           {wps.map((w) => (
             <li key={w.id}>
-              <button type="button" class={'walk-map-wp' + (w.lit ? ' is-lit' : '') + (pick === w.id ? ' is-picked' : '')} onClick={() => setPick(w.id)} aria-pressed={pick === w.id}>
-                <i aria-hidden="true" />{t(REGION[w.id].zh, REGION[w.id].en)}
+              <button type="button" class={'walk-map-wp' + (w.lit ? ' is-lit' : '') + (w.kind === 'petal' ? ' is-petal' : '') + (pick === w.id ? ' is-picked' : '')} onClick={() => setPick(w.id)} aria-pressed={pick === w.id}>
+                <i aria-hidden="true" />{w.kind === 'petal' ? t(w.zh, w.en) : t(REGION[w.id].zh, REGION[w.id].en)}
               </button>
             </li>
           ))}
@@ -847,15 +857,15 @@ function WorldMap(props: { world: WorldHandle; mod: typeof import('./world'); on
           {sel ? (
             <>
               <div class={'walk-map-place' + (lit ? '' : ' is-dim')}>
-                <b class={lang === 'zh' ? 'brush' : 'latin'}>{lit || known ? t(sel.zh, sel.en) : t(`${sel.zh}？`, `${sel.en}?`)}{wp ? <small>{t(` · ${wp.zh}驿碑`, ` · ${wp.en} stele`)}</small> : null}</b>
-                <span>{lit ? t(sel.blurbZh, sel.blurbEn) : t('尚未到访 · 循着小路走到那里的驿碑前，点亮它的灯。', 'Not yet visited · follow the paths to its stele and light the lantern.')}</span>
+                <b class={lang === 'zh' ? 'brush' : 'latin'}>{lit || known ? t(sel.zh, sel.en) : t(`${sel.zh}？`, `${sel.en}?`)}{wp ? <small>{wp.kind === 'petal' ? t(` · ${wp.zh}`, ` · ${wp.en}`) : t(` · ${wp.zh}驿碑`, ` · ${wp.en} stele`)}</small> : null}</b>
+                <span>{wp?.kind === 'petal' ? t('小满夹在信里的那片花瓣。拿着它，瀑布后面的光就还在。', 'The petal Xiaoman pressed into his letter. Hold it, and the light behind the falls is still there.') : lit ? t(sel.blurbZh, sel.blurbEn) : t('尚未到访 · 循着小路走到那里的驿碑前，点亮它的灯。', 'Not yet visited · follow the paths to its stele and light the lantern.')}</span>
               </div>
               {lit && !hereNow && (
                 <button type="button" class="btn btn-primary walk-map-go" onClick={() => props.onTravel(sel.id)} autoFocus>
-                  <span class="brush" aria-hidden="true">驿</span> {t('传送', 'Travel')}
+                  <span class="brush" aria-hidden="true">{wp?.kind === 'petal' ? '花' : '驿'}</span> {wp?.kind === 'petal' ? t('入光', 'Enter') : t('传送', 'Travel')}
                 </button>
               )}
-              {lit && hereNow && <span class="walk-map-here">{t('就在此处', 'You are here')}</span>}
+              {lit && hereNow && <span class="walk-map-here">{wp?.kind === 'petal' ? t('此刻就在桃源', "You're already in the Peach Spring") : t('就在此处', 'You are here')}</span>}
             </>
           ) : (
             <span class="muted">{t('点选已点亮的驿碑（有灯火的），即可传送前往。', 'Tap a lit waypoint stele (the ones with a lantern glow) to travel there.')}</span>

@@ -1075,6 +1075,11 @@ const BUILT: [number, number, number][] = [
   [4.6, 0, 2.4], [-3, 2, 1.2], [26, -20, 4.5], [-20.5, 19.5, 1.8], [-4.6, 36.4, 2.5], [-1.4, 35.2, 2],
   // 小满's kite spot on the terrace, where B2 and B8 look at him (no bank peach in front of his face)
   [-0.6, 31, 1.7], [-27.5, 1.5, 1.5], [-28.2, 6.5, 1.5], [-19, 11, 1.5], [-31, 0, 4],
+  // 二期 · the station props (life/stalls.ts STALLS): 桂娘's stove and lean-to, 杜二's wine-flag and step
+  // brazier, 葛姑's porch brazier, 三娘's tray, 阿黍's ember ring, and the 曲池 before the brewery
+  [2.4, -3.6, 1.2], [16.4, 2.2, 0.5], [19.3, 6.5, 0.5], [24.9, -14.7, 0.6], [-21.4, 3.1, 0.6], [4.6, 13.6, 0.9], [18, 3, 1.0],
+  // (the wine-flag's first place, kept so the bank and field trees lay out as they always have)
+  [18.7, 3.3, 0.5],
 ];
 
 /** hill-kit's stairs() places in world coordinates (it reads the ground there); the batch here is local. */

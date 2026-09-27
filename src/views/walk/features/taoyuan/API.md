@@ -271,3 +271,56 @@ const e = engine(ctx);
 | `tv` | the TaoyuanWorld itself |
 
 From `window.__walk`: `pocket()`, `pocketHidden()`, `region()`, `info()` (draws and triangles), `teleport(x, z, heading)`.
+
+## 8. 二期「常住」 · everyday life — `life/` (L)
+
+After the story (`phaseOf === 'chang'`), the valley is lived in: food paid in kind, the 特写, six games, 歇一歇. The contracts are in `life/types.ts` and `life/keys.ts`; the full export list and owners are in the phase-0 CONTRACTS.
+
+- `life/index.ts` — the `taoyuanLife` feature (registered after the story and the case). Per world it makes the `LifeApi`, mounts every module (`LifeMount`: `mountPV`, `mountTable`, `mountGames`, then L's), and sets `taoyuanHooks.life`.
+- `lifeOf(ctx)` (`life/api.ts`) — the world's `LifeApi`, without importing `life/index.ts`.
+- `lifeOpen(flags, storyRunning)` (`life/gate.ts`) — the gate every stall, stand, the board and 歇一歇 check each second. `canTravelToValley(flags)` — the petal (`ty:way`).
+- `LifeApi`: goods in kind (`grant`, `stock`, `use`), today's counts (`today`, `day`), the visit (`mood`, `setMood`, `part`, `hour`), the one `taoyuan-life` claim (`claim`, `release`, `current`), `borrow(k, at)`, `defer(fn)` and the one idempotent `restore()` (lens, time scale, the lent hand, the freeze, the cinematic, `seeFocus`, borrowed villagers).
+- `taoyuanHooks.life: LifeHooks` — `prompt(k)`, `leaving()`, `talkPrefix(k, who)`, `busy()`. The story asks `prompt(k)` last (only at 常 with the case closed), awaits `leaving()` before 出谷, and prepends `talkPrefix`.
+- `taoyuanHooks.story` also offers `talk(k)` (a villager's ordinary chat; give back any claim first), `refresh()` (everyone placed for the hour at once) and `running()` (a beat or a story talk is under way).
+- The engine gains `lens(fov | null)` (a held field of view the core honours on resize, the run kick and the photo camera's end; null gives back the walk's own) and `pocketDoor(id, fn | null)` (travel's door into a pocket region, called once its curtain lifts).
+
+### 8.1 The way back (L)
+
+- **The petal.** Once `ty:way` is set, `WorldHandle.waypoints()` appends `{ id: 'taoyuan', kind: 'petal', zh: '持花入光', … }` over the waterfall. The atlas draws a pressed petal (no stele), the map's list shows it, and 「驿站已通 n / 7」 does not count it. Inside the valley the entry says 「此刻就在桃源」.
+- **`travel('taoyuan')`** is allowed only with `ty:way` and a registered door: the curtain sets you down at `ARRIVE.taoyuan` (the pool), lifts, then the core awaits `pocketDoors.get('taoyuan')`, which the story registers as its `door()` (`eng.pocketDoor`).
+- **`door()`**: with `ty:way` and `tyl:back` it runs `tv.enter({ line: null, atMouth: true })` and calls `mouth()` itself. Without `tyl:back` the cleft is walked; `mouth()` then runs the `back` beat — 小满 2 m ahead: 「你真来啦！……」 — and sets `tyl:back`.
+- **「出谷」**: `leave()` awaits `taoyuanHooks.life.leaving()` first while life is busy (a game's 「这局不玩了？」, a 特写 run to its end); false stays.
+- **The dark falls**: while 小满's letter waits unclaimed, 「寻」 adds 「信箱里有你一封信，摸着鼓鼓的。」.
+
+### 8.2 The valley's hour (歇一歇)
+
+- `tv.setClock(state, { secs, hour })` keeps `hour` for the rest of the visit (常 paints it); `tv.hour()` returns it, else `ctx.env.hour`; `tv.hourHeld`; `left()` clears it. The story's `partNow()`/`spotNow()` and `LifeApi.hour()` read `tv.hour()`.
+- `life/rest.ts`: 「长凳 · 歇一歇」 and 「石瞽的廊下 · 歇一歇」 offer the three parts ahead (`partsAhead`); the hours are `REST_HOURS` 6/12/18/20 (`daily.ts`). It holds the claim (`kind: 'rest'`), tilts the camera to the sky, `setClock('chang', { secs: 2.5, hour })` + `story.refresh()`; reduced motion: a paper curtain (150 ms in, 300 ms held, then out; the hour turns only once it is opaque). It re-asserts the hour if something repaints 常 from the world's hour.
+- **开饭**: whenever the part becomes 晨/昼/暮 (a few seconds after the way in, or after 歇一歇): `clapper()` and 桂娘's 「开饭喽！」, once per part per visit; at 晨 also 「小满！洗手！」.
+
+### 8.3 The day's picks and the board — `life/daily.ts` (pure)
+
+- Every daily pick is here, with its salt: `songOfDay` (`tyl:qu`), `waterOfDay`, `leavesOfDay`, `sleeperOfDay`, `draughtOfDay`, `kingOfDay`, `flowOfDay` (+ `FLOW_SPEED`), `seatsOfDay` (5 of `CUP_GUESTS`), `lingOfDay` (`tyl:ling`), `yueOfDay` (`tyl:yue`) and `yueFor(day)` (host, target, line). **The games read them here** so the board, 小满's news and the games agree.
+- `boardFor(day, { season, festival?, dishName? })` → `{ title, rows, picks }`: 秦's register page. `newsOf(day, festival)`: 小满's toast at the mouth (daily count `tyl:news`). `festivalDish(key, season)`, `festivalChoices(key, day)`, `cnThousands(n)`, `petalsOfDay(day)`.
+- `life/board.ts`: the 「花神杆 · 今日谷中」 prompt (a card), 小满's news on the first way in of the day, and the festival: the lane lanterns at 暮, and 秦's prompt 「外头今天过什么节？」 (three choices; once a day).
+
+### 8.4 Stalls, the bowl, moods — `life/stalls.ts`, `life/moods.ts`
+
+- `STALLS` (valley-local): the stove (`stoveSpot()`), the counter, the wine-flag, the step brazier, the porch brazier, the tray, the ember ring (F's `table-logic.ts PROPS`), the 曲池 (18, 3) and the bowl. One merged `inked` mesh (≈1.4k triangles, 2 draws), colliders while inside, `BUILT` entries in `valley.ts`.
+- One smoke `Cloud` (18 × density, 9 at 低, +6 embers, +6 dust): 桂娘's stove chimney at 晨/昼/暮 (`smokeFrom`), 杜二's step at 夜; embers at the fire and the step at night.
+- **The 曲 block** (踩曲): `quBlock(ctx)?.hit()` squashes it 4% (it springs back in about 0.3 s) and `.puff()` sends 6 puffs of dust off it. The block is the merged mesh's last box, moved in place (no extra draw); null before the stalls are built.
+- 留一碗: `talk:ty.guiniang` ≥ 3, once a day (`tyl:liu`), not at 夜: the covered bowl (1 draw, no outline) and 「长桌那头 · 揭开碗盖」 → `playPV(…, { mode: 'short', at: null })` of a 桂娘 dish on now; free, uses appetite (the festival's one extra serving), records like the table.
+- `moodOfTaste(taste)`; 暖 → a breath puff after 3 s still; 醺 → a pink edge vignette and a ±0.4° CSS sway (none under reduced motion), and 「井 · 洗把脸」 at the well, which clears it.
+- Echoes (`LifePart.talkPrefix`): 石瞽 hears the freshest dish (`tyl:ate:*` rising) or game (a `LifeActivity` with `kind: 'game'` and **`game: GameId`** — set it) within 4 minutes, once; 夭夭 at dawn before 7 once 桃花粥 is tasted.
+
+### 8.4.1 Seams between the builders (integration)
+
+- **The table → the 特写:** `table.ts` calls `playPV(ctx, tv, dish, { first, own, mode, at: place, season, li, festival, rare, react })`. `festival` (新糕 on red paper at the 春节/元宵 暮 席) comes from `festivalServing`; `rare` is 柳枝炙鱼 paid with a 鳜 (the cook says `ownRare`). A `playPV` that returns within 150 ms (`mode: 'none'`, 不看) means the table shows its own small card: the order ends after 1.0 s and the card stays a while as a note. After a 特写 at a table the walker steps 0.55 m back from the seat.
+- **The 鳜:** 摸鱼 with a 鳜 (`bonus`) that kept a 鱼 records `tyl:gui:got`; the table records `tyl:gui:used` when it pays 炙鱼 with it (or the last 鱼 goes). `guiHeld(counters)` (`keys.ts`).
+- **流觞's supper:** after the result card, if 鸡黍 was never tasted or today's free bowl is unused, 「吃一碗」 calls `serveDish(ctx, 'jishu')` (`table.ts`): the table's own flow and its 特写. On a festival day the two cup guests without a bay stand by the channel and watch.
+
+### 8.5 Quests and the letter
+
+- `src/data/quests.ts`: `q-zhiwei` (`tyl:eat:` × 12), `q-letu` (`tyl:seal:` × 6), `q-sishi` (`tyl:eat:s-` × 4), seals 知味 乐土 四时.
+- `letters.ts` `ty-guiniang` 「锅里给你留着」: due once `tyl:back` is set and `dayNumber(today) − best['tyl:lastday'] ≥ 7`; `life/index.ts` writes `recordMax('tyl:lastday', dayNumber(today))` on every way in at 常.
+- DEV `window.__tylife`: `board()`, `news()`, `festival()`, `ask()`, `rest(where)`, `pass(hour)`, `hour()`, `stalls()`, `bowl()`, `qu('hit' | 'puff')`, `fresh()`, `moodOf(taste)`, plus the phase-0 hooks; F's `menu(cook)`, `eat(dish)`, `table()`; P's `pv`, `pvShots`, `pvKit`; G's `game(g)`, `gameStop()`, `gameEnd(score, measure, feat)` (it skips a game's own `after`, so no 流觞 supper), `stands()`.

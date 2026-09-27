@@ -1,0 +1,140 @@
+/* 桃源 · the table: the menu card (「吃点什么」) and the small served card that stands in for the 特写.
+   Paper and ink over the painting, like the walk's own cards; mounted in the minigames' layer (.mg),
+   whose is-game class hides the joystick and the act button while the card is up. */
+
+.tyl-menu, .tyl-served { --tyl-paper: #f6f0e4; --tyl-line: rgba(27, 25, 22, 0.18); --tyl-red: #b93a2b; }
+
+/* ---------- the menu card */
+.tyl-card {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 18px);
+  transform: translateX(-50%);
+  width: min(94vw, 540px);
+  max-height: calc(100% - env(safe-area-inset-top) - 36px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-radius: 16px;
+  background: var(--tyl-paper);
+  border: 1px solid var(--tyl-line);
+  box-shadow: 0 18px 40px -22px rgba(40, 30, 10, 0.7), inset 0 0 0 4px rgba(255, 255, 255, 0.35);
+  pointer-events: auto;
+  animation: tyl-rise 0.32s var(--ease) both;
+}
+@keyframes tyl-rise { from { opacity: 0; transform: translate(-50%, 10px); } }
+.tyl-head { display: flex; align-items: center; gap: 10px; }
+.tyl-seal {
+  flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px;
+  border-radius: 28% 40% 34% 38%; background: var(--tyl-red); color: #fbf5ea; font-size: 21px; line-height: 1; transform: rotate(-5deg);
+}
+.tyl-who { min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.tyl-who b { font-weight: 500; font-size: 16.5px; letter-spacing: 0.08em; }
+.tyl-who small { font-size: 12.5px; color: #6c6358; letter-spacing: 0.06em; }
+.tyl-mood { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px 2px 4px; border-radius: 999px; background: rgba(95, 138, 110, 0.14); }
+.tyl-mood .brush { font-size: 18px; line-height: 1; }
+.tyl-mood small { font-size: 11.5px; color: #4d6b57; }
+.tyl-x {
+  flex: none; margin-left: auto; width: 36px; height: 36px; border-radius: 50%; font-size: 22px; line-height: 1;
+  background: rgba(255, 255, 255, 0.6) !important; border: 1px solid var(--tyl-line) !important;
+}
+.tyl-mood + .tyl-x { margin-left: 4px; }
+.tyl-say { margin: 0; font-size: 14.5px; line-height: 1.55; color: #3a342c; }
+.tyl-say:empty { display: none; }
+
+.tyl-tiles { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.tyl-tiles[data-n="1"] { grid-template-columns: minmax(0, 150px); justify-content: center; }
+.tyl-tiles[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 150px)); justify-content: center; }
+.tyl-tiles[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.tyl-tile { position: relative; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tyl-tile-pick {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 4px 9px; min-height: 100%;
+  border-radius: 12px; background: rgba(255, 255, 255, 0.55) !important; border: 1px solid var(--tyl-line) !important;
+  text-align: center; transition: transform 0.12s var(--ease), border-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tyl-tile-pick:hover { border-color: rgba(27, 25, 22, 0.4) !important; }
+.tyl-tile-pick:active { transform: scale(0.97); }
+.tyl-tile-pick:focus-visible { outline: 2px solid var(--tyl-red); outline-offset: 2px; }
+.tyl-thumb { width: min(96px, 100%); aspect-ratio: 1; height: auto; }
+.tyl-name { font-weight: 500; font-size: 14.5px; letter-spacing: 0.04em; line-height: 1.25; }
+.tyl-tag { font-size: 11.5px; color: #6c6358; letter-spacing: 0.03em; line-height: 1.3; }
+.tyl-own { display: block; color: #3f7a55; font-weight: 500; }
+.tyl-tile-line { font-size: 11px; color: #857c6e; }
+.tyl-tile.is-own .tyl-tile-pick { border-color: rgba(63, 122, 85, 0.45) !important; }
+.tyl-tile.is-off .tyl-tile-pick { opacity: 0.55; border-style: dashed !important; background: transparent !important; }
+.tyl-tile.is-off .tyl-thumb { filter: grayscale(0.7); }
+.tyl-tile.is-shake { animation: tyl-shake 0.36s ease; }
+@keyframes tyl-shake { 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+.tyl-pay {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px; padding: 3px 8px; border-radius: 999px;
+  font-size: 12px !important; background: rgba(27, 25, 22, 0.06) !important; border: 1px solid var(--tyl-line) !important;
+}
+.tyl-pay:disabled { cursor: default; }
+.tyl-cycle { font-size: 13px; color: var(--tyl-red); }
+
+.tyl-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; padding-top: 2px; border-top: 1px dashed var(--tyl-line); }
+.tyl-belly, .tyl-goods { display: inline-flex; align-items: center; gap: 7px; padding-top: 6px; }
+.tyl-foot small { font-size: 11.5px; color: #6c6358; letter-spacing: 0.06em; }
+.tyl-bowls { display: inline-flex; gap: 4px; }
+.tyl-bowls i {
+  position: relative; width: 16px; height: 10px; border-radius: 0 0 9px 9px; border: 1.5px solid #3a342c; border-top-width: 1px; overflow: hidden;
+}
+.tyl-bowls i::after { content: ''; position: absolute; inset: 0 0 0 0; background: #c9952a; transform: scaleX(0); transform-origin: left; }
+.tyl-bowls i.is-half::after { transform: scaleX(0.5); }
+.tyl-bowls i.is-full::after { transform: none; }
+.tyl-goods-list { display: inline-flex; flex-wrap: wrap; gap: 3px 9px; font-size: 12.5px; }
+.tyl-good { display: inline-flex; gap: 2px; align-items: baseline; }
+.tyl-good b { font-family: var(--font-latin); font-weight: 600; font-size: 13px; }
+.tyl-good.is-none { color: #a39a8c; }
+.tyl-acts { display: flex; justify-content: center; }
+.tyl-chat {
+  padding: 7px 18px; border-radius: 999px; font-size: 13.5px !important; letter-spacing: 0.08em;
+  background: rgba(255, 255, 255, 0.6) !important; border: 1px solid var(--tyl-line) !important;
+}
+
+@media (max-width: 520px) {
+  .tyl-tiles, .tyl-tiles[data-n="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tyl-tiles[data-n="1"] { grid-template-columns: minmax(0, 150px); }
+  .tyl-thumb { width: 72px; }
+  .tyl-card { padding: 12px 10px 10px; gap: 8px; }
+}
+
+/* ---------- the served card (no 特写: the emote and this) */
+.tyl-served-card {
+  position: absolute;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 18%);
+  transform: translateX(-50%);
+  width: min(88vw, 380px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--tyl-paper);
+  border: 1px solid var(--tyl-line);
+  box-shadow: 0 18px 40px -22px rgba(40, 30, 10, 0.7);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: tyl-rise 0.3s var(--ease) both;
+}
+.tyl-served-top { display: flex; align-items: center; gap: 12px; }
+.tyl-served-thumb { flex: none; width: 76px; height: 76px; }
+.tyl-served-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tyl-served-txt b { display: inline-flex; align-items: center; gap: 8px; font-weight: 400; font-size: 24px; letter-spacing: 0.08em; }
+.tyl-served-txt .tyl-seal { width: 24px; height: 24px; font-size: 15px; }
+.tyl-caption { font-size: 13px; color: #6c6358; letter-spacing: 0.12em; }
+.tyl-served-vo, .tyl-served-me { margin: 0; font-size: 14px; line-height: 1.55; color: #3a342c; }
+.tyl-served-me b { font-weight: 500; margin-right: 4px; }
+.tyl-served-me b::after { content: '：'; }
+.tyl-served:lang(en) .tyl-served-me b::after { content: ': '; }
+.tyl-served-me.is-narr { color: #6c6358; font-style: italic; }
+.tyl-served-new { margin: 2px 0 0; align-self: flex-start; padding: 2px 10px; border-radius: 999px; font-size: 12.5px; letter-spacing: 0.08em; background: rgba(185, 58, 43, 0.12); color: #9e2f22; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tyl-card, .tyl-served-card { animation: none; }
+  .tyl-tile.is-shake { animation: none; }
+}

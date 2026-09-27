@@ -304,7 +304,7 @@ describe("the owner's code", () => {
     _acceptCodeForTests('TESTING');
     expect(redeemCode('TESTING')).toBe('ok');
     const f = play.value.flags;
-    for (const k of Object.keys(f)) expect(/^(ty:|case:|mail:|char:|item:|met:|visit:taoyuan)/.test(k), k).toBe(false);
+    for (const k of Object.keys(f)) expect(/^(ty:|tyl:|case:|mail:|char:|item:|met:|visit:taoyuan)/.test(k), k).toBe(false);
     expect(doorStateFor(f, inBox('ty-shide'))).toBe('hidden');
     expect(nextBeat(f)).toBe('b1');
     expect(phaseOf(f)).toBe('arrive');
