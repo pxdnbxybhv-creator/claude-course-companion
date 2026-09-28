@@ -12,7 +12,10 @@
 // Budgets (GDD §24.3): sprites are baked once (gradients only at bake time); the frame does
 // setTransform + drawImage and a few ellipse strokes; motes live in typed arrays made once and move
 // analytically from the world clock (nothing is allocated per frame). Low quality keeps only the
-// shadows of you, your summons and elites; the frame guard (W.degrade) drops grain and motes. Reduced
+// shadows of you, your summons and elites. Under load the engine's frame guard sheds the two
+// full-screen passes (grain, vignette: `shed`) before it lowers the resolution, and its degrade step
+// drops the motes too. Grain is blitted 1:1 at whole pixels and the vignette only as its four edge
+// bands, so neither filters a pixel. Reduced
 // motion: motes at half speed and half count, no twinkle. Never vermilion: danger is the enemy's.
 import type { MapId } from '../ids';
 import { SUMMON_REG } from '../ids';
@@ -48,6 +51,8 @@ const VIGNETTE_A: Record<Quality, number> = { low: 0, mid: 0, high: 1 };
 const SHADOW_A = 0.3;
 
 const TILE = 256;
+/** The vignette's band: it is clear inside the central (1 − 2·band)² rect of the screen. */
+const VIG_BAND = 0.2;
 const SHW = 64, SHH = 32;
 
 /** Mote kinds. */
@@ -55,7 +60,7 @@ const enum MK { Petal, Moon, Firefly, Leaf, Osman }
 /** What each map scatters (kinds cycle through this list). */
 const MAP_MOTES: Record<MapId, readonly MK[]> = {
   lake: [MK.Petal, MK.Moon, MK.Petal, MK.Moon, MK.Petal],
-  forest: [MK.Firefly, MK.Leaf, MK.Firefly, MK.Leaf, MK.Firefly],
+  forest: [MK.Firefly, MK.Firefly, MK.Leaf, MK.Firefly, MK.Firefly],
   palace: [MK.Moon, MK.Osman, MK.Moon, MK.Osman, MK.Moon],
 };
 
@@ -75,10 +80,11 @@ export class Ambience {
   static off = { grain: false, vignette: false, shadows: false, motes: false };
   /** EMA of the pass's JS time (ms), for the perf probe. */
   ms = 0;
+  /** The full-screen passes (grain, vignette) shed by the engine's frame guard under load: the first
+   *  thing it gives up, before any resolution or effect. */
+  shed = false;
   private shadow: HTMLCanvasElement | null = null;
   private grain: HTMLCanvasElement | null = null;
-  private pat: CanvasPattern | null = null;
-  private patCtx: CanvasRenderingContext2D | null = null;
   private vig: HTMLCanvasElement | null = null;
   private vigKey = '';
   /** Mote sprites by kind, and their size in u. */
@@ -134,7 +140,6 @@ export class Ambience {
     try {
       this.shadow = bakeShadow();
       this.grain = GRAIN_A[this.quality] > 0 ? bakeGrain(this.dpr, inverted, this.map) : null;
-      this.pat = null; this.patCtx = null;
       this.spr = []; this.sprU = [];
       if (this.n > 0) for (const kind of [MK.Petal, MK.Moon, MK.Firefly, MK.Leaf, MK.Osman]) {
         const { c, u } = bakeMote(kind, this.k, this.map);
@@ -163,7 +168,7 @@ export class Ambience {
     ctx.globalAlpha = 1;
     // grain and vignette belong to the paper: not under the darkness (it hides them), not when slow
     const off = Ambience.off;
-    if (!dark && !W.degrade) {
+    if (!dark && !W.degrade && !this.shed) {
       if (!off.grain) this.drawGrain(ctx, cam, GRAIN_A[q]);
       if (!off.vignette) this.drawVignette(ctx, cam, VIGNETTE_A[q]);
     }
@@ -177,18 +182,15 @@ export class Ambience {
   }
 
   private drawGrain(ctx: CanvasRenderingContext2D, cam: Camera, a: number): void {
-    if (a <= 0 || !this.grain) return;
-    if (!this.pat || this.patCtx !== ctx) {
-      this.pat = ctx.createPattern(this.grain, 'repeat');
-      this.patCtx = ctx;
-      if (!this.pat) return;
-    }
-    // anchored to the world: the tile's origin follows world (0, 0) on screen
-    const ox = fmod(-cam.x * cam.scale + cam.w / 2, TILE) - TILE, oy = fmod(-cam.y * cam.scale + cam.h / 2, TILE) - TILE;
-    ctx.setTransform(1, 0, 0, 1, ox, oy);
+    const img = this.grain;
+    if (a <= 0 || !img) return;
+    // anchored to the world: the tile's origin follows world (0, 0) on screen. The tiles are blitted
+    // 1:1 at whole pixels: a plain copy-blend per pixel, no filtering (a fractional pattern fill costs
+    // ≈ 4× as much under CPU raster), so this full-screen pass stays cheap on any phone
+    const ox = Math.round(fmod(-cam.x * cam.scale + cam.w / 2, TILE)) - TILE, oy = Math.round(fmod(-cam.y * cam.scale + cam.h / 2, TILE)) - TILE;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = a;
-    ctx.fillStyle = this.pat;
-    ctx.fillRect(0, 0, cam.w + TILE, cam.h + TILE);
+    for (let y = oy; y < cam.h; y += TILE) for (let x = ox; x < cam.w; x += TILE) ctx.drawImage(img, x, y);
     ctx.globalAlpha = 1;
   }
 
@@ -196,10 +198,18 @@ export class Ambience {
     if (a <= 0) return;
     const key = `${Math.round(cam.w)}x${Math.round(cam.h)}`;
     if (this.vigKey !== key) { this.vig = bakeVignette(cam.w, cam.h, this.inverted); this.vigKey = key; }
-    if (!this.vig) return;
+    const v = this.vig;
+    if (!v) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = a;
-    ctx.drawImage(this.vig, 0, 0, cam.w, cam.h);
+    // the vignette is clear inside its central rect: draw only the four bands around it (≈ 60% of the
+    // screen instead of all of it)
+    const f = VIG_BAND, sw = v.width, sh = v.height, W = cam.w, H = cam.h;
+    const bw = Math.round(W * f), bh = Math.round(H * f), sbw = sw * f, sbh = sh * f;
+    ctx.drawImage(v, 0, 0, sw, sbh, 0, 0, W, bh);
+    ctx.drawImage(v, 0, sh - sbh, sw, sbh, 0, H - bh, W, bh);
+    ctx.drawImage(v, 0, sbh, sbw, sh - 2 * sbh, 0, bh, bw, H - 2 * bh);
+    ctx.drawImage(v, sw - sbw, sbh, sbw, sh - 2 * sbh, W - bw, bh, bw, H - 2 * bh);
     ctx.globalAlpha = 1;
   }
 
@@ -284,7 +294,7 @@ export class Ambience {
         bx += Math.sin(t * 1.05 + ph) * 16;
         ang = ph + Math.sin(t * 1.6 + ph) * 0.9 + t * 0.2;
         ky *= calm ? 0.8 : 0.35 + 0.65 * Math.abs(Math.cos(t * 2.1 + ph));
-        a = 0.85;
+        a = 0.6;
       } else {
         bx += Math.sin(t * 0.9 + ph) * 7;
         ang = ph + t * 1.1;
@@ -404,16 +414,18 @@ function bakeGrain(dpr: number, inverted: boolean, map: MapId): HTMLCanvasElemen
 function bakeVignette(w: number, h: number, inverted: boolean): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null;
   const k = 160 / Math.max(w, h, 1);
-  const cw = Math.max(8, Math.round(w * k)), ch = Math.max(8, Math.round(h * k));
+  const cw = Math.max(10, Math.round(w * k)), ch = Math.max(10, Math.round(h * k));
   const c = canvas(cw, ch), g = ctx2d(c);
   g.translate(cw / 2, ch / 2);
   g.scale(1, ch / cw);
-  const r = (cw / 2) * Math.SQRT2;
-  const gr = g.createRadialGradient(0, 0, r * 0.5, 0, 0, r);
+  // ρ = the elliptical radius over the corner's: clear up to the central rect's corners (ρ = 1 − 2·band),
+  // then a warm darkening toward the paper's edge
+  const r = (cw / 2) * Math.SQRT2, r0 = 1 - 2 * VIG_BAND;
+  const gr = g.createRadialGradient(0, 0, r * r0, 0, 0, r);
   const col = inverted ? '0,0,0' : '58,40,22';
   gr.addColorStop(0, `rgba(${col},0)`);
-  gr.addColorStop(0.55, `rgba(${col},0.07)`);
-  gr.addColorStop(1, `rgba(${col},${inverted ? 0.35 : 0.24})`);
+  gr.addColorStop(0.35, `rgba(${col},0.08)`);
+  gr.addColorStop(1, `rgba(${col},${inverted ? 0.38 : 0.26})`);
   g.fillStyle = gr;
   g.fillRect(-cw, -cw * 2, cw * 2, cw * 4);
   return c;
@@ -421,7 +433,7 @@ function bakeVignette(w: number, h: number, inverted: boolean): HTMLCanvasElemen
 
 /** One mote sprite at k px per u; returns it and its half-size in u (for culling). */
 function bakeMote(kind: MK, k: number, map: MapId): { c: HTMLCanvasElement | null; u: number } {
-  const U = kind === MK.Leaf ? 13 : kind === MK.Firefly ? 11 : kind === MK.Petal ? 8 : kind === MK.Osman ? 5 : 6;
+  const U = kind === MK.Leaf ? 13 : kind === MK.Firefly ? 14 : kind === MK.Petal ? 8 : kind === MK.Osman ? 5 : 6;
   const px = Math.max(8, Math.ceil(U * 2 * k));
   const c = canvas(px, px), g = ctx2d(c);
   g.translate(px / 2, px / 2);
@@ -445,16 +457,18 @@ function bakeMote(kind: MK, k: number, map: MapId): { c: HTMLCanvasElement | nul
     g.fillStyle = gr; g.beginPath(); g.arc(0, 0, U, 0, Math.PI * 2); g.fill();
     g.strokeStyle = 'rgba(111,142,166,0.35)'; g.lineWidth = 0.35; g.beginPath(); g.arc(0, 0, U * 0.2, 0, Math.PI * 2); g.stroke();
   } else if (kind === MK.Firefly) {
-    // 萤: a jade-gold glow with a white-hot core, crisp enough to read on pale paper
+    // 萤: a jade-gold glow with a white-hot core and a soft outer halo, crisp enough to read on pale
+    // paper (a faint ink ring gives the glow an edge against the light ground)
     const gr = g.createRadialGradient(0, 0, 0, 0, 0, U);
-    gr.addColorStop(0, 'rgba(255,255,236,1)'); gr.addColorStop(0.14, 'rgba(236,246,150,1)');
-    gr.addColorStop(0.32, 'rgba(176,214,96,0.6)'); gr.addColorStop(0.62, 'rgba(120,176,92,0.2)'); gr.addColorStop(1, 'rgba(120,176,92,0)');
+    gr.addColorStop(0, 'rgba(255,255,240,1)'); gr.addColorStop(0.1, 'rgba(250,255,190,1)');
+    gr.addColorStop(0.22, 'rgba(206,232,110,0.85)'); gr.addColorStop(0.45, 'rgba(150,200,90,0.3)'); gr.addColorStop(1, 'rgba(120,176,92,0)');
     g.fillStyle = gr; g.beginPath(); g.arc(0, 0, U, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(40,52,30,0.85)'; g.beginPath(); g.ellipse(-1.9, 0, 1.3, 0.8, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(58,84,40,0.35)'; g.lineWidth = 0.4; g.beginPath(); g.arc(0, 0, U * 0.24, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = 'rgba(40,52,30,0.8)'; g.beginPath(); g.ellipse(-2.4, 0.4, 1.4, 0.85, 0.3, 0, Math.PI * 2); g.fill();
   } else if (kind === MK.Leaf) {
     // a falling bamboo leaf: a long blade, dark at the stem, a pale midrib
     const gr = g.createLinearGradient(-12, 0, 12, 0);
-    gr.addColorStop(0, '#1a2419'); gr.addColorStop(0.5, '#2f4a36'); gr.addColorStop(1, '#5f8a6e');
+    gr.addColorStop(0, '#2f4a36'); gr.addColorStop(0.5, '#4f7a5c'); gr.addColorStop(1, '#8fb89a');
     g.fillStyle = gr;
     g.beginPath(); g.moveTo(-12, 0); g.quadraticCurveTo(-4, -3.2, 4, -2.2); g.quadraticCurveTo(9, -1.2, 12, 0); g.quadraticCurveTo(8, 1.4, 3, 2.1); g.quadraticCurveTo(-4, 2.6, -12, 0); g.fill();
     g.strokeStyle = 'rgba(214,230,200,0.6)'; g.lineWidth = 0.4;

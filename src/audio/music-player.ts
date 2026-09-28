@@ -8,7 +8,9 @@
 //
 // A Conductor composes one phrase at a time a few seconds ahead of the audio clock, asks for the
 // renders (worker or synchronous), and schedules each layer as a single AudioBufferSourceNode.
-// Every node is disconnected when it ends; a finished conductor releases its faders.
+// Every node is disconnected when it ends; a finished conductor releases its faders. A theme with an
+// epoch (the mirror's fights) has its not-yet-sounding phrases re-composed when the epoch moves, and
+// the playing band's beat grid is readable (bandBeat) so a cue can land in its time.
 import { makeRng, mixSeed, type Rng } from '../core/rng';
 import type { MusicJob, MusicJobRequest, MusicJobResult } from './music-dsp';
 import { runMusicJob } from './music-dsp';
@@ -228,7 +230,25 @@ export interface PlayedPhrase { start: number; end: number; next: number; phrase
 export interface PlayedEvent { at: number; ev: MusicEvent }
 
 interface Tracked { src: AudioBufferSourceNode; when: number }
-interface Queued { when: number; ev: MusicEvent; buf: AudioBuffer | null }
+interface Queued { when: number; ev: MusicEvent; buf: AudioBuffer | null; ph: PlayedPhrase; rec?: PlayedEvent }
+
+const copyPhrase = (p: Phrase): Phrase => ({ ...p, notes: p.notes.map((n) => ({ ...n })) });
+const offline = (ctx: BaseAudioContext) => typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext;
+
+/** The band on the live context (the newest Conductor not rendering offline), for cues in its time. */
+let band: Conductor | null = null;
+
+/**
+ * The playing band's next beat, at least `lead` s from now: `wait` is the seconds until it, `bpm` the
+ * tempo of the phrase it belongs to. Null with no band (or before its first phrase is composed).
+ */
+export function bandBeat(lead = 0.03): { wait: number; bpm: number } | null {
+  const b = band;
+  if (!b || b.finishing || b.done) return null;
+  const now = b.clock();
+  const x = b.beatAt(now + lead);
+  return x ? { wait: x.at - now, bpm: x.bpm } : null;
+}
 
 export class Conductor {
   readonly theme: ThemeId;
@@ -250,6 +270,10 @@ export class Conductor {
   private seed: number;
   private record: boolean;
   private sentinel: AudioBufferSourceNode | null = null;
+  /** The theme's epoch when its queued phrases were composed (undefined: a theme without one). */
+  private epoch: number | undefined;
+  /** The composer's phrase before the theme reshaped it (themes with an epoch), to compose it again. */
+  private raw = new WeakMap<PlayedPhrase, Phrase>();
 
   constructor(private bus: MusicBus, theme: ThemeId, when: number, seed: number, visit = 0, o: ConductorOptions = {}) {
     this.theme = theme;
@@ -258,19 +282,27 @@ export class Conductor {
     this.rng = makeRng(mixSeed(this.seed, 0xa11));
     this.record = !!o.record;
     const ctx = bus.ctx;
-    const level = THEMES[theme].level;
+    const spec = THEMES[theme];
+    const level = spec.level;
+    this.epoch = spec.epoch?.();
+    // a theme may ask for a quicker fade-in than the handover's (a fight opens on its first drum stroke)
+    const fadeIn = o.fadeIn && spec.fadeIn != null ? Math.min(o.fadeIn, spec.fadeIn) : o.fadeIn;
     const mk = (dest: AudioNode) => { const g = ctx.createGain(); g.connect(dest); return g; };
     this.dry = mk(bus.input);
     this.wet = mk(bus.verbIn);
     this.echo = mk(bus.echoIn);
     for (const g of [this.dry, this.wet, this.echo]) {
-      if (o.fadeIn) {
+      if (fadeIn) {
         g.gain.setValueAtTime(0, Math.max(0, when - 0.5));
-        g.gain.setTargetAtTime(level, Math.max(0, when - 0.5), o.fadeIn);
+        g.gain.setTargetAtTime(level, Math.max(0, when - 0.5), fadeIn);
       } else g.gain.value = level;
     }
     this.cursor = when;
+    if (!offline(ctx)) band = this;
   }
+
+  /** The audio clock (context seconds). */
+  clock(): number { return this.bus.ctx.currentTime; }
 
   /**
    * Compose every phrase that starts before `until` (and send its renders), and create the sources
@@ -279,27 +311,74 @@ export class Conductor {
   tick(until: number, playUntil = until) {
     const now = this.bus.ctx.currentTime;
     if (!this.finishing) {
+      const e = this.epoch === undefined ? undefined : THEMES[this.theme].epoch?.();
+      if (e !== undefined && e !== this.epoch) { this.epoch = e; this.recompose(); }
       // fell behind (a throttled timer): skip ahead instead of bursting
       if (this.cursor < now) this.cursor = now + 0.1;
       let guard = 0;
-      while (this.cursor < until && guard++ < 16) {
-        const p = this.composer.next();
-        const evs = arrange(this.theme, p, this.rng, mixSeed(this.seed, p.index));
-        const start = this.cursor;
-        const len = phraseSeconds(p);
-        this.phrases.push({ start, end: start + (p.end * 60) / p.bpm, next: start + len, phrase: p });
-        if (this.phrases.length > 64 && !this.record) this.phrases.shift();
-        for (const ev of evs) this.enqueue(ev, start);
-        this.cursor = start + len;
-      }
+      while (this.cursor < until && guard++ < 16) this.compose(this.composer.next(), this.cursor);
     }
     this.flush(playUntil);
   }
 
-  private enqueue(ev: MusicEvent, t0: number) {
+  /** Arrange a phrase at `start`, queue its events, and move the cursor past it. */
+  private compose(p: Phrase, start: number) {
+    const raw = this.epoch === undefined ? null : copyPhrase(p);
+    const evs = arrange(this.theme, p, this.rng, mixSeed(this.seed, p.index));
+    const len = phraseSeconds(p);
+    const pp: PlayedPhrase = { start, end: start + (p.end * 60) / p.bpm, next: start + len, phrase: p };
+    this.phrases.push(pp);
+    if (raw) this.raw.set(pp, raw);
+    if (this.phrases.length > 64 && !this.record) this.phrases.shift();
+    for (const ev of evs) this.enqueue(ev, start, pp);
+    this.cursor = start + len;
+  }
+
+  /**
+   * Compose again, with the theme's state as it is now, every phrase that has no sound yet (no source
+   * is created before `playUntil`): the change is heard from the next phrase boundary that far ahead,
+   * not ≈ 4.5 s plus a phrase later. The composer's tune and roles are kept; the theme re-shapes them.
+   */
+  recompose(): void {
+    if (this.finishing) return;
+    const i = this.phrases.findIndex((x) => x.start >= this.playUntil + 0.01 && this.raw.has(x));
+    if (i < 0) return;
+    const gone = this.phrases.splice(i);
+    const set = new Set(gone);
+    const dead = new Set<PlayedEvent>();
+    this.queue = this.queue.filter((q) => {
+      if (!set.has(q.ph)) return true;
+      if (q.rec) dead.add(q.rec);
+      return false;
+    });
+    if (dead.size) {
+      let w = 0;
+      for (const e of this.events) if (!dead.has(e)) this.events[w++] = e;
+      this.events.length = w;
+    }
+    this.cursor = gone[0].start;
+    for (const x of gone) this.compose(copyPhrase(this.raw.get(x)!), this.cursor);
+  }
+
+  /** The band's next beat at or after `t` (context s) and the tempo of the phrase it opens or falls in; null before the first phrase. */
+  beatAt(t: number): { at: number; bpm: number } | null {
+    const ph = this.phrases;
+    for (let i = ph.length - 1; i >= 0; i--) {
+      const x = ph[i];
+      if (x.start > t + 1e-6) continue;
+      const spb = 60 / x.phrase.bpm;
+      const at = x.start + Math.ceil((t - x.start) / spb - 1e-6) * spb;
+      const nx = ph[i + 1];
+      if (nx && at >= nx.start - 1e-6) return { at: nx.start, bpm: nx.phrase.bpm };
+      return { at, bpm: x.phrase.bpm };
+    }
+    return ph.length && ph[0].start - t < 1 ? { at: ph[0].start, bpm: ph[0].phrase.bpm } : null;
+  }
+
+  private enqueue(ev: MusicEvent, t0: number, ph: PlayedPhrase) {
     const bus = this.bus;
-    const q: Queued = { when: t0 + ev.t, ev, buf: null };
-    if (this.record) this.events.push({ at: q.when, ev });
+    const q: Queued = { when: t0 + ev.t, ev, buf: null, ph };
+    if (this.record) { q.rec = { at: q.when, ev }; this.events.push(q.rec); }
     let i = this.queue.length;
     while (i > 0 && this.queue[i - 1].when > q.when) i--;
     this.queue.splice(i, 0, q);
@@ -375,6 +454,7 @@ export class Conductor {
   finish(when: number, fade = 3) {
     if (this.finishing) return;
     this.finishing = true;
+    if (band === this) band = null;
     const ctx = this.bus.ctx;
     when = Math.max(when, ctx.currentTime);
     this.endAt = when;

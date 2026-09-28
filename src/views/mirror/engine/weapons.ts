@@ -16,6 +16,10 @@ import { classExtras } from './effects';
 import { areaStrike } from './enemies';
 import type { World } from './world';
 import { fcOfWeapon } from './feel';
+import { BK, FK, STAIN, VF, VT, slashFlags, tintOfWeapon, vfxOf } from './vfx';
+
+/** 流光: a slot's light (never vermilion). Visual only: nothing here changes a number. */
+const tintOf = (s: WeaponSlot): number => tintOfWeapon(s.id, s.fc);
 
 export interface WeaponSlot {
   i: number;
@@ -220,7 +224,8 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       if (s.kind === 'thrust') {
         const pierce = perTier(p.pierce, t, 1) + st.pierce + (W.mods.flags.has('swordPierce') && s.sword ? 1 : 0);
         thrustHit(W, s, px, py, dir, range, (p.w as number) ?? 24, 1 + pierce, d, cp, cm, knock);
-        W.fxLine('swordStreak', px + Math.cos(dir) * range, py + Math.sin(dir) * range, dir, range, 0.14, 1);
+        // a lance of light along the reach (a thrust is not a crescent)
+        vfxOf(W).lance(px + Math.cos(dir) * 8, py + Math.sin(dir) * 8, dir, range, 11, tintOf(s), 0.17);
         W.feel.swing(s.i, px, py, dir, range * 0.55, 40, s.fc);
       } else if (s.kind === 'combo') {
         const spin = t === 4 && s.id === 'longquan' && (s.n + 1) % ((p.spinEvery as number) ?? 3) === 0;
@@ -252,7 +257,10 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       // the sim's smashAt: r × √(1 + 范围)
       const r = ((p.r as number) ?? 80) * areaOf(W, s, st) ** 0.5;
       const n = areaStrike(W, tx, ty, r, d, s.i, SRCI.weapon, HF.melee, knock, cp, cm);
-      W.fx('shockRing', tx, ty, { r, life: 0.3 });
+      // the pestle comes down in light: a lance from above, a shockwave, the paper cracks
+      const V = vfxOf(W), tn = tintOf(s);
+      V.lance(tx, ty - r * 0.95, Math.PI / 2, r * 0.9, 13, tn, 0.14, VF.streak);
+      V.shock(tx, ty, r, tn, { stain: STAIN.crack, life: 0.34 });
       if (n && W.erng() < ((p.healChance as number) ?? 0.1) * s.proc) W.heal(1);
       if (n && t === 4) W.shield(n, (p.shieldMax as number) ?? 10);
       W.feel.swing(s.i, px, py, W.lastDir, 40, 90, s.fc);
@@ -380,7 +388,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
         W.strike(i, d * big * (res ? ((p.resX as number) ?? 2) : 1), cp, cm, knock, px, py, s.i, SRCI.weapon, 0, s.proc);
         if (res && E.alive[i]) W.statusSlot(i, 'slow', (p.slowDur as number) ?? 1.5, (p.slow as number) ?? 30);
       }
-      W.fx('pulseRing', px, py, { r, life: 0.35 });
+      vfxOf(W).shock(px, py, r, tintOf(s), { flags: VF.thin | VF.double | (res ? VF.halo : 0), debris: res ? 6 : 0, fleck: FK.glint, life: 0.38, prio: res ? 1 : 0 });
       if (res) { if (t === 4) W.heal((p.healT4 as number) ?? 1); W.title({ zh: '共鸣', en: 'Resonance' }, 'edge'); }
       // the ring is the shot: its hits sound through the feel bus (pluck), so no cast sound or puff
       W.feel.fire(s.i, px, py, W.face, true);
@@ -423,13 +431,16 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       const kind = kinds[t - 1];
       const life = ((p.life as number) ?? 10) * (1 + W.mods.summonLife / 100);
       const a = W.erng() * TAU;
-      spawnSummon(W, kind, s, px + Math.cos(a) * 40, py + Math.sin(a) * 40, life, true);
+      const sx = px + Math.cos(a) * 40, sy = py + Math.sin(a) * 40;
+      spawnSummon(W, kind, s, sx, sy, life, true);
+      inkBloom(W, sx, sy, 26);
       W.sfx('summon');
       return true;
     }
     case 'turret': {
       const life = ((p.life as number) ?? 8) * (1 + W.mods.summonLife / 100);
       spawnSummon(W, 'yantai', s, px, py, life, true);
+      inkBloom(W, px, py, 22);
       W.sfx('summon');
       return true;
     }
@@ -515,9 +526,12 @@ function swipe(W: World, s: WeaponSlot, dir: number, r: number, deg: number, d: 
     s.stack = Math.min((s.def.p.stackMax as number) ?? 10, s.stack + ((s.def.p.stack as number) ?? 2) * hits);
     s.stackT = (s.def.p.stackDur as number) ?? 3;
   }
-  // the brush-stroke swipe (and a whoosh); the impact's sound comes from the feel bus on the hit
+  // 流光: a crescent of the weapon's light (a luminous core in its class colour, a trailing smear;
+  // claws rake in ink, glaives carry an ink rim), swinging back and forth; the whoosh and the held
+  // weapon's follow-through come from the feel layer, the impact's sound from its bus on the hit
+  const spin = deg >= 300;
+  vfxOf(W).slash(px, py, dir, r, deg, tintOf(s), slashFlags(s.fc) | (s.hit & 1 ? VF.flip : 0) | (spin ? VF.big : 0), spin ? 0.28 : 0.2);
   if (W.feel.sprites.ok) W.feel.swing(s.i, px, py, dir, r, deg, s.fc);
-  else W.fx('slashArc', px + Math.cos(dir) * r * 0.5, py + Math.sin(dir) * r * 0.5, { r: r * 0.6, dir, life: 0.16 });
   return hits;
 }
 
@@ -615,6 +629,7 @@ function launch(W: World, s: WeaponSlot, dir: number, range: number, d: number, 
     PS.flags[i] |= SF.sword | (W.mods.swordTrail ? SF.trail : 0) | (s.t === 4 ? SF.splitSword : 0);
     W.swordsAir++;
   }
+  vfxOf(W).bloom(W.px + Math.cos(dir) * 20, W.py + Math.sin(dir) * 20, 16, tintOf(s), 0.14, BK.glow, 0.85, 0);
   W.feel.fire(s.i, W.px, W.py, dir);
   return true;
 }
@@ -630,7 +645,7 @@ function beam(W: World, s: WeaponSlot, dir: number, len: number, d: number, cp: 
     if (segDist2(E.x[i], E.y[i], x, y, ex, ey) > rr * rr) continue;
     W.strike(i, d, cp, cm, 0, x, y, s.i, SRCI.weapon, HF.beam, s.proc);
   }
-  W.fxLine('beamRay', x, y, dir, len, 0.18, 1);
+  vfxOf(W).beam(x, y, dir, len, 9, tintOf(s), 0.2);
 }
 
 /** Random target within range (chains). */
@@ -657,7 +672,7 @@ function chain(W: World, s: WeaponSlot, first: number, jumps: number, d: number,
   const stun4 = s.t === 4 ? ((s.def.p.stunT4 as number) ?? 0.15) : 0;
   for (let j = 0; j <= jumps && cur >= 0; j++) {
     const x = E.x[cur], y = E.y[cur];
-    W.fxLine('boltChain', lx, ly, Math.atan2(y - ly, x - lx), Math.hypot(x - lx, y - ly), 0.16, 1);
+    vfxOf(W).bolt(lx, ly, x, y, tintOf(s), 0.18, j === 0 ? 1.15 : 0.9);
     chainHit[nh++ % 16] = cur;
     W.strike(cur, dmg, cp, cm, 0, lx, ly, s.i, SRCI.weapon, 0, s.proc);
     if (E.alive[cur]) {
@@ -730,7 +745,8 @@ export function tickPlayerShots(W: World, dt: number): void {
         PS.trailT[i] = 0.18;
         // an invisible damage strip (the streak is an effect); keep room in the zone pool for content
         if (W.Z.count < 64) W.coreZone(1, '' as never, PS.x[i], PS.y[i], 18, 0.36, ZC.trail, PS.dmg[i] * W.mods.swordTrail.pct / 100);
-        W.fxLine('swordStreak', PS.x[i], PS.y[i], Math.atan2(PS.vy[i], PS.vx[i]), 40, 0.3, 1);
+        const a = Math.atan2(PS.vy[i], PS.vx[i]);
+        vfxOf(W).streak(PS.x[i] - Math.cos(a) * 44, PS.y[i] - Math.sin(a) * 44, PS.x[i], PS.y[i], 6, VT.jade, 0.3, 0);
       }
     }
     // obstacles: bamboo stops shots (not swords, beams, lobs); the tree stops everything
@@ -852,7 +868,10 @@ function shotHit(W: World, i: number, e: number, h: number): void {
 const STATUS_OF = ['burn', 'bleed', 'slow', 'root', 'stun', 'charm', 'shred', 'vuln', 'stagger'] as const;
 
 function peachBurst(W: World, x: number, y: number, d: number, slot: number) {
-  return () => { W.fx('shockRing', x, y, { r: 80, life: 0.3 }); areaStrike(W, x, y, (WEAPONS.peach.p.charmR as number) ?? 80, d, slot, SRCI.weapon, HF.fire); };
+  return () => {
+    vfxOf(W).shock(x, y, (WEAPONS.peach.p.charmR as number) ?? 80, VT.gamboge, { stain: STAIN.burn, fleck: FK.ember, life: 0.32 });
+    areaStrike(W, x, y, (WEAPONS.peach.p.charmR as number) ?? 80, d, slot, SRCI.weapon, HF.fire);
+  };
 }
 
 /** A lob or a falling sword lands: the burst. */
@@ -863,10 +882,21 @@ function landLob(W: World, i: number): void {
   if (PS.mode[i] === SMode.Rain) {
     const n = areaStrike(W, x, y, r, PS.dmg[i], slot, SRCI.weapon, HF.sword, PS.knock[i], PS.critP[i], PS.critM[i]);
     if ((flags & SF.stun) && n) stunNear(W, x, y, r, (WEAPONS.seven.p.stunT4 as number) ?? 0.5);
-    W.fx('swordStreak', x, y, { r: 20, life: 0.2, dir: Math.PI / 2 });
+    // a falling star: the blade's light comes down and rings out
+    const V = vfxOf(W);
+    V.streak(x, y - 90, x, y, 7, VT.jade, 0.2, 0);
+    V.shock(x, y, r * 0.8, VT.jade, { flags: VF.double, debris: 4, life: 0.28, prio: 0 });
     return;
   }
-  W.fx(flags & SF.gourd ? 'dustPuff' : 'shockRing', x, y, { r, life: 0.3 });
+  {
+    // the talisman bursts into fire and scorches the paper; the gourd splashes wine
+    const V = vfxOf(W);
+    if (flags & SF.gourd) V.shock(x, y, r, VT.wine, { flags: VF.double, debris: 8, fleck: FK.drop, life: 0.32 });
+    else {
+      V.shock(x, y, r, VT.gamboge, { debris: 10, fleck: FK.ember, stain: STAIN.burn, life: 0.36 });
+      V.bloom(x, y, r * 0.75, VT.gamboge, 0.24, BK.glow, 0.9, 0);
+    }
+  }
   const buf = W.q1;
   const n = W.hash.gather(x, y, r + 64, buf);
   let hits = 0;
@@ -1018,6 +1048,7 @@ function summonEnd(W: World, i: number, slain: boolean): void {
       if (W.E.alive[e]) W.statusSlot(e, 'slow', b.dur, b.slow);
     }
     W.fx('inkBurst', x, y, { r: b.r, life: 0.4 });
+    vfxOf(W).shock(x, y, b.r, VT.ink, { flags: VF.double, debris: 6, life: 0.32, prio: 0 });
   }
   W.emit('summonDeath', -1, 0, false, 'summon', x, y, -1);
 }
@@ -1127,10 +1158,14 @@ function summonAttack(W: World, i: number, t: number, kind: number): void {
   if (S.dragon[i]) {
     areaStrike(W, E.x[t], E.y[t], W.mods.special.inkdragon?.r ?? 60, d, slot, SRCI.summon, HF.noProc, S.knock[i], S.critP[i], S.critM[i]);
     W.fx('inkBurst', E.x[t], E.y[t], { r: 40, life: 0.25 });
+    vfxOf(W).streak(x, y, E.x[t], E.y[t], 14, VT.ink, 0.22, 0);
     return;
   }
   switch (kind) {
-    case SK.moque: W.strike(t, d, S.critP[i], S.critM[i], S.knock[i], x, y, slot, SRCI.summon, HF.noProc); break;
+    case SK.moque:
+      W.strike(t, d, S.critP[i], S.critM[i], S.knock[i], x, y, slot, SRCI.summon, HF.noProc);
+      vfxOf(W).slash(x, y, Math.atan2(E.y[t] - y, E.x[t] - x), 30, 70, VT.ink, VF.rake, 0.16, 0);
+      break;
     case SK.moli: {
       // lunge in a 120 line
       const a = Math.atan2(E.y[t] - y, E.x[t] - x);
@@ -1144,13 +1179,19 @@ function summonAttack(W: World, i: number, t: number, kind: number): void {
         W.strike(e, d, S.critP[i], S.critM[i], S.knock[i], x, y, slot, SRCI.summon, HF.noProc);
       }
       S.x[i] = ex; S.y[i] = ey;
+      // the carp's lunge is a stroke of wet ink along its path
+      vfxOf(W).streak(x, y, ex, ey, 12, VT.ink, 0.24, 0);
       break;
     }
     case SK.mohe: areaStrike(W, E.x[t], E.y[t], perTier(WEAPONS.brush.p.r, 3, 60), d, slot, SRCI.summon, HF.noProc, S.knock[i], S.critP[i], S.critM[i]); break;
     case SK.mohu: {
-      S.x[i] = E.x[t]; S.y[i] = E.y[t];
-      areaStrike(W, E.x[t], E.y[t], perTier(WEAPONS.brush.p.r, 4, 90), d, slot, SRCI.summon, HF.noProc, S.knock[i], S.critP[i], S.critM[i]);
-      W.fx('shockRing', E.x[t], E.y[t], { r: 90, life: 0.25 });
+      const tx = E.x[t], ty = E.y[t];
+      S.x[i] = tx; S.y[i] = ty;
+      areaStrike(W, tx, ty, perTier(WEAPONS.brush.p.r, 4, 90), d, slot, SRCI.summon, HF.noProc, S.knock[i], S.critP[i], S.critM[i]);
+      // the tiger's pounce: an ink stroke to its prey, then the paper shakes under it
+      const V = vfxOf(W);
+      V.streak(x, y, tx, ty, 15, VT.ink, 0.22, 0);
+      V.shock(tx, ty, perTier(WEAPONS.brush.p.r, 4, 90), VT.ink, { flags: VF.double | VF.halo, debris: 8, stain: STAIN.scorch, life: 0.3, prio: 0 });
       break;
     }
     default: W.strike(t, d, S.critP[i], S.critM[i], S.knock[i], x, y, slot, SRCI.summon, HF.noProc);
@@ -1171,8 +1212,10 @@ function craneTick(W: World, i: number, dt: number): void {
     if (d < E.r[t] + 10) {
       const slot = S.slot[i];
       const s = slot >= 0 ? W.slots[slot] : null;
-      if (s && s.t === 4) areaStrike(W, E.x[t], E.y[t], (WEAPONS.crane.p.burstT4 as number) ?? 80, S.dmg[i], slot, SRCI.summon, HF.noProc, 20);
-      else W.strike(t, S.dmg[i], s ? critPOf(s, s.stats) : 0, s ? critMOf(s, s.stats) : 1, 20, S.x[i], S.y[i], slot, SRCI.summon, HF.noProc);
+      if (s && s.t === 4) {
+        areaStrike(W, E.x[t], E.y[t], (WEAPONS.crane.p.burstT4 as number) ?? 80, S.dmg[i], slot, SRCI.summon, HF.noProc, 20);
+        vfxOf(W).shock(E.x[t], E.y[t], (WEAPONS.crane.p.burstT4 as number) ?? 80, VT.moon, { flags: VF.double, debris: 6, fleck: FK.glint, life: 0.3, prio: 0 });
+      } else W.strike(t, S.dmg[i], s ? critPOf(s, s.stats) : 0, s ? critMOf(s, s.stats) : 1, 20, S.x[i], S.y[i], slot, SRCI.summon, HF.noProc);
       S.st[i] = 2;
     }
     return;
@@ -1289,8 +1332,11 @@ function blast(W: World, i: number, x: number): void {
     for (let k = 0; k < n; k++) { const e = buf[k]; if (W.targetable(e)) W.pull(E.handle(e), sx, sy, (s.def.p.pullT4 as number) ?? 60); }
   }
   areaStrike(W, sx, sy, r, dmgOf(W, s, st) * x, slot, SRCI.weapon, HF.blast, s.def.knock, critPOf(s, st), critMOf(s, st));
-  W.fx('shockRing', sx, sy, { r, life: 0.3 });
-  W.shake(3);
+  // ink on the board: a double ring, flung chips, a scorch; a white heart for the stone (no camera shake:
+  // the player's blows show on the bodies)
+  const V = vfxOf(W);
+  V.shock(sx, sy, r, VT.ink, { flags: VF.double | VF.halo, debris: 8, stain: STAIN.scorch, life: 0.32 });
+  V.bloom(sx, sy, r * 0.5, VT.moon, 0.16, BK.glow, 0.8, 0);
   W.stoneChain++;
   W.maxStat('peakStoneChain', W.stoneChain);
   // chain-detonate stones within 120
@@ -1344,6 +1390,7 @@ function capture(W: World, r: number, need: number, x: number): boolean {
   const st = sheet(W, s);
   W.strike(best, dmgOf(W, s, st) * x, 0, 1, 0, ex, ey, s.i, SRCI.weapon, HF.noArmor);
   W.fx('stoneWhite', ex, ey, { r: 26, life: 0.35 });
+  vfxOf(W).shock(ex, ey, r * 0.6, VT.moon, { flags: VF.thin | VF.double, debris: 0, life: 0.3 });
   W.title({ zh: '提子', en: 'Capture' }, 'edge');
   return true;
 }
@@ -1457,4 +1504,11 @@ function orbitContact(W: World, n: number, R: number, rev: number, d: number, pe
       W.strike(e, d, clamp(W.stats.crit / 100, 0, 1), F.critXDefault + W.stats.critDmg / 100, 10, W.px, W.py, -1, SRCI.item, HF.sword | HF.noProc);
     }
   }
+}
+
+/** A 墨宝 comes out of the paper: a wet ring and a few ink chips (visual only). */
+function inkBloom(W: World, x: number, y: number, r: number): void {
+  const V = vfxOf(W);
+  V.ring(x, y, r, VT.indigo, 0.34, VF.thin | VF.double);
+  V.debris(x, y, r * 0.5, VT.ink, 5);
 }

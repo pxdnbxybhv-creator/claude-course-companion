@@ -254,8 +254,10 @@ const LINE_LOUD: Record<LineInst, LinePreset> = {
     bright: (k) => [0, 1, 0.5, 0.6, 0.34, 0.36, 0.2, 0.2, 0.11, 0.1, 0.06, 0.06, 0.035, 0.03][k] ?? 0,
     maxK: 14, atk: 0.024, rel: 0.07, slur: 0.8, tongue: 0.12, glide: 0.045,
     vib: { cents: 20, rate: 5.9, delay: 0.2, amp: 0.1 },
-    breath: 0.45, breathQ: 2.6, hiss: 0.12, hissF: 4200, buzz: 0.9, buzzF: 4600, jitter: 3, swell: 0.08,
-    eq: (sr) => [highpass(sr, 380, 0.7), peaking(sr, 2600, 1.2, 2), peaking(sr, 4600, 1.1, 2), lowpass(sr, 9500, 0.7)],
+    // the 笛膜 at 0.55 and no presence peak at 4.6 kHz: its E5–A5 (half its notes) buzzes without
+    // stinging, where a phone's speaker is loudest
+    breath: 0.45, breathQ: 2.6, hiss: 0.12, hissF: 4200, buzz: 0.55, buzzF: 4600, jitter: 3, swell: 0.08,
+    eq: (sr) => [highpass(sr, 380, 0.7), peaking(sr, 2600, 1.2, 2), lowpass(sr, 9500, 0.7)],
     level: 0.19, chiff: 0.5, chiffT: 0.009, buzzGrow: true,
   },
   xiao: {
@@ -399,7 +401,7 @@ export function renderLine(sr: number, inst: LineInst, input: LineNote[], seed: 
     // the battle 笛's top octave: a real flute's high notes are nearly pure (the fundamental), so above
     // A5 the tone leans toward its fundamental and the bright blend and the 笛膜 rattle roll off —
     // otherwise H3/H4 outshine H1 at 3–5 kHz, where a phone and the ear are keenest, and it shrieks
-    const hiR = hiRoll && f0 > 900 ? Math.min(0.7, (f0 - 900) / 640) : 0;
+    const hiR = hiRoll && f0 > 780 ? Math.min(0.7, (f0 - 780) / 760) : 0; // from G5 up, toward the fundamental
     const keep = 1 - hiR;
     for (let i = i0; i < i1; i++) {
       const u = (i - i0) * inv;
@@ -684,9 +686,10 @@ export function renderDrum(sr: number, kind: 'tang' | 'rim' | 'big', seed: numbe
   for (const [r, a, t] of modes) addMode(out, sr, f0 * r, a, T * t, 0, rng() * TAU, 0.001);
   addNoiseBurst(out, sr, rng, 0.5, 0.004, [lowpass(sr, 1800), highpass(sr, 80)]);
   if (hard) {
-    const knock: [number, number, number][] = kind === 'big' ? [[5.6, 1.1, 0.08], [8.3, 0.7, 0.05], [11.2, 0.4, 0.03]] : [[3.4, 1.0, 0.09], [5.1, 0.7, 0.06], [7.3, 0.3, 0.035]];
+    // the 大鼓's knock and click lean hardest: its body (66 Hz) is below anything a phone plays
+    const knock: [number, number, number][] = kind === 'big' ? [[5.6, 1.5, 0.08], [8.3, 1.0, 0.05], [11.2, 0.6, 0.03]] : [[3.4, 1.0, 0.09], [5.1, 0.7, 0.06], [7.3, 0.3, 0.035]];
     for (const [r, a, t] of knock) addMode(out, sr, f0 * r, a, t, 0, rng() * TAU, 0.0008);
-    addNoiseBurst(out, sr, rng, kind === 'big' ? 2.4 : 2.6, 0.005, [bandpass(sr, kind === 'big' ? 1500 : 2400, 0.8)]);
+    addNoiseBurst(out, sr, rng, kind === 'big' ? 3.2 : 2.6, 0.005, [bandpass(sr, kind === 'big' ? 1500 : 2400, 0.8)]);
   }
   filter(out, highpass(sr, 40, 0.7));
   scale(out, 0.85 / (peakOf(out) || 1));

@@ -1768,8 +1768,9 @@ export class World implements WorldApi {
     this.titles.push({ text, where, t: where === 'centre' ? 1.4 : 0.6 });
     if (this.titles.length > 4) this.titles.shift();
   }
-  /** An enemy's slam shakes the screen a little (the feel layer: ≤ 2 px, at most one per 0.5 s, off with
-   *  the shake setting). The player's own weapons and 镜技 never call it: their blows show on the bodies. */
+  /** A boss's slam shakes the screen a little (the feel layer: ≤ 2 px, at most one per 0.5 s, off with
+   *  the shake setting). The player's own weapons, 镜技 and the elites never call it: their blows show on
+   *  the bodies. */
   shake(px: number): void {
     this.feel.shake(px);
   }

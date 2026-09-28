@@ -9,7 +9,9 @@ import { createEngine, RES_STEPS, type MirrorEngine } from '../src/views/mirror/
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { EKind } from '../src/views/mirror/engine/pools';
 import { ST } from '../src/views/mirror/engine/enemies';
-import { bakeScale, createPainter, specOf, viewScale } from '../src/views/mirror/paint';
+import { bakeScale, createPainter, edgeOf, specOf, viewScale } from '../src/views/mirror/paint';
+import { isSoft } from '../src/views/mirror/paint/arena';
+import { B } from '../src/views/mirror/paint/kit';
 import { AMB_EKIND, AMB_ST, Ambience } from '../src/views/mirror/paint/ambient';
 import { isZone } from '../src/views/mirror/paint/things';
 import { FX_REG } from '../src/views/mirror/ids';
@@ -98,12 +100,14 @@ describe('dynamic resolution', () => {
   const g = globalThis as unknown as { window?: unknown };
   const savedWindow = g.window;
   afterEach(() => { g.window = savedWindow; });
-  function make(q: Quality, dpr: number) {
+  function make(q: Quality, dpr: number, amb?: { shed: boolean }) {
     g.window = { devicePixelRatio: dpr };
     const cv = { width: 390, height: 844, clientWidth: 390, clientHeight: 844, getContext: () => null, getBoundingClientRect: () => ({ width: 390, height: 844 }) } as unknown as HTMLCanvasElement;
     const run: RunSave = beginWave(newRun(opts()));
     const settings: EngineSettings = { quality: q, dprCap: 3, reduceMotion: false, nums: 2, shake: true, aim: 'auto', lang: 'zh' };
-    const eng = createEngine(cv, run, { painter: createDebugPainter('lake', q, 1), audio: SILENT, content: EMPTY, hooks: { hud() {}, levelUp() {}, crate() {}, coin() {}, boss() {}, waveEnd() {}, death() {}, error() {} }, settings }) as MirrorEngine;
+    const painter = createDebugPainter('lake', q, 1);
+    if (amb) Object.assign(painter, { ambience: amb });
+    const eng = createEngine(cv, run, { painter, audio: SILENT, content: EMPTY, hooks: { hud() {}, levelUp() {}, crate() {}, coin() {}, boss() {}, waveEnd() {}, death() {}, error() {} }, settings }) as MirrorEngine;
     eng.start(run, waveSetup(run, defaultMeta('2026-09-27'), new Date(2026, 8, 27, 20)));
     const W = eng.world;
     W.godmode = true; W.plan = { ...W.plan, groups: [], elites: [], treasures: [] }; W.len = 1e9;
@@ -127,6 +131,30 @@ describe('dynamic resolution', () => {
     expect(eng.resolution).toBe(2);
     expect(RES_STEPS[0]).toBe(3);
     eng.dispose();
+  });
+  it('with the ambience overlays on, the guard sheds them first (before any resolution), and restores them last', () => {
+    const amb = { shed: false };
+    const { eng, W } = make('mid', 3, amb);
+    let now = 1000;
+    const seen: string[] = [];
+    const state = () => `${amb.shed ? 'shed' : 'full'}@${eng.resolution}`;
+    for (let f = 0; f < 60 * 14; f++) { now += 40; eng.frame(now); if (seen[seen.length - 1] !== state()) seen.push(state()); if (W.degrade) break; }
+    expect(seen).toEqual(['full@3', 'shed@3', 'shed@2.5', 'shed@2', 'shed@1.5']);
+    // fast again: effects, then resolution notch by notch, the overlays only once it is all back
+    for (let f = 0; f < 60 * 9; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(W.degrade).toBe(0);
+    for (let f = 0; f < 60 * 21 * 3; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(eng.resolution).toBe(3);
+    expect(amb.shed).toBe(true); // three step-ups a run: the resolution came first
+    eng.dispose();
+    // a low-quality run draws no overlays: nothing to shed, resolution first as before
+    const low = { shed: false };
+    const r = make('low', 3, low);
+    now = 1000;
+    for (let f = 0; f < 60; f++) { now += 40; r.eng.frame(now); } // 2.4 s of slow frames: one notch
+    expect(low.shed).toBe(false);
+    expect(r.eng.resolution).toBe(2.5);
+    r.eng.dispose();
   });
   it('a DPR-1 screen has nothing to step down: the guard cuts effects as before', () => {
     const { eng, W } = make('high', 1);
@@ -160,5 +188,26 @@ describe('ambience', () => {
     a.bake(false);
     a.draw({} as never, ctx, { x: 0, y: 0, scale: 2, w: 780, h: 1688, dpr: 2 });
     expect(calls).toEqual([]);
+  });
+});
+
+describe('bake: soft arena marks and the volume of bodies', () => {
+  it('washes and broad bands are painted at half resolution; lines, fills, dots and thin brushes stay crisp', () => {
+    const b = new B(1);
+    b.wash('#445566', [[0, 0], [40, 0], [40, 40], [0, 40]], 0.1, 10);
+    b.brush([[0, 0, 34], [50, 0, 34], [100, 0, 34]], 0.9, '#8a6a3a');
+    b.brush([[0, 0, 3], [50, 0, 3]], 0.8, '#3a2c1c');
+    b.line([[0, 0], [10, 10]], 1.2, 0.5, '#223344');
+    b.fill('#5f8a6e', [[0, 0], [10, 0], [10, 10]], 0.8, 1);
+    b.dot(0, 0, 5, 0.6, '#223344');
+    expect(b.ops.map((op) => isSoft(op))).toEqual([true, true, false, false, false, false]);
+  });
+  it('bodies get the moonlight rim and the ink volume; effects, drops and shots stay flat', () => {
+    for (const id of ['char:swordsman', 'mon:crab', 'elite:tiger', 'boss:carp:0', 'sum:mohu']) {
+      const e = edgeOf(id);
+      expect(e.volume, id).toBeGreaterThan(0);
+      expect(e.rim, id).toBeGreaterThan(0);
+    }
+    for (const id of ['fx:shockRing', 'drop:cashCoin', 'proj:flySword', 'wpn:qingfeng', 'item:tea']) expect(edgeOf(id)).toEqual({ rim: 0, outline: 0, volume: 0 });
   });
 });

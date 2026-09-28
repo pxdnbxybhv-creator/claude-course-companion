@@ -13,12 +13,13 @@
 //     trails (trails.ts);
 //   · player-side only and never vermilion: danger stays the enemy's colour.
 // Content reaches it through vfxW(w) (a WorldApi is always the World itself); the engine through vfxOf(W).
+import type { WeaponId } from '../ids';
 import type { AtlasId, Camera, Quality, Sprite, WorldApi } from '../types';
 import type { World } from './world';
 import { Pool } from './pools';
 import { TAU } from './consts';
 import { SH, TN } from '../paint/feel';
-import { RING_EDGE, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, VfxSprites, isInkTint } from '../paint/vfx';
+import { RING_EDGE, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, type VfxSprites, isInkTint, vfxSprites } from '../paint/vfx';
 
 export { VT, STAIN } from '../paint/vfx';
 
@@ -51,6 +52,11 @@ export const VF = {
   /** A big moment (boss down, 镜技 landing): a wider band and a slower ring. */
   big: 256,
 } as const;
+/** Options of a shockwave. */
+export interface ShockOpts {
+  life?: number; flags?: number; debris?: number; debrisTint?: number; fleck?: number; stain?: number; stainLife?: number; prio?: number;
+}
+const NO_OPTS: ShockOpts = {};
 /** Bloom kinds. */
 export const BK = { glow: 0, column: 1, halo: 2, glyph: 3 } as const;
 /** Fleck kinds. */
@@ -73,10 +79,10 @@ export class FxPool extends Pool {
 /** A VFX tint's feel-sprite tint (the flecks and glints reuse the feel layer's baked pieces). */
 export const TN_OF: readonly number[] = [TN.azure, TN.jade, TN.gold, TN.moon, TN.ink, TN.wine, TN.indigo, TN.green, TN.gamboge, TN.white];
 
-/** The crescent's thickness profile along its sweep (tail 0 → head 1): pointed both ends, fullest near the head. */
-const NCR = 16;
-const PROF = new Float32Array(NCR + 1);
-for (let k = 0; k <= NCR; k++) PROF[k] = Math.sin(Math.PI * Math.pow(k / NCR, 1.6));
+/** The crescent's thickness profile along its sweep (tail 0 → head 1): pointed both ends, fullest near
+ *  the head; sampled finely enough that a wide sweep has no visible facets (one vertex per ≈ 5°). */
+const NCR_MAX = 72;
+const PROF = new Float32Array(NCR_MAX + 1);
 /** The lance's width profile (base → tip): swelling, then a sharp point. */
 const NLA = 10;
 const LPROF = new Float32Array(NLA + 1);
@@ -110,15 +116,17 @@ export class Vfx {
     this.q = W.quality;
     this.caps = VFX_CAP[this.q] ?? VFX_CAP.mid;
     this.build();
-    this.sprites = new VfxSprites(this.q);
+    this.sprites = vfxSprites(this.q);
   }
 
+  private pools: FxPool[] = [];
   private build(): void {
     const c = this.caps;
     this.rings = new FxPool(c.rings); this.slashes = new FxPool(c.slashes); this.lances = new FxPool(c.lances); this.bolts = new FxPool(c.bolts);
     this.beams = new FxPool(c.beams); this.flecks = new FxPool(c.flecks); this.blooms = new FxPool(c.blooms); this.stains = new FxPool(c.stains);
+    this.pools = [this.rings, this.slashes, this.lances, this.bolts, this.beams, this.flecks, this.blooms, this.stains];
   }
-  private all(): FxPool[] { return [this.rings, this.slashes, this.lances, this.bolts, this.beams, this.flecks, this.blooms, this.stains]; }
+  private all(): readonly FxPool[] { return this.pools; }
 
   /** Follow the world: a new quality rebuilds the pools and sprites; a new wave clears them. */
   sync(): void {
@@ -127,8 +135,7 @@ export class Vfx {
       this.q = W.quality;
       this.caps = VFX_CAP[this.q] ?? VFX_CAP.mid;
       this.build();
-      this.sprites.dispose();
-      this.sprites = new VfxSprites(this.q);
+      this.sprites = vfxSprites(this.q);
     }
     if (W.t < this.lastT - 0.25) this.clear();
     this.lastT = W.t;
@@ -171,22 +178,24 @@ export class Vfx {
    * A shockwave at (x, y) out to radius r: a soft halo band, a trailing tint band, a bright leading
    * edge and (VF.double) a second ring behind it; `debris` flecks thrown outward; a ground stain.
    */
-  shock(x: number, y: number, r: number, tint: number, o: { life?: number; flags?: number; debris?: number; stain?: number; prio?: number } = {}): number {
+  shock(x: number, y: number, r: number, tint: number, o: ShockOpts = NO_OPTS): number {
     const P = this.rings;
     const i = this.take(P, o.prio ?? 1);
     if (i < 0) return -1;
     const ink = isInkTint(tint);
     P.x[i] = x; P.y[i] = y; P.r[i] = Math.max(8, r); P.tint[i] = tint;
     P.life[i] = o.life ?? (r > 150 ? 0.45 : 0.34);
-    P.flags[i] = o.flags ?? (VF.double | VF.halo | (ink ? VF.ink : 0));
+    P.flags[i] = (o.flags ?? (VF.double | VF.halo)) | (ink ? VF.ink : 0);
     this.st.rings++;
-    const n = o.debris ?? Math.min(12, 4 + Math.round(r / 22));
-    if (n > 0) this.debris(x, y, r, tint, n);
-    if ((o.stain ?? -1) >= 0) this.stain(x, y, r * 0.55, o.stain!, 1.6);
+    // the pressure wind: flecks thrown outward (fewer on low; none under the frame guard's cut)
+    let n = o.debris ?? Math.min(12, 4 + Math.round(r / 22));
+    if (this.q === 'low' || this.W.degrade) n >>= 1;
+    if (n > 0) this.debris(x, y, r, o.debrisTint ?? tint, n, o.fleck ?? -1);
+    if ((o.stain ?? -1) >= 0) this.stain(x, y, r * 0.55, o.stain!, o.stainLife ?? 1.6);
     return i;
   }
   /** A thin ring (a pulse of sound, a ripple, a ping): no band, no debris. */
-  ring(x: number, y: number, r: number, tint: number, life = 0.35, flags = VF.thin): number {
+  ring(x: number, y: number, r: number, tint: number, life = 0.35, flags: number = VF.thin): number {
     const P = this.rings;
     const i = this.take(P, 0);
     if (i < 0) return -1;
@@ -195,12 +204,15 @@ export class Vfx {
     return i;
   }
   /** Flecks thrown outward from a blow: ink chips for ink, sparks of light for the rest. */
-  debris(x: number, y: number, r: number, tint: number, n: number): void {
+  debris(x: number, y: number, r: number, tint: number, n: number, kind = -1): void {
     const ink = isInkTint(tint);
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + this.rnd() * 0.5;
       const v = r * (2.6 + 2.2 * this.rnd());
-      this.fleck(x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2, Math.cos(a) * v, Math.sin(a) * v, ink ? FK.ink : (k & 1 ? FK.ember : FK.ink), ink || !(k & 1) ? VT.ink : tint, 0.3 + 0.2 * this.rnd(), ink ? 0.8 + 0.5 * this.rnd() : 1);
+      // light: every other fleck a spark of the tint, the rest ink chips (ink on paper under the light)
+      const kd = kind >= 0 ? (k & 1 ? kind : FK.ink) : ink ? FK.ink : (k & 1 ? FK.ember : FK.ink);
+      const tn = kd === FK.ink ? VT.ink : tint;
+      this.fleck(x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2, Math.cos(a) * v, Math.sin(a) * v, kd, tn, 0.3 + 0.2 * this.rnd(), kd === FK.ink ? 0.8 + 0.5 * this.rnd() : 1);
     }
   }
   /** One fleck (analytic flight with drag). */
@@ -230,7 +242,7 @@ export class Vfx {
     if (i < 0) return -1;
     P.x[i] = x; P.y[i] = y; P.a[i] = dir; P.r[i] = Math.max(16, r); P.b[i] = Math.max(20, Math.min(360, deg)); P.tint[i] = tint; P.life[i] = life;
     P.flags[i] = flags | (isInkTint(tint) ? VF.ink : 0);
-    P.w[i] = Math.max(7, Math.min(34, r * 0.2));
+    P.w[i] = Math.max(6, Math.min(28, r * 0.17));
     this.st.slashes++;
     return i;
   }
@@ -286,14 +298,18 @@ export class Vfx {
     return i;
   }
 
-  /** Is there an entry standing in for a legacy fx `name`, aged between a and b (0..1)? (QA harness.) */
+  /** Is there an entry standing in for a legacy fx `name`, aged between a and b (0..1)? (QA harness.)
+   *  A shockwave is a full ring (not a thin pulse or ping); a pulse is a thin one. */
   probe(name: string, a = 0, b = 1): boolean {
-    const list = name === 'shockRing' || name === 'pulseRing' || name === 'levelRing' || name === 'dustPuff' ? [this.rings]
+    const ring = name === 'shockRing' || name === 'levelRing' || name === 'dustPuff' ? 1 : name === 'pulseRing' ? 2 : 0;
+    const list = ring ? [this.rings]
       : name === 'swordStreak' ? [this.lances, this.slashes] : name === 'slashArc' ? [this.slashes]
         : name === 'boltChain' || name === 'lightningStrike' ? [this.bolts] : name === 'beamRay' ? [this.beams] : [];
     const t = this.W.t;
     for (const Q of list) for (let i = 0; i < Q.n; i++) {
       if (!Q.alive[i]) continue;
+      if (ring === 1 && (Q.flags[i] & VF.thin)) continue;
+      if (ring === 2 && !(Q.flags[i] & VF.thin)) continue;
       const u = (t - Q.t0[i]) / Q.life[i];
       if (u >= a && u <= b) return true;
     }
@@ -413,14 +429,14 @@ export class Vfx {
       if (s) {
         this.halosLeft--;
         const sz = R / (32 * RING_EDGE);
-        rot(ctx, cam, s, x, y, 0, sz, sz, pa * fade * (ink ? 0.8 : 0.95));
+        rot(ctx, cam, s, x, y, 0, sz, sz, pa * fade * (ink ? 0.7 : 0.75));
       }
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const sx = (x - cam.x) * cam.scale + cam.w / 2, sy = (y - cam.y) * cam.scale + cam.h / 2;
     const Rs = R * cam.scale;
     const big = (fl & VF.big) !== 0;
-    const edgeW = Math.max(1.3 * d, Math.min((big ? 7 : 4.5) * d, r * 0.028 * cam.scale)) * (thin ? 0.6 : 1) * (1 - 0.45 * u);
+    const edgeW = Math.max(1.3 * d, Math.min((big ? 5.5 : 3.6) * d, r * 0.026 * cam.scale)) * (thin ? 0.6 : 1) * (1 - 0.45 * u);
     if (!thin) {
       const band = Math.max(2 * d, Math.min(r * (big ? 0.12 : 0.08), 16) * cam.scale * (0.45 + 0.55 * fade));
       stroke(ctx, sx, sy, Math.max(0.5, Rs - band * 0.6), band, ink ? VFX_EDGE : VFX_BODY[tint], pa * fade * (ink ? 0.22 : 0.3));
@@ -463,7 +479,7 @@ export class Vfx {
       const aH = a0 + span * head, aT = a0 + span * tail;
       const fade = pa * (u < 0.4 ? 1 : 1 - (u - 0.4) / 0.6);
       const sx = (P.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (P.y[i] - cam.y) * cam.scale + cam.h / 2;
-      const R = P.r[i] * 0.86 * cam.scale;
+      const R = P.r[i] * 0.78 * cam.scale;
       const th = P.w[i] * cam.scale * (0.7 + 0.3 * head);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       if (fl & VF.rake) {
@@ -503,8 +519,8 @@ export class Vfx {
       crescent(ctx, sx, sy, R - th * 0.08, aT, aH, th * 0.34, th * 0.04);
       fill(ctx, VFX_CORE[tint], fade);
       // a glint on the leading tip
-      if (star && u < 0.5) {
-        const hx = P.x[i] + Math.cos(aH) * P.r[i] * 0.8, hy = P.y[i] + Math.sin(aH) * P.r[i] * 0.8;
+      if (star && !this.calm && u < 0.5) {
+        const hx = P.x[i] + Math.cos(aH) * P.r[i] * 0.74, hy = P.y[i] + Math.sin(aH) * P.r[i] * 0.74;
         rot(ctx, cam, star, hx, hy, aH, 0.42, 0.42, fade * (1 - u * 1.6));
       }
     }
@@ -558,7 +574,7 @@ export class Vfx {
           ctx.stroke();
         }
       }
-      if (star && !(fl & VF.ink) && u < 0.45) {
+      if (star && !calm && !(fl & VF.ink) && u < 0.45) {
         const hx = x + c * len * ext, hy = y + s * len * ext;
         rot(ctx, cam, star, hx, hy, dir, 0.36, 0.36, fade * (1 - u * 2));
       }
@@ -674,7 +690,7 @@ export class Vfx {
       } else if (k === FK.ember) {
         const s = feel.get(SH.ember, tn);
         const sp = Math.hypot(P.vx[i], P.vy[i]) * ev;
-        if (s) rot(ctx, cam, s, x, y, Math.atan2(P.vy[i], P.vx[i]), sz * (0.6 + Math.min(1.6, sp / 220)), sz, pa * (1 - u));
+        if (s) rot(ctx, cam, s, x, y, Math.atan2(P.vy[i], P.vx[i]), sz * (0.45 + Math.min(0.9, sp / 320)), sz, pa * (1 - u));
       } else {
         const s = feel.get(k === FK.drop ? SH.drop : SH.dot, tn);
         const sp = Math.hypot(P.vx[i], P.vy[i]) * ev;
@@ -718,18 +734,21 @@ function fill(ctx: CanvasRenderingContext2D, col: string, a: number): void {
 }
 /** A crescent about (cx, cy): the arc of radius R from aT to aH, thInner inward and thOuter outward at its fullest. */
 function crescent(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, aT: number, aH: number, thIn: number, thOut: number): void {
+  const n = Math.max(12, Math.min(NCR_MAX, Math.ceil(Math.abs(aH - aT) / 0.09)));
+  if (n !== profN) { for (let k = 0; k <= n; k++) PROF[k] = Math.sin(Math.PI * Math.pow(k / n, 1.6)); profN = n; }
   ctx.beginPath();
-  for (let k = 0; k <= NCR; k++) {
-    const a = aT + (aH - aT) * (k / NCR), rr = R + thOut * PROF[k];
+  for (let k = 0; k <= n; k++) {
+    const a = aT + (aH - aT) * (k / n), rr = R + thOut * PROF[k];
     const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
     if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
-  for (let k = NCR; k >= 0; k--) {
-    const a = aT + (aH - aT) * (k / NCR), rr = Math.max(0, R - thIn * PROF[k]);
+  for (let k = n; k >= 0; k--) {
+    const a = aT + (aH - aT) * (k / n), rr = Math.max(0, R - thIn * PROF[k]);
     ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
   }
   ctx.closePath();
 }
+let profN = -1;
 /** A lance along +x from x0 to L (the current transform is the lance's frame), half-width hw by profile. */
 function lancePath(ctx: CanvasRenderingContext2D, x0: number, L: number, hw: number, prof: Float32Array): void {
   ctx.beginPath();
@@ -752,13 +771,35 @@ export function vfxOf(W: World): Vfx {
 export const vfxW = (w: WorldApi): Vfx => vfxOf(w as unknown as World);
 
 /** The slash tint of a feel class: blades azure, heavy arms gold (with an ink rim), claws ink, fists and wine wine. */
-export function slashLook(fc: number): { tint: number; flags: number } {
+export function slashTint(fc: number): number {
   switch (fc) {
-    case 1: return { tint: VT.gold, flags: VF.edge }; // heavy: 偃月, 花锄, 捣药杵 (gold-ink)
-    case 2: return { tint: VT.ink, flags: VF.rake }; // claw
-    case 3: case 7: return { tint: VT.wine, flags: 0 }; // fist, wine
-    case 8: return { tint: VT.indigo, flags: 0 }; // ink brush
-    case 9: return { tint: VT.jade, flags: 0 }; // flying
-    default: return { tint: VT.azure, flags: 0 }; // blades
+    case 1: return VT.gold; // heavy: 偃月, 花锄, 捣药杵 (gold-ink)
+    case 2: return VT.ink; // claw
+    case 3: case 7: return VT.wine; // fist, wine
+    case 8: return VT.indigo; // ink brush
+    case 9: return VT.jade; // flying
+    default: return VT.azure; // blades
   }
+}
+/** The slash flags of a feel class (a glaive's ink rim, a claw's three rakes). */
+export function slashFlags(fc: number): number {
+  return fc === 1 ? VF.edge : fc === 2 ? VF.rake : 0;
+}
+
+/**
+ * 流光 per weapon: the light of its trails, glows, slashes and blows (never vermilion). 仙剑 are jade,
+ * steel blades azure, glaives gold-ink, claws ink, fists and wine wine, talismans gamboge and gold,
+ * music green, moon moon-white, ink indigo, go ink.
+ */
+export const WPN_TINT: Readonly<Record<WeaponId, number>> = {
+  qingfeng: VT.azure, longquan: VT.azure, yanyue: VT.gold, hoe: VT.gold, pestle: VT.jade, claw: VT.ink, drunkfist: VT.wine,
+  dart: VT.azure, coindart: VT.gold, sunbow: VT.gold, repeater: VT.azure, rod: VT.azure,
+  qingping: VT.jade, casket: VT.jade, peach: VT.gamboge, seven: VT.jade,
+  thunder: VT.gold, fire: VT.gamboge, gourd: VT.wine, qin: VT.green, flute: VT.green,
+  brush: VT.indigo, inkstone: VT.ink, crane: VT.moon, gobowl: VT.ink, moonwheel: VT.moon, moonmirror: VT.moon,
+};
+/** A weapon slot's light (by its id; a missing id falls back to its feel class). */
+export function tintOfWeapon(id: string | undefined, fc: number): number {
+  const t = id ? (WPN_TINT as Record<string, number>)[id] : undefined;
+  return t ?? slashTint(fc);
 }

@@ -261,7 +261,7 @@ describe('水月幻镜 · the mirror themes', () => {
   // imported lazily so the module state (colour, wave clock) is reset per test
   const load = async () => {
     const T = await import('../src/audio/music-themes');
-    T.setMirrorMusic({ colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 });
+    T.setMirrorMusic({ colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0, wave: 0 });
     return T;
   };
   const COLOURS = ['lake', 'forest', 'palace'] as const;
@@ -365,21 +365,29 @@ describe('水月幻镜 · the mirror themes', () => {
     }
   });
 
-  it('the maps state their own call, the same in every wave', async () => {
-    const heads = new Map<string, string>();
+  it('each map has its own calls and turns through them wave by wave (the same call on any day)', async () => {
+    const all = new Map<string, string[]>();
     for (const colour of COLOURS) {
-      for (const day of ['2026-09-20', '2026-09-27']) {
-        const T = await load();
-        T.setMirrorColour(colour);
-        const c = new Composer(T.THEMES.mirror.style, daySeed('mirror', day), 2);
-        const p = c.next();
-        arrange('mirror', p, makeRng(3), 1);
-        const call = p.notes.filter((n) => n.beat >= 4 && n.beat < 12).map((n) => `${n.deg}:${n.dur}`).join(' ');
-        if (heads.has(colour)) expect(call, colour).toBe(heads.get(colour));
-        heads.set(colour, call);
+      for (let wave = 0; wave < 4; wave++) {
+        const calls = new Set<string>();
+        for (const day of ['2026-09-20', '2026-09-27']) {
+          const T = await load();
+          T.setMirrorMusic({ colour, wave });
+          const c = new Composer(T.THEMES.mirror.style, daySeed('mirror', day), 2);
+          const p = c.next();
+          arrange('mirror', p, makeRng(3), 1);
+          calls.add(p.notes.filter((n) => n.beat >= 4 && n.beat < 12).map((n) => `${n.deg}:${n.dur}`).join(' '));
+        }
+        expect(calls.size, `${colour} wave ${wave}`).toBe(1); // a wave's call does not depend on the day
+        all.set(colour, [...(all.get(colour) ?? []), [...calls][0]]);
       }
+      const seq = all.get(colour)!;
+      expect(seq[1], colour).not.toBe(seq[0]); // the next wave, another call
+      expect(new Set(seq).size, colour).toBeGreaterThanOrEqual(2);
+      expect(seq[3], colour).toBe(seq[0]); // three calls in turn
     }
-    expect(new Set(heads.values()).size).toBe(3);
+    const flat = [...all.values()].flat();
+    for (const colour of COLOURS) for (const x of new Set(all.get(colour))) expect(flat.filter((y) => y === x).length).toBeLessThanOrEqual(2); // never another map's
   });
 
   it('the wave clock drives the layers, the last 10 s tighten, danger pushes a layer up', async () => {

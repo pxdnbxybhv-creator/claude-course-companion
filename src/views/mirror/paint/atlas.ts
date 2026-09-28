@@ -50,6 +50,9 @@ export interface RenderOpts {
   rim?: number;
   /** An ink hairline outside the halo at this alpha (0 none): pale figures on pale paper get an edge. */
   outline?: number;
+  /** Ink volume (0 none … 1): moonlight wraps the body's upper left and shade gathers at its lower
+   *  right, soft and inside the silhouette, so a flat ink body reads as rounded. */
+  volume?: number;
 }
 
 /** The moonlight rim's colour and the ink of the outline and of the flash twin's rim. */
@@ -88,6 +91,7 @@ export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
   // the white body of the flash twin (before the rim light: a flash is flat white)
   const wantFlash = o.flash !== false;
   const white = wantFlash ? tinted(ink, '#fffdf6') : null;
+  if (!o.ghost && o.volume && o.volume > 0) volume(ink, Math.max(2, Math.round(k * 2.6)), o.volume);
   if (!o.ghost && o.rim && o.rim > 0) rimLight(ink, Math.max(1, Math.round(k * 0.9)), o.rim);
   let out = ink;
   if (hp > 0) {
@@ -166,6 +170,41 @@ function rimLight(ink: HTMLCanvasElement, d: number, a: number) {
   q.globalCompositeOperation = 'source-over';
   m.width = m.height = 1;
 }
+
+/** Ink volume: the silhouette minus itself shifted d px leaves a band along the edges facing away
+ *  from the shift. Each band is made at 1/f of the sprite's resolution (so it costs little and comes
+ *  out soft) and laid over the body smoothed (source-atop): moon-white on the upper left (light
+ *  wrapping a rounded body), ink on the lower right (the shaded side). */
+function volume(ink: HTMLCanvasElement, d: number, a: number) {
+  const w = ink.width, h = ink.height;
+  const f = Math.max(2, Math.round(d * 0.75));
+  const sw = Math.max(1, Math.ceil(w / f)), sh = Math.max(1, Math.ceil(h / f));
+  const small = canvas(sw, sh), sg = ctx2d(small);
+  sg.imageSmoothingEnabled = true;
+  sg.imageSmoothingQuality = 'high';
+  const q = ctx2d(ink);
+  q.imageSmoothingEnabled = true;
+  q.imageSmoothingQuality = 'high';
+  const band = (dx: number, dy: number, color: string, alpha: number) => {
+    sg.globalCompositeOperation = 'copy';
+    sg.drawImage(ink, 0, 0, sw * f, sh * f, 0, 0, sw, sh);
+    sg.globalCompositeOperation = 'destination-out';
+    sg.drawImage(ink, 0, 0, sw * f, sh * f, dx / f, dy / f, sw, sh);
+    sg.globalCompositeOperation = 'source-in';
+    sg.fillStyle = color;
+    sg.fillRect(0, 0, sw, sh);
+    q.globalCompositeOperation = 'source-atop';
+    q.globalAlpha = alpha;
+    q.drawImage(small, 0, 0, sw, sh, 0, 0, sw * f, sh * f);
+  };
+  band(d, d, SHEEN, 0.4 * a);
+  band(-d, -d, `rgb(${RIM_INK})`, 0.3 * a);
+  q.globalAlpha = 1;
+  q.globalCompositeOperation = 'source-over';
+  small.width = small.height = 1;
+}
+/** The volume's light: a cool moon-white. */
+const SHEEN = '#eef3ff';
 
 /** Warm the brush's grain patterns on the shared scratch context for these colours (the pattern
  *  cache is per context and colour; building a tile is the slow part of a sprite's first paint). */

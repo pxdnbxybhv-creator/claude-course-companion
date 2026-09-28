@@ -8,11 +8,12 @@
 // render cleanly.
 import { describe, expect, it } from 'vitest';
 import type { ContentRegistry, EngineSettings, MirrorAudio, NewRunOpts, RunSave, WaveSetup } from '../src/views/mirror/types';
-import type { WeaponId } from '../src/views/mirror/ids';
+import { ELITE_REG, type EliteId, type WeaponId } from '../src/views/mirror/ids';
 import { allUnlocked, beginWave, newRun, waveSetup } from '../src/views/mirror/logic';
 import { defaultMeta } from '../src/app/mirror';
 import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
+import { CONTENT } from '../src/views/mirror/engine/content';
 import { FC, MK, fcOfWeapon, numPop } from '../src/views/mirror/engine/feel';
 import { SRCI } from '../src/views/mirror/engine/consts';
 import { SH } from '../src/views/mirror/paint/feel';
@@ -36,12 +37,12 @@ function logAudio(W: () => MirrorEngine['world'] | null) {
   };
   return { a, log };
 }
-function make(run: RunSave, settings: Partial<EngineSettings> = {}) {
+function make(run: RunSave, settings: Partial<EngineSettings> = {}, content: ContentRegistry = EMPTY) {
   let eng: MirrorEngine | null = null;
   const { a, log } = logAudio(() => eng?.world ?? null);
   const hooks = { hud: () => {}, levelUp: () => {}, crate: () => {}, coin: () => {}, boss: () => {}, waveEnd: () => {}, death: () => {}, error: () => {} };
   const s: EngineSettings = { quality: 'high', dprCap: 1, reduceMotion: false, nums: 2, shake: true, aim: 'auto', lang: 'zh', ...settings };
-  eng = createEngine(canvas(), run, { painter: createDebugPainter(run.map, s.quality, 1), audio: a, content: EMPTY, hooks, settings: s }) as MirrorEngine;
+  eng = createEngine(canvas(), run, { painter: createDebugPainter(run.map, s.quality, 1), audio: a, content, hooks, settings: s }) as MirrorEngine;
   return { eng, log };
 }
 function setupFor(run: RunSave): { run: RunSave; setup: WaveSetup } {
@@ -219,6 +220,22 @@ describe('打击感: the feel layer', () => {
       for (const p of [hard, slam, phase]) {
         if (shake) { expect(p.m).toBeGreaterThan(0.3); expect(p.m).toBeLessThanOrEqual(3.0001); expect(p.frames).toBeLessThan(20); } else expect(p.m).toBe(0);
       }
+      eng.dispose();
+    }
+  });
+
+  it('an elite fight never moves the camera: elites are ordinary combat (their slams ring and thud)', () => {
+    // every named elite, with its real moves (slams, leaps, roars, charges), for 20 s at 60 fps: the
+    // camera stays still while you take no hard blow
+    for (const el of ELITE_REG) {
+      const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 5, map: el.map })), []), wave: 11 });
+      const { eng } = make(run, {}, CONTENT);
+      eng.start(run, setup);
+      const W = quiet(eng);
+      W.spawn(el.id as EliteId, W.px + 220, W.py, { bloom: false });
+      let now = 1000, worst = 0;
+      for (let f = 0; f < 60 * 20; f++) { eng.frame((now += 1000 / 60)); worst = Math.max(worst, Math.hypot(W.feel.offX, W.feel.offY)); }
+      expect(worst, el.id).toBe(0);
       eng.dispose();
     }
   });

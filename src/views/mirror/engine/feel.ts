@@ -3,7 +3,7 @@
 //   · a reaction on the body, scaled by the blow's class and damage (light · medium · heavy/crit):
 //     a crisp white flash in an ink rim (2 frames) that fades into a brief ink tint, a squash along
 //     the blow that springs back, a recoil that snaps away and settles, and on medium and heavy blows
-//     a LOCAL freeze — the struck sprite alone holds where it was hit and jitters for 35–70 ms (a per-
+//     a LOCAL freeze — the struck sprite alone holds where it was hit and jitters for 45–75 ms (a per-
 //     body bank keeps it ≤ 30% of any second) while the world runs on; then it flies (knockback).
 //     Elites and bosses stagger (a flash, a ring of light, a wobble) every few % of their HP. All of
 //     it is drawn only: the hitbox never moves (pose());
@@ -13,7 +13,7 @@
 //   · a death burst: the body's own sprite breaks into pieces flung along the killing blow (frags),
 //     a pop of light, a ring, a wet crown, droplets and a stain stamped into the paper;
 //   · the camera stays still for your own hits, crits, kills and weapons. It moves only a little, and
-//     rarely: a hard blow you take (≥ 15% of your HP, or a boss's), an enemy slam, a boss's phase or
+//     rarely: a hard blow you take (≥ 15% of your HP, or a boss's), a boss's slam, phase change or
 //     death (≤ 3 px, short), and a gentle zoom on the 镜技's landing. The shake setting means "big
 //     moments only"; off removes those too; reduced motion removes every camera motion and stop;
 //   · global hitstop only for rare heavy moments (a heavy weapon's crit, elite kills, the 镜技, a hard
@@ -236,7 +236,7 @@ const HEAVY_CRIT_GAP = 0.45;
 // the body's reaction by tier (light · medium · heavy/crit)
 const SQUASH = [0.12, 0.18, 0.28] as const;
 const RECOIL = [4, 7, 11] as const;
-const FREEZE = [0, 0.035, 0.07] as const;
+const FREEZE = [0, 0.045, 0.075] as const;
 const JITTER = [0, 1.5, 2.6] as const;
 const FLASH = [0.05, 0.066, 0.1] as const;
 /** A body re-pulses on a blow ≥ this share of its live reaction, or after PULSE_GAP s (≤ 12 Hz). */
@@ -562,11 +562,11 @@ export class Feel {
       this.rAt[i] = t; this.rW[i] = w; this.rA[i] = ang;
       let S: number = SQUASH[tier] * (crit ? 1.14 : 1);
       let R: number = RECOIL[tier] + (crit ? 2 : 0);
-      let frz: number = crit && tier === 2 ? 0.05 : FREEZE[tier];
+      let frz: number = crit && tier === 2 ? 0.06 : FREEZE[tier];
       let J: number = JITTER[tier];
       let jt = 0;
       if (boss) { S *= 0.35; R = Math.min(3, R * 0.35); frz = 0; J = 1.5; jt = tier >= 1 ? 0.06 : 0; }
-      else if (big) { S *= 0.7; R *= 0.7; frz = Math.min(0.05, frz); J = Math.min(2, J); }
+      else if (big) { S *= 0.7; R *= 0.7; frz = Math.min(0.055, frz); J = Math.min(2, J); }
       if (thunder) { J = Math.max(J, 1.5); jt = Math.max(jt, 0.09); }
       if (calm) { S = 0.06; R = Math.min(2, R); frz = 0; J = 0; jt = 0; }
       if (frz > 0) {
@@ -1013,8 +1013,9 @@ export class Feel {
     if (!this.shakeOn) return;
     this.trauma = Math.min(1, this.trauma + a);
   }
-  /** The contract's shake(px), now an enemy's slam (bosses, elites): a small, short shake of
-   *  min(2, px / 2) px, at most once per 0.5 s. The player's own weapons and 镜技 never call it. */
+  /** The contract's shake(px), now a boss's slam (the bosses and 镜主; elites no longer call it): a
+   *  small, short shake of min(2, px / 2) px, at most once per 0.5 s. The player's own weapons and
+   *  镜技 never call it. */
   shake(px: number): void {
     if (!this.shakeOn || !(px > 0)) return;
     const t = this.W.t;

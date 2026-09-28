@@ -45,8 +45,9 @@ export { abbrev } from './numbers';
 /** Sprite resolution when no bake scale is given (the lab, icons): px per u = dpr × this. */
 const PX_PER_U: Record<Quality, number> = { low: 0.85, mid: 1, high: 1.15 };
 /** Bake scale over the camera's base px per u: zoom punches reach +3–10% for a tenth of a second, and a
- *  little supersample keeps rotating blades and thin lines crisp. Low paints exactly at the drawn size. */
-const HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.15 };
+ *  little supersample keeps rotating blades and thin lines crisp (high as mid: its 1.15 cost a desktop
+ *  at DPR 2 ≈ 9% more bake time for no visible gain). Low paints exactly at the drawn size. */
+const HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 };
 /** The bake scale's ceiling (memory grows with k²: the start atlas is ≈ 3 MB × k²). */
 const K_MAX: Record<Quality, number> = { low: 3, mid: 3.2, high: 3.4 };
 /** Zone looks (a ±32 u disc the engine draws at r 40–360 u) bake at least this many px per u. */
@@ -74,13 +75,14 @@ function kindScale(id: string): number {
 function flashes(id: string): boolean {
   return id.startsWith('mon:') || id.startsWith('elite:') || id.startsWith('boss:') || id.startsWith('sum:') || id.startsWith('char:');
 }
-/** The moonlight rim and ink hairline by kind: figures stand off the paper; effects stay flat washes. */
-function edgeOf(id: string): { rim: number; outline: number } {
-  if (id.startsWith('char:')) return { rim: 0.6, outline: 0.5 };
-  if (id.startsWith('sum:')) return { rim: 0.45, outline: 0.35 };
-  if (id.startsWith('mon:') || id.startsWith('elite:')) return { rim: 0.32, outline: 0 };
-  if (id.startsWith('boss:')) return { rim: 0.3, outline: 0 };
-  return { rim: 0, outline: 0 };
+/** The moonlight rim, ink hairline and ink volume by kind: figures stand off the paper and read as
+ *  rounded; effects stay flat washes. */
+export function edgeOf(id: string): { rim: number; outline: number; volume: number } {
+  if (id.startsWith('char:')) return { rim: 0.6, outline: 0.5, volume: 0.8 };
+  if (id.startsWith('sum:')) return { rim: 0.45, outline: 0.35, volume: 0.7 };
+  if (id.startsWith('mon:') || id.startsWith('elite:')) return { rim: 0.32, outline: 0, volume: 1 };
+  if (id.startsWith('boss:')) return { rim: 0.3, outline: 0, volume: 1 };
+  return { rim: 0, outline: 0, volume: 0 };
 }
 const FONT_WAIT_MS = 1500;
 /** Bake budget per frame (GDD §21: 6 ms). One job always runs, so a single big sprite can exceed it. */
@@ -88,7 +90,7 @@ const SLICE_MS = 6;
 /** The first bake (the start plan, behind the 研墨 screen, which only animates a bar) takes bigger
  *  slices: the frames between slices are idle there, and sprites painted at the camera's scale cost
  *  2× the old pixels. Later bakes run in the shop's background and keep to SLICE_MS. */
-const START_SLICE_MS = 14;
+const START_SLICE_MS = 24;
 /** Icons kept painted (≈ 48–96 px each: a few MB at most). */
 const ICON_CACHE = 260;
 
@@ -345,7 +347,7 @@ class InkPainter implements Painter {
       const edge = edgeOf(id);
       // the halo in px follows the bake scale (≈ 1 u; bosses 1.8 u), never under 1 px
       const halo = Math.max(1, Math.round(k * (big ? 1.8 : 1)));
-      const painted = renderSpec(sp.spec, v, { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, flash: flashes(id), rim: edge.rim, outline: edge.outline });
+      const painted = renderSpec(sp.spec, v, { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, flash: flashes(id), rim: edge.rim, outline: edge.outline, volume: edge.volume });
       const { s, f } = pack(this.pages, painted);
       e.s[v] = s; e.f[v] = f;
     } catch (err) {

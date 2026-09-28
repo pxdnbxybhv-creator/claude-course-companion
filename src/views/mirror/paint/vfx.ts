@@ -70,7 +70,7 @@ export class VfxSprites {
     try {
       for (let t = 0; t < NVT; t++) {
         this.glows[t] = this.glow(t, S.glow);
-        this.rings[t] = t === VT.ink ? this.ring(t, S.ring) : this.ring(t, S.ring);
+        this.rings[t] = this.ring(t, S.ring);
         this.cols[t] = t === VT.gold || t === VT.moon || t === VT.azure || t === VT.jade ? this.column(t, S.col[0], S.col[1]) : null;
       }
       for (let k = 0; k < 3; k++) this.stains[k] = this.stain(k, S.stain);
@@ -115,8 +115,8 @@ export class VfxSprites {
     const body = t === VT.ink ? '#1b1916' : VFX_BODY[t];
     grad.addColorStop(0, hexA(col, 0));
     grad.addColorStop(e * 0.55, hexA(col, 0));
-    grad.addColorStop(e * 0.84, hexA(col, t === VT.ink ? 0.12 : 0.2));
-    grad.addColorStop(e * 0.97, hexA(body, t === VT.ink ? 0.3 : 0.42));
+    grad.addColorStop(e * 0.84, hexA(col, t === VT.ink ? 0.1 : 0.13));
+    grad.addColorStop(e * 0.97, hexA(body, t === VT.ink ? 0.28 : 0.36));
     grad.addColorStop(e, hexA(col, t === VT.ink ? 0.26 : 0.5));
     grad.addColorStop(Math.min(0.99, e + 0.07), hexA(col, 0.14));
     grad.addColorStop(1, hexA(col, 0));
@@ -229,3 +229,13 @@ export class VfxSprites {
 
 /** Flat colour strings (the frame loop never builds a string). */
 export const VFX_COL = { halo: VFX_HALO, body: VFX_BODY, core: VFX_CORE, edge: VFX_EDGE } as const;
+
+/** One baked set per quality for the whole session (≈ 0.3–1.6 MB): the renderer warms it when an
+ *  engine is made, behind the run's loading bake, so no frame ever paints a gradient. */
+const SHARED = new Map<Quality, VfxSprites>();
+export function vfxSprites(q: Quality): VfxSprites {
+  let s = SHARED.get(q);
+  if (!s) { s = new VfxSprites(q); SHARED.set(q, s); }
+  s.warm();
+  return s;
+}

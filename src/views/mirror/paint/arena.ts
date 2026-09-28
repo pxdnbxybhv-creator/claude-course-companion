@@ -27,6 +27,27 @@ const BUDGET: Record<Quality, number> = { low: 2.0e6, mid: 3.6e6, high: 4.5e6 };
 /** The stain layer's resolution relative to the base. */
 const STAIN_K: Record<Quality, number> = { low: 0.5, mid: 0.6, high: 0.6 };
 const MARGIN = 150;
+/** The soft pass's resolution relative to the base, by quality (see paint: low paints one pass). */
+const SOFT_K: Record<Quality, number> = { low: 1, mid: 0.6, high: 0.7 };
+/** A brush this wide (u) or wider is a broad soft band (the lake's deep rim, the bronze band under
+ *  its crisp dark edges): painted with the washes. */
+const SOFT_W = 20;
+/** The index just past the washes that open ops[from…] (an obstacle's shadow comes first). */
+function leadingWashes(ops: B['ops'], from: number): number {
+  let i = from;
+  while (i < ops.length) { const op = ops[i]; if (op.k !== 'stroke' || op.s.kind !== 'wash') break; i++; }
+  return i;
+}
+/** Whether an arena mark is soft: washes and broad bands (their edges are blurred anyway). */
+export function isSoft(op: B['ops'][number]): boolean {
+  if (op.k !== 'stroke') return false;
+  const st = op.s;
+  if (st.kind === 'wash') return true;
+  if (st.kind !== 'brush') return false;
+  let w = 0;
+  for (const p of st.pts) w = Math.max(w, p.w);
+  return w >= SOFT_W;
+}
 /** The bronze rim's width (u), outside the arena's shape. */
 const RIM_W = 34;
 /** Obstacle sprites: px per u at most, by quality (they are drawn at the camera's scale; memory: the
@@ -95,39 +116,76 @@ export class ArenaLayer {
     // painted whole, then cut into tiles (the whole canvas is freed)
     const big = canvas(pw, ph);
     const g = ctx2d(big);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over';
-    g.fillStyle = this.pal.outside;
-    g.fillRect(0, 0, pw, ph);
     const P = this.pal;
-    // world → layer px
-    const toL = () => g.setTransform(k, 0, 0, k, -x0 * k, -y0 * k);
-    const strokes = (b: B) => { for (const op of b.ops) { toL(); if (op.k === 'stroke') paintStroke(g, op.s); else { g.save(); try { op.f(g); } finally { g.restore(); } } } };
+    // Two passes. The soft pass (the paper, washes, broad bands: everything whose edge is blurred
+    // anyway) is painted opaque at SOFT_K of the layer's resolution — a fraction of the pixels, and
+    // they are most of the arena's paint time — then laid in smoothed; the crisp pass (lines, dots,
+    // fills, the rim's edges and motifs) is painted over it at full resolution. The paper's crisp tooth
+    // comes from the screen-resolution grain overlay (paint/ambient.ts) on mid and high; low paints
+    // one pass at full resolution. (Washes must be painted onto the opaque paper, not a clear layer:
+    // at their low alphas a clear layer's 8-bit premultiplied colour bleaches them.)
+    const sk = SOFT_K[this.quality];
+    const two = sk < 1;
+    const soft = two ? canvas(Math.ceil(pw * sk) + 2, Math.ceil(ph * sk) + 2) : big;
+    const kk = two ? k * sk : k;
+    const sg = ctx2d(soft);
+    sg.setTransform(1, 0, 0, 1, 0, 0);
+    sg.globalCompositeOperation = 'source-over';
+    sg.fillStyle = P.outside;
+    sg.fillRect(0, 0, soft.width, soft.height);
+    const pass = (gg: CanvasRenderingContext2D, kp: number, ops: B['ops']) => {
+      for (const op of ops) {
+        gg.setTransform(kp, 0, 0, kp, -x0 * kp, -y0 * kp);
+        if (op.k === 'stroke') paintStroke(gg, op.s); else { gg.save(); try { op.f(gg); } finally { gg.restore(); } }
+      }
+    };
+    const clipTo = (gg: CanvasRenderingContext2D, kp: number, band: boolean) => {
+      gg.save();
+      gg.setTransform(kp, 0, 0, kp, -x0 * kp, -y0 * kp);
+      if (band) { shapePath(gg, geom, RIM_W + 1); shapePath(gg, geom, -1, true); gg.clip('evenodd'); } else { shapePath(gg, geom, 0); gg.clip(); }
+    };
+    /** Paint a B: its soft marks on the soft pass now, its crisp marks later on the crisp pass (in the
+     *  same clip). */
+    const crispLater: { ops: B['ops']; clip: 0 | 1 | 2 }[] = [];
+    const strokes = (b: B, clip: 0 | 1 | 2 = 0) => {
+      const softOps = two ? b.ops.filter(isSoft) : b.ops;
+      if (softOps.length) {
+        if (clip) clipTo(sg, kk, clip === 2);
+        pass(sg, kk, softOps);
+        if (clip) sg.restore();
+      }
+      if (two) { const crisp = b.ops.filter((op) => !isSoft(op)); if (crisp.length) crispLater.push({ ops: crisp, clip }); }
+    };
 
     // the void / surround
     const out = new B(seed ^ 0x51);
     surround(out, this.map, geom, P, seed);
     strokes(out);
     // paper inside the shape
-    g.save();
-    toL(); shapePath(g, geom, 0); g.clip();
-    g.setTransform(k, 0, 0, k, 0, 0);
-    fillPaper(g, W, H, 11 + (seed % 7));
-    g.restore();
-    g.save();
-    toL(); shapePath(g, geom, 0); g.clip();
+    clipTo(sg, kk, false);
+    sg.setTransform(kk, 0, 0, kk, 0, 0);
+    fillPaper(sg, W, H, 11 + (seed % 7));
+    sg.restore();
     const bg = new B(seed);
     ground(bg, this.map, geom, P, seed);
-    strokes(bg);
+    strokes(bg, 1);
     this.obst = [];
     const ks = Math.min(OBST_K[this.quality], Math.max(1, this.sk));
     if (ks > k * 1.15) {
-      // crisp obstacles: each its own sprite (a shadow wash under it stays in the base)
+      // crisp obstacles: each its own sprite; the soft shadow wash under it (its leading washes) is
+      // painted into the base with the ground's soft marks instead
+      const shade = new B(seed ^ 0x7b);
+      for (const o of geom.obstacles) {
+        const from = shade.ops.length;
+        obstacle(shade, o, P, seed);
+        shade.ops.length = leadingWashes(shade.ops, from);
+      }
+      strokes(shade, 1);
       for (const o of geom.obstacles) {
         const R = o.r * 1.35 + 12;
-        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => obstacle(b, o, P, seed) };
+        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => { const from = b.ops.length; obstacle(b, o, P, seed); b.ops.splice(from, leadingWashes(b.ops, from) - from); } };
         try {
-          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0 });
+          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0, flash: false });
           if (inverted) invertLightness(p.img);
           // the spec's anchor (0, 0) is the world origin: the canvas's corner sits at −anchor × size
           this.obst.push({ img: p.img, x0: -p.ax * p.w, y0: -p.ay * p.h, w: p.w, h: p.h });
@@ -137,21 +195,27 @@ export class ArenaLayer {
     if (!this.obst.length) {
       const ob = new B(seed ^ 0x77);
       for (const o of geom.obstacles) obstacle(ob, o, P, seed);
-      strokes(ob);
+      strokes(ob, 1);
     }
-    g.restore();
     const rim = new B(seed ^ 0x99), deco = new B(seed ^ 0x9b);
     rimOf(rim, deco, this.map, geom, P);
-    if (geom.shape.kind === 'circle') strokes(rim);
-    else {
-      // a polygon's rim: one stroke per edge, clipped to the band so the corners are mitred (the
-      // brush's ends would otherwise stick out past each corner)
-      g.save();
-      toL(); shapePath(g, geom, RIM_W + 1); shapePath(g, geom, -1, true); g.clip('evenodd');
-      strokes(rim);
-      g.restore();
-    }
+    // a polygon's rim: one stroke per edge, clipped to the band so the corners are mitred (the brush's
+    // ends would otherwise stick out past each corner)
+    strokes(rim, geom.shape.kind === 'circle' ? 0 : 2);
     strokes(deco);
+    if (two) {
+      // the soft pass laid in, then the crisp marks over it
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(soft, 0, 0, soft.width / sk, soft.height / sk);
+      for (const c of crispLater) {
+        if (c.clip) clipTo(g, k, c.clip === 2);
+        pass(g, k, c.ops);
+        if (c.clip) g.restore();
+      }
+      soft.width = soft.height = 1;
+    }
     g.setTransform(1, 0, 0, 1, 0, 0);
     if (inverted) invertLayer(big, geom, k, x0, y0, P);
     feather(g, pw, ph, k, inverted ? voidOf(P) : P.outside);
@@ -171,7 +235,7 @@ export class ArenaLayer {
     const k = Math.max(0.6, this.kS) * 1.5;
     this.stampK = k;
     const mk = (spec: Spec, n: number) => Array.from({ length: n }, (_, v) => {
-      const p = renderSpec(spec, v, { k, seed: 101 + v * 31, halo: 0 });
+      const p = renderSpec(spec, v, { k, seed: 101 + v * 31, halo: 0, flash: false });
       if (inverted) invertLightness(p.img);
       return p.img;
     });

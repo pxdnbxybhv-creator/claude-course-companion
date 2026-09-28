@@ -42,6 +42,14 @@ export interface ThemeSpec {
   /** Reshape a phrase before it is arranged (tempo, whole bars, a new tune); the Conductor reads p afterwards. */
   shape?(p: Phrase, r?: Rng): void;
   arrange(c: Ctx): MusicEvent[];
+  /** The longest fade-in the theme starts with (s): a fight opens on its first drum stroke. */
+  fadeIn?: number;
+  /**
+   * A counter the theme bumps when its state moves on in a way the band must play before the phrases
+   * already composed are heard (a boss's new phase): the Conductor then re-composes the phrases that
+   * have no sound yet (music-player.ts). Themes without it are never re-composed.
+   */
+  epoch?(): number;
 }
 
 export interface Ctx {
@@ -617,9 +625,10 @@ const taoyuan: ThemeSpec = {
 //
 // Every phrase is four whole 4/4 bars (the groove never skips a beat across phrases) and reads its
 // tempo and layers from the mirror state below when it is composed, ≈ 4.5 s ahead of the audio clock
-// (music.ts HORIZON): a change is heard at the next phrase — the director (src/views/mirror/audio/
-// music.ts) fires a cue on the music bus — on the band's next beat, in its tempo — for a rise in danger
-// or a boss phase.
+// (music.ts HORIZON): a change is heard at the next phrase. A boss's new phase and the danger cue bump
+// the mirror epoch, so the Conductor re-composes the phrases that have no sound yet (the band changes
+// at the next phrase boundary more than 1.2 s ahead, not a phrase later), and the director (src/views/
+// mirror/audio/music.ts) fires a cue on the music bus at once — on the band's next beat, in its tempo.
 
 export type MirrorColour = 'lake' | 'forest' | 'palace';
 
@@ -634,9 +643,17 @@ export interface MirrorMusicState {
   danger: number;
   /** The boss's phase (0, 1, 2…): each one steps the boss theme up. */
   bossPhase: number;
+  /** Waves started this session: the map's call rotates with it (WAVE_HEADS). */
+  wave?: number;
 }
 
-const mm: MirrorMusicState = { colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 };
+const mm: MirrorMusicState = { colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0, wave: 0 };
+let epoch = 0;
+/** Bumped by a boss's new phase and by the director's danger cue (ThemeSpec.epoch). */
+export const mirrorEpoch = () => epoch;
+/** Have the band re-compose what it has not played yet with the state as it is now (the director calls it
+ *  with the danger cue, at most every 12 s: a danger hovering around one half must not churn the renders). */
+export function refreshMirrorBand(): void { epoch++; }
 const num = (v: unknown, lo: number, hi: number, dflt: number) => (typeof v === 'number' && Number.isFinite(v) ? clamp(v, lo, hi) : dflt);
 
 /** Update the mirror state (non-finite values are ignored; everything is clamped). */
@@ -644,8 +661,12 @@ export function setMirrorMusic(s: Partial<MirrorMusicState>): void {
   if (s.colour) mm.colour = s.colour;
   if ('left' in s) mm.left = s.left == null ? null : num(s.left, 0, 3600, 0);
   if ('total' in s) mm.total = s.total == null ? null : num(s.total, 1, 3600, 60);
+  const phase = mm.bossPhase;
   if ('danger' in s) mm.danger = num(s.danger, 0, 1, 0);
   if ('bossPhase' in s) mm.bossPhase = Math.round(num(s.bossPhase, 0, 9, 0));
+  if ('wave' in s) mm.wave = Math.round(num(s.wave, 0, 1e6, 0));
+  // a boss's new phase: the band steps up now, not a phrase later (the Conductor re-composes what has not sounded)
+  if (mm.bossPhase > phase) epoch++;
 }
 export const getMirrorMusic = (): Readonly<MirrorMusicState> => mm;
 export function setMirrorColour(map: MirrorColour): void { mm.colour = map; }
@@ -840,11 +861,31 @@ interface Head { degs: number[]; beats: number[] }
  * fifth — a call across the water. 林: a 吐音 burst on the final, a 5th up, a half-cadence hold — the
  * ambush. 宫: a rising 5th + 4th arpeggio to the top, then 吐音 below it — cold and high.
  */
-const WAVE_HEAD: Record<MirrorColour, Head> = {
-  lake: { degs: [5, 6, 5, 4, 3, 4, 5, 7, 8], beats: [1.5, 0.5, 0.75, 0.25, 1, 0.5, 0.5, 1, 2] },
-  forest: { degs: [0, 0, 0, 0, 3, 3, 5, 4, 3, 2, 3, 4, 3], beats: [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 1, 0.75, 0.25, 0.5, 0.5, 1, 2] },
-  palace: { degs: [2, 5, 7, 6, 7, 6, 6, 6, 6, 6, 5, 4, 5], beats: [0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 2] },
+const WAVE_HEADS: Record<MirrorColour, readonly Head[]> = {
+  lake: [
+    { degs: [5, 6, 5, 4, 3, 4, 5, 7, 8], beats: [1.5, 0.5, 0.75, 0.25, 1, 0.5, 0.5, 1, 2] },
+    // the call from below: a 4th up to the held sixth, a 吐音 answer climbing to the top
+    { degs: [3, 5, 6, 5, 4, 3, 3, 4, 5, 7], beats: [0.5, 0.5, 1.5, 0.5, 1, 0.25, 0.25, 0.5, 1, 2] },
+    // tongued on the fifth, a leap to the seventh, falling back and pushing up again
+    { degs: [5, 5, 7, 6, 5, 4, 5, 5, 6, 5, 4, 5], beats: [0.75, 0.25, 1, 0.5, 0.5, 1, 0.25, 0.25, 0.5, 0.5, 0.5, 2] },
+  ],
+  forest: [
+    { degs: [0, 0, 0, 0, 3, 3, 5, 4, 3, 2, 3, 4, 3], beats: [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 1, 0.75, 0.25, 0.5, 0.5, 1, 2] },
+    // a 4th up and 吐音 on it, a 5th to the top, a snap back to the half-cadence
+    { degs: [0, 3, 3, 3, 3, 5, 4, 3, 3, 2, 0, 2], beats: [0.5, 0.5, 0.25, 0.25, 0.5, 1.5, 0.5, 0.25, 0.25, 0.5, 1, 2] },
+    // 吐音 on the fourth, the 5th leap, down to the final and up again
+    { degs: [3, 3, 3, 3, 5, 4, 3, 2, 0, 0, 0, 3, 2, 3, 5], beats: [0.25, 0.25, 0.25, 0.25, 0.75, 0.25, 0.5, 0.5, 1, 0.25, 0.25, 0.5, 0.5, 0.5, 2] },
+  ],
+  palace: [
+    { degs: [2, 5, 7, 6, 7, 6, 6, 6, 6, 6, 5, 4, 5], beats: [0.5, 0.5, 0.5, 0.5, 1.5, 0.5, 0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 2] },
+    // from the top down the arpeggio and back up to it; 吐音 below
+    { degs: [7, 5, 2, 5, 7, 6, 6, 5, 4, 2, 4], beats: [1, 0.5, 0.5, 0.5, 1.5, 0.25, 0.25, 0.5, 0.5, 0.5, 2] },
+    // a tongued pickup, the 5th + 4th to the top, a turn under it, rising to the held sixth
+    { degs: [2, 2, 5, 7, 6, 5, 7, 6, 5, 4, 4, 5, 6], beats: [0.25, 0.25, 0.5, 0.75, 0.25, 0.5, 1.5, 0.5, 0.5, 0.25, 0.25, 0.5, 2] },
+  ],
 };
+/** The call of the session's `wave`-th wave: the map's calls in turn, so a run does not hear one lick all night. */
+const waveHead = (col: MirrorColour, wave = 0) => { const hs = WAVE_HEADS[col]; return hs[((wave % hs.length) + hs.length) % hs.length]; };
 /** The 吐音 pickup into a phrase starting on `start`: a 4th below it, or a 5th above when the flute has no room below. */
 const pickupDeg = (start: number, lo: number, hi: number) => (start - 2 >= lo ? start - 2 : Math.min(hi, start + 3));
 /** The bosses' calls: long notes to scoop into (the 唢呐's 上滑音), a dotted answer. */
@@ -966,7 +1007,7 @@ function composeBattle(p: Phrase, r: Rng, plan: BattlePlan): BattleNote[] {
     pickup(plan.lead);
   };
   const L = plan.lead;
-  const dev = p.period % 3; // the call is re-stated every wave; its second bar develops with the periods
+  const dev = p.period % 3; // the call returns each period; its second bar develops with the periods
   switch (p.role) {
     case 'qi': {
       statement(bar1, L);
@@ -976,10 +1017,11 @@ function composeBattle(p: Phrase, r: Rng, plan: BattlePlan): BattleNote[] {
       break;
     }
     case 'cheng': {
-      // the second statement (箫 in 湖 and 林): the call again, its second bar moved
-      statement(bar1, plan.second);
+      // the second statement (箫 in 湖 and 林): the call sequenced a step up (while the flute has room),
+      // its second bar moved and back at pitch
+      statement(bar1, plan.second, 1);
       const moved = { degs: bar2.degs.map((d, i) => (i > 0 && i < bar2.degs.length - 1 && r.chance(0.4) ? clamp(d + r.pick([-1, 1]), lo, hi) : d)), beats: bar2.beats };
-      statement(moved, plan.second, dev === 1 ? 1 : 0); // (moved up a step only while the flute has room)
+      statement(moved, plan.second, dev === 1 ? 1 : 0);
       drive(r.pick([1, half]) + 2, L, r.pick([DRIVE_BARS[1], DRIVE_BARS[3], DRIVE_BARS[4]]));
       cadenceBar(r.pick([1, half]), L);
       break;
@@ -1048,13 +1090,16 @@ function shapeBattle(p: Phrase, r: Rng, boss: boolean): void {
   const bpm = boss ? between(p.bpm, style.bpm) + 3 * Math.min(2, tier) : between(p.bpm, style.bpm) * (tier >= 4 ? 1.04 : 1);
   p.bpm = Math.round(Math.min(MIRROR_MAX_BPM, bpm));
   lastBpm = p.bpm;
-  const head = (boss ? BOSS_HEAD : WAVE_HEAD)[col];
+  const head = boss ? BOSS_HEAD[col] : waveHead(col, mm.wave);
   // the lead's octave: the head's middle pitch nearest the colour's register; the tune keeps inside
   // the lead's range there (a 曲笛/梆笛 G4–E6, a 唢呐 D4–C6) and never below the call itself
   const reg = (boss ? BOSS_REG : LEAD_REG)[col];
   const pitches = head.degs.map((d) => degreeToMidi(p.mode, d)).sort((a, b) => a - b);
-  const lead = Math.round((reg - pitches[pitches.length >> 1]) / 12);
+  let lead = Math.round((reg - pitches[pitches.length >> 1]) / 12);
   const [pLo, pHi] = boss ? [62, 84] : [67, 88];
+  // …and the call itself inside that range (a call whose middle sits low would drop out of the flute's compass)
+  if (pitches[0] + 12 * lead < pLo && pitches[pitches.length - 1] + 12 * (lead + 1) <= pHi) lead++;
+  else if (pitches[pitches.length - 1] + 12 * lead > pHi && pitches[0] + 12 * (lead - 1) >= pLo) lead--;
   let lo = Math.min(...head.degs) - 2, hi = Math.max(...head.degs) + 3;
   while (degreeToMidi(p.mode, lo) + 12 * lead < pLo && lo < Math.min(...head.degs)) lo++;
   while (degreeToMidi(p.mode, hi) + 12 * lead > pHi && hi > Math.max(...head.degs)) hi--;
@@ -1090,9 +1135,10 @@ function octNear(c: Ctx, notes: readonly MNote[], target: number, shift = 0): nu
   const ms = notes.map((n) => midiOf(c, n.deg + shift, 0)).sort((a, b) => a - b);
   return Math.round((target - ms[ms.length >> 1]) / 12);
 }
-/** Where the supporting voices sit (median MIDI): the 箫 low and hollow, the 二胡 under the 笛, the 唢呐 below it;
- *  the 笛's answers in its singing register (G5–A5), never its shrill top. */
-const REG = { xiao: 65, erhu: 67, suona: 71, sheng: 62, diziAns: 79, bossDizi: 78, bossXiao: 62 } as const;
+/** Where the supporting voices sit (median MIDI): the 箫 low and hollow (but its second harmonic above ≈ 800 Hz,
+ *  where a phone still plays it), the 二胡 under the 笛, the 唢呐 below it; the 笛's answers in its singing
+ *  register (G5–A5), never its shrill top. */
+const REG = { xiao: 68, erhu: 67, suona: 71, sheng: 62, diziAns: 79, bossDizi: 78, bossXiao: 67 } as const;
 /** The battle 笛's ceiling (E6): above it a band flute turns shrill. */
 export const DIZI_TOP = 88;
 /** `oct`, lowered by octaves until the line's top note (degrees + `shift`) is at most the 笛's ceiling. */
@@ -1211,7 +1257,7 @@ function battleDrums(c: Ctx, o: BattleDrums): MusicEvent[] {
     if (intro && b === 0) {
       if (o.intro === 'fill') {
         // 咚 咚 哒哒哒哒哒哒哒哒 | 仓 — into the wave (the lead's pickup rides the roll's last beat)
-        kit.at('big', 0, 0.62, -0.1); kit.at('big', 1, 0.54, -0.1);
+        kit.at('big', 0, 0.72, -0.1); kit.at('big', 1, 0.66, -0.1); // at least a downbeat's weight
         for (let k = 0; k < 8; k++) kit.at('tang', 2 + k * 0.25, 0.2 + 0.045 * k, -0.3 + 0.08 * k);
       } else {
         // the boss: a roll swelling for a whole bar — 大鼓 on the 8ths, 堂鼓 between
@@ -1220,7 +1266,7 @@ function battleDrums(c: Ctx, o: BattleDrums): MusicEvent[] {
       continue;
     }
     // 大鼓: 1 and 3; the and-of-4 pickup; war drums (a boss, tight) push the and-of-2 too
-    kit.at('big', b0, 0.66, -0.1); kit.at('big', b0 + 2, 0.56, -0.1);
+    kit.at('big', b0, 0.72, -0.1); kit.at('big', b0 + 2, 0.6, -0.1); // (the harder knock takes body: a little more stick)
     if (tier >= 1 || boss) kit.at('big', b0 + 3.5, 0.34, -0.1);
     if (tier >= 4 || boss || (tier >= 3 && b % 2 === 1)) kit.at('big', b0 + 1.5, 0.32, -0.1);
     if (boss && tier >= 3) { kit.at('big', b0 + 1, 0.3, -0.1); kit.at('big', b0 + 3, 0.34, -0.1); }
@@ -1229,10 +1275,10 @@ function battleDrums(c: Ctx, o: BattleDrums): MusicEvent[] {
     if ((tier >= 2 || boss) && b % 2 === 1 && !last) { kit.at('tang', b0 + 2.75, 0.16, 0.22); kit.at('tang', b0 + 3.25, 0.13, 0.22); }
     if (o.toms) { kit.at('tang', b0 + 2.5, 0.54, -0.35); kit.at('tang', b0 + 3.75, 0.44, -0.35); }
     // 板 on every off-beat; tight and in a boss's heat, the 16ths between
-    for (const k of [0.5, 1.5, 2.5, 3.5]) kit.at('rim', b0 + k, 0.56, 0.3);
+    for (const k of [0.5, 1.5, 2.5, 3.5]) kit.at('rim', b0 + k, 0.66, 0.3);
     if (tier >= 4 || (boss && tier >= 3)) for (const k of [0.25, 1.25, 2.25, 3.25]) kit.at('rim', b0 + k, 0.2, 0.38);
     // 梆子: a 16th before each backbeat
-    if (tier >= 1 || boss) { kit.at('bang', b0 + 0.75, 0.44, 0.45); kit.at('bang', b0 + 2.75, 0.44, 0.45); }
+    if (tier >= 1 || boss) { kit.at('bang', b0 + 0.75, 0.54, 0.45); kit.at('bang', b0 + 2.75, 0.54, 0.45); }
     // 小锣 (才) on 3 from tier 3; on 1 too in a boss's later phases
     if (tier >= 3 || boss) kit.at('xiaoluo', b0 + 3, 0.065, 0.42);
     if (boss && tier >= 3) kit.at('xiaoluo', b0 + 1, 0.05, 0.42);
@@ -1326,6 +1372,8 @@ function shengStabs(c: Ctx, oct: number, o: { gain: number; from: number; at: nu
 const mirror: ThemeSpec = {
   get level() { return MIRROR_LEVEL[mm.colour]; },
   get style() { return MIRROR_STYLE[mm.colour]; },
+  fadeIn: 0.05,
+  epoch: mirrorEpoch,
   shape(p, r) { shapeBattle(p, r ?? makeRng(p.index + 1), false); },
   arrange(c) {
     const { p } = c;
@@ -1340,7 +1388,8 @@ const mirror: ThemeSpec = {
     const orn = 0.22 + 0.07 * tier;
     const flutter = tier >= 3;
     const by = (v: BattleVoice) => notes.filter((n) => n.v === v);
-    const dizi = battleLine(c, 'dizi', by('dizi'), o, { gain: 0.66 + 0.02 * tier, pan: 0.1, send: 0.16, echo: col === 'lake' ? 0.12 : 0.05, orn, flutter });
+    // (the first layers leave the war drums room on a phone's small speaker)
+    const dizi = battleLine(c, 'dizi', by('dizi'), o, { gain: tier <= 1 ? 0.6 : 0.66 + 0.02 * tier, pan: 0.1, send: 0.16, echo: col === 'lake' ? 0.12 : 0.05, orn, flutter });
     const xiao = battleLine(c, 'xiao', by('xiao'), octNear(c, by('xiao'), REG.xiao), { gain: 0.78, pan: -0.25, send: 0.3, orn: orn * 0.7, slide: 0.25, echo: col === 'lake' ? 0.1 : 0 });
     const suona = battleLine(c, 'suona', by('suona'), octNear(c, by('suona'), REG.suona), { gain: 0.5, pan: 0.05, send: 0.18, orn, scoop: 90 });
     ev.push(...[dizi, xiao, suona].filter(notNull));
@@ -1350,14 +1399,16 @@ const mirror: ThemeSpec = {
     if (ax) ev.push(...[battleLine(c, 'xiao', ax, octNear(c, ax, REG.xiao), { gain: col === 'lake' ? 0.66 : 0.56, pan: -0.3, send: 0.32, prio: 1, slide: 0.3, echo: col === 'lake' ? 0.12 : 0 })].filter(notNull));
     if (ad) ev.push(...[battleLine(c, 'dizi', ad, octNear(c, ad, REG.diziAns), { gain: 0.46, pan: 0.25, send: 0.2, prio: 1, echo: 0.08 })].filter(notNull));
     // tight (or pushed by danger into it): the 唢呐 doubles the whole tune an octave below the 笛
-    // (always the octave: in unison it would beat against the lead and bury it)
+    // (always the octave: in unison it would beat against the lead and bury it) — below the octave
+    // the 笛 actually plays, which battleLine lowers when the tune would pass E6
     if (tier >= 4) {
       const dbl = notes.filter((n) => n.v === 'dizi' && !n.pick).map((n) => ({ ...n, v: 'suona' as const }));
-      ev.push(...[battleLine(c, 'suona', dbl, o - 1, { gain: 0.4, pan: -0.08, send: 0.18, prio: 1, scoop: 70 })].filter(notNull));
-    } else if (tier >= 2 && (p.role === 'cheng' || p.role === 'he')) {
-      // 支声: the 箫 doubles the 笛's long notes an octave below
+      ev.push(...[battleLine(c, 'suona', dbl, diziOct(c, by('dizi'), o) - 1, { gain: 0.4, pan: -0.08, send: 0.18, prio: 1, scoop: 70 })].filter(notNull));
+    }
+    if (tier >= 4 || (tier >= 2 && (p.role === 'cheng' || p.role === 'he'))) {
+      // 支声: the 箫 doubles the 笛's long notes an octave below (in every phrase of the climax)
       const long = notes.filter((n) => n.v === 'dizi' && n.dur >= 1 && !n.pick);
-      if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.xiao), { gain: 0.46, pan: -0.2, send: 0.3, prio: 1 })].filter(notNull));
+      if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.xiao), { gain: tier >= 4 ? 0.52 : 0.46, pan: -0.2, send: 0.3, prio: 1 })].filter(notNull));
     }
     // support: 笙 (pad, then stabs), 二胡 counterline
     const sh = octFor(p, REG.sheng) + (col === 'palace' ? 1 : 0); // the palace's 笙 voiced high
@@ -1384,6 +1435,8 @@ const mirror: ThemeSpec = {
 const mirrorBoss: ThemeSpec = {
   get level() { return MIRROR_BOSS_LEVEL[mm.colour]; },
   get style() { return MIRROR_BOSS_STYLE[mm.colour]; },
+  fadeIn: 0.05,
+  epoch: mirrorEpoch,
   shape(p, r) { shapeBattle(p, r ?? makeRng(p.index + 1), true); },
   arrange(c) {
     const { p } = c;
@@ -1402,15 +1455,17 @@ const mirrorBoss: ThemeSpec = {
     const dz = battleLine(c, 'dizi', by('dizi'), octNear(c, by('dizi'), REG.bossDizi), { gain: 0.5, pan: 0.2, send: 0.2, orn: 0.3, flutter: true });
     ev.push(...[suona, xiao, dz].filter(notNull));
     // the 箫 low and ominous under the long notes, in every phase; from phase 1 the 笛 above the 唢呐
-    // (支声): a 4th over it, meeting it in unison where that would climb past E6
+    // (支声): a 4th over it, silent where that would climb past E6 (in unison it would bury the lead)
     const long = notes.filter((n) => n.v === 'suona' && n.dur >= 1 && !n.pick);
-    if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.bossXiao), { gain: step === 0 ? 0.42 : 0.36, pan: -0.3, send: 0.32, prio: 1 })].filter(notNull));
+    if (long.length) ev.push(...[battleLine(c, 'xiao', long, octNear(c, long, REG.bossXiao), { gain: 0.5, pan: -0.3, send: 0.32, prio: 1 })].filter(notNull));
     if (step >= 1) {
       const het = notes.filter((n) => n.v === 'suona' && !n.pick && (n.dur >= 0.75 || Math.abs(n.beat - Math.round(n.beat)) < 1e-6 || step >= 2))
-        .map((n) => ({ ...n, deg: midiOf(c, n.deg + 2, o) <= DIZI_TOP ? n.deg + 2 : n.deg, v: 'dizi' as const }));
+        .filter((n) => midiOf(c, n.deg + 2, o) <= DIZI_TOP)
+        .map((n) => ({ ...n, deg: n.deg + 2, v: 'dizi' as const }));
       ev.push(...[battleLine(c, 'dizi', het, o, { gain: step >= 2 ? 0.5 : 0.42, pan: 0.25, send: 0.2, prio: 1, flutter: true, orn: 0.25, echo: col === 'lake' ? 0.1 : 0 })].filter(notNull));
     }
-    const ans = answers(notes, (v) => (v === 'suona' ? (step >= 1 ? null : 'xiao') : v === 'xiao' ? 'dizi' : null));
+    // the answers in the holds: the 箫 under the 唢呐 in every phase, the 笛 over the 箫
+    const ans = answers(notes, (v) => (v === 'suona' ? 'xiao' : v === 'xiao' ? 'dizi' : null));
     for (const [who, list] of ans) ev.push(...[battleLine(c, who, list, octNear(c, list, who === 'dizi' ? REG.bossDizi : REG.bossXiao), { gain: 0.5, pan: who === 'dizi' ? 0.25 : -0.3, send: 0.3, prio: 1 })].filter(notNull));
     // support: 笙 pad, then stabs; 二胡 (快弓 in the 转); 琵琶 strums, 古筝 gallop
     ev.push(pad(c, 0, octFor(p, REG.sheng), { gain: 0.13, send: 0.35, vel: 0.62, air: 0.3, overlap: 1.5, start: secOf(c, from) }));
@@ -1426,11 +1481,17 @@ const mirrorBoss: ThemeSpec = {
 /** One-shots the mirror's audio plays on the music bus between phrases (music.cue). */
 export type MirrorCue = 'clear' | 'danger' | 'phase';
 /**
- * A cue in the band's time: `bpm` is the band's tempo (mirrorBpm()); t = 0 is meant to fall on a beat
- * (music.cue's `quantize`), so the roll runs in the band's 16ths and its accent lands on the next beat.
- * The drums are the battle kit's (the knock a phone can play).
+ * A cue in the band's time: `bpm` is the band's tempo, `at` the seconds from music.cue's start to the
+ * band's next beat (music-player.ts bandBeat), so the roll runs in the band's 16ths and its accent
+ * lands on the beat after. The drums are the battle kit's (the knock a phone can play).
  */
-export function mirrorCue(kind: MirrorCue, seed = 1, bpm = 144): MusicEvent[] {
+export function mirrorCue(kind: MirrorCue, seed = 1, bpm = 144, at = 0): MusicEvent[] {
+  const ev = cueEvents(kind, seed, bpm);
+  if (at > 0 && Number.isFinite(at)) for (const e of ev) e.t += at;
+  return ev;
+}
+
+function cueEvents(kind: MirrorCue, seed: number, bpm: number): MusicEvent[] {
   const tempo = Math.round(clamp(Number.isFinite(bpm) ? bpm : 144, 128, MIRROR_MAX_BPM));
   const spb = 60 / tempo;
   const c = { p: { bpm: tempo, beats: 8, mode: M(62, 4) } as Phrase, r: makeRng(seed), spb, seed } as Ctx;

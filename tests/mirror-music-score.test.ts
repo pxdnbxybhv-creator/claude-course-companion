@@ -4,12 +4,15 @@
 // energy in every layer, the plucked strings only keep time, the lead sounds in (nearly) every bar, the
 // 笛 sits in a flute's register. And the battle voices themselves: tongued chiff, 笛膜 buzz on loud
 // notes only, 花舌, 叠音/打音/颤音, scoops — rendered cleanly.
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { makeRng, mixSeed } from '../src/core/rng';
 import { Composer, daySeed } from '../src/audio/music-theory';
 import { runMusicJob, renderDrum, renderKit, renderLine, renderPlucks, renderSheng, type LineNote } from '../src/audio/music-dsp';
 import { filter, highpass } from '../src/audio/dsp';
 import type { MusicEvent } from '../src/audio/music-themes';
+
+// every test starts on the map's first call (the director rotates it wave by wave)
+beforeEach(async () => { (await import('../src/audio/music-themes')).setMirrorMusic({ wave: 0 }); });
 
 const COLOURS = ['lake', 'forest', 'palace'] as const;
 const WINDS = new Set(['dizi', 'xiao', 'suona']);
@@ -103,8 +106,8 @@ describe('水月幻镜 · the battle score, measured', () => {
     for (const colour of COLOURS) {
       const midis: number[] = [];
       let bars = 0, withLead = 0;
-      for (const [left] of TIERS) {
-        T.setMirrorMusic({ colour, left, total: 60, danger: 0, bossPhase: 0 });
+      for (const [left] of TIERS) for (const wave of [0, 1, 2]) {
+        T.setMirrorMusic({ colour, left, total: 60, danger: 0, bossPhase: 0, wave });
         const seed = daySeed('mirror', '2026-09-23');
         const comp = new Composer(T.THEMES.mirror.style, seed, 1);
         const r = makeRng(9);
@@ -137,8 +140,8 @@ describe('水月幻镜 · the battle score, measured', () => {
   it('the battle tune drives: dotted rhythms, 吐音 repeated notes, upward 4th/5th leaps outnumber downward ones', async () => {
     const T = await import('../src/audio/music-themes');
     let up = 0, down = 0, dotted = 0, tu = 0, n = 0;
-    for (const colour of COLOURS) {
-      T.setMirrorMusic({ colour, left: 30, total: 60, danger: 0, bossPhase: 0 });
+    for (const colour of COLOURS) for (const wave of [0, 1, 2]) {
+      T.setMirrorMusic({ colour, left: 30, total: 60, danger: 0, bossPhase: 0, wave });
       const comp = new Composer(T.THEMES.mirror.style, daySeed('mirror', '2026-09-24'));
       const r = makeRng(2);
       for (let i = 0; i < 12; i++) {
@@ -157,6 +160,7 @@ describe('水月幻镜 · the battle score, measured', () => {
     expect(up).toBeGreaterThan(down);
     expect(dotted / n).toBeGreaterThan(0.04);
     expect(tu / n).toBeGreaterThan(0.12);
+    T.setMirrorMusic({ wave: 0 });
   });
 });
 
@@ -192,7 +196,7 @@ describe('the battle voices', () => {
     expect(Array.from(renderLine(sr, 'dizi', plain, 3, true))).not.toEqual(Array.from(renderLine(sr, 'dizi', plain, 3)));
   });
 
-  it('the battle 笛 is breathier and brighter; its 笛膜 buzz grows with the breath', () => {
+  it('the battle 笛 is breathier and brighter, never stinging; its 笛膜 buzz grows with the breath', () => {
     const hi = (x: Float32Array, f: number) => {
       const y = Float32Array.from(x); filter(y, highpass(44100, f, 0.7)); filter(y, highpass(44100, f, 0.7));
       let a = 0, b = 0; for (let i = 0; i < x.length; i++) { a += y[i] * y[i]; b += x[i] * x[i]; } return a / b;
@@ -200,9 +204,12 @@ describe('the battle voices', () => {
     const held = (vel: number): LineNote[] => [{ t: 0, dur: 1.5, freq: 587, vel }];
     const gentle = renderLine(44100, 'dizi', held(0.85), 5);
     const loud = renderLine(44100, 'dizi', held(0.85), 5, true);
-    expect(hi(loud, 4000)).toBeGreaterThan(hi(gentle, 4000) * 1.8);
+    expect(hi(loud, 4000)).toBeGreaterThan(hi(gentle, 4000) * 1.5);
     // soft notes stay clean: the high share rises with the velocity
     expect(hi(renderLine(44100, 'dizi', held(1), 5, true), 4000)).toBeGreaterThan(hi(renderLine(44100, 'dizi', held(0.35), 5, true), 4000));
+    // its busiest register (E5–A5) does not sting where a phone is loudest: a held A5 at full breath keeps
+    // ≤ 20 % of its energy above 4 kHz (it was 31 % with the 4.6 kHz presence peak and a louder 笛膜)
+    expect(hi(renderLine(44100, 'dizi', [{ t: 0, dur: 1.5, freq: 880, vel: 1 }], 5, true), 4000)).toBeLessThan(0.2);
   });
 
   it('the kit, the hard drums, the 笙 stab and the battle plucks', () => {
@@ -239,10 +246,10 @@ describe('水月幻镜 · the battle score, second pass', () => {
     for (const theme of ['mirror', 'mirror-boss'] as const) {
       for (const colour of COLOURS) {
         const ms: number[] = [];
-        for (const day of month) {
+        for (const [di, day] of month.entries()) {
           const states = theme === 'mirror' ? [{ left: 56, total: 60 }, { left: 30, total: 60 }, { left: 12, total: 60 }] : [{ bossPhase: 1 }, { bossPhase: 2 }];
           for (const st of states) {
-            T.setMirrorMusic({ colour, danger: 0, bossPhase: 0, left: null, total: null, ...st });
+            T.setMirrorMusic({ colour, danger: 0, bossPhase: 0, left: null, total: null, wave: di % 3, ...st });
             const seed = daySeed(theme, day), cs = mixSeed(seed, 1);
             const comp = new Composer(T.THEMES[theme].style, seed);
             const r = makeRng(mixSeed(cs, 0xa11));
@@ -403,6 +410,107 @@ describe('水月幻镜 · the battle score, second pass', () => {
       const phase = T.mirrorCue('phase', 1, bpm);
       const call = phase.find((e) => e.inst === 'suona')!;
       expect(call.job.op === 'line' && call.t + call.job.notes[1].t).toBeCloseTo(spb, 5);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The band follows the fight (music-player.ts): a boss's new phase re-composes the phrases that have no
+// sound yet, the band's beat grid places the cues, and a fight opens without the handover's slow fade.
+
+describe('水月幻镜 · the band follows the fight', () => {
+  /** A context that records nothing but the fade time constants; a worker that never answers (nothing sounds). */
+  function fakeBus(P: typeof import('../src/audio/music-player')) {
+    const tcs: number[] = [];
+    const param = () => ({ value: 1, setValueAtTime() {}, setTargetAtTime(_v: number, _t: number, tc: number) { tcs.push(tc); }, cancelScheduledValues() {} });
+    const node = () => ({ connect: (d: unknown) => d, disconnect() {}, start() {}, stop() {}, gain: param(), playbackRate: param(), pan: param(), threshold: param(), knee: param(), ratio: param(), attack: param(), release: param(), delayTime: param(), frequency: param(), Q: param() });
+    const ctx: Record<string, unknown> = {
+      currentTime: 0, sampleRate: 8000, state: 'running', destination: node(),
+      createBuffer: (ch: number, len: number, rate: number) => { const d = Array.from({ length: ch }, () => new Float32Array(len)); return { duration: len / rate, numberOfChannels: ch, length: len, getChannelData: (i: number) => d[i] }; },
+    };
+    for (const k of ['createGain', 'createDynamicsCompressor', 'createWaveShaper', 'createConvolver', 'createChannelMerger', 'createDelay', 'createBiquadFilter', 'createBufferSource', 'createStereoPanner']) ctx[k] = node;
+    const worker = { postMessage() {}, terminate() {}, onmessage: null, onerror: null } as unknown as Worker;
+    return { bus: new P.MusicBus(ctx as unknown as BaseAudioContext, { worker }), ctx: ctx as { currentTime: number }, tcs };
+  }
+
+  it('a new boss phase re-composes the phrases not yet sounding: the band steps up at the next phrase, in time', async () => {
+    const T = await import('../src/audio/music-themes');
+    const P = await import('../src/audio/music-player');
+    T.setMirrorMusic({ colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 });
+    const { bus, ctx } = fakeBus(P);
+    const c = new P.Conductor(bus, 'mirror-boss', 0.45, daySeed('mirror-boss', '2026-09-27'), 0, { fadeIn: 0.7, record: true });
+    const stabs = (from: number) => c.events.filter((e) => e.at >= from - 1e-6 && e.ev.key?.startsWith('sheng:stab')).length;
+    c.tick(4.5, 1.2);
+    ctx.currentTime = 6; c.tick(10.5, 7.2);
+    expect(c.phrases.length).toBe(2);
+    const [p0, p1] = c.phrases;
+    expect(p1.start).toBeGreaterThan(7.2); // composed, nothing of it sounding yet
+    const before0 = c.events.filter((e) => e.at < p1.start).length;
+    expect(stabs(p1.start)).toBe(0); // phase 0: no 笙 stabs
+    const bpm0 = p1.phrase.bpm;
+    T.setMirrorMusic({ bossPhase: 1 }); // the boss changes phase at 6 s
+    c.tick(10.5, 7.2);
+    expect(c.phrases.length).toBe(2);
+    expect(c.phrases[0]).toBe(p0); // what is sounding is left alone
+    expect(c.events.filter((e) => e.at < p1.start).length).toBe(before0);
+    const q1 = c.phrases[1];
+    expect(q1).not.toBe(p1);
+    expect(q1.start).toBe(p1.start); // on the grid: the new phrase starts where the old one would have
+    expect(q1.phrase.role).toBe(p1.phrase.role); // the same place in the 起承转合
+    expect(q1.phrase.bpm).toBeGreaterThan(bpm0); // phase 1: +3 bpm
+    expect(stabs(q1.start)).toBeGreaterThan(0); // …and its layers (笙 stabs, the 笛 over the 唢呐)
+    expect(c.events.some((e) => e.at >= q1.start && e.ev.inst === 'dizi' && e.ev.gain === 0.42)).toBe(true);
+    // the next phrases follow the new one without a gap
+    ctx.currentTime = 12; c.tick(16.5, 13.2);
+    for (let i = 1; i < c.phrases.length; i++) expect(c.phrases[i].start).toBeCloseTo(c.phrases[i - 1].next, 9);
+    // a phase rising again once the next phrase is already sounding: only the phrases after it change
+    const sounding = c.phrases.filter((x) => x.start < 13.2).length;
+    T.setMirrorMusic({ bossPhase: 2 });
+    c.tick(16.5, 13.2);
+    expect(c.phrases.slice(0, sounding).every((x, i) => x === c.phrases[i])).toBe(true);
+    c.finish(20, 0.5);
+    T.setMirrorMusic({ bossPhase: 0 });
+  });
+
+  it('the band\'s beat grid: the next beat after any moment, in the tempo of the phrase it falls in (bandBeat)', async () => {
+    const T = await import('../src/audio/music-themes');
+    const P = await import('../src/audio/music-player');
+    T.setMirrorMusic({ colour: 'forest', left: 40, total: 60, danger: 0, bossPhase: 0 });
+    const { bus, ctx } = fakeBus(P);
+    const c = new P.Conductor(bus, 'mirror', 0.45, daySeed('mirror', '2026-09-27'), 0, { fadeIn: 0.7 });
+    c.tick(20, 1.2);
+    const ph = c.phrases;
+    expect(ph.length).toBeGreaterThanOrEqual(2);
+    for (let t = 0.5; t < ph[ph.length - 1].next - 0.5; t += 0.137) {
+      const b = c.beatAt(t)!;
+      const x = [...ph].reverse().find((p) => p.start <= b.at + 1e-9)!;
+      const spb = 60 / x.phrase.bpm;
+      expect(b.at).toBeGreaterThanOrEqual(t - 1e-9);
+      expect(b.at - t).toBeLessThan(spb + 1e-9);
+      const k = (b.at - x.start) / spb;
+      expect(Math.abs(k - Math.round(k))).toBeLessThan(1e-6); // on a beat of its phrase
+      expect(b.bpm).toBe(x.phrase.bpm);
+    }
+    // the live band answers bandBeat (the director's cues): now + wait is a beat ≥ 30 ms ahead
+    ctx.currentTime = 3.21;
+    const g = P.bandBeat(0.03)!;
+    expect(g.wait).toBeGreaterThanOrEqual(0.03);
+    expect(g.wait).toBeLessThan(60 / g.bpm + 0.03);
+    expect(3.21 + g.wait).toBeCloseTo(c.beatAt(3.24)!.at, 9);
+    c.finish(4, 0.5);
+    expect(P.bandBeat()).toBeNull(); // a finished band has no beat
+  });
+
+  it('a fight opens on its first drum stroke (a 50 ms fade-in); the shop keeps the handover\'s 0.7 s', async () => {
+    const T = await import('../src/audio/music-themes');
+    const P = await import('../src/audio/music-player');
+    T.setMirrorMusic({ colour: 'lake', left: null, total: null, danger: 0, bossPhase: 0 });
+    for (const [id, tc] of [['mirror', 0.05], ['mirror-boss', 0.05], ['mirror-calm', 0.7], ['garden', 0.7]] as const) {
+      const { bus, tcs } = fakeBus(P);
+      tcs.splice(0);
+      const c = new P.Conductor(bus, id, 0.45, 1, 0, { fadeIn: 0.7 });
+      expect(tcs, id).toEqual([tc, tc, tc]);
+      c.finish(1, 0.5);
     }
   });
 });

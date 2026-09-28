@@ -2,31 +2,35 @@
 // the calm theme for the lobby, the shop and the results; the wave theme with a 0.3 s cut (its drum
 // fill); the clear cue (钹 + 大鼓) when the timer reaches 0 or the last boss falls; the boss phase and
 // danger fed to the band, each answered by a cue on the band's next beat (a 堂鼓 roll into 大鼓 + 小锣 when the danger rises,
-// at most every 12 s; a 大锣 with the 唢呐's call on a new boss phase); a new map restarts the band
+// at most every 12 s; a 大锣 with the 唢呐's call on a new boss phase), shifted onto that beat from the band's grid
+// (music-player.ts bandBeat, stubbed here); each wave tells the band its number; a new map restarts the band
 // through a breath of silence; dispose forgets.
 // The mirror audio (sfx.ts) hands its music() and the engine's HUD feed to the director.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const calls: string[] = [];
-const st = { want: null as string | null };
+/** The first event's time of each cue, and the band's beat the stub reports. */
+const cueAt: number[] = [];
+const st = { want: null as string | null, beat: null as { wait: number; bpm: number } | null };
+vi.mock('../src/audio/music-player', () => ({ bandBeat: () => st.beat }));
 vi.mock('../src/audio/music', () => ({
   music: {
     get theme() { return st.want; },
     setTheme: (id: string | null, o?: { cut?: number; fade?: number }) => { calls.push(`setTheme(${id}${o ? ', ' + JSON.stringify(o) : ''})`); st.want = id; },
-    cue: (ev: { inst: string }[], o?: { choke?: number }) => { calls.push(`cue(${ev.map((e) => e.inst).join('+')}, ${JSON.stringify(o ?? {})})`); },
+    cue: (ev: { inst: string; t: number }[], o?: { choke?: number }) => { calls.push(`cue(${ev.map((e) => e.inst).join('+')}, ${JSON.stringify(o ?? {})})`); cueAt.push(Math.min(...ev.map((e) => e.t))); },
     duck: () => {},
   },
 }));
 
 const { mirrorMusic, dangerOf, themeOf } = await import('../src/views/mirror/audio/music');
-const { getMirrorMusic } = await import('../src/audio/music-themes');
+const { getMirrorMusic, mirrorEpoch } = await import('../src/audio/music-themes');
 
 const hud = (time: number | null, hp = 80, crowd = 0.2, boss: { id: string; hp: number; phase: number } | null = null) =>
   mirrorMusic.hud({ hp, hpMax: 100, lowHp: hp < 30, time, boss } as never, crowd);
 const take = () => calls.splice(0);
 
 describe('the mirror music director', () => {
-  beforeEach(() => { vi.useFakeTimers(); mirrorMusic.dispose(); st.want = null; take(); });
+  beforeEach(() => { vi.useFakeTimers(); mirrorMusic.dispose(); st.want = null; st.beat = null; take(); cueAt.splice(0); });
   afterEach(() => { vi.useRealTimers(); });
 
   it('maps phases to themes', () => {
@@ -50,7 +54,7 @@ describe('the mirror music director', () => {
     expect(getMirrorMusic().total).toBe(20);
     hud(10, 50, 0.95);
     expect(getMirrorMusic().danger).toBeGreaterThanOrEqual(0.5); // a crowd at the cap pushes a layer up
-    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']); // …and the drums answer at once
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {})']); // …and the drums answer at once
     hud(0);
     expect(take()).toEqual(['cue(bo+drum, {"choke":0.16})', 'setTheme(mirror-calm, {"cut":0.05,"fade":0.4})']);
     hud(0); // heard once
@@ -60,6 +64,30 @@ describe('the mirror music director', () => {
     mirrorMusic.phase('wave', 'lake');
     expect(take()).toEqual(['setTheme(mirror, {"cut":0.3,"fade":1.2})']);
     expect(getMirrorMusic().left).toBeNull(); // a new wave counts its own phrases until the HUD reports
+  });
+
+  it('each wave tells the band its number (the call rotates); the cues land on the band\'s next beat', () => {
+    mirrorMusic.phase('wave', 'lake');
+    const w = getMirrorMusic().wave ?? 0;
+    mirrorMusic.phase('shop', 'lake');
+    mirrorMusic.phase('wave', 'lake');
+    expect(getMirrorMusic().wave).toBe(w + 1);
+    mirrorMusic.phase('boss', 'lake'); // a boss has its own call
+    expect(getMirrorMusic().wave).toBe(w + 1);
+    take(); cueAt.splice(0);
+    // the band's next beat is 0.31 s away: the boss-phase cue's 大锣 (t = 0) waits for it, past music.cue's own 20 ms
+    st.beat = { wait: 0.31, bpm: 146 };
+    hud(null, 80, 0.1, { id: 'b', hp: 1, phase: 0 });
+    hud(null, 80, 0.1, { id: 'b', hp: 0.6, phase: 1 });
+    expect(take()).toEqual(['cue(gong+drum+suona, {})']);
+    expect(cueAt[0]).toBeCloseTo(0.29, 6);
+    // no band playing: at once
+    mirrorMusic.phase('wave', 'lake');
+    take(); cueAt.splice(0);
+    st.beat = null;
+    hud(30, 90, 0.2); hud(29, 90, 0.95);
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {})']);
+    expect(cueAt[0]).toBe(0);
   });
 
   it('a wave left without a clear (the shop straight after) still plays the cue; dying drops out fast', () => {
@@ -82,9 +110,11 @@ describe('the mirror music director', () => {
     expect(take()).toEqual([]);
     hud(null, 80, 0.1, { id: 'b', hp: 1, phase: 0 });
     expect(take()).toEqual([]); // the entry has its own roll into the 锣
+    const e0 = mirrorEpoch();
     hud(null, 80, 0.1, { id: 'b', hp: 0.6, phase: 1 });
     expect(getMirrorMusic().bossPhase).toBe(1);
-    expect(take()).toEqual(['cue(gong+drum+suona, {"quantize":true})']); // a new phase: 大锣, 大鼓 and the 唢呐's call
+    expect(mirrorEpoch()).toBe(e0 + 1); // the band re-composes what it has not played
+    expect(take()).toEqual(['cue(gong+drum+suona, {})']); // a new phase: 大锣, 大鼓 and the 唢呐's call
     hud(null, 80, 0.1, { id: 'b', hp: 0.5, phase: 1 });
     expect(take()).toEqual([]);
     hud(null, 80, 0.1, null);
@@ -116,17 +146,20 @@ describe('the mirror music director', () => {
     mirrorMusic.phase('wave', 'lake');
     take();
     hud(30, 90, 0.2);
+    const e0 = mirrorEpoch();
     hud(29, 90, 0.95); // a crowd at the cap
-    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']);
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {})']);
+    expect(mirrorEpoch()).toBe(e0 + 1); // …and the band re-composes its next phrases with the danger layer
     hud(28, 90, 0.95); // still in danger: no repeat
     for (let i = 0; i < 20; i++) hud(27, 90, 0.2); // it falls away (0.05 per report)
     expect(getMirrorMusic().danger).toBeLessThan(0.5);
     hud(26, 90, 0.95); // rises again within 12 s: the band's next phrase carries it, no second cue
     expect(take()).toEqual([]);
+    expect(mirrorEpoch()).toBe(e0 + 1); // a danger hovering around one half does not churn the band
     for (let i = 0; i < 20; i++) hud(25, 90, 0.2);
     vi.advanceTimersByTime(12_500);
     hud(24, 90, 0.95);
-    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {"quantize":true})']);
+    expect(take()).toEqual(['cue(drum+drum+drum+drum+gong+drum, {})']);
     for (let i = 0; i < 20; i++) hud(23, 90, 0.2);
     vi.advanceTimersByTime(12_500);
     hud(22, 0, 0.95); // dead

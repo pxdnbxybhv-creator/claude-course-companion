@@ -271,9 +271,12 @@ class MirrorEngine implements Engine {
 
   /**
    * The frame-time guard (GDD §24.3): when frames arrive more than 20 ms apart (under ~50 fps) for
-   * 2 s, drop particles and fade player effects; recover after 8 s of fast frames. It is based on
-   * the real interval between animation frames, so a device limited by rasterising trips it too.
-   * Intervals over 250 ms (a tab switch, a GC pause, a breakpoint) are ignored.
+   * 2 s, give something up, cheapest to lose first: the paper's full-screen overlays (grain,
+   * vignette), then a notch of resolution at a time, then particles and player effects (degrade).
+   * Recovery runs the other way: effects after 8 s of fast frames, then a notch of resolution (or the
+   * overlays, last) after each long fast stretch, a few times a run. It is based on the real interval
+   * between animation frames, so a device limited by rasterising trips it too. Intervals over 250 ms
+   * (a tab switch, a GC pause, a breakpoint) are ignored.
    */
   private guard(ms: number): void {
     const w = this.world;
@@ -283,17 +286,31 @@ class MirrorEngine implements Engine {
     this.frameMs = this.frameMs * 0.9 + ms * 0.1;
     const s = ms / 1000;
     if (this.frameMs > 20) { this.slowFor += s; this.fastFor = 0; } else { this.fastFor += s; if (this.fastFor > 3) this.slowFor = 0; }
-    // slow: first a notch of resolution (every 2 s while still slow), then effects
+    // slow: first the overlays, then a notch of resolution (every 2 s while still slow), then effects
     if (this.slowFor > 2) {
-      if (!w.degrade && this.stepRes(-1)) this.slowFor = 0;
+      if (!w.degrade && this.shedOverlays(true)) this.slowFor = 0;
+      else if (!w.degrade && this.stepRes(-1)) this.slowFor = 0;
       else if (!w.degrade) w.degrade = 1;
     }
-    // fast again: effects come back first; resolution only after a long fast stretch, a few times a run
+    // fast again: effects come back first; resolution, then the overlays, only after a long fast stretch
     if (w.degrade && this.fastFor > 8) w.degrade = 0;
-    else if (!w.degrade && this.resCap !== Infinity && this.resUps > 0 && this.fastFor > RES_UP_AFTER) {
-      if (this.stepRes(1)) this.resUps--;
+    else if (!w.degrade && this.resUps > 0 && this.fastFor > RES_UP_AFTER && (this.resCap !== Infinity || this.overlaysShed())) {
+      if (this.resCap !== Infinity ? this.stepRes(1) : this.shedOverlays(false)) this.resUps--;
       this.fastFor = 0;
     }
+  }
+  /** The painter's ambience overlays (paint/ambient.ts), when it has them. */
+  private ambience(): { shed: boolean } | null {
+    const a = (this.painter as Painter & { ambience?: { shed: boolean } }).ambience;
+    return a && typeof a === 'object' && 'shed' in a ? a : null;
+  }
+  private overlaysShed(): boolean { return !!this.ambience()?.shed; }
+  /** Shed (true) or restore (false) the full-screen overlays; false when there was nothing to change. */
+  private shedOverlays(on: boolean): boolean {
+    const a = this.ambience();
+    if (!a || a.shed === on || (on && this.deps.settings.quality === 'low')) return false;
+    a.shed = on;
+    return true;
   }
   private frameMs = 16.7;
 

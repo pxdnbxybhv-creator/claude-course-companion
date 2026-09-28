@@ -72,7 +72,7 @@ export class Trails {
    * Feed owner `key` of `group` at (x, y), simulation time t: continues its trail (fed last frame, no
    * jump) or starts one. `lim` caps the live trails (the frame guard halves it). Returns the trail or −1.
    */
-  feed(group: number, key: number, x: number, y: number, t: number, width: number, dur: number, tint: number, style: number, lim = this.cap): number {
+  feed(group: number, key: number, x: number, y: number, t: number, width: number, dur: number, tint: number, style: number, lim = this.cap, jump = JUMP): number {
     let m = this.maps[group];
     if (key >= m.length) { const n = new Int16Array(Math.max(key + 1, m.length * 2, 16)).fill(-1); n.set(m); this.maps[group] = m = n; }
     let i = m[key];
@@ -80,7 +80,7 @@ export class Trails {
     if (i >= 0 && this.np[i] > 0) {
       const h = i * TRAIL_PTS + this.head[i];
       const dx = x - this.px[h], dy = y - this.py[h];
-      if (dx * dx + dy * dy > JUMP * JUMP) i = -1;
+      if (dx * dx + dy * dy > jump * jump) i = -1;
     }
     if (i < 0) {
       if (this.count >= Math.min(lim, this.cap)) this.reap(t);
@@ -110,6 +110,18 @@ export class Trails {
     this.px[h] = x; this.py[h] = y; this.pt[h] = t;
     if (this.np[i] < TRAIL_PTS) this.np[i]++;
     return i;
+  }
+
+  /** Owner `key` of `group` is someone new (a pool slot reused): its old trail fades on unfed. */
+  cut(group: number, key: number): void {
+    const m = this.maps[group];
+    if (key < m.length) m[key] = -1;
+  }
+  /** Live trails of a group (dev, tests). */
+  live(group: number): number {
+    let n = 0;
+    for (let i = 0; i < this.cap; i++) if (this.alive[i] && this.group[i] === group) n++;
+    return n;
   }
 
   /** Release every trail whose newest point has aged past its length. */
