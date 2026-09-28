@@ -45,7 +45,21 @@ export interface MusicEngine {
   duck(amount?: number, ms?: number): void;
   /** Currently requested theme. */
   readonly theme: MusicTheme | null;
+  /**
+   * Create (or reuse the sound engine's) context and the music bus without resuming anything —
+   * allowed before a gesture; the context stays suspended until one. A no-op while music is off.
+   */
+  prime(): void;
+  /**
+   * The context and bus for a hand-scored reel (the opening PV, src/views/intro/reel.ts), primed if
+   * need be; null while music is off or unsupported. The reel plays through the bus's duck, volume
+   * and switch like any theme, so setEnabled(false) silences it without stopping its clock.
+   */
+  attach(): { ctx: AudioContext; bus: MusicBusHandle } | null;
 }
+
+/** The music bus as a reel sees it. */
+export type MusicBusHandle = MusicBus;
 
 export interface MusicStats {
   state: AudioContextState | 'none' | 'unsupported';
@@ -189,9 +203,19 @@ class WebMusic implements MusicEngine {
     for (const type of ['pointerdown', 'keydown', 'touchend'] as const) f.call(window, type, this.onGesture, { capture: true, passive: true } as AddEventListenerOptions);
   }
 
+  prime() {
+    if (this.enabled) this.connect(false);
+  }
+
+  attach(): { ctx: AudioContext; bus: MusicBusHandle } | null {
+    if (!this.enabled) return null;
+    this.connect(false);
+    return this.ctx && this.bus ? { ctx: this.ctx, bus: this.bus } : null;
+  }
+
   private onGesture = () => {
     if (!this.enabled) return; // stay silent (and create nothing) until music is switched on
-    this.attach();
+    this.connect(true);
     const ctx = this.ctx;
     if (!ctx) return;
     if (ctx.state !== 'running') ctx.resume().catch(() => {});
@@ -210,11 +234,14 @@ class WebMusic implements MusicEngine {
     ctx.resume().then(done, () => {});
   };
 
-  /** Find or create the context and the music bus (inside a gesture). */
-  private attach() {
-    if (this.bus || this.unsupported) return;
+  /**
+   * Find or create the context and the music bus. `gesture`: inside one, so the sound engine is
+   * unlocked too; otherwise (prime) its context is only created, left suspended.
+   */
+  private connect(gesture: boolean) {
+    if (this.bus || this.unsupported || typeof window === 'undefined') return;
     let ctx: AudioContext | null = null;
-    try { void audio.unlock(); } catch { /* engine unavailable */ }
+    try { if (gesture) void audio.unlock(); else audio.prime(); } catch { /* engine unavailable */ }
     ctx = engineContext();
     if (!ctx) {
       const C: Ctor | undefined = window.AudioContext ?? (window as unknown as { webkitAudioContext?: Ctor }).webkitAudioContext;

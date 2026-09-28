@@ -6,7 +6,7 @@
 // (/lab.html?scene=audio) renders the same code through an OfflineAudioContext and measures it.
 import type { AmbientKind } from '../core/types';
 import { Mixer } from './graph';
-import { playBell, playChime, playKnock, playPluck } from './voices';
+import { dripBuffer, playBell, playChime, playDrip, playKnock, playPluck } from './voices';
 import { createBed, type Bed } from './ambient';
 import RenderWorker from './render.worker.ts?worker&inline';
 
@@ -29,14 +29,27 @@ export interface AudioEngine {
   setVolume(v: number): void;
   /** A guqin (古琴) pluck on the pentatonic scale. degree 0 = 宫; negative/above 4 wrap octaves. */
   pluck(degree?: number, velocity?: number): void;
-  /** Check-in reward: a short rising phrase of harmonics (泛音). `streak` can make it richer. */
-  chime(streak?: number): void;
+  /**
+   * Check-in reward: a short rising phrase of harmonics (泛音). `streak` can make it richer.
+   * `at` (here and below): the audio-clock time (context seconds) to sound at; omitted = now. A
+   * sound given an `at` is scheduled on the clock as it stands and never resumes a suspended
+   * context (the opening PV's holds suspend it; the sound then waits with the clock).
+   */
+  chime(streak?: number, at?: number): void;
   /** A struck bronze bowl / chime stone (磬) — end of a focus session. */
   bell(): void;
   /** A soft wooden knock (木鱼) — lighting the incense. */
-  knock(): void;
+  knock(at?: number): void;
+  /** A drop touching still water (the opening PV's tap). `pitch` scales it; equal arguments sound identical. */
+  drip(pitch?: number, gain?: number, at?: number): void;
   /** Crossfade the ambient bed. 'qin' = slow generative guqin improvisation. */
   setAmbient(kind: AmbientKind): void;
+  /** Warm a bed's buffers without playing it. */
+  prepareAmbient(kind: AmbientKind): void;
+  /** The bed last asked for with setAmbient (what to restore after borrowing it). */
+  readonly ambient: AmbientKind;
+  /** Create the context (suspended until a gesture) without resuming it, so the music can share it. */
+  prime(): AudioContext | null;
   /** Diagnostics (lab / debugging). */
   stats(): AudioStats;
   /** The context, once unlock() or a sound has created it (the music shares it). */
@@ -121,7 +134,8 @@ class WebAudioEngine implements AudioEngine {
    * interruption) it waits briefly for resume(); a sound that cannot start soon is dropped
    * rather than queued, so nothing stale bursts out at the next unlock.
    */
-  private safely(f: (m: Mixer, t: number) => void) {
+  private safely(f: (m: Mixer, t: number) => void, at?: number) {
+    if (at !== undefined && Number.isFinite(at)) return this.scheduled(f, at);
     const m = this.live();
     const ctx = this.ctx;
     if (!m || !ctx) return;
@@ -131,6 +145,23 @@ class WebAudioEngine implements AudioEngine {
     const t0 = performance.now();
     ctx.resume().then(() => { if (ctx.state === 'running' && performance.now() - t0 < 400) run(); }).catch(() => {});
   }
+
+  /** A one-shot at audio-clock time `at`: never resumes the context (a suspended clock is a hold). */
+  private scheduled(f: (m: Mixer, t: number) => void, at: number) {
+    if (!this.enabled) return;
+    const m = this.ensure();
+    const ctx = this.ctx;
+    if (!m || !ctx || ctx.state === 'closed') return;
+    try { f(m, Math.max(at, ctx.currentTime + 0.003)); } catch (e) { console.warn('[audio]', e); }
+  }
+
+  prime(): AudioContext | null {
+    const m = this.ensure();
+    try { if (m) dripBuffer(m); } catch { /* made on first use instead */ } // the tap's drip, ready before the tap
+    return this.ctx;
+  }
+
+  get ambient(): AmbientKind { return this.want; }
 
   async unlock(): Promise<void> {
     const m = this.ensure();
@@ -176,21 +207,39 @@ class WebAudioEngine implements AudioEngine {
     const v = Math.max(0.05, Math.min(1, Number.isFinite(velocity) ? velocity : 0.7));
     this.safely((m, t) => playPluck(m, t, d, v));
   }
-  chime(streak = 1) {
+  chime(streak = 1, at?: number) {
     if (this.enabled) this.onEffect?.('chime');
-    this.safely((m, t) => playChime(m, t, Number.isFinite(streak) ? streak : 1));
+    this.safely((m, t) => playChime(m, t, Number.isFinite(streak) ? streak : 1), at);
   }
   bell() {
     if (this.enabled) this.onEffect?.('bell');
     this.safely((m, t) => playBell(m, t));
   }
-  knock() {
-    this.safely((m, t) => playKnock(m, t));
+  knock(at?: number) {
+    this.safely((m, t) => playKnock(m, t), at);
+  }
+  drip(pitch = 1, gain = 0.5, at?: number) {
+    const p = Math.max(0.25, Math.min(4, Number.isFinite(pitch) ? pitch : 1));
+    const g = Math.max(0, Math.min(1, Number.isFinite(gain) ? gain : 0.5));
+    this.safely((m, t) => playDrip(m, t, p, g), at);
   }
 
   setAmbient(kind: AmbientKind) {
     this.want = kind ?? 'none';
     this.syncAmbient();
+  }
+
+  /** Synthesize a bed's buffers now (the drop banks, its noise), silently, so switching to it later is
+   *  cheap; the opening film warms the stream in a quiet hold. Never creates the context by itself. */
+  prepareAmbient(kind: AmbientKind) {
+    const m = this.mix;
+    if (!m || kind === 'none') return;
+    try {
+      m.dropBanks();
+      for (const c of ['brown', 'pink', 'white'] as const) m.noise(c, () => {});
+    } catch (e) {
+      console.warn('[audio] prepare', e);
+    }
   }
 
   /** Bring the running bed in line with (enabled, want). Never creates the context by itself. */

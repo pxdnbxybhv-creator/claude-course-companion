@@ -7,6 +7,9 @@
 /* 水月幻镜: while a run shows (a wave, a between-wave screen, a pause) the arena has the whole screen. */
 .shell:has(.mirror-live) .tabbar { display: none; }
 .shell:has(.mirror-live) .view { padding-bottom: 0; animation: none; }
+/* 开篇: the opening film has the whole screen; nothing scrolls, bounces or pulls to refresh under it. */
+.shell:has(.intro-film) .tabbar { display: none; }
+html.intro-on, html.intro-on body { overflow: hidden; overscroll-behavior-y: none; }
 /* A run is paused in the mirror: one small ink dot on the 镜 glyph (the only nudge). */
 .tab { position: relative; }
 .tab-dot { position: absolute; top: 6px; left: calc(50% + 13px); width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: 0.8; pointer-events: none; }

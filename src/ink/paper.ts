@@ -346,6 +346,8 @@ function coloredGrainTile(color: string, variant: 'fine' | 'wash'): HTMLCanvasEl
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.globalCompositeOperation = 'destination-out';
   ctx.drawImage(g, 0, 0);
+  // bounded, as tileCache and macroCache are (a film passing many rgba colours must not grow it for good)
+  if (colTileCache.size > 24) colTileCache.delete(colTileCache.keys().next().value!);
   colTileCache.set(key, c);
   return c;
 }

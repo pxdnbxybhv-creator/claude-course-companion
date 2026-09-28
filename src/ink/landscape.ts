@@ -479,7 +479,8 @@ function paintBody(ctx: CanvasRenderingContext2D, L: Layout, env: SceneEnv, nois
   ctx.restore();
 }
 
-function moonPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, phase: number) {
+/** The lit part of a moon disc at `phase` (0 new · .5 full) as the current path. */
+export function moonPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, phase: number) {
   const p = ((phase % 1) + 1) % 1;
   const waxing = p < 0.5;
   const k = Math.cos(2 * Math.PI * p); // 1 new · −1 full
@@ -1099,6 +1100,8 @@ export interface PondOptions {
    * pond spans that backdrop 1:1; `null` → none.
    */
   body?: { x: number; y: number; r: number; kind?: 'sun' | 'moon' } | null;
+  /** Optional: false paints a one-off (a bake) without keeping its cache, so it never evicts a live pond's. */
+  cache?: boolean;
 }
 
 interface Sprite { c: HTMLCanvasElement; w: number; h: number }
@@ -1319,12 +1322,15 @@ export function paintPond(ctx: CanvasRenderingContext2D, o: PondOptions): void {
   const cl = Math.round(clarity * 20) / 20;
   const key = `${o.w}|${o.h}|${o.dpr}|${cl}|${o.seed ?? 1}|${full}`;
   let ci = pondCaches.findIndex((c) => c.key === key);
-  if (ci < 0) {
+  let C: PondCache;
+  if (ci >= 0) C = pondCaches[ci];
+  else if (o.cache === false) C = buildPondCache(o, key, full, cl);
+  else {
     pondCaches.unshift(buildPondCache(o, key, full, cl));
     if (pondCaches.length > 3) pondCaches.pop();
     ci = 0;
+    C = pondCaches[ci];
   }
-  const C = pondCaches[ci];
   const { w, h, t, dpr } = o;
   const seed = o.seed ?? 1;
   const night = o.tod === 'night';

@@ -4,6 +4,7 @@
 // dismiss it; several finish at once → shown one after another. Renders nothing when idle.
 // A companion who came in a letter (`gift:<letter id>`, e.g. 「初见礼 · 玉兔」) is announced the same way.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { introOn } from '../../app/intro';
 import { celebrations, nextCelebration, questCoins, selectCharacter } from '../../app/play';
 import { CoinIcon, fmtCoins } from '../../ui/coins';
 import { go, route } from '../../app/router';
@@ -60,13 +61,15 @@ export function Celebrate() {
   const [cur, setCur] = useState<{ id: string; key: number } | null>(null);
   // a quest that finishes in a background tab (incense burning out) waits until the tab is seen
   const [visible, setVisible] = useState(isVisible);
+  // the opening film (a replay) plays over everything: a quest finished meanwhile is celebrated after it
+  const filmOn = introOn.value;
   useEffect(() => {
     const on = () => setVisible(isVisible());
     document.addEventListener('visibilitychange', on);
     return () => document.removeEventListener('visibilitychange', on);
   }, []);
   useEffect(() => {
-    if (cur || !pending || !visible) return;
+    if (cur || !pending || !visible || filmOn) return;
     // A breath first, so the moment that finished the quest (a solved puzzle, a caught fish) is seen.
     const tm = setTimeout(() => {
       let id = nextCelebration();
@@ -74,7 +77,7 @@ export function Celebrate() {
       if (id) setCur({ id, key: ++seq });
     }, seq === 0 ? 700 : 450);
     return () => clearTimeout(tm);
-  }, [cur, pending, visible]);
+  }, [cur, pending, visible, filmOn]);
   const o = cur ? occasion(cur.id) : null;
   if (!cur || !o) return null;
   return <Card key={cur.key} q={o.q} coins={o.coins} letter={o.letter} onGone={() => setCur(null)} />;

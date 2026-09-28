@@ -18,6 +18,7 @@ import { Inscription } from './garden/Inscription';
 import { HabitDetail, HabitEditor, Welcome } from './garden/Sheets';
 import { openMail } from '../app/mail';
 import { MailGlyph, mailLabel } from './mail/MailHost';
+import { introOn, noteDemoSeed, registerGarden, releaseGarden, type GardenHooks } from '../app/intro';
 import './garden/garden.css';
 
 // Dev / README screenshots: /?demo=1#garden seeds the demo garden once (&lang=en for English),
@@ -34,6 +35,7 @@ import './garden/garden.css';
     const lng = l === 'en' || l === 'zh' ? l : state.value.settings.lang;
     if (flag === '1') seedDemo(today.value, lng);
     else replaceState({ ...emptyState(), settings: { ...state.value.settings, lang: lng }, onboarded: true });
+    noteDemoSeed();
     q.delete('demo');
     q.delete('lang');
     const qs = q.toString();
@@ -255,7 +257,7 @@ export function GardenView() {
         onEdit={() => sheetHabit && setSheet({ kind: 'edit', id: sheetHabit.id })}
       />
       <Welcome
-        open={welcome && !sheet}
+        open={welcome && !sheet && !introOn.value}
         onClose={finishWelcome}
         onPlant={() => { finishWelcome(); setSheet({ kind: 'add' }); }}
         onDemo={() => { setWelcome(false); seedDemo(day, lang.value); }}
@@ -288,7 +290,18 @@ function GardenStage(props: {
     scene.onBackdrop = () => props.onOpenSide(scene.poemSide());
     scene.setPlants(props.plants);
     props.sceneRef.current = scene;
+    // the opening film lands on this painting (held under it, snapshotted, settled into)
+    const hooks: GardenHooks = {
+      canvas: c,
+      hold: (on) => scene.hold(on),
+      pondRect: () => scene.pondRect(),
+      body: () => scene.body(),
+      env: () => scene.currentEnv(),
+      bench: () => scene.bench(),
+    };
+    registerGarden(hooks);
     return () => {
+      releaseGarden(hooks);
       scene.destroy();
       props.sceneRef.current = null;
     };
