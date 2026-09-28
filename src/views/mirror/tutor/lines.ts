@@ -53,7 +53,7 @@ export const LINES = {
   }),
   H2a: L('between', s('也行。再把{w0}买下来。', 'Fine. Now buy the {w0} too.')),
   H2b: L('between', s('{moon}差一点，这回算我的。', "A little short on moonlight. This one's on me.")),
-  H3a: L('between', s('点「兵器」，看看你手里的兵器。', "Tap Weapons to see what you're holding.")),
+  H3a: L('between', s('点「兵器」，看看你手里的兵器。', "Open Weapons to see what you're holding.")),
   H3: L('between', s('两把同名、同品阶的兵器，能合铸成更强的一把。先点一把剑，再点「{merge}」。', 'Two identical weapons of the same tier merge into a stronger one. Tap one of the swords, then {merge}.'), {
     keys: s('两把同名、同品阶的兵器，能合铸成更强的一把。先点一把剑，再点「{merge}」。', 'Two identical weapons of the same tier merge into a stronger one. Click one of the swords, then {merge}.'),
   }),
@@ -139,7 +139,7 @@ export const END = {
   ],
   enter: s('去入镜', 'Go in for real'),
   back: s('回镜前', 'Back to the mirror'),
-  foot: s('想再看一遍，镜前点「{tutorial}」。', 'To see it again, tap {tutorial} in the lobby.'),
+  foot: s('想再看一遍，镜前点「{tutorial}」。', 'To see it again, choose {tutorial} in the lobby.'),
 } as const;
 export const OFFER = {
   title: s('初入镜中', 'First steps'),
@@ -172,7 +172,7 @@ export const TIPS = {
   curseSmall: L('between', s('每 1 点{curse}：敌人{hp}、伤害 +{e}%，你的伤害 +{d}%，{moon} +{m}%。', 'Each point: enemies +{e}% HP and damage; you +{d}% damage and +{m}% moonlight.')),
   lowHp: L('wave', s('{hp}快没了！先走远一些，兵器会自己打。下一重开场会回满。', 'HP is low! Back away; your weapons keep fighting. You start the next wave at full HP.')),
   cards: L('between', s('升级了：挑一张{card}，这一局都算数。', 'Level up: pick a bonus card; it counts for the whole run.')),
-  shop: L('between', s('{shop}：点货就买。「{lock}」留到下次，「{reroll}」换一批，两把一样的兵器能「{merge}」。想看完整教程，镜前点「{tutorial}」。', 'The shop: tap to buy. {lock} keeps an item for next time; {reroll} brings new goods; two identical weapons merge. Full tutorial: {tutorial} in the lobby.')),
+  shop: L('between', s('{shop}：点货就买。「{lock}」留到下次，「{reroll}」换一批，两把一样的兵器能「{merge}」。想看完整教程，镜前点「{tutorial}」。', 'The shop: pick to buy. {lock} keeps an item for next time; {reroll} brings new goods; two identical weapons merge. Full tutorial: {tutorial} in the lobby.')),
 } as const satisfies Record<string, Line>;
 export type TipLineId = keyof typeof TIPS;
 

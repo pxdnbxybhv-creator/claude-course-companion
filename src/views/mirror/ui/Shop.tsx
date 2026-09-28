@@ -217,7 +217,7 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
   const d = w ? describeWeapon(w.id, w.t, t) : null;
   return (
     <div>
-      <p class="mj-tabhint">{t('点一把兵器，看它做什么、卖掉或合铸。', 'Tap a weapon to see what it does, sell it or merge it.')}</p>
+      <p class="mj-tabhint">{t('点一把兵器，看它做什么、卖掉或合铸。', 'Pick a weapon to see what it does, sell it or merge it.')}</p>
       <div class="mj-wslots">
         {Array.from({ length: 6 }, (_, i) => {
           const x = run.weapons[i];
@@ -276,7 +276,7 @@ function BagTab(props: { run: RunSave; t: T }) {
   if (!ids.length) return <p class="muted mj-empty" data-tut="bag">{t('行囊还是空的。', 'Your pack is empty.')}</p>;
   return (
     <div data-tut="bag">
-      <p class="mj-tabhint">{t('点一件道具，看它做什么。', 'Tap an item to see what it does.')}</p>
+      <p class="mj-tabhint">{t('点一件道具，看它做什么。', 'Pick an item to see what it does.')}</p>
       <div class="mj-bag">
         {ids.map((id) => (
           <button type="button" class={`mj-bagitem tier-${ITEMS[id].tier}` + (open === id ? ' is-sel' : '')} onClick={() => setOpen(open === id ? null : id)} aria-label={`${nameOf(id, t)} ×${run.items[id]}`} aria-pressed={open === id}>
