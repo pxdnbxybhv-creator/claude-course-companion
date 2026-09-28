@@ -100,17 +100,17 @@ export function payLines(p: PayBreakdown, free: boolean, t: T): PayLine[] {
   if (p.heatX !== 1) out.push({ label: t('× 镜誓', '× vows'), value: `×${x2(p.heatX)}` });
   out.push({ label: p.capped ? t('一局最多 70', 'capped at 70 a run') : t('合计', 'gross'), value: `${p.gross}` });
   out.push({
-    label: free ? t('今日免费 ×½', 'today’s free run ×½') : t(`此照${rateIndexWord(p.rate)} ${rateMark(p.rate)}`, `this run’s rate ${rateMark(p.rate)}`),
+    label: free ? t('今日免费 ×½', 'today’s free run ×½') : t(`这一局${rateIndexWord(p.rate)} ${rateMark(p.rate)}`, `this run’s rate ${rateMark(p.rate)}`),
     value: `${p.rated}`,
   });
-  if (p.income < p.rated) out.push({ label: t(`今日镜钱余 ${p.room} / 300`, `room left today ${p.room} / 300`), value: `${p.income}`, note: t('过了每日三百文的上限', 'the daily 300 ceiling') });
+  if (p.income < p.rated) out.push({ label: t(`今天还能结算 ${p.room} / 300`, `room left today ${p.room} / 300`), value: `${p.income}`, note: t('过了每日三百文的上限', 'the daily 300 ceiling') });
   out.push({ label: t('返照钱', 'Reflected coins'), value: `+${p.income}`, strong: true });
   if (p.back > 0) out.push({ label: t('退回本钱（不计进账）', 'fee back (a refund, not income)'), value: `+${p.back}` });
   out.push({ label: t('一路铜钱（已入囊）', 'coins along the way (already in your purse)'), value: `+${p.coins}` });
   if (p.firsts > 0) out.push({ label: t('首次奖励', 'first-time bonuses'), value: `+${p.firsts}` });
   if (p.firstsHeld > 0) out.push({ label: t('首次奖励留待他日', 'bonuses held for another day'), value: `${p.firstsHeld}`, note: t('今日已满，改日入镜前补上', 'today is full; paid on a later day') });
   out.push({ label: p.fee ? t('入镜钱', 'entry fee') : t('今日免费', 'today’s free run'), value: p.fee ? `−${p.fee}` : '0' });
-  out.push({ label: t('此照净得', 'net for this run'), value: `${p.net >= 0 ? '+' : '−'}${Math.abs(p.net)}`, strong: true });
+  out.push({ label: t('这一局净得', 'net for this run'), value: `${p.net >= 0 ? '+' : '−'}${Math.abs(p.net)}`, strong: true });
   return out;
 }
 function rateIndexWord(rate: number): string {
@@ -196,10 +196,10 @@ export function screenKeyGate(e: KeyLike, sheetUp: boolean): 'skip' | 'swallow' 
 
 /** The toast after a run is voided (the engine failed before wave 1 was won): what really came back. */
 export function voidNote(o: { free: boolean; refunded: number; freeBack: boolean }, t: T): string {
-  if (o.refunded > 0) return t(`镜未成：此照作废，本钱 ${o.refunded} 文已退回。`, `The mirror failed: this run is void and your ${o.refunded} coins are back.`);
-  if (o.free && o.freeBack) return t('镜未成：此照作废，今日免费仍在。', 'The mirror failed: this run is void; today’s free run is still yours.');
-  if (o.free) return t('镜未成：此照作废；今日已补过一次，不再补。', 'The mirror failed: this run is void; today’s one make-good is already used.');
-  return t('镜未成：此照作废；今日已退过一次，本钱不再退。', 'The mirror failed: this run is void; today’s one refund is already used, so the fee stays spent.');
+  if (o.refunded > 0) return t(`镜没打开：这一局不算，本钱 ${o.refunded} 文已退回。`, `The mirror failed: this run is void and your ${o.refunded} coins are back.`);
+  if (o.free && o.freeBack) return t('镜没打开：这一局不算，今天的免费局还在。', 'The mirror failed: this run is void; today’s free run is still yours.');
+  if (o.free) return t('镜没打开：这一局不算；今天已经补过一次，不再补。', 'The mirror failed: this run is void; today’s one make-good is already used.');
+  return t('镜没打开：这一局不算；今天已经退过一次，本钱不再退。', 'The mirror failed: this run is void; today’s one refund is already used, so the fee stays spent.');
 }
 
 /** The 技 button drag: below 18 px (or dragged back onto the button) it is a tap / a cancel. */
@@ -276,11 +276,11 @@ export const TERM_TEXT: Record<string, readonly [string, string]> = {
   xiaoman: ['月华 +20%；商店价格 +10%', 'moonlight +20%; shop prices +10%'],
   mangzhong: ['打倒的敌人有 5% 几率长出一朵回血花', 'kills have a 5% chance to sprout a healing flower'],
   xiazhi: ['每重长 10%；升级多一张卡可挑', 'waves 10% longer; one more level-up card to choose from'],
-  xiaoshu: ['回血 −2；攻速 +10%', '−2 HP Regen; +10% attack speed'],
+  xiaoshu: ['回血 −2；攻速 +10%', '−2 HP Regen; +10% Attack speed'],
   dashu: ['你和敌人的移速都 −10%；燃烧伤害 +50%', 'you and enemies −10% move speed; burns +50%'],
   liqiu: ['每 20 秒刮一阵风，把所有东西吹动', 'a gust pushes everything every 20 s'],
   chushu: ['每重前 10 秒少受 30% 伤害', 'take 30% less damage for the first 10 s of each wave'],
-  bailu: ['闪避 +5%，护甲 −2', '+5% dodge, −2 armour'],
+  bailu: ['闪避 +5%，护甲 −2', '+5% Dodge, −2 Armour'],
   qiufen: ['精英各掉 2 个镜奁', 'elites drop 2 caskets each'],
   hanlu: ['地上结霜；敌人移速 −10%', 'frost on the ground; enemies −10% move speed'],
   shuangjiang: ['暴击率 +10%；治疗效果 −20%', '+10% crit chance; −20% healing'],
@@ -296,7 +296,7 @@ export const TERM_TEXT: Record<string, readonly [string, string]> = {
 export const HEART_TEXT: Record<string, readonly [string, string]> = {
   heartHp: ['每阶 +2 气血', '+2 HP a rank'], heartRegen: ['每阶 +1 回血', '+1 HP Regen a rank'],
   heartMoon: ['每阶开局多 10 点月华', 'start with +10 moonlight a rank'], heartReroll: ['每阶刷新便宜 4%', 'rerolls 4% cheaper a rank'],
-  heartArmor: ['每阶 +1 护甲', '+1 armour a rank'], heartDodge: ['每阶 +2% 闪避', '+2% dodge a rank'],
+  heartArmor: ['每阶 +1 护甲', '+1 Armour a rank'], heartDodge: ['每阶 +2% 闪避', '+2% Dodge a rank'],
   heartPickup: ['每阶拾取范围 +10%', '+10% pickup range a rank'], heartHarvest: ['每阶 +2 收成', '+2 Harvest a rank'],
   heartRevive: ['每局一次：倒下后带着 30% 气血站起来', 'once a run, get back up with 30% HP'], heartWard: ['每局第一次挨了致命一击，只剩 1 点血，不倒', 'the first lethal hit of a run leaves you at 1 HP'],
   heartStand: ['商店多一个货位', 'one more shop slot'], heartTrade: ['每阶卖兵器多拿 10%', 'weapons sell for +10% a rank'],

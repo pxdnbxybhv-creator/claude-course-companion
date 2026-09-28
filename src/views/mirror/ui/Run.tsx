@@ -245,7 +245,8 @@ export function RunView(props: {
     P.current.audio.sfx(sfx ?? 'uiTap');
     between(r);
     settleFocus();
-    if (act) emit({ k: 'act', a: act.a, slot: act.slot });
+    // the whole diff: H2 finishes on the bought id (the 青锋剑 wherever a reroll put it), not on a slot number
+    if (act) emit({ k: 'act', ...act });
   };
   /** After a pick made with the pointer, focus leaves the clicked button (Enter / Space then mean the
    *  screen's default, never that button again); a keyboard user's focus stays where it was. */
@@ -379,7 +380,7 @@ export function RunView(props: {
         if (runRef.current.wave < 1) { onError(e, true); return; }
         console.error('[mirror] engine failed to load', e);
         ended.current = true;
-        toast(t('镜未能打开（离线？），此照仍在，稍后续镜。', 'The mirror could not open (offline?): the run waits; come back later.'), 4000);
+        toast(t('镜没能打开（没联网？），这一局还在，等会儿再来接着打。', 'The mirror could not open (offline?): the run waits; come back later.'), 4000);
         P.current.onLeave();
         return;
       }

@@ -348,18 +348,18 @@ balm | +3% Lifesteal
 elixir | +12 HP, +6% Damage, +2 Armour, +1 HP Regen
 drumroll | For the first 8 s of every wave: +40% Attack speed.
 gall | +2 max HP every time you clear a wave.
-backwater | Below 40% HP: +30% damage, +20% Attack speed.
+backwater | Below 40% HP: +30% Damage, +20% Attack speed.
 atease | After standing still for 0.5 s: +25% Attack speed, +2 Armour.
-versatile | For each different weapon class you carry: +3% damage, +2% Attack speed.
-chasewind | +1% damage for every 3% Move speed (max +30%).
-ironbone | +1% damage per point of Armour (max +30%).
+versatile | For each different weapon class you carry: +3% Damage, +2% Attack speed.
+chasewind | +1% Damage for every 3% Move speed (max +30%).
+ironbone | +1% Damage per point of Armour (max +30%).
 physician | Adds 50% of your HP Regen to Melee, Ranged, Elemental and Craft (max +15 each).
 basket | +6 Harvest
 coinstring | +30% Pickup range, +2 Harvest
 lots | +1 free reroll in every shop.
 pawn | Weapons sell for 60% of their price (normally 25%).
 luckycat | +10 Luck. Kills have a 2% chance to drop gold moonlight worth 4 (more with Luck).
-miser | +1% damage per 10 moonlight you hold (max +40%); shop prices +8%.
+miser | +1% Damage per 10 moonlight you hold (max +40%); shop prices +8%.
 abacus | At wave end, +1 moonlight for every 10 you haven't spent (max +25 per abacus).
 xuan | +1 Ink summon limit, +1 Craft
 duanyan | +3 Craft. Ink summons last 30% longer.
@@ -386,7 +386,7 @@ goldenbell | Blocks the first hit of every wave; melee attackers are hurt back (
 gomanual | +2 Stone limit. Stone blasts +20% area.
 capture | An enemy ringed by 3 stones is captured: 3× stone damage, ignoring armour (not bosses).
 moonsoul | Each dodge fires 3 homing moon shards (scales with Elemental).
-osmanthus | Dodge cap +10%; +30% damage for 2 s after a dodge.
+osmanthus | Dodge cap +10%; +30% Damage for 2 s after a dodge.
 lingbo | Moving leaves footprints that hurt enemies on them every 0.5 s; the faster you move, the harder.
 cushion | After standing still for 1 s: +50% HP Regen (each copy adds more).
 cuthair | +10% Damage, −2 HP. Curse +1.
@@ -402,10 +402,10 @@ samadhi | Burns in a huge area around you never go out; the burn stack limit is 
 treasurebowl | At wave end, +15% interest on moonlight held (max 60); +1 free reroll every shop.
 penglai | +20 HP, +4 HP Regen. Once a run, when you go down you get back up with 50% HP and every enemy shot is cleared.
 ambush | Every 4th Music or Talisman attack fires all your other Music and Talisman weapons at 40%.
-needle | +8 Armour. Immune to knockback; +1% damage per point of Armour (with Iron Bones, max +40%).
+needle | +8 Armour. Immune to knockback; +1% Damage per point of Armour (with Iron Bones, max +40%).
 jiangjinjiu | Drunk cap becomes 200; at 100+ Drunk every hit crits; Drunk drains twice as fast.
 watermoon | Every weapon also attacks behind you as a mirror image (50% damage). −4 Armour.
-yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest damage stat). It stays 5 s: enemies inside are 40% slower and take 20% more damage.
+yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest of Melee, Ranged, Elemental and Craft). It stays 5 s: enemies inside are 40% slower and take 20% more damage.
 manyuan | Plants a flowerbed at your feet for 12 s (max 2): every 0.8 s petals hit 4 enemies inside (scales with Craft and HP Regen), enemies are 25% slower, and you heal 1.5 HP a second inside.
 yiwang | Throws a net where enemies crowd: they're dragged to the middle and held 2 s (elites 1 s). For 4 s they take 25% more damage and drop 2× moonlight. Loose moonlight nearby flies to you.
 guangling | Plays for 6 s: every 0.5 s a beat hits enemies around you (scales with Elemental) and slows them 40%; each second small enemies have a 15% chance to switch sides for 6 s (more with Luck).
@@ -414,7 +414,7 @@ jiji | Pins a talisman that becomes a vortex for 5 s, pulling enemies in (elites
 dianhua | Sweeps a scroll ahead: up to 5 small enemies become your ink allies for 10 s (scales with Craft); elites and bosses take a heavy hit instead (60 damage, scales with Craft).
 wei | Eight stones ring you and close in over 1 s: up to 30 small enemies inside are captured; elites and bosses lose 8% of their current HP and are stunned 1 s.
 pudie | Pounces on the strongest enemy nearby, untouchable for 0.4 s in the air. Landing deals 25 damage (scales with Melee) and stuns enemies around you 0.5 s. A kill on landing resets the cooldown.
-daoyao | Stands still for 1.2 s taking 50% less damage and pounds 3 times, hurting enemies around you (scales with HP Regen and HP); then drinks: heals 15% of max HP and +20% damage for 6 s.
+daoyao | Stands still for 1.2 s taking 50% less damage and pounds 3 times, hurting enemies around you (scales with HP Regen and HP); then drinks: heals 15% of max HP and +20% Damage for 6 s.
 yaoyue | Drinks to 100 Drunk: for 6 s +30% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to 2 more; then 2 s of hangover at −30% Move speed.
 tuodao | Feigns a retreat (untouchable for 0.3 s), then spins a full-circle sweep that scales with your best Heavy weapon and Melee, knocking enemies away and stunning them 1 s.
 qinghui | Rises for 2.5 s where nothing can touch you, then lands in a moon pool (40 damage, scales with Elemental) that lasts 6 s: enemies inside deal 30% less and are 20% slower; you get +5 HP Regen. The moon turns full.
@@ -443,4 +443,4 @@ jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP a
 yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing. | −15% range
 baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. | Auto-aim sways 10°
 yibo | No hit takes more than 20% of max HP; +1 Melee every 3 waves cleared (max +10); enemies in a medium area around you deal 10% less. | Only 5 weapon slots; no Hidden weapons in his shop
-yinqing | A 16 s moon cycle: full moon +30% damage; new moon −15% damage and +15% dodge. Floats over ground hazards. | Armour gains count 75%
+yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Floats over ground hazards. | Armour gains count 75%

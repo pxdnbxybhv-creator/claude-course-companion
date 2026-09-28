@@ -213,7 +213,7 @@ function EntryButton(props: { q: ReturnType<typeof entryQuote>; t: T; onEnter: (
           <span class="brush">{t('入镜', 'Enter')}</span>
           <Seal text="今日免费" size={46} class="mj-free-seal" color="#c0412f" label={t('今日免费', 'Free today')} />
         </button>
-        <p class="mj-entry-note">{t('免费这局：结算的钱减半，捡到的铜钱照拿', 'Free run: half the payout; coins you pick up are yours as usual')}</p>
+        <p class="mj-entry-note">{t('这局免费：结算的钱减半，捡到的铜钱照拿', 'Free run: half the payout; coins you pick up are yours as usual')}</p>
       </div>
     );
   }

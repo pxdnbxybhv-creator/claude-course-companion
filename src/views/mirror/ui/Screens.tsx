@@ -56,6 +56,9 @@ export function GearCard(props: {
   const classes = isW ? WEAPONS[props.id as WeaponId].classes : [];
   const tags = isW ? [] : ITEMS[props.id as ItemId].tags;
   const fit = !isW && props.run ? itemFit(props.run, props.id as ItemId, t) : null;
+  // an item's tags only steer the shop (logic/shop.ts classLean): 「相关」, never 「适合」 (which read as "only for")
+  const tagText = tags.length ? t('相关：', 'related: ') + tags.map((c) => termName(clsKey(c), t)).join(' · ') : '';
+  const enItem = !isW && lang.value === 'en';
   const Tag = props.onClick ? 'button' : 'div';
   return (
     <Tag
@@ -72,9 +75,10 @@ export function GearCard(props: {
         <div class="mj-card-title">
           <b class="mj-card-name">{name}{isW && lang.value === 'en' && <span class="mj-tierroman num"> {TIER_ROMAN[tier]}</span>}</b>
           <span class="mj-card-tier">
-            <span class="visually-hidden">{tierWord(tier, t)} · </span>
-            {isW ? classes.map((c) => termName(clsKey(c), t)).join(' · ') : tags.length ? t('相关：', 'related: ') + tags.map((c) => termName(clsKey(c), t)).join(' · ') : ''}
-            {!isW && lang.value === 'en' && <span class="mj-tierword"> · {tierWord(tier, t)}</span>}
+            {/* an English item card spells its tier (the 凡/灵 seal alone says nothing to it); elsewhere the seal
+                shows it and only a screen reader hears the word */}
+            {enItem ? <span class="mj-tierword">{tierWord(tier, t)}</span> : <span class="visually-hidden">{tierWord(tier, t)}{isW || tagText ? ' · ' : ''}</span>}
+            {isW ? classes.map((c) => termName(clsKey(c), t)).join(' · ') : enItem && tagText ? ` · ${tagText}` : tagText}
           </span>
         </div>
         <span class={`mj-tierseal tier-${tier}`} aria-hidden="true" title={tierWord(tier, t)}>{TIER_ZH[tier]}</span>

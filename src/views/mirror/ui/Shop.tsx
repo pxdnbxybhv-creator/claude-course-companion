@@ -188,7 +188,7 @@ export function Shop(props: {
         <div class="mj-shop-next">
           <span class="brush">{t(`第 ${w} 重`, `Wave ${w}`)}</span>
           <small>
-            {boss ? t(`首领 · ${boss.name}`, `Boss · ${boss.name}`) : plan.kind === 'elite' ? t(`有${termName('elite', (z) => z)}`, 'elite wave') : plan.kind === 'horde' ? termName('horde', t) : t(`这一重 ${plan.len ?? 0} 秒`, `lasts ${plan.len ?? 0} s`)}
+            {boss ? t(`首领 · ${boss.name}`, `Boss · ${boss.name}`) : plan.kind === 'elite' ? t(`有${termName('elite', (z) => z)}`, 'elite wave') : plan.kind === 'horde' ? termName('horde', t) : t(`要打 ${plan.len ?? 0} 秒`, `lasts ${plan.len ?? 0} s`)}
           </small>
         </div>
         <button type="button" class="btn btn-small btn-ghost" data-tut="leave" onClick={props.onLeave} title={termLine('leave', t)}>{termName('leave', t)}</button>

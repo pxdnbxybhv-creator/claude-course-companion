@@ -76,7 +76,7 @@ export function weaponNumbers(run: RunSave, s: Stats, x: Pick<OwnedWeapon, 'id' 
 /** 「每 0.86 秒一下」, or for 神笔 / 砚台 what they put out and how often that strikes. */
 export function cadenceText(kind: string, cd: number, every: number | null, t: T): string {
   if (every !== null && kind === 'paint') return t(`每 ${num(cd)} 秒画一只，每只 ${num(every)} 秒打一下`, `paints one every ${num(cd)} s; each strikes every ${num(every)} s`);
-  if (every !== null && kind === 'turret') return t(`每 ${num(cd)} 秒放一方，每 ${num(every)} 秒吐一次墨`, `sets one down every ${num(cd)} s; it spits ink every ${num(every)} s`);
+  if (every !== null && kind === 'turret') return t(`每 ${num(cd)} 秒放一块砚台，它每 ${num(every)} 秒吐一颗墨丸`, `sets one down every ${num(cd)} s; it spits ink every ${num(every)} s`);
   return t(`每 ${num(cd)} 秒一下`, `every ${num(cd)} s`);
 }
 

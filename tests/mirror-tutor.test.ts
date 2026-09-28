@@ -268,6 +268,27 @@ describe('the first shop when the newcomer goes off script (mirror3 fix round)',
     st = reduce(st, { k: 'act', a: 'buy', slot: 3, id: 'qingfeng' }).state;
     expect(view(st)?.id).toBe('H3a');
   });
+  it('end to end through classify: reroll, buy the pestle in slot 0, then the sword where the reroll put it', () => {
+    let st = atH2();
+    let r = shop1();
+    const rr = reroll(r, tutorUnlocks());
+    expect(rr).toBeTruthy();
+    // the fixed seed's reroll keeps a 青锋剑 but moves it (the newcomer QA's case); either way the id decides
+    const act0 = classify(r, rr!)!;
+    st = reduce(st, { k: 'act', ...act0 }).state;
+    r = rr!;
+    const other = r.shop!.slots.findIndex((x) => !!x && x.id !== 'qingfeng');
+    const b1 = buy({ ...r, moon: 999 }, other)!;
+    st = reduce(st, { k: 'act', ...classify({ ...r, moon: 999 }, b1)! }).state;
+    expect(view(st)?.id).toBe('H2');
+    const k = swordSlot(b1);
+    expect(k).toBeGreaterThanOrEqual(0);
+    const b2 = buy(b1, k)!;
+    const act = classify(b1, b2)!;
+    expect(act).toEqual({ a: 'buy', slot: k, id: 'qingfeng' });
+    st = reduce(st, { k: 'act', ...act }).state;
+    expect(view(st)?.id).toBe('H3a');
+  });
   it('a buy before the sword asks the session for the shortfall, which it grants once, only when short', () => {
     const o = reduce(atH2(), { k: 'act', a: 'buy', slot: 1, id: 'songzi' });
     expect(o.grant).toBe(true);

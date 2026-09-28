@@ -1,5 +1,5 @@
 // 水月幻镜 · the fee ritual (GDD §2, §18.3) and 研墨. Paid: two strings of coins drop into the pond and
-// a ripple opens the glass. Free: the old polisher breathes on the bronze, 「今日头一照，老朽请了」, a
+// a ripple opens the glass. Free: the old polisher breathes on the bronze, 「今天第一局，我请了」, a
 // moon-glint. The tutorial: the same glint with the polisher's offer to walk you through. 0.8 s, a tap
 // skips it. Then the inkstone grinds while the sprites bake, with tips.
 import { useEffect, useState } from 'preact/hooks';
@@ -25,7 +25,7 @@ export function Ritual(props: { kind: 'paid' | 'free' | 'tutor'; onDone: () => v
         ) : <i class="mj-ritual-glint" />}
       </span>
       <span class={'mj-ritual-line' + (props.kind === 'tutor' ? '' : ' brush')}>
-        {props.kind === 'tutor' ? t(LINES.ritual.base.zh, LINES.ritual.base.en) : props.kind === 'free' ? t('今日头一照，老朽请了。', 'The first look today is on me.') : t('投钱入镜', 'Coins into the mirror')}
+        {props.kind === 'tutor' ? t(LINES.ritual.base.zh, LINES.ritual.base.en) : props.kind === 'free' ? t('今天第一局，我请了。', 'Your first run today is on me.') : t('投钱入镜', 'Coins into the mirror')}
       </span>
     </button>
   );

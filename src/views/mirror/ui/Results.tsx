@@ -83,7 +83,7 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
           <p class="mj-res-wave brush">{t(`第 ${reached} 重`, `Wave ${reached}`)}</p>
           <p class="mj-res-sub">{t(`已过 ${report.W} 重`, `${report.W} waves cleared`)}{run.ms >= 60_000 ? ` · ${Math.round(run.ms / 60000)} ${t('分', 'min')}` : ''}</p>
 
-          {snapUrl && <img class="mj-res-snap" src={snapUrl} alt={t('此照的墨迹', 'The ink of this run')} />}
+          {snapUrl && <img class="mj-res-snap" src={snapUrl} alt={t('这一局的墨迹', 'The ink of this run')} />}
 
           <h2 class="mj-h3">{t('行装', 'Build')}</h2>
           <BuildRow run={run} t={t} px={34} />
@@ -122,7 +122,7 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
           {pay.coins > 0 && <p class="mj-small muted">{t('一路铜钱每破一重即已入囊；袖中未入囊者随镜沉池。', 'Coins went to your purse as each wave fell; those still in your sleeve sank with the glass.')}</p>}
 
           <div class="mj-res-meta">
-            <p><b>{t('镜屑', 'Mirror dust')}</b> <span class="num">+{report.dust}</span> <span class="muted">({t('共', 'total')} {fmtInt(mirror.value.dust)})</span></p>
+            <p><b>{termName('dust', t)}</b> <span class="num">+{report.dust}</span> <span class="muted">({t('共', 'total')} {fmtInt(mirror.value.dust)})</span></p>
             <div class="mj-mastery">
               <span>{t(`${nameOf(m.char, t)} · 心得 ${m.level} 级`, `${nameOf(m.char, t)} · mastery ${m.level}`)}</span>
               <i class="mj-bar"><b style={{ width: `${frac * 100}%` }} /></i>

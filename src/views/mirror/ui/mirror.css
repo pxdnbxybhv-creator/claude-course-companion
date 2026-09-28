@@ -555,9 +555,11 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-cp { display: flex; flex-direction: column; gap: 14px; max-width: 640px; color: var(--ink); font-size: 15px; }
 /* lining figures in the panel: an old-style 0 reads as the letter o at a glance */
 .mj-cp .num, .mj-cp b.num, .mj-cp-delta, .mj-tile-value, .mj-cp-dps, .mj-lvbadge, .mj-hp-text, .mj-lvval, .mj-lvnow { font-variant-numeric: lining-nums tabular-nums; }
-/* every number in the mirror uses lining figures: old-style 1 and 0 read as I and O (「IO」, 「5I」, 「第 I 重」) */
-.mirror .num, .mirror .brush, .mirror .mj-timer, .mirror .mj-wave, .mirror .mj-ready-title, .mirror .mj-shop-next,
-.mirror .mj-price, .mirror .mj-moon-cost, .mirror .mj-have b { font-variant-numeric: lining-nums tabular-nums; }
+/* every number in the mirror uses lining figures: Cormorant's default old-style 1 and 0 read as I and O
+   (「IO」, 「5I」, 「第 I 重」). The root's value is inherited by all text; .num (ui.css: oldstyle-nums) and
+   anything that sets its own figures (the coin badge's bare tabular-nums) are overruled here. */
+.mirror { font-variant-numeric: lining-nums; }
+.mirror .num, .mirror .brush, .mirror .coin-badge, .mirror .mj-timer, .mirror .mj-price, .mirror .mj-moon-cost { font-variant-numeric: lining-nums tabular-nums; }
 .mj-cp button { font: inherit; color: inherit; }
 .mj-cp-who { display: flex; align-items: center; gap: 12px; }
 .mj-cp-who .mj-portrait { box-shadow: 0 0 0 2px var(--line-strong); }

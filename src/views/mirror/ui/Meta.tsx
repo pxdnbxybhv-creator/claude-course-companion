@@ -112,7 +112,7 @@ export function HeartMirror() {
   return (
     <section class="mj-meta" aria-label={t('心镜', 'Heart mirror')}>
       <h1 class="brush mj-page-title">{t('心镜', 'Heart mirror')}</h1>
-      <p class="mj-small">{t(`镜屑 ${fmtInt(m.dust)} · 每对只一面生效，入镜之间可换。`, `Dust ${fmtInt(m.dust)} · one face of each pair is in force; switch between runs.`)}</p>
+      <p class="mj-small">{t(`镜屑 ${fmtInt(m.dust)} · 每对只一面生效，入镜之间可换。`, `Shards ${fmtInt(m.dust)} · one face of each pair is in force; switch between runs.`)}</p>
       <div class={'mj-heart' + (m.heart.plain ? ' is-plain' : '')}>
         {pairs.map((p, i) => {
           const [a, b] = HEART_REG.filter((f) => f.pair === p);
@@ -144,16 +144,16 @@ export function HeartMirror() {
           <div class="mj-row-actions">
             <button type="button" class="btn btn-small" disabled={active(face.id)} onClick={() => heartPick(face.pair, face.side)}>{active(face.id) ? t('已用此面', 'In force') : t('改用此面', 'Use this face')}</button>
             <button type="button" class="btn btn-small btn-primary" disabled={cost === null || m.dust < cost} onClick={() => heartBuy(face.id)}>
-              {cost === null ? t('已满', 'Full') : t(`升一阶 · ${cost} 镜屑`, `Rank up · ${cost} dust`)}
+              {cost === null ? t('已满', 'Full') : t(`升一阶 · ${cost} 镜屑`, `Rank up · ${cost} shards`)}
             </button>
           </div>
         </div>
       )}
       <div class="row">
-        <div class="row-main"><div class="row-title">{t('素镜', 'Plain mirror')}</div><div class="row-sub">{t('心镜不生效，另记镜碑，镜屑 +20%。', 'Heart faces off, own records, +20% dust.')}</div></div>
+        <div class="row-main"><div class="row-title">{t('素镜', 'Plain mirror')}</div><div class="row-sub">{t('心镜不生效，另记镜碑，镜屑 +20%。', 'Heart faces off, own records, +20% shards.')}</div></div>
         <Toggle checked={m.heart.plain} onChange={setPlain} label={t('素镜', 'Plain mirror')} />
       </div>
-      <p class="muted mj-small">{t('心镜只在入镜时取用；镜中暂停的一照不受影响。', 'The heart mirror is read when you enter; a paused run keeps its own.')}</p>
+      <p class="muted mj-small">{t('心镜只在入镜时生效；已经在打、暂停着的那一局不受影响。', 'The heart mirror is read when you enter; a paused run keeps its own.')}</p>
     </section>
   );
 }
