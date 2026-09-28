@@ -338,6 +338,15 @@ engine.setSettings({ view: 'near' | 'mid' | 'far' }); // the view size, live (่ง
 
 ---
 
+### 3.x The tutorial's controller (`engine/tutor.ts`) and `World.attach`
+
+- `World.attach(b: Behaviour, arg?)` runs an outside Behaviour for the rest of the wave (cleared at the wave end like content behaviours). It is the only engine-core addition for the tutorial.
+- `engine/tutor.ts` reaches the World through the MirrorEngine, like `engine/dev.ts`; every export is a no-op on the stub engine.
+  - `attachScript(engine, 'tut1' | 'tut2' | 'tut3', cue)`: the tutorial's wave scripts (d-tutorial ยง1.6; pacing numbers in `data/tutorial.ts`, which real runs never read). They spawn, draw telegraphs, set the clock and report cues (`move`, `moved`, `kills3`, `pickups3`, `clock`, `pause`, `tele1`, `teleDodged`, `teleHit`, `dodged2`, `lanterns`, `crowd`, `cast`, `foe`, `foeHp`, `tele`, `foeDown`, `saved`). A cue that returns `true` holds the engine (`pauseRequest`, the boss-intro path); the UI resumes it. Their `lethal` keeps the player up (60% HP, 1.5 s grace).
+  - `attachTipWatch(engine, cue)`: the real runs' first-time-tip watcher. Read-only: it never draws a random number, spawns, hits, sets a timer or takes a pool slot; it says `'elite'` once, the first time an elite is alive.
+  - `clock(engine, sec | null)`: wave time left from now (`null` holds the wave, `0` ends it now); `hold(engine)`.
+- The tutorial's run, session and step machine are `tutor/*` (pure); `RunView` takes `sess?: RunSession` (`logic/session.ts realSession` by default) and `practice?`.
+
 ## 4. Screens and flow (`MirrorView.tsx` + `ui/*`)
 
 ```

@@ -18,7 +18,7 @@ import { describeItem, describeWeapon } from './describe';
 import { levelPreview, statDeltaText, tierWord } from './panelView';
 import { bossName, nameOf, screenKeyGate, statName, TIER_ROMAN, TIER_ZH, type T } from './text';
 
-const sheetOpen = () => typeof document !== 'undefined' && !!document.querySelector('.sheet-backdrop');
+const sheetOpen = () => typeof document !== 'undefined' && !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold');
 
 /**
  * Keys for a between-wave screen (ignored while a sheet is open). `on` returns true when it acted: the
@@ -120,8 +120,6 @@ export function Cards(props: {
   run: RunSave; onRun: (r: RunSave) => void; onPause: () => void;
   /** The 人物 button: opens the 人物 sheet. */
   onWho?: () => void;
-  /** @deprecated the old name of onWho (until Run.tsx switches). */
-  onStats?: () => void;
 }) {
   const t = useT();
   const v = cardsView(props.run);
@@ -129,7 +127,7 @@ export function Cards(props: {
   const reroll = () => { const r = rerollCards(props.run); if (r) props.onRun(r); return !!r; };
   useScreenKeys((k) => (k === 'r' ? reroll() : pick(digit(k, 9))), [props.run]);
   if (!v) return null;
-  const onWho = props.onWho ?? props.onStats;
+  const onWho = props.onWho;
   return (
     <Panel
       title={t(`升 · 第 ${v.level} 级`, `Level ${v.level}`)}

@@ -2,7 +2,7 @@
    load order against mirror.css never matters. Colours come from the app tokens (light and dark). */
 .mj-codex .mj-codex-body { display: flex; flex-direction: column; gap: 6px; }
 .mj-codex .mj-codex-body > p { margin: 0; }
-.mj-codex .mj-codex-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14px; }
+.mj-codex .mj-codex-head { font-variant-numeric: lining-nums; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14px; }
 .mj-codex .mj-codex-chip { display: inline-block; font-size: 12px; line-height: 1.5; padding: 0 7px; border-radius: 999px; background: var(--paper-2); color: var(--ink-2); margin-right: 6px; }
 .mj-codex .mj-codex-chip.is-cost { color: var(--mj-down, var(--ink-2)); }
 .mj-codex .mj-codex-t4 { font-size: 14px; padding-left: 8px; border-left: 3px solid var(--mj-t4, #b8862b); }

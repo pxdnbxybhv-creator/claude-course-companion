@@ -217,23 +217,7 @@ export function relevance(run: Pick<RunSave, 'weapons'>, s: Stats, id: StatId): 
   return false;
 }
 
-/** Set rule flags in words, used only until describe.FLAG_TEXT carries them (d-panel §5.2, glossary words). */
-const FLAG_FALLBACK: Readonly<Record<string, { zh: string; en: string }>> = {
-  swordPierce: { zh: '刺出去的剑多刺穿 1 个敌人', en: 'thrusting swords pierce 1 more enemy' },
-  hiddenBounce: { zh: '暗器多弹 1 次', en: 'hidden weapons bounce once more' },
-  idleSwords: { zh: '闲着的飞剑绕着你转，碰到敌人打 30%', en: 'idle flying swords circle you and cut for 30%' },
-  burnStack: { zh: '燃烧多叠 1 层', en: 'burns stack 1 higher' },
-  chainPlus: { zh: '雷多跳 1 个敌人', en: 'lightning jumps to 1 more enemy' },
-  drainHalf: { zh: '醉意退得慢一半', en: 'Drunk drains half as fast' },
-  musicArea10: { zh: '乐器范围 +10%', en: 'music weapons +10% area' },
-  musicArea20: { zh: '乐器范围 +20%', en: 'music weapons +20% area' },
-  musicArea30: { zh: '乐器范围 +30%', en: 'music weapons +30% area' },
-  charmX2: { zh: '迷惑敌人的次数翻倍', en: 'charms twice as often' },
-  ink6: { zh: '墨宝个头和伤害 +20%', en: 'ink summons 20% bigger and stronger' },
-  goArea25: { zh: '棋子炸开的范围 +25%', en: 'stone blasts 25% wider' },
-  dodgeCap5: { zh: '闪避上限 +5', en: 'dodge cap +5' },
-};
-/** The words of one set step: from describe.setSteps when TEXT has it, else generated from SETS. */
+/** The words of one set step: describe.setSteps (generated from SETS + FLAG_TEXT), with a SETS fallback. */
 export function setStepText(cls: WClass, tier: 0 | 1 | 2, t: T): string {
   const n = ([2, 4, 6] as const)[tier];
   const fromText = setSteps(cls, t).find((x) => x.n === n)?.text;
@@ -241,7 +225,7 @@ export function setStepText(cls: WClass, tier: 0 | 1 | 2, t: T): string {
   const def = SETS[cls].tiers[tier];
   const parts = (Object.keys(def.stats) as StatId[]).map((k) => `${statLabel(k, t)} ${statDeltaText(k, def.stats[k] ?? 0)}`);
   for (const f of def.flags ?? []) {
-    const w = FLAG_TEXT[f] ?? FLAG_FALLBACK[f];
+    const w = FLAG_TEXT[f];
     if (w) parts.push(t(w.zh, w.en));
   }
   return parts.join(t('，', ', '));
@@ -414,10 +398,10 @@ export function deltaStrip(run: RunSave, s: Stats, cap: number, b: PanelBase, t:
     for (const tw of was) { const j = nowLeft.indexOf(tw); if (j >= 0) nowLeft.splice(j, 1); else wasLeft.push(tw); }
     const nm = nameOf(id, t);
     if (nowLeft.length && wasLeft.length) {
-      push(t(`${nm} ${ROMAN[wasLeft[0]]} → ${ROMAN[nowLeft[0]]}`, `${nm} ${ROMAN[wasLeft[0]]} → ${ROMAN[nowLeft[0]]}`), 1);
-      for (const tw of nowLeft.slice(1)) push(t(`新兵器 ${nm} ${ROMAN[tw]}`, `new ${nm} ${ROMAN[tw]}`), 1);
+      push(t(`${nm} ${tierWord(wasLeft[0], t)} → ${tierWord(nowLeft[0], t)}`, `${nm} ${ROMAN[wasLeft[0]]} → ${ROMAN[nowLeft[0]]}`), 1);
+      for (const tw of nowLeft.slice(1)) push(t(`新兵器 ${nm}（${tierWord(tw, t)}）`, `new ${nm} ${ROMAN[tw]}`), 1);
     } else if (nowLeft.length) {
-      for (const tw of nowLeft) push(t(`新兵器 ${nm} ${ROMAN[tw]}`, `new ${nm} ${ROMAN[tw]}`), 1);
+      for (const tw of nowLeft) push(t(`新兵器 ${nm}（${tierWord(tw, t)}）`, `new ${nm} ${ROMAN[tw]}`), 1);
     } else if (wasLeft.length) {
       push(t(`卖了 ${nm}`, `sold ${nm}`), 0);
     }

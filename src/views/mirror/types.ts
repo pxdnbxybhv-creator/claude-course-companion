@@ -639,8 +639,8 @@ export interface MirrorSettings {
   left: boolean;
   quality: 'auto' | Quality;
   /** 新手提示: a line the first time you meet a boss, an elite, a casket, a curse item or low HP. On unless
-   *  false (sanitizeMirror always writes it; optional only so an older literal still type-checks). */
-  tips?: boolean;
+   *  false; sanitizeMirror always writes it. */
+  tips: boolean;
   /** 视野 (EngineSettings.view): 'near' 近 · 'mid' 中 (the default; missing means 'mid') · 'far' 远. The
    *  UI half keeps it (sanitizeMirror must copy it), shows it in the settings sheet and forwards it to
    *  the engine's setSettings({ view }) and the painter's bakeScale (scratchpad/mirror4/UI-HALF.md). */
@@ -688,9 +688,9 @@ export interface MirrorMeta {
   /** Chapter rims earned; the lobby shows `rim`. */
   rims: RimId[];
   rim: RimId | null;
-  /** The tutorial's flags (TutorFlags). Always set by sanitizeMirror / defaultMeta; optional only so an
-   *  older literal meta (sim/bot.ts) still type-checks — read it through ui/tips.ts tutorOf(). */
-  tutor?: TutorFlags;
+  /** The tutorial's flags (TutorFlags). Always set by sanitizeMirror / defaultMeta; read it through
+   *  ui/tips.ts tutorOf(). */
+  tutor: TutorFlags;
 }
 
 // ═════════════════════════════════════════════════════════════ 5 · engine ↔ UI (engine/index.ts: createEngine)

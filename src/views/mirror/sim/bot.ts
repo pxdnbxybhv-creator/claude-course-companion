@@ -235,7 +235,8 @@ export function simulateRun(o: BotOpts, meta0?: MirrorMeta): BotRun {
     heart: { ranks: {}, pick: {}, plain: false }, mastery: {}, daily: { day: '2026-09-27', best: 0, bonus: false, weekDays: [], weekPaid: null },
     slips: {}, payDay: { day: '2026-09-27', runs: 1, free: true, paid: 0, drops: 0, refunded: false }, coinsPaid: 0, owed: 0, firstsHeld: 0,
     lastDay: '2026-09-27', lobby: { char: o.char, map: o.map ?? 'lake', diff: o.diff ?? 1, vows: {} },
-    settings: { aim: 'auto', nums: 1, shake: false, left: false, quality: 'auto' }, records: {}, titles: [], title: null, rims: [], rim: null,
+    settings: { aim: 'auto', nums: 1, shake: false, left: false, quality: 'auto', tips: true }, records: {}, titles: [], title: null, rims: [], rim: null,
+    tutor: { offered: false, done: false, tips: {} },
   } as MirrorMeta);
   let run = newRun({
     seed: o.seed, char: o.char, map: o.map ?? 'lake', diff: o.diff ?? 1, vows: {}, daily: false, plain: false, heart: {}, ticket: 1, free: false,

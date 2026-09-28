@@ -705,6 +705,7 @@ button.mj-card[disabled] { opacity: 0.55; }
 
 /* gear cards: the head line and what it scales with */
 .mj-card-headline { margin: 0; font-size: 13px; color: var(--ink); }
+.mj-card-headline.num { font-family: inherit; font-variant-numeric: lining-nums; }
 .mj-card-scales { margin: 0; }
 .mj-card-scales span { display: inline-block; padding: 0 6px; border-radius: 3px; font-size: 12px; line-height: 18px; color: var(--mj-tag); border: 1px solid color-mix(in srgb, var(--mj-tag) 45%, transparent); }
 .mj-select-weapon .mj-card-scales { margin-left: 6px; }

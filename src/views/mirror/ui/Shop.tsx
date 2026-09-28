@@ -22,8 +22,9 @@ import { panelView, tierWord } from './panelView';
 import { bossName, nameOf, TIER_ROMAN, TIER_ZH, type T } from './text';
 
 type Tab = 'who' | 'wpn' | 'bag';
-/** The shop tab, remembered for the sitting (the Shop remounts every wave): 人物 first. */
-const shopTab = signal<Tab>('who');
+/** The shop tab, remembered between the waves of one run (the Shop remounts every wave); a new run (or
+ *  the tutorial's practice run, then a real one) opens on 人物 again. */
+const shopTab = signal<{ seed: number; tab: Tab } | null>(null);
 /** Desktop and landscape tablets: the 人物 panel is a column beside the shop, always open. */
 const WIDE = '(min-width: 1100px)';
 function useWide(): boolean {
@@ -49,8 +50,9 @@ export function Shop(props: {
   const { run } = props;
   const v = shopView(run);
   const wide = useWide();
-  const tab: Tab = wide && shopTab.value === 'who' ? 'wpn' : shopTab.value;
-  const setTab = (x: Tab) => { shopTab.value = x; };
+  const kept: Tab = shopTab.value?.seed === run.seed ? shopTab.value.tab : 'who';
+  const tab: Tab = wide && kept === 'who' ? 'wpn' : kept;
+  const setTab = (x: Tab) => { shopTab.value = { seed: run.seed, tab: x }; };
   const [sel, setSel] = useState<number | null>(null);
   const lockNext = useRef(false);
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -287,11 +289,6 @@ function BagTab(props: { run: RunSave; t: T }) {
   );
 }
 
-/** The old 属性 tab, now the 人物 panel (kept until Run.tsx switches to WhoSheet; the integrator deletes it). */
-export function StatsPanel(props: { run: RunSave; t: T }) {
-  return <CharacterPanel run={props.run} t={props.t} density="full" />;
-}
-
 /** Read-only build (pause sheet, results): weapons with tiers, then items with counts. */
 export function BuildRow(props: { run: RunSave; t: T; px?: number }) {
   const { run, t } = props;
@@ -301,9 +298,9 @@ export function BuildRow(props: { run: RunSave; t: T; px?: number }) {
     <div class="mj-build">
       <div class="mj-build-w">
         {run.weapons.map((x) => (
-          <span class={`mj-build-slot tier-${x.t}`} title={`${nameOf(x.id, t)} ${TIER_ROMAN[x.t]}`}>
-            <Icon id={`wpn:${x.id}`} px={px} label={`${nameOf(x.id, t)} ${TIER_ROMAN[x.t]}`} />
-            <span class="num">{TIER_ROMAN[x.t]}</span>
+          <span class={`mj-build-slot tier-${x.t}`} title={`${nameOf(x.id, t)} ${t(tierWord(x.t, t), TIER_ROMAN[x.t])}`}>
+            <Icon id={`wpn:${x.id}`} px={px} label={`${nameOf(x.id, t)} ${t(tierWord(x.t, t), TIER_ROMAN[x.t])}`} />
+            <span class="num">{t(TIER_ZH[x.t], TIER_ROMAN[x.t])}</span>
           </span>
         ))}
       </div>

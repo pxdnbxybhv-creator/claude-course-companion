@@ -188,8 +188,9 @@ describe('人物 panel · since the last wave', () => {
     const texts = v.delta!.map((c) => c.text);
     expect(texts).toContain(`气血 +4`);
     expect(texts).toContain('暴击率 +5%');
-    expect(texts).toContain('青锋剑 I → II');
-    expect(texts).toContain('新兵器 飞镖 I');
+    expect(texts).toContain('青锋剑 凡品 → 灵品');
+    expect(texts).toContain('新兵器 飞镖（凡品）');
+    expect(panelView(after, base, en).delta!.map((c) => c.text)).toContain('new Throwing Star I');
     expect(texts).toContain('新道具 松子');
     expect(v.tiles.find((x) => x.id === 'hp')!.delta!.text).toBe('+4');
     // armour's change is said as what it was, never as a bare percent next to 「多受」

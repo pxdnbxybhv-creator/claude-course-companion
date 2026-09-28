@@ -65,3 +65,5 @@
 
 # 水月幻镜 · mirror3: the 人物 panel and level-card stat glyphs (data/glossary.ts `icon`)
 倍吸围法疗穿退造
+# 水月幻镜 · mirror3: the pause sheet titles (暂停 · 练习) and the 离开教程 confirm
+停练习教程

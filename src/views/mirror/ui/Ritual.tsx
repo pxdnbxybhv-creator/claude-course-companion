@@ -4,7 +4,8 @@
 // skips it. Then the inkstone grinds while the sprites bake, with tips.
 import { useEffect, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
-import { LINES } from '../tutor/lines';
+import { LINES, backWave } from '../tutor/lines';
+import { F, PAY } from '../data';
 
 export function Ritual(props: { kind: 'paid' | 'free' | 'tutor'; onDone: () => void; reduced: boolean }) {
   const t = useT();
@@ -30,21 +31,22 @@ export function Ritual(props: { kind: 'paid' | 'free' | 'tutor'; onDone: () => v
   );
 }
 
+/** The inkstone's tips, in plain words; numbers from data. */
 const TIPS: readonly [string, string][] = [
-  ['过第十重，镜钱回本。', 'Clear wave 10 and the fee comes back.'],
-  ['两件同名同阶的兵器可以合铸成更高一阶。', 'Two copies of a weapon at the same tier merge into the next tier.'],
-  ['锁住的货位留到下一重，按新价出售。', 'A locked slot waits for the next shop, at the new price.'],
-  ['地上剩下的月华会存入蓄月，下一重每拾一颗多得一颗。', 'Moonlight left on the ground goes into the store: each pickup next wave draws one more.'],
-  ['只有真正的铜钱才是圆形方孔；月华从不换钱。', 'Only real coins are round with a square hole; moonlight never turns into money.'],
-  ['朱红色的才是危险：敌人的弹丸白心朱边。', 'Only danger is vermilion: enemy shots have a white core and a red rim.'],
-  ['湿墨填满预警之处，便是攻击落下之时。', 'When the wet ink fills a warning, the blow lands.'],
-  ['暂离随时可以，续镜永远免费。', 'You may step away any time; coming back is always free.'],
-  ['首领之重不计时，首领倒下即破。', 'Boss waves are untimed; the wave falls with the boss.'],
-  ['每日头一照免费，返照减半，铜钱照常。', 'The first run each day is free: half the reflected coins, coins as usual.'],
-  ['两件同类兵器起，类别套装生效；四件、六件更强。', 'Two weapons of a class start its set bonus; four and six grow it.'],
-  ['护甲按 15/(15+甲) 减伤，越高越稳。', 'Armour cuts damage by 15/(15+armour).'],
+  [`打过第 ${backWave()} 重，入镜钱就回本了。`, `Clear wave ${backWave()} and the fee has paid for itself.`],
+  ['两把同名、同品阶的兵器，能合铸成更强的一把。', 'Two identical weapons of the same tier merge into a stronger one.'],
+  ['锁住的货会留到下一次商店，价钱按那时的算。', 'A locked item waits for the next shop, at that shop’s price.'],
+  ['地上没捡完的月华会存起来，下一重每捡一颗，多给一颗。', 'Moonlight left on the ground is saved: next wave, each pickup gives one more.'],
+  ['圆形方孔的才是真铜钱；月华换不了钱。', 'Only round coins with a square hole are real money; moonlight never is.'],
+  ['朱红色就是危险：敌人的弹丸是白心、红边。', 'Red means danger: enemy shots have a white core and a red rim.'],
+  ['地上的红色填满时，攻击就落下来了。', 'When the red on the ground fills up, the blow lands.'],
+  ['随时可以暂离，回来接着打，不用再交钱。', 'Step away any time; coming back is always free.'],
+  ['首领那一重不计时，打倒首领就过了。', 'Boss waves have no timer: beat the boss to clear them.'],
+  ['每天第一局免费：结算的镜钱减半，铜钱照常掉。', 'The first run each day is free: half the settled coins, dropped coins as usual.'],
+  ['同一类兵器带够 2 把就有套装加成，4 把、6 把更强。', 'Two weapons of one class start a set bonus; four and six make it stronger.'],
+  [`护甲越高，挨打时少受得越多：护甲 ${F.armorK} 时少受一半。`, `The more armour, the less each hit takes: at ${F.armorK} armour, half.`],
   ['镜鉴里的每一页，见得越多，画得越满。', 'Every codex page fills in the more you meet it.'],
-  ['福缘只让铜钱多掉一点，至多一倍半。', 'Luck only nudges coin drops, at most ×1.5.'],
+  [`福缘只让铜钱多掉一点，最多多 ${Math.round((PAY.luckCap / PAY.luckDiv) * 100)}%。`, `Luck only nudges coin drops, at most ${Math.round((PAY.luckCap / PAY.luckDiv) * 100)}% more.`],
 ];
 
 /** The inkstone bar while sprites bake (progress 0..1), with a rotating tip. */
