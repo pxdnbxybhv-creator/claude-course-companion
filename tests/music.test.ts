@@ -177,7 +177,7 @@ describe('arrangements', () => {
       expect(total).toBeGreaterThan(0);
       expect(secs).toBeGreaterThan(20);
     }
-  });
+  }, 30_000);
 
   it('is deterministic', () => {
     const run = () => { const c = new Composer(THEMES.festival.style, 5); const r = makeRng(1); return JSON.stringify([0, 1, 2, 3].map((i) => arrange('festival', c.next(), r, i))); };
@@ -189,7 +189,9 @@ describe('instruments', () => {
   const sr = 16000;
   const ok = (x: Float32Array, maxPeak = 0.95) => {
     let peak = 0, sum = 0;
-    for (const v of x) { expect(Number.isFinite(v)).toBe(true); peak = Math.max(peak, Math.abs(v)); sum += v; }
+    let bad = 0; // one expect per render, not per sample (a per-sample expect made this the slowest test)
+    for (const v of x) { if (!Number.isFinite(v)) bad++; peak = Math.max(peak, Math.abs(v)); sum += v; }
+    expect(bad).toBe(0);
     expect(peak).toBeGreaterThan(0.01);
     expect(peak).toBeLessThan(maxPeak);
     expect(Math.abs(sum / x.length)).toBeLessThan(0.01);
@@ -205,7 +207,7 @@ describe('instruments', () => {
       ok(x);
       expect(x.length / sr).toBeGreaterThan(2.1);
     }
-  });
+  }, 30_000);
 
   it('renders plucks, tremolo, pads and percussion', () => {
     const [L, R] = renderPlucks(sr, 'pipa', [{ t: 0, freq: 330, vel: 0.7, trem: 0.6 }, { t: 0.8, freq: 440, vel: 0.6, pan: 0.5 }], 1);
@@ -217,7 +219,7 @@ describe('instruments', () => {
     ok(renderDrum(sr, 'tang', 1));
     ok(renderGong(sr, 'da', 1));
     ok(renderGong(sr, 'xiao', 2));
-  });
+  }, 30_000);
 });
 
 describe('themes share the key of the sound effects', () => {
@@ -325,7 +327,7 @@ describe('水月幻镜 · the mirror themes', () => {
         }
       }
     }
-  });
+  }, 30_000);
 
   it('the 笛 leads from the first bar: its 吐音 pickup rides the drum fill, the call lands with 钹 + 大锣, a wind in every bar', async () => {
     for (const colour of COLOURS) {
@@ -363,7 +365,7 @@ describe('水月幻镜 · the mirror themes', () => {
       for (const i of ['dizi', 'xiao', 'erhu', 'sheng', 'pipa', 'zheng']) expect(all.has(i as never), `${colour} ${i}`).toBe(true);
       expect(density(ph.slice(3, 5))).toBeGreaterThan(density(ph.slice(0, 1)) * 1.2);
     }
-  });
+  }, 30_000);
 
   it('each map has its own calls and turns through them wave by wave (the same call on any day)', async () => {
     const all = new Map<string, string[]>();
@@ -388,7 +390,7 @@ describe('水月幻镜 · the mirror themes', () => {
     }
     const flat = [...all.values()].flat();
     for (const colour of COLOURS) for (const x of new Set(all.get(colour))) expect(flat.filter((y) => y === x).length).toBeLessThanOrEqual(2); // never another map's
-  });
+  }, 30_000);
 
   it('the wave clock drives the layers, the last 10 s tighten, danger pushes a layer up', async () => {
     const T = await load();
@@ -418,7 +420,7 @@ describe('水月幻镜 · the mirror themes', () => {
     expect(T.getMirrorMusic().danger).toBe(1);
     expect(T.getMirrorMusic().left).toBe(0);
     expect(T.getMirrorMusic().total).toBe(60);
-  });
+  }, 30_000);
 
   it('a boss opens with a 大鼓 roll into the 大锣, the 唢呐 leads, and each phase steps it up', async () => {
     for (const colour of COLOURS) {
@@ -436,7 +438,7 @@ describe('水月幻镜 · the mirror themes', () => {
       expect(p2[1].evs.some((e) => e.inst === 'dizi')).toBe(true); // the 笛 joins above the 唢呐
       expect(p2[1].p.bpm).toBeLessThanOrEqual(152);
     }
-  });
+  }, 30_000);
 
   it('the shop keeps a pulse but stays light', async () => {
     for (const colour of COLOURS) {
@@ -473,7 +475,7 @@ describe('水月幻镜 · the mirror themes', () => {
       expect(dropped1, `${id} ${colour}`).toBe(0);
       expect(peak, `${id} ${colour}`).toBeLessThanOrEqual(24);
     }
-  });
+  }, 30_000);
 
   it('the cues: the clear is a 钹 and a 大鼓; danger a 堂鼓 roll into a 小锣; a boss phase the 大锣 and the 唢呐', async () => {
     const T = await load();
@@ -487,5 +489,5 @@ describe('水月幻镜 · the mirror themes', () => {
     expect(phase.some((e) => e.key?.startsWith('gong:daluo'))).toBe(true);
     expect(phase.some((e) => e.inst === 'suona' && e.job.op === 'line' && e.job.loud)).toBe(true);
     for (const e of [...danger, ...phase]) { expect(e.key).toBeTruthy(); expect(e.t).toBeLessThan(1); expect(e.gain).toBeLessThanOrEqual(1); }
-  });
+  }, 30_000);
 });

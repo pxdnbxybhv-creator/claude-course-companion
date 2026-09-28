@@ -32,8 +32,8 @@ export const STAIN = { scorch: 0, burn: 1, crack: 2 } as const;
 /** Baked sizes (px) by quality: soft pieces are drawn scaled, so small is fine (blur never shows). */
 const SIZE = {
   low: { glow: 40, ring: 128, col: [32, 112], stain: 96 },
-  mid: { glow: 64, ring: 160, col: [40, 144], stain: 128 },
-  high: { glow: 64, ring: 192, col: [48, 176], stain: 128 },
+  mid: { glow: 64, ring: 160, col: [40, 144], stain: 160 },
+  high: { glow: 64, ring: 192, col: [48, 176], stain: 192 },
 } as const;
 
 /** The ring sprite's leading edge sits at this fraction of its half-size (the vector edge is drawn there). */
@@ -187,7 +187,7 @@ export class VfxSprites {
       g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, Math.max(0.8, r * 0.03 * (0.6 + h01(i, kind + 9))), 0, Math.PI * 2); g.fill();
     }
     if (kind !== STAIN.burn) {
-      g.strokeStyle = `rgba(${ink},${kind === STAIN.crack ? 0.7 : 0.4})`;
+      g.strokeStyle = `rgba(${ink},${kind === STAIN.crack ? 0.55 : 0.36})`;
       g.lineCap = 'round';
       const n = kind === STAIN.crack ? 7 : 4;
       for (let i = 0; i < n; i++) {

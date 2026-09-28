@@ -9,8 +9,9 @@ import { createEngine, RES_STEPS, type MirrorEngine } from '../src/views/mirror/
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { EKind } from '../src/views/mirror/engine/pools';
 import { ST } from '../src/views/mirror/engine/enemies';
-import { bakeScale, createPainter, edgeOf, specOf, viewScale } from '../src/views/mirror/paint';
-import { isSoft } from '../src/views/mirror/paint/arena';
+import { bakeScale, createPainter, DEMON_INK, edgeOf, kindScale, specOf, viewScale } from '../src/views/mirror/paint';
+import { isSoft, obstacleScale } from '../src/views/mirror/paint/arena';
+import { CHAR_SPECS } from '../src/views/mirror/paint/figures';
 import { B } from '../src/views/mirror/paint/kit';
 import { AMB_EKIND, AMB_ST, Ambience } from '../src/views/mirror/paint/ambient';
 import { isZone } from '../src/views/mirror/paint/things';
@@ -57,6 +58,50 @@ describe('resolution: nothing is drawn larger than it was painted', () => {
     expect(p.dpr).toBe(3);
     // without a bake scale: the old dpr × quality factor
     expect((createPainter('lake', 'high', 1) as unknown as { k: number }).k).toBeCloseTo(1.15, 5);
+  });
+  it('obstacles are painted at the camera scale (never enlarged), within 3 px per u', () => {
+    for (const q of QS) for (const sc of SCREENS) for (const dpr of sc.dprs) {
+      const canvasDpr = Math.min(dpr, dprCapOf(q));
+      const cam = viewScale(sc.w, sc.h) * canvasDpr;
+      const ko = obstacleScale(bakeScale(sc.w, sc.h, canvasDpr, q), q);
+      expect(ko).toBeLessThanOrEqual(3);
+      if (cam <= 3) expect(cam / ko, `${sc.name} @${dpr} ${q}: cam ${cam.toFixed(2)} obstacles ${ko.toFixed(2)}`).toBeLessThanOrEqual(1.0001);
+      // and no finer than that (memory): the painter's headroom is for rotating sprites
+      expect(ko / cam).toBeLessThanOrEqual(1.0001);
+    }
+  });
+  it('kill bursts and strikes, drawn at r / 32 (up to 2–4×), are baked larger; status marks smaller', () => {
+    expect(kindScale('fx:inkBurst')).toBeGreaterThanOrEqual(1.5);
+    expect(kindScale('fx:petalBurst')).toBeGreaterThanOrEqual(1.5);
+    expect(kindScale('fx:lightningStrike')).toBeGreaterThanOrEqual(2);
+    expect(kindScale('fx:hitSpark')).toBe(1);
+    expect(kindScale('fx:stunMark')).toBe(0.5);
+    expect(kindScale('boss:carp:0')).toBeLessThan(1);
+  });
+  it('the fields a run shows large and long (its map\'s standing hazard, its own 镜技) bake at their drawn size', () => {
+    const run = (char: RunSave['char'], map: RunSave['map']) => newRun({
+      seed: 7, char, map, diff: 1, vows: {}, daily: false, plain: false, heart: {}, ticket: 20, free: false,
+      runIndex: 1, rate: 1, startedDay: '2026-09-27', term: null, mutator: null, boon: null, unlocks: allUnlocked(), mastery: 0,
+    });
+    type Z = { plan: (r: RunSave, s: 'start') => unknown; zoneScale: (l: string) => number };
+    // a DPR-3 phone on mid: camera 2.66 px per u, sprites at 2.93
+    const p = createPainter('lake', 'mid', 3, 2.93) as unknown as Z;
+    p.plan(run('scholar', 'lake'), 'start');
+    // 月影 (r 110): drawn at 2.66 × 110 / 32 = 9.1 px per u of its disc — baked at least that fine
+    expect(p.zoneScale('moonCircle')).toBeGreaterThanOrEqual(2.66 * 110 / 32);
+    // 一字千钧's glyph (r 180) up to the 640 px cap (it was 2.93: a 5× enlargement)
+    expect(p.zoneScale('zhenGlyph') * 68).toBeCloseTo(640, 0);
+    expect(p.zoneScale('vortex')).toBe(0); // another companion's field keeps the small bake
+    expect(p.zoneScale('inkPuddle')).toBe(0); // another map's
+    const f = createPainter('forest', 'high', 1, 1.485) as unknown as Z;
+    f.plan(run('taoist', 'forest'), 'start');
+    expect(f.zoneScale('vortex')).toBeCloseTo(1.485 * 180 / 32, 3);
+    expect(f.zoneScale('inkPuddle')).toBeCloseTo(1.485 * 90 / 32, 3);
+    expect(f.zoneScale('moonCircle')).toBe(0);
+    // low keeps the fixed zone resolution (memory)
+    const l = createPainter('lake', 'low', 3, 2.66) as unknown as Z;
+    l.plan(run('scholar', 'lake'), 'start');
+    expect(l.zoneScale('moonCircle')).toBe(0);
   });
   it('zone looks are flagged so they bake at a fixed pixel size', () => {
     const zones = FX_REG.filter((f) => { const s = specOf(`fx:${f.id}`); return !!s && isZone(s.spec); }).map((f) => f.id);
@@ -209,5 +254,22 @@ describe('bake: soft arena marks and the volume of bodies', () => {
       expect(e.rim, id).toBeGreaterThan(0);
     }
     for (const id of ['fx:shockRing', 'drop:cashCoin', 'proj:flySword', 'wpn:qingfeng', 'item:tea']) expect(edgeOf(id)).toEqual({ rim: 0, outline: 0, volume: 0 });
+    // 点化's mark rides a converted foe: an overlay, not a body (no volume turning it into a grey disc)
+    expect(edgeOf('sum:inkAlly')).toEqual({ rim: 0, outline: 0, volume: 0 });
+    // 心魔 is an enemy: lit like one
+    expect(edgeOf('sum:demonSelf')).toEqual(edgeOf('mon:blot'));
+  });
+  it('心魔 is a purple-ink copy of your own companion, in a dark halo, and inverts in 倒影 like any enemy', () => {
+    for (const ch of ['scholar', 'cat', 'guan'] as const) {
+      const s = specOf('sum:demonSelf', ch)!;
+      expect(s.spec.box).toEqual(CHAR_SPECS[ch].box);
+      expect(s.spec.n).toBe(3); // walk, walk, tell (an enemy never shows the hurt frame)
+      expect(s.spec.paint).toBe(CHAR_SPECS[ch].paint);
+      expect(s.spec.halo).toBe('dark');
+      expect(s.duo).toEqual(DEMON_INK);
+      expect(s.invertible).toBe(true);
+    }
+    // the ink pair: dark plum → pale lilac, never the enemy vermilion
+    expect(DEMON_INK[0]).not.toBe(DEMON_INK[1]);
   });
 });

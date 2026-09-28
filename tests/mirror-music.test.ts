@@ -3,7 +3,8 @@
 // fill); the clear cue (钹 + 大鼓) when the timer reaches 0 or the last boss falls; the boss phase and
 // danger fed to the band, each answered by a cue on the band's next beat (a 堂鼓 roll into 大鼓 + 小锣 when the danger rises,
 // at most every 12 s; a 大锣 with the 唢呐's call on a new boss phase), shifted onto that beat from the band's grid
-// (music-player.ts bandBeat, stubbed here); each wave tells the band its number; a new map restarts the band
+// (music-player.ts bandBeat, stubbed here), and a new boss phase cuts the band over at its next bar (bandCut,
+// stubbed); each wave tells the band its number; a new map restarts the band
 // through a breath of silence; dispose forgets.
 // The mirror audio (sfx.ts) hands its music() and the engine's HUD feed to the director.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -12,7 +13,7 @@ const calls: string[] = [];
 /** The first event's time of each cue, and the band's beat the stub reports. */
 const cueAt: number[] = [];
 const st = { want: null as string | null, beat: null as { wait: number; bpm: number } | null };
-vi.mock('../src/audio/music-player', () => ({ bandBeat: () => st.beat }));
+vi.mock('../src/audio/music-player', () => ({ bandBeat: () => st.beat, bandCut: () => { calls.push('bandCut'); return null; } }));
 vi.mock('../src/audio/music', () => ({
   music: {
     get theme() { return st.want; },
@@ -79,7 +80,7 @@ describe('the mirror music director', () => {
     st.beat = { wait: 0.31, bpm: 146 };
     hud(null, 80, 0.1, { id: 'b', hp: 1, phase: 0 });
     hud(null, 80, 0.1, { id: 'b', hp: 0.6, phase: 1 });
-    expect(take()).toEqual(['cue(gong+drum+suona, {})']);
+    expect(take()).toEqual(['cue(gong+drum+suona, {})', 'bandCut']);
     expect(cueAt[0]).toBeCloseTo(0.29, 6);
     // no band playing: at once
     mirrorMusic.phase('wave', 'lake');
@@ -114,9 +115,11 @@ describe('the mirror music director', () => {
     hud(null, 80, 0.1, { id: 'b', hp: 0.6, phase: 1 });
     expect(getMirrorMusic().bossPhase).toBe(1);
     expect(mirrorEpoch()).toBe(e0 + 1); // the band re-composes what it has not played
-    expect(take()).toEqual(['cue(gong+drum+suona, {})']); // a new phase: 大锣, 大鼓 and the 唢呐's call
+    // a new phase: 大锣, 大鼓 and the 唢呐's call on the next beat; the band cuts over at its next bar,
+    // after the new phase is set (the cut composes with it)
+    expect(take()).toEqual(['cue(gong+drum+suona, {})', 'bandCut']);
     hud(null, 80, 0.1, { id: 'b', hp: 0.5, phase: 1 });
-    expect(take()).toEqual([]);
+    expect(take()).toEqual([]); // the same phase: no cue, no cut
     hud(null, 80, 0.1, null);
     expect(take()).toEqual(['cue(bo+drum, {"choke":0.16})', 'setTheme(mirror-calm, {"cut":0.05,"fade":0.4})']);
   });

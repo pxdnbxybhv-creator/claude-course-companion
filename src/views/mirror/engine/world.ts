@@ -1462,9 +1462,12 @@ export class World implements WorldApi {
     if (k === EKind.Demon && drops) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
     onEnemyDeath(this, i, k, id, x, y, crit);
     this.emit('kill', h, 0, crit, SRC[lastSrc] ?? 'weapon', x, y, lastSlot);
-    // ink: a burst, a wet crown and flung drops (打击感), then a stain stamped into the paper
-    this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
-    if (!ally) { this.feel.corpse(look, lookFace, lookK); this.feel.kill(x, y, r, k, crit, hitA, this.fcOf(lastSlot, lastSrc, 0)); }
+    // ink (打击感): the body breaks into its pieces over a splash on the ground, a wet crown and flung
+    // drops, then a stain stamped into the paper. The dark ink burst (drawn in the effects layer, over
+    // the pieces) only when nothing breaks: an ally, a degraded frame, a crowd's fifth death in a step.
+    let broke = false;
+    if (!ally) { this.feel.corpse(look, lookFace, lookK); broke = this.feel.kill(x, y, r, k, crit, hitA, this.fcOf(lastSlot, lastSrc, 0)); }
+    if (!broke) this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
     try { this.painter?.stamp('splat', x, y, r * 1.2, (h * 2654435761) >>> 0); } catch { /* painter optional */ }
   }
 

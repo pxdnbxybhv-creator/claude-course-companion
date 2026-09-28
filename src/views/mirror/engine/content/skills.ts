@@ -228,8 +228,9 @@ const yijian: SkillImpl = {
       const nS = Math.max(1, Math.min(6, sw.n));
       for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; V.streak(sx - dy * o, sy + dx * o, ex - dy * o, ey + dx * o, k === (nS - 1) >> 1 ? 12 : 7, k & 1 ? VT.jade : VT.azure, 0.45, 2); }
       const cx = ex + dx * 34, cy = ey + dy * 34;
-      V.lance(cx - Math.cos(ang + 0.8) * 42, cy - Math.sin(ang + 0.8) * 42, ang + 0.8, 84, 9, VT.gold, 0.28, VF.streak, 2);
-      V.lance(cx - Math.cos(ang - 0.8) * 42, cy - Math.sin(ang - 0.8) * 42, ang - 0.8, 84, 9, VT.gold, 0.28, VF.streak, 2);
+      // two whole cuts crossing (an X of light that thins away in place)
+      V.lance(cx - Math.cos(ang + 0.8) * 46, cy - Math.sin(ang + 0.8) * 46, ang + 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
+      V.lance(cx - Math.cos(ang - 0.8) * 46, cy - Math.sin(ang - 0.8) * 46, ang - 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
       V.bloom(cx, cy, 40, VT.gold, 0.3, BK.glow, 1, 2);
       V.shock(ex, ey, 90, VT.azure, { flags: VF.double, debris: 6, fleck: FK.glint, life: 0.3, prio: 2 });
       // then the orbiting swords spin fast for 3 s, 40% on contact
@@ -589,6 +590,7 @@ const qinghui: SkillImpl = {
         if (Math.floor(t * 4) !== Math.floor((t + w.dt) * 4)) {
           const V = vfxW(w);
           V.bloom(w.player.x, w.player.y + 8, 130, VT.moon, 0.55, BK.column, 0.9, 1);
+          V.bloom(w.player.x, w.player.y - 8, 58, VT.moon, 0.5, BK.halo, 0.75, 1);
           V.motes(w.player.x, w.player.y, 34, 4, VT.moon, 0.8);
         }
         t += w.dt;

@@ -54,6 +54,8 @@ const TILE = 256;
 /** The vignette's band: it is clear inside the central (1 − 2·band)² rect of the screen. */
 const VIG_BAND = 0.2;
 const SHW = 64, SHH = 32;
+/** Motes are drawn at up to 1.25× (their size jitter): baked that much finer, so none is enlarged. */
+const MOTE_SS = 1.25;
 
 /** Mote kinds. */
 const enum MK { Petal, Moon, Firefly, Leaf, Osman }
@@ -142,7 +144,7 @@ export class Ambience {
       this.grain = GRAIN_A[this.quality] > 0 ? bakeGrain(this.dpr, inverted, this.map) : null;
       this.spr = []; this.sprU = [];
       if (this.n > 0) for (const kind of [MK.Petal, MK.Moon, MK.Firefly, MK.Leaf, MK.Osman]) {
-        const { c, u } = bakeMote(kind, this.k, this.map);
+        const { c, u } = bakeMote(kind, this.k * MOTE_SS, this.map);
         if (c && inverted && kind !== MK.Moon && kind !== MK.Firefly) invertLightness(c);
         this.spr[kind] = c; this.sprU[kind] = u;
       }
@@ -296,16 +298,18 @@ export class Ambience {
         ky *= calm ? 0.8 : 0.35 + 0.65 * Math.abs(Math.cos(t * 2.1 + ph));
         a = 0.6;
       } else {
+        // a floret tumbles as it falls: it turns and flickers edge-on
         bx += Math.sin(t * 0.9 + ph) * 7;
         ang = ph + t * 1.1;
-        a = 0.9;
+        ky *= calm ? 0.85 : 0.45 + 0.55 * Math.abs(Math.cos(t * 2.3 + ph));
+        a = 0.85;
       }
       const x = x0 + fmod(bx - x0, w), y = y0 + fmod(by - y0, h);
       const px = (x - cam.x) * s + hw, py = (y - cam.y) * s + hh;
       const u = this.sprU[kind] * this.sz[i];
       if (px < -u * s || py < -u * s || px > cam.w + u * s || py > cam.h + u * s) continue;
-      // the sprite is baked at k px per u: draw it at cam.scale / k
-      const f = s / this.k;
+      // the sprite is baked at k · MOTE_SS px per u: draw it at cam.scale / that
+      const f = s / (this.k * MOTE_SS);
       const c = Math.cos(ang) * f, sn = Math.sin(ang) * f;
       ctx.setTransform(c * kx, sn * kx, -sn * ky, c * ky, px, py);
       ctx.globalAlpha = Math.min(1, a);
@@ -474,16 +478,16 @@ function bakeMote(kind: MK, k: number, map: MapId): { c: HTMLCanvasElement | nul
     g.strokeStyle = 'rgba(214,230,200,0.6)'; g.lineWidth = 0.4;
     g.beginPath(); g.moveTo(-11, 0); g.lineTo(10.5, -0.1); g.stroke();
   } else {
-    // 桂花: a four-petal gold floret with a warm heart
-    g.fillStyle = 'rgba(217,166,46,0.35)'; g.beginPath(); g.arc(0, 0, U * 0.95, 0, Math.PI * 2); g.fill();
+    // 桂花: four pale cream-gold petals cut apart, open between them — a falling blossom, never a
+    // round gold thing (round and golden is money's look: a coin must not have a double)
     for (let i = 0; i < 4; i++) {
-      g.save(); g.rotate((i * Math.PI) / 2);
-      g.fillStyle = i % 2 ? '#f0c85a' : '#e6b23e';
-      g.beginPath(); g.ellipse(0, -2.1, 1.35, 2.1, 0, 0, Math.PI * 2); g.fill();
+      g.save(); g.rotate((i * Math.PI) / 2 + 0.3);
+      g.fillStyle = i % 2 ? '#f6e3a4' : '#efd07a';
+      g.beginPath(); g.moveTo(0, -0.5); g.bezierCurveTo(-1.5, -1.4, -1.3, -3.6, 0, -3.9); g.bezierCurveTo(1.3, -3.6, 1.5, -1.4, 0, -0.5); g.fill();
+      g.strokeStyle = 'rgba(176,122,40,0.55)'; g.lineWidth = 0.28; g.stroke();
       g.restore();
     }
-    g.fillStyle = '#fff4c8'; g.beginPath(); g.arc(0, 0, 0.9, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#b8792e'; g.beginPath(); g.arc(0.3, 0.3, 0.45, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#d9822e'; g.beginPath(); g.arc(0, 0, 0.55, 0, Math.PI * 2); g.fill();
   }
   return { c, u: U };
 }

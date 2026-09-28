@@ -11,7 +11,7 @@ import { blit, blitRot } from '../paint/draw';
 import { EKind, SMode } from './pools';
 import { DROP_ATLAS, DROP_IDS, PROJ_ATLAS, PROJ_IDS, SK, SUMMON_ATLAS, SWORDS_ON_SCREEN, TAU } from './consts';
 import { ST } from './enemies';
-import { CRIT_NUM, MK, PF, numPop } from './feel';
+import { CRIT_NUM, MK, PF, fragGrid, fragWhite, numPop } from './feel';
 import { SH, TN } from '../paint/feel';
 import { drawAmbience } from '../paint/ambient';
 import { BK, FK, VF, VT, tintOfWeapon, vfxOf, type Vfx } from './vfx';
@@ -45,6 +45,8 @@ const CHAR_TINT: Readonly<Record<string, number>> = {
   swordsman: VT.azure, guan: VT.gold, change: VT.moon, cat: VT.gold, rabbit: VT.jade, poet: VT.wine, taoist: VT.gamboge, painter: VT.indigo,
   scholar: VT.indigo, gardener: VT.green, fisher: VT.azure, musician: VT.green, player: VT.moon,
 };
+/** The largest glow under a shot (u): a soft light, never a wash over the field. */
+const GLOW_MAX_R = 34;
 /** Orbiting blades drawn with an arc ribbon, per quality (the frame guard halves it). */
 const ARC_CAP = { low: 8, mid: 16, high: 24 } as const;
 /** Drops that always glow (moon pearls, gold, hearts, cases), by kind index; −1 only while streaming in. */
@@ -70,6 +72,9 @@ export class Renderer {
   private atlasCache = new Map<string, AtlasId>();
   /** Extra body passes spent this frame (BODY_PASSES). */
   private passes = 0;
+  /** Per enemy slot: the generation whose death shards are baked (or can't be), so a body's pieces are
+   *  ready long before it breaks. */
+  private shardGen = new Uint32Array(0);
   /** 流光: the ribbon trails (shots, your dash and leap, summons), sized by quality. */
   readonly trails: Trails;
   /** Per shot slot: its last life, kind and mode (a reused slot is a new shot: its trail restarts). */
@@ -126,7 +131,7 @@ export class Renderer {
       case 'drops': this.drawDrops(W, ctx, cam); break;
       case 'enemies': this.drawEnemies(W, ctx, cam); break;
       case 'summons': this.drawSummons(W, ctx, cam); break;
-      case 'player': this.drawSwords(W, ctx, cam); this.drawPlayer(W, ctx, cam); break;
+      case 'player': vfxOf(W).drawUnder(ctx, cam, this.spr); this.drawSwords(W, ctx, cam); this.drawPlayer(W, ctx, cam); break;
       case 'effects': this.drawEffects(W, ctx, cam); break;
       case 'playerShots': this.drawPlayerShots(W, ctx, cam); break;
       case 'numbers': this.drawNumbers(W, ctx, cam); break;
@@ -232,6 +237,7 @@ export class Renderer {
     if (F.mk.count) this.drawMarks(W, ctx, cam, true);
     this.passes = 0;
     F.sprites.frame();
+    if (this.shardGen.length < E.cap) this.shardGen = new Uint32Array(E.cap).fill(0xffffffff);
     for (let i = 0; i < E.n; i++) {
       if (!E.alive[i] || E.hidden[i]) {
         if (E.alive[i] && E.hidden[i] && E.st[i] !== ST.bloom && (E.id[i] === 'rat' || E.id[i] === 'drowned')) {
@@ -303,7 +309,12 @@ export class Renderer {
     if (W.xpGot < this.seenXp - 1e-6) { this.seenXp = 0; this.lastPing = -9; }
     if (W.xpGot > this.seenXp + 1e-6) {
       this.seenXp = W.xpGot;
-      if (W.phase === 'wave' && (W.t - this.lastPing >= 1 / 6 || W.t < this.lastPing)) { this.lastPing = W.t; V.ring(W.px, W.py, 22, VT.moon, 0.3, VF.thin); }
+      if (W.phase === 'wave' && (W.t - this.lastPing >= 1 / 6 || W.t < this.lastPing)) {
+        this.lastPing = W.t;
+        V.ring(W.px, W.py, 22, VT.moon, 0.3, VF.thin);
+        // and a glint of it rising off you (sparkle)
+        V.motes(W.px, W.py - 12, 12, 1, VT.moon, 0.45);
+      }
     }
   }
 
@@ -346,9 +357,10 @@ export class Renderer {
   /** A mid-wave level: a gold double ring with a bright edge, a column of light, rising glints. */
   private levelUp(W: World, V: Vfx, x: number, y: number): void {
     const calm = !!W.settings.reduceMotion;
-    V.shock(x, y, 150, VT.gold, { flags: VF.double | VF.halo | VF.big, debris: 10, fleck: FK.glint, life: 0.55, prio: 2 });
-    V.bloom(x, y + 6, 120, VT.gold, 0.55, BK.column, 0.9, 2);
-    V.motes(x, y, 40, calm ? 4 : 9, VT.gold, 0.8);
+    // (the feel layer adds its gold burst at your feet: this is the light around it — no ink chips)
+    V.shock(x, y, 150, VT.gold, { flags: VF.double | VF.halo, debris: 6, fleck: FK.glint, life: 0.55, prio: 2 });
+    V.bloom(x, y + 6, 120, VT.gold, 0.6, BK.column, 0.85, 2);
+    V.motes(x, y, 40, calm ? 4 : 8, VT.gold, 0.8);
   }
 
   private drawEffects(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -421,7 +433,8 @@ export class Renderer {
       if (this.glowsLeft > 0 && TR_GLOW[k] > 0) {
         const sl = PS.slot[i];
         const g = VS.glow(sl >= 0 && sl < nsl && sl < 16 ? this.slotTint[sl] : KIND_TINT[k]);
-        if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, (Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.5 * pa); }
+        // (capped: a falling 七星 sword's r is its landing's reach, not its size)
+        if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.5 * pa); }
       }
       if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
       else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
@@ -512,6 +525,11 @@ export class Renderer {
           if (ink) { this.passes++; blitBody(ctx, cam, ink, x, y, scale, flip, a * o.ink, bx, by, o.s, o.ang, o.wob); }
         }
       }
+      // its death shards, baked on first sight (≤ 2 bakes a frame, shared with the ink twins)
+      if (this.shardGen[i] !== E.gen[i] && F.sprites.ok) {
+        const s0 = this.sprite(id!, 0);
+        if (!s0 || F.sprites.shards(s0, fragGrid(k, W.quality), this.painter.flash(id!, 0), id!) !== undefined) this.shardGen[i] = E.gen[i];
+      }
     } else circle(ctx, cam, x, y, E.r[i] * (1 - o.s * 0.15), o.fl ? '#ffffff' : k === EKind.Elite ? '#5a4012' : k === EKind.Boss ? '#12141a' : k === EKind.Treasure ? '#d9a62e' : '#1d2430', a);
     // 伐桂人's three axes orbit it
     if (E.id[i] === 'axeshade') {
@@ -587,28 +605,44 @@ export class Renderer {
     }
   }
 
-  /** 打击感: the dead body's pieces (feel.fr), cut from its own sprite — white for their first frames. */
+  /**
+   * 打击感: the dead body's pieces (feel.fr) — its own sprite broken into irregular shards with a
+   * white-hot rim along each break (FeelSprites.shards), white for their first frames; plain grid cuts
+   * of the sprite until a body's shards are baked.
+   */
   private drawFrags(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    const Fr = W.feel.fr;
+    const Fr = W.feel.fr, FS = W.feel.sprites;
+    const calm = !!W.settings.reduceMotion;
     for (let j = 0; j < Fr.n; j++) {
       if (!Fr.alive[j]) continue;
       const id = Fr.id[j];
       if (!id) continue;
-      const white = Fr.life0[j] - Fr.life[j] < 0.035;
-      const s = (white ? this.painter.flash(id, 0) : null) ?? this.sprite(id, 0);
-      if (!s) continue;
-      const g = Fr.g[j] || 2, q = Fr.q[j];
-      const qx = q % g, qy = (q / g) | 0;
+      const white = fragWhite(Fr.life0[j] - Fr.life[j], calm);
       const u = Math.min(1, Math.max(0, 1 - Fr.life[j] / Fr.life0[j]));
       const al = u < 0.6 ? 1 : (1 - u) / 0.4;
       if (al <= 0.02) continue;
+      const g = Fr.g[j] || 2, q = Fr.q[j];
+      const f = Fr.flip[j] ? -1 : 1;
+      const sc = Fr.sc[j];
+      const plain = this.sprite(id, 0);
+      const sh = plain && FS.ok ? FS.shardsOf(plain, g) : null;
+      if (sh && q < g * g) {
+        const R = sh.r, o = q * 8, up = sh.upx;
+        const px = (Fr.x[j] + R[o + 4] * f * sc - cam.x) * cam.scale + cam.w / 2, py = (Fr.y[j] + R[o + 5] * sc - cam.y) * cam.scale + cam.h / 2;
+        const k = cam.scale * sc * (1 - 0.3 * u), c = Math.cos(Fr.rot[j]) * k, n = Math.sin(Fr.rot[j]) * k;
+        ctx.setTransform(c * f, n * f, -n, c, px, py);
+        ctx.globalAlpha = al;
+        ctx.drawImage(sh.img, R[o], R[o + 1] + (white && sh.wy ? sh.wy : 0), R[o + 2], R[o + 3], R[o + 6], R[o + 7], R[o + 2] * up, R[o + 3] * up);
+        continue;
+      }
+      const s = (white ? this.painter.flash(id, 0) : null) ?? plain;
+      if (!s) continue;
+      const qx = q % g, qy = (q / g) | 0;
       const cw = s.w / g, ch = s.h / g;
       // the piece's place in the body (u from the anchor), mirrored with it
       let ox = (qx + 0.5) * cw - s.ax * s.w;
       const oy = (qy + 0.5) * ch - s.ay * s.h;
-      const f = Fr.flip[j] ? -1 : 1;
       ox *= f;
-      const sc = Fr.sc[j];
       const px = (Fr.x[j] + ox * sc - cam.x) * cam.scale + cam.w / 2, py = (Fr.y[j] + oy * sc - cam.y) * cam.scale + cam.h / 2;
       const k = cam.scale * sc * (1 - 0.3 * u), c = Math.cos(Fr.rot[j]) * k, n = Math.sin(Fr.rot[j]) * k;
       ctx.setTransform(c * f, n * f, -n, c, px, py);

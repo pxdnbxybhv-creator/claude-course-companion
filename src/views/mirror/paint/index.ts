@@ -48,10 +48,26 @@ const PX_PER_U: Record<Quality, number> = { low: 0.85, mid: 1, high: 1.15 };
  *  little supersample keeps rotating blades and thin lines crisp (high as mid: its 1.15 cost a desktop
  *  at DPR 2 ≈ 9% more bake time for no visible gain). Low paints exactly at the drawn size. */
 const HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 };
-/** The bake scale's ceiling (memory grows with k²: the start atlas is ≈ 3 MB × k²). */
-const K_MAX: Record<Quality, number> = { low: 3, mid: 3.2, high: 3.4 };
+/** The bake scale's ceiling (memory grows with k²: the start atlas is ≈ 3 MB × k²). Mid's 3.3 lets any
+ *  DPR-3 phone up to 440 px wide keep its full headroom (camera ≤ 3.0 × 1.1). */
+const K_MAX: Record<Quality, number> = { low: 3, mid: 3.3, high: 3.4 };
+/** Zone looks a run shows large and for long, baked at the size they are drawn instead (≤ ZONE_PX
+ *  across): the map's standing field (月湖's 月影, 墨林's 墨雨 puddles) and your own 镜技's field — at
+ *  r 90–220 they are 3–7× the ±32 u disc the others are painted on. Low keeps ZONE_K. */
+const MAP_ZONES: Readonly<Record<MapId, readonly FxName[]>> = { lake: ['moonCircle'], forest: ['inkPuddle'], palace: [] };
+const SKILL_ZONES: Readonly<Partial<Record<CharacterId, FxName>>> = { scholar: 'zhenGlyph', gardener: 'flowerbed', fisher: 'netMesh', taoist: 'vortex', change: 'moonPool' };
+/** The radius each is drawn at (engine/content: 月影 110, 墨雨 90, the skills' r). */
+export const ZONE_R: Readonly<Partial<Record<FxName, number>>> = { moonCircle: 110, inkPuddle: 90, zhenGlyph: 180, flowerbed: 160, netMesh: 150, vortex: 180, moonPool: 220 };
+/** Their size cap in px by quality (memory: 640² ≈ 1.6 MB each, two a run; ≈ 10–25 ms of bake each). */
+const ZONE_PX: Record<Quality, number> = { low: 0, mid: 640, high: 640 };
+/** Looks the renderer draws itself from sprite() (the vortex spins, the net is thrown, the glyph
+ *  pulses: engine/render.ts zoneLive): their only sprite is the large one. The others keep their small
+ *  sprite too, for small draws (芒种's r-18 flowers must not be a 640 px bed drawn 1/9 its size). */
+const LIVE_ZONES: ReadonlySet<string> = new Set(['vortex', 'netMesh', 'zhenGlyph']);
+/** drawZone uses the large sprite from this radius up. */
+const BIG_ZONE_MIN_R = 48;
 /** Zone looks (a ±32 u disc the engine draws at r 40–360 u) bake at least this many px per u. */
-const ZONE_K: Record<Quality, number> = { low: 2, mid: 2.6, high: 3.2 };
+const ZONE_K: Record<Quality, number> = { low: 2, mid: 2.6, high: 2.6 };
 
 /**
  * The sprite resolution (px per u) for a viewport: the camera's base scale there (viewScale × the
@@ -62,28 +78,42 @@ export function bakeScale(cssW: number, cssH: number, dpr: number, quality: Qual
   const cam = viewScale(cssW, cssH) * Math.max(1, dpr || 1);
   return Math.max(1, Math.min(K_MAX[quality], cam * HEADROOM[quality]));
 }
+/** Effects the engine draws larger than they are painted (fx(name, …, { r }) blits at r / 32 of the
+ *  sprite: kill bursts reach r 50–120, strikes r 64): baked this much larger, so the big ones stay
+ *  near 1:1 while the common small ones are only drawn down to ≈ 0.4–0.6. */
+const FX_DRAWN: Readonly<Record<string, number>> = { 'fx:inkBurst': 1.5, 'fx:petalBurst': 1.75, 'fx:dustPuff': 1.25, 'fx:lightningStrike': 2 };
 /** How large an id is drawn relative to 1 × its size (bake it that much larger or smaller). */
-function kindScale(id: string): number {
+export function kindScale(id: string): number {
   if (id.startsWith('boss:')) return 0.9; // the boss fight's camera zooms out to 0.84
   if (id.startsWith('wpn:')) return 0.6; // held weapons are drawn at 0.55 (baked small: no shimmer)
   if (id.startsWith('proj:e')) return 1.5; // enemy shots are drawn at 1.5×
   if (id === 'sum:molong') return 1.4; // 墨龙 is drawn at 1.4×
   if (id === 'fx:stunMark' || id === 'fx:charmMark' || id === 'fx:burnMark' || id === 'fx:slowMark' || id === 'fx:rootMark') return 0.5;
-  return 1;
+  return FX_DRAWN[id] ?? 1;
 }
+/** Overlays that ride a body (点化's mark over a converted foe): never a body themselves. */
+const OVERLAYS = new Set<string>(['sum:inkAlly']);
 /** Only bodies flash (enemies, summons, the companion); the rest shares its sprite as its flash. */
 function flashes(id: string): boolean {
+  if (OVERLAYS.has(id)) return false;
   return id.startsWith('mon:') || id.startsWith('elite:') || id.startsWith('boss:') || id.startsWith('sum:') || id.startsWith('char:');
 }
 /** The moonlight rim, ink hairline and ink volume by kind: figures stand off the paper and read as
- *  rounded; effects stay flat washes. */
+ *  rounded; effects and overlays stay flat washes. 心魔 (sum:demonSelf) is an enemy: it is lit like one. */
 export function edgeOf(id: string): { rim: number; outline: number; volume: number } {
+  if (OVERLAYS.has(id)) return { rim: 0, outline: 0, volume: 0 };
   if (id.startsWith('char:')) return { rim: 0.6, outline: 0.5, volume: 0.8 };
+  if (id === 'sum:demonSelf') return { rim: 0.32, outline: 0, volume: 1 };
   if (id.startsWith('sum:')) return { rim: 0.45, outline: 0.35, volume: 0.7 };
   if (id.startsWith('mon:') || id.startsWith('elite:')) return { rim: 0.32, outline: 0, volume: 1 };
   if (id.startsWith('boss:')) return { rim: 0.3, outline: 0, volume: 1 };
   return { rim: 0, outline: 0, volume: 0 };
 }
+/** 心魔's ink: your companion recoloured dark plum → pale lilac (luminance kept), in a dark halo. */
+export const DEMON_INK: readonly [string, string] = ['#2a1234', '#d2bade'];
+/** Damage numbers pop to ≈ 1.3× and big hits to ≈ 2× their glyphs: the glyphs are baked this much
+ *  larger and drawn at 1 / it, so a settled number is ≈ 1:1 and a popped one ≤ 1.5×. */
+const NUM_SS = 1.35;
 const FONT_WAIT_MS = 1500;
 /** Bake budget per frame (GDD §21: 6 ms). One job always runs, so a single big sprite can exceed it. */
 const SLICE_MS = 6;
@@ -101,7 +131,7 @@ const TREASURE_IDS = new Set<string>(TREASURE_REG.map((t) => t.id));
 const MOON_LOOKS: readonly MoonLook[] = [0, 1, 2, 3, 4, 5, 6, 7];
 
 /** Which spec paints an atlas id (null: unknown id). `self` is the run's companion for 镜主. */
-export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec; ghost?: boolean; invertible: boolean } | null {
+export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec; ghost?: boolean; duo?: readonly [string, string]; invertible: boolean } | null {
   const [kind, name, ph, sub] = id.split(':') as [Kind, string, string?, string?];
   switch (kind) {
     case 'char': return CHAR_SPECS[name as CharacterId] ? { spec: CHAR_SPECS[name as CharacterId], invertible: false } : null;
@@ -125,7 +155,12 @@ export function specOf(id: string, self: CharacterId = 'scholar'): { spec: Spec;
     }
     case 'wpn': return lookup(WPN_SPECS, name);
     case 'item': return lookup(ITEM_SPECS, name);
-    case 'sum': return lookup(SUM_SPECS, name);
+    case 'sum': {
+      // 心魔: a purple-ink copy of your companion (an enemy: it inverts in 倒影 like the others)
+      // (frames 0–2: it walks and tells like any enemy; the hurt frame 3 is never drawn)
+      if (name === 'demonSelf' && CHAR_SPECS[self]) return { spec: { ...CHAR_SPECS[self], n: 3, halo: 'dark' }, duo: DEMON_INK, invertible: true };
+      return lookup(SUM_SPECS, name);
+    }
     case 'proj': return lookup(PROJ_SPECS, name);
     case 'drop': return lookup(DROP_SPECS, name);
     case 'fx': return lookup(FX_SPECS, name);
@@ -239,6 +274,10 @@ class InkPainter implements Painter {
   private disposed = false;
   /** Bakes started (the first is the start plan: START_SLICE_MS). */
   private bakes = 0;
+  /** Zone looks this run shows large (planned at the start: its map and companion) → their px per u. */
+  private bigK = new Map<string, number>();
+  /** The large bakes of those zone looks that also keep a small sprite (drawZone picks by r). */
+  private bigZone = new Map<string, Sprite>();
 
   constructor(readonly map: MapId, readonly quality: Quality, dpr: number, pxPerU?: number) {
     this.dpr = Math.max(1, Math.min(dpr || 1, 3));
@@ -246,7 +285,7 @@ class InkPainter implements Painter {
     this.arena = new ArenaLayer(map, quality, this.dpr, this.k);
     this.ambience = new Ambience(map, quality, this.dpr, this.k);
     this.tele = new Tele(this.dpr);
-    this.nums = new Numbers(this.dpr);
+    this.nums = new Numbers(this.dpr * NUM_SS);
   }
 
   plan(run: RunSave, stage: BakeStage): AtlasId[] {
@@ -262,6 +301,7 @@ class InkPainter implements Painter {
       return bosses; // 双生: two of the three, cycling
     };
     if (stage === 'start') {
+      this.planZones(run);
       out.add(`char:${run.char}` as AtlasId);
       for (const id of rosterOf(run.map)) out.add(id);
       out.add('mon:pixiu'); out.add('mon:mirrorflower');
@@ -284,6 +324,23 @@ class InkPainter implements Painter {
     }
     return [...out];
   }
+
+  /** The zone looks this run draws large, and the px per u each bakes at (none on low). */
+  private planZones(run: RunSave): void {
+    this.bigK.clear();
+    const cap = ZONE_PX[this.quality];
+    if (!cap) return;
+    const looks = [...(MAP_ZONES[run.map] ?? []), SKILL_ZONES[run.char]];
+    for (const look of looks) {
+      const R = look ? ZONE_R[look] : undefined;
+      if (!look || !R) continue;
+      // the disc spans ±34 u (its 2 u margin); drawn at r / 32 of it
+      const k = Math.min(this.k * (R / 32), cap / 68);
+      if (k > Math.max(this.k, ZONE_K[this.quality]) * 1.15) this.bigK.set(`fx:${look}`, k);
+    }
+  }
+  /** px per u a zone look's large bake uses (0: none), for the lab and the tests. */
+  zoneScale(look: FxName): number { return this.bigK.get(`fx:${look}`) ?? 0; }
 
   async bake(ids: readonly AtlasId[], onProgress?: (done: number, total: number) => void): Promise<void> {
     await fontsReady();
@@ -343,13 +400,19 @@ class InkPainter implements Painter {
     if (!e) { e = { s: new Array(n), f: new Array(n) }; pending.set(key + (inv ? '|i' : ''), e); }
     try {
       const big = id.startsWith('boss:');
-      const k = isZone(sp.spec) ? Math.max(this.k, ZONE_K[this.quality]) : this.k * kindScale(id);
+      const zone = isZone(sp.spec);
+      const kBig = zone ? this.bigK.get(id) ?? 0 : 0;
+      const live = kBig > 0 && LIVE_ZONES.has(id.slice(3));
+      const k = zone ? (live ? kBig : Math.max(this.k, ZONE_K[this.quality])) : this.k * kindScale(id);
       const edge = edgeOf(id);
       // the halo in px follows the bake scale (≈ 1 u; bosses 1.8 u), never under 1 px
       const halo = Math.max(1, Math.round(k * (big ? 1.8 : 1)));
-      const painted = renderSpec(sp.spec, v, { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, flash: flashes(id), rim: edge.rim, outline: edge.outline, volume: edge.volume });
+      const opts = { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, duo: sp.duo, flash: flashes(id), rim: edge.rim, outline: edge.outline, volume: edge.volume };
+      const painted = renderSpec(sp.spec, v, opts);
       const { s, f } = pack(this.pages, painted);
       e.s[v] = s; e.f[v] = f;
+      // a zone look drawn large this run also gets its large bake (same seed: the same marks)
+      if (kBig > 0 && !live && v === 0 && !inv) this.bigZone.set(id.slice(3), pack(this.pages, renderSpec(sp.spec, 0, { ...opts, k: kBig, halo: Math.max(1, Math.round(kBig)) })).s);
     } catch (err) {
       console.warn('[mirror paint]', id, err);
     }
@@ -396,12 +459,12 @@ class InkPainter implements Painter {
   wash(f: number): void { this.arena.wash(f); }
   drawTele(ctx: CanvasRenderingContext2D, cam: Camera, shape: TeleShape, k: number): void { this.tele.draw(ctx, cam, shape, k); }
   drawZone(ctx: CanvasRenderingContext2D, cam: Camera, look: FxName, x: number, y: number, r: number, a: number): void {
-    const s = this.sprite(`fx:${look}` as AtlasId);
+    const s = (r >= BIG_ZONE_MIN_R ? this.bigZone.get(look) : undefined) ?? this.sprite(`fx:${look}` as AtlasId);
     this.tele.zone(ctx, cam, s, look, x, y, r, a);
   }
   /** `scale` (optional, beyond the contract): the engine's pop and size-by-damage. */
   drawNumber(ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale = 1): void {
-    this.nums.draw(ctx, value, sx, sy, style, a, lang, scale);
+    this.nums.draw(ctx, value, sx, sy, style, a, lang, scale / NUM_SS);
   }
 
   /** A fresh canvas each call (the UI may keep or mutate it), copied from a painted icon cached by
@@ -409,7 +472,7 @@ class InkPainter implements Painter {
   icon(id: AtlasId, px: number): HTMLCanvasElement {
     const d = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1;
     const size = Math.max(8, Math.round(px * d));
-    const key = `${id}|${size}|${id.startsWith('boss:mirrorself') ? this.self : ''}`;
+    const key = `${id}|${size}|${id.startsWith('boss:mirrorself') || id === 'sum:demonSelf' ? this.self : ''}`;
     let src = this.icons.get(key);
     if (!src) {
       src = this.paintIcon(id, size);
@@ -433,7 +496,7 @@ class InkPainter implements Painter {
     try {
       const [x0, y0, x1, y1] = extentOf(sp.spec, 0, seedOf(id));
       const k = (size * 0.86) / Math.max(x1 - x0, y1 - y0);
-      const p = renderSpec(sp.spec, 0, { k, seed: seedOf(id), halo: Math.max(1, Math.round(size / 40)), ghost: sp.ghost, flash: false });
+      const p = renderSpec(sp.spec, 0, { k, seed: seedOf(id), halo: Math.max(1, Math.round(size / 40)), ghost: sp.ghost, duo: sp.duo, flash: false });
       const g = ctx2d(c);
       const s = Math.min(size / p.img.width, size / p.img.height, 1);
       g.drawImage(p.img, (size - p.img.width * s) / 2, (size - p.img.height * s) / 2, p.img.width * s, p.img.height * s);
@@ -457,6 +520,7 @@ class InkPainter implements Painter {
     this.disposed = true;
     this.pages.dispose();
     this.normal.clear();
+    this.bigZone.clear();
     this.inv.clear();
     this.arena.dispose();
     for (const c of this.icons.values()) { c.width = 1; c.height = 1; }

@@ -323,7 +323,9 @@ export function renderLine(sr: number, inst: LineInst, input: LineNote[], seed: 
     const gap = prev ? n.t - (prev.t + prev.dur) : Infinity;
     const legato = gap < 0.03 && !n.tongue;
     const gd = n.graceLen ?? 0.065, gx = Math.min(0.03, gd * 0.7);
-    if (n.grace && tt < gd + gx) {
+    // (a default grace keeps its old 0.1 s window, so a slurred note after it glides exactly as the
+    // garden themes always have: the window only ends at gd + gx for a 叠音 with its own length)
+    if (n.grace && tt < (n.graceLen == null ? 0.1 : gd + gx)) {
       l = tt < gd ? Math.log2(n.grace) : Math.log2(n.grace) + (base - Math.log2(n.grace)) * smooth((tt - gd) / gx);
     } else if (prev && n.slide && gap < 0.2) {
       const lp = Math.log2(prev.freq);

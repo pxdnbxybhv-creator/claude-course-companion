@@ -15,7 +15,7 @@ import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { CONTENT } from '../src/views/mirror/engine/content';
 import { Renderer, drawOrder } from '../src/views/mirror/engine/render';
-import { VFX_CAP, VF, VT, WPN_TINT, slashTint, vfxOf } from '../src/views/mirror/engine/vfx';
+import { BK, FK, STAIN, VFX_CAP, VF, VT, WPN_TINT, slashTint, vfxOf } from '../src/views/mirror/engine/vfx';
 import { TG, TSY, Trails } from '../src/views/mirror/engine/trails';
 import { NVT, VFX_BODY, VFX_CORE, VFX_HALO } from '../src/views/mirror/paint/vfx';
 
@@ -350,5 +350,70 @@ describe('流光: the renderer', () => {
     const blink = alphas(false), calm = alphas(true);
     expect(blink.size).toBeGreaterThan(1);
     expect([...calm]).toEqual([55]);
+  });
+});
+
+describe('流光: pass 3 (the ground, the columns, the cross)', () => {
+  it('a shockwave\'s ground mark stays local to the blow; ink chips fly only for blows, a level\'s glints stay light', () => {
+    const { run, setup } = setupFor(newRun(opts()));
+    const eng = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const V = vfxOf(W);
+    V.shock(0, 0, 320, VT.gold, { stain: STAIN.crack, debris: 8 });
+    V.shock(0, 0, 320, VT.ink, { stain: STAIN.scorch, debris: 0 });
+    const radii: number[] = [];
+    for (let i = 0; i < V.stains.n; i++) if (V.stains.alive[i]) radii.push(V.stains.r[i]);
+    expect(radii.sort((a, b) => a - b)).toEqual([64, 84]);
+    // a blow: half the flecks are ink chips (the pressure wind); a glint burst: none
+    let ink = 0;
+    for (let i = 0; i < V.flecks.n; i++) if (V.flecks.alive[i] && V.flecks.kind[i] === FK.ink) ink++;
+    expect(ink).toBe(4);
+    V.clear();
+    V.shock(0, 0, 150, VT.gold, { debris: 6, fleck: FK.glint });
+    for (let i = 0; i < V.flecks.n; i++) if (V.flecks.alive[i]) expect(V.flecks.kind[i]).toBe(FK.glint);
+    eng.dispose();
+  });
+
+  it('a column of light rises behind the figures (the player layer draws it first), never over them', () => {
+    const { run, setup } = setupFor(newRun(opts()));
+    const eng = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const V = vfxOf(W);
+    // stand-in baked sprites (node has no canvas)
+    const img = {} as CanvasImageSource;
+    const sp = { img, sx: 0, sy: 0, sw: 16, sh: 64, w: 16, h: 64, ax: 0.5, ay: 0.96 };
+    (V as unknown as { sprites: unknown }).sprites = { ok: true, glow: () => sp, ring: () => sp, column: () => sp, stain: () => sp };
+    V.bloom(W.px, W.py, 120, VT.moon, 0.6, BK.column, 0.9, 2);
+    eng.stepN(3);
+    const under = recCtx();
+    V.drawUnder(under.ctx, camOf(W), () => null);
+    expect(under.log.filter((l) => l.op === 'drawImage').length).toBe(1);
+    const over = recCtx();
+    V.draw(over.ctx, camOf(W), null, () => null);
+    expect(over.log.filter((l) => l.op === 'drawImage').length).toBe(0);
+    eng.dispose();
+  });
+
+  it('一剑光寒 ends in a cross of two whole gold cuts (an X that thins in place, not a V of retreating streaks)', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 21, char: 'swordsman' as CharId })), [['qingping', 2], ['casket', 2]]), wave: 6 });
+    const eng = make(run, {}, CONTENT);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    crowd(W, 12, 90);
+    eng.stepN(20);
+    const V = vfxOf(W);
+    W.skillCd = 0;
+    expect(W.castSkill(null, { x: 1, y: 0 })).toBe(true);
+    let most = 0;
+    for (let k = 0; k < 120; k++) {
+      eng.stepN(1);
+      let n = 0;
+      for (let i = 0; i < V.lances.n; i++) if (V.lances.alive[i] && (V.lances.flags[i] & VF.cut) && V.lances.tint[i] === VT.gold) n++;
+      most = Math.max(most, n);
+    }
+    expect(most).toBe(2);
+    eng.dispose();
   });
 });

@@ -28,7 +28,7 @@ const BUDGET: Record<Quality, number> = { low: 2.0e6, mid: 3.6e6, high: 4.5e6 };
 const STAIN_K: Record<Quality, number> = { low: 0.5, mid: 0.6, high: 0.6 };
 const MARGIN = 150;
 /** The soft pass's resolution relative to the base, by quality (see paint: low paints one pass). */
-const SOFT_K: Record<Quality, number> = { low: 1, mid: 0.6, high: 0.7 };
+const SOFT_K: Record<Quality, number> = { low: 1, mid: 0.6, high: 0.6 };
 /** A brush this wide (u) or wider is a broad soft band (the lake's deep rim, the bronze band under
  *  its crisp dark edges): painted with the washes. */
 const SOFT_W = 20;
@@ -50,14 +50,23 @@ export function isSoft(op: B['ops'][number]): boolean {
 }
 /** The bronze rim's width (u), outside the arena's shape. */
 const RIM_W = 34;
-/** Obstacle sprites: px per u at most, by quality (they are drawn at the camera's scale; memory: the
- *  forest's 14 clumps are ≈ 0.42 M u² of sprite, 7 MB at 2.2 px per u). */
-const OBST_K: Record<Quality, number> = { low: 1.6, mid: 2.2, high: 2.6 };
+/** Obstacle sprites are painted at the camera's own scale (they never rotate, and the zoom punches
+ *  that the sprites' headroom is for are a 2% flick now), within this cap: a DPR-3 phone's 2.66–2.93
+ *  px per u and a DPR-2 desktop's 2.7 are drawn 1:1. Memory: the forest's 14 clumps are ≈ 0.42 M u² of
+ *  sprite, ≈ 12 MB at 2.66 px per u (a DPR-2 phone ≈ 6 MB, a DPR-1 desktop ≈ 3 MB). */
+const OBST_K_MAX = 3;
+/** The painter's bake scale over the camera's, by quality (paint/index.ts HEADROOM). */
+const SPRITE_HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 };
 /** 倒影's surround: the map's outside darkened toward the void. */
 const VOID = '#08090c';
 const VOID_A = 0.55;
 
 interface ObstSprite { img: HTMLCanvasElement; x0: number; y0: number; w: number; h: number }
+
+/** The obstacles' px per u for a sprite bake scale `sk` (the camera's scale × the painter's headroom). */
+export function obstacleScale(sk: number, q: Quality): number {
+  return Math.min(OBST_K_MAX, Math.max(1, sk / SPRITE_HEADROOM[q]));
+}
 
 export class ArenaLayer {
   inverted = false;
@@ -170,8 +179,8 @@ export class ArenaLayer {
     ground(bg, this.map, geom, P, seed);
     strokes(bg, 1);
     this.obst = [];
-    const ks = Math.min(OBST_K[this.quality], Math.max(1, this.sk));
-    if (ks > k * 1.15) {
+    const ks = obstacleScale(this.sk, this.quality);
+    if (ks > k * 1.02) {
       // crisp obstacles: each its own sprite; the soft shadow wash under it (its leading washes) is
       // painted into the base with the ground's soft marks instead
       const shade = new B(seed ^ 0x7b);
@@ -279,7 +288,9 @@ export class ArenaLayer {
     const px = (x - this.x0) * k, py = (y - this.y0) * k, R = (Math.max(img.width, img.height) / 2) * scale * 1.42;
     st.over(px - R, py - R, px + R, py + R, (g, ox, oy) => {
       g.setTransform(c, n, -n, c, px - ox, py - oy);
-      g.globalAlpha = kind === 'coinRing' ? 0.9 : 0.75;
+      // a stain is a memory of the fight, not a new floor: light enough that dark monsters keep their
+      // contrast over a long wave's fight path (the feel layer also washes the layer as you fight)
+      g.globalAlpha = kind === 'coinRing' ? 0.9 : 0.5;
       g.drawImage(img, -img.width / 2, -img.height / 2);
       g.globalAlpha = 1;
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -483,10 +494,16 @@ function ground(b: B, map: MapId, geom: ArenaGeom, P: MapPalette, seed: number) 
       b.brush(arcW(x, y, 22, 16, Math.PI * 0.2, Math.PI * 1.8, 1, 3, 10), 0.18, P.ground);
       b.brush(arcW(x + 30, y + 4, 14, 10, Math.PI * 1.2, Math.PI * 2.8, 2, 0.6, 8), 0.16, P.ground);
     }
-    // fallen osmanthus
+    // fallen osmanthus: tiny four-petal florets, pale and open — never round gold dots of a coin's size
+    // (round and golden is money's look on this floor)
     for (let i = 0; i < 40; i++) {
       const a = rnd(i + 1000) * Math.PI * 2, r = 110 + rnd(i + 1100) * 260;
-      b.dot(Math.cos(a) * r, Math.sin(a) * r, 3 + rnd(i) * 3, 0.55, GOLD);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r, s = 0.8 + rnd(i) * 0.5, t = rnd(i + 1200) * Math.PI;
+      for (let k = 0; k < 4; k++) {
+        const pa = t + (k * Math.PI) / 2, cx = x + Math.cos(pa) * 1.5 * s, cy = y + Math.sin(pa) * 1.5 * s;
+        b.fill(k % 2 ? '#efd48a' : '#e6c26a', rot(ell(cx, cy, 1.5 * s, 0.9 * s, 0, Math.PI * 2, 8), pa, cx, cy), 0.6, 0.2);
+      }
+      b.dot(x, y, 0.9 * s, 0.7, '#c98a3a');
     }
   }
 }
@@ -538,9 +555,22 @@ function obstacle(b: B, o: ArenaGeom['obstacles'][number], P: MapPalette, seed: 
       const a = h01(s, i + 5) * Math.PI * 2, d = Math.sqrt(h01(s, i + 25)) * r * 0.85;
       b.dot(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.35 + h01(s, i + 45) * 0.25), 0.75, i % 2 ? '#1f3a2a' : '#2f4a36');
     }
-    for (let i = 0; i < 60; i++) {
-      const a = h01(s, i + 105) * Math.PI * 2, d = Math.sqrt(h01(s, i + 205)) * r;
-      b.disc(x + Math.cos(a) * d, y + Math.sin(a) * d, 2 + h01(s, i + 305) * 1.6, i % 4 ? GOLD : '#f0d060');
+    // in bloom: tiny pale four-petal florets held inside the canopy — never round gold discs (on this
+    // floor round and golden is money's look, and loose ones on bare paper read as dropped coins)
+    for (let i = 0; i < 48; i++) {
+      const a = h01(s, i + 105) * Math.PI * 2, d = Math.sqrt(h01(s, i + 205)) * r * 0.75;
+      const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d, fs = 0.7 + h01(s, i + 305) * 0.5, t = h01(s, i + 405) * Math.PI;
+      const col = i % 4 ? '#e8d9a8' : '#f4ead0';
+      b.flat((g) => {
+        g.fillStyle = col; g.globalAlpha = 0.9;
+        for (let q = 0; q < 4; q++) {
+          const pa = t + (q * Math.PI) / 2;
+          g.beginPath(); g.ellipse(fx + Math.cos(pa) * 1.3 * fs, fy + Math.sin(pa) * 1.3 * fs, 1.3 * fs, 0.75 * fs, pa, 0, Math.PI * 2); g.fill();
+        }
+        g.globalAlpha = 0.85; g.fillStyle = '#c98a3a';
+        g.beginPath(); g.arc(fx, fy, 0.45 * fs, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = 1;
+      }, [fx - 3 * fs, fy - 3 * fs, fx + 3 * fs, fy + 3 * fs]);
     }
     b.dot(x, y, 22, 0.9, '#4a3526');
   }

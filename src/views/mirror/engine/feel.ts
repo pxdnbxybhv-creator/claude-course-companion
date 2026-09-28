@@ -213,9 +213,15 @@ const MARK_CAP = { low: 36, mid: 56, high: 80 } as const;
 const FRAG_CAP = { low: 24, mid: 40, high: 64 } as const;
 /** Marks a step may add (the busiest steps keep the heavy blows' marks). */
 const MARK_STEP = { low: 5, mid: 7, high: 9 } as const;
-/** Fragments per mob death. */
-const FRAG_MOB = { low: 3, mid: 4, high: 4 } as const;
+/** Fragments per mob death (a mob breaks on a 3 × 3 grid, 2 × 2 on low). */
+const FRAG_MOB = { low: 3, mid: 5, high: 6 } as const;
 const Q_BASE = { low: 0.7, mid: 0.85, high: 1 } as const;
+/** The paper dries as you fight: every STAIN_WASH_S of play the stain layer loses STAIN_WASH of its
+ *  ink (half-life ≈ 30 s), so a long wave's fight path never turns the floor into a grey mottle that
+ *  dark monsters vanish against. One sparked droplet a step lands as a stain (the kill keeps its own). */
+export const STAIN_WASH_S = 1.5;
+export const STAIN_WASH = 0.035;
+const STAMPS_STEP = 1;
 /** Largest shake (CSS px) at trauma 1 (amplitude ∝ trauma²). */
 const MAX_SHAKE = 6;
 /** The camera's whole offset (shake + kick) never exceeds this (CSS px): big moments only, and small. */
@@ -262,6 +268,8 @@ const INK_A = 0.34;
 export interface FeelStats {
   sparks: number; emitted: number; hits: number; kills: number; voices: number; stopReqMs: number; stopMs: number; stopDenied: number;
   frozenMs: number; realMs: number; maxShare: number; lastShare: number; stamps: number; q: number;
+  /** The stain layer's timed washes (STAIN_WASH every STAIN_WASH_S of play). */
+  washes: number;
   /** Body reactions: pulses, local freezes (count, total s), staggers; marks and fragments made. */
   pulses: number; freezes: number; freezeS: number; staggers: number; marks: number; frags: number;
   /** Camera: frames drawn, frames the offset was > 0.5 px, frames zoomed. */
@@ -281,6 +289,7 @@ export class Feel {
   private markBudget = 7;
   private fragBursts = 0;
   private stampsStep = 0;
+  private washT = 0;
   private seed = 0x2545f491;
   // per-body reaction state (indexed by enemy slot; valid while rGen matches the slot's generation)
   readonly rGen: Uint32Array;
@@ -346,7 +355,7 @@ export class Feel {
   /** A running mean of hit numbers (numbers size by damage against it). */
   numRef = 10;
   readonly st: FeelStats = {
-    sparks: 0, emitted: 0, hits: 0, kills: 0, voices: 0, stopReqMs: 0, stopMs: 0, stopDenied: 0, frozenMs: 0, realMs: 0, maxShare: 0, lastShare: 0, stamps: 0, q: 1,
+    sparks: 0, emitted: 0, hits: 0, kills: 0, voices: 0, stopReqMs: 0, stopMs: 0, stopDenied: 0, frozenMs: 0, realMs: 0, maxShare: 0, lastShare: 0, stamps: 0, q: 1, washes: 0,
     pulses: 0, freezes: 0, freezeS: 0, staggers: 0, marks: 0, frags: 0, camFrames: 0, camOff: 0, camZoom: 0,
   };
 
@@ -490,7 +499,7 @@ export class Feel {
       if (!P.alive[i]) continue;
       P.life[i] -= dt;
       if (P.life[i] <= 0) {
-        if ((P.flags[i] & PF.stamp) && this.stampsStep < 3 && W.painter) {
+        if ((P.flags[i] & PF.stamp) && this.stampsStep < STAMPS_STEP && W.painter) {
           this.stampsStep++;
           this.st.stamps++;
           try { W.painter.stamp('splat', P.x[i], P.y[i], 2.5 + P.s0[i] * 2.5, (i * 2654435761 + W.kills) >>> 0); } catch { /* optional */ }
@@ -518,7 +527,7 @@ export class Feel {
       Fr.life[i] -= dt;
       if (Fr.life[i] <= 0) {
         // the first piece of a burst lands and stains the paper
-        if (Fr.stamp[i] && this.stampsStep < 3 && W.painter) {
+        if (Fr.stamp[i] && this.stampsStep < STAMPS_STEP && W.painter) {
           this.stampsStep++;
           this.st.stamps++;
           try { W.painter.stamp('splat', Fr.x[i], Fr.y[i], 4 + 6 * Fr.sc[i], (i * 2246822519 + W.kills) >>> 0); } catch { /* optional */ }
@@ -533,6 +542,13 @@ export class Feel {
     }
     Fr.trim();
     this.st.sparks = P.count;
+    // the stains dry a little (one full-layer fill every 1.5 s)
+    this.washT += dt;
+    if (this.washT >= STAIN_WASH_S - 1e-4) {
+      this.washT -= STAIN_WASH_S;
+      this.st.washes++;
+      try { W.painter?.wash(STAIN_WASH); } catch { /* optional */ }
+    }
     for (let k = 0; k < 8; k++) if (this.slotT[k] < 9) this.slotT[k] += dt;
     this.flush();
   }
@@ -759,8 +775,10 @@ export class Feel {
     this.cId = id; this.cFlip = Math.cos(face) < 0 ? 1 : 0; this.cSc = scale > 0 && Number.isFinite(scale) ? scale : 1;
   }
 
-  /** A body died at (x, y) (radius r, kind k); ang is the direction of the killing blow. */
-  kill(x: number, y: number, r: number, k: number, crit: boolean, ang: number, fc: number): void {
+  /** A body died at (x, y) (radius r, kind k); ang is the direction of the killing blow. True when
+   *  the body broke into pieces (the world then leaves out its dark ink burst, which is drawn over the
+   *  enemy layer and would bury the pieces' white-hot breaks and the pop of light). */
+  kill(x: number, y: number, r: number, k: number, crit: boolean, ang: number, fc: number): boolean {
     const W = this.W;
     this.st.kills++;
     const elite = k === EKind.Elite || k === EKind.Demon;
@@ -776,21 +794,40 @@ export class Feel {
     if (this.markRoom(prio)) this.mark(MK.pop, SH.star, popT, -1, x, y, ang, boss ? 0.14 : 0.09, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48 * 0.6, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48, 1);
     if (this.markRoom(prio)) this.mark(MK.ring, SH.halo, md.halo >= 0 ? md.halo : md.star === TN.white ? TN.azure : md.star, -1, x, y, 0, 0.22, (0.4 * r) / 28, (2.2 * r) / 28, 0.9);
     if ((elite || boss) && this.markRoom(prio)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.36, (0.6 * r) / 28, (3.2 * r) / 28, 0.8);
+    // the killing blow's signature: a blade's cut left hanging where the body stood (a flying sword's
+    // light straight through it, a claw's rakes), a talisman's embers rising from the burnt paper
+    if ((fc === FC.slash || fc === FC.heavy || fc === FC.claw || fc === FC.flying) && this.markRoom(prio)) {
+      if (fc === FC.flying) this.mark(MK.beam, SH.beam, TN.jade, -1, x + Math.cos(ang) * r * 0.9, y + Math.sin(ang) * r * 0.9, ang, 0.14, (3 * r) / 64, 1, 1);
+      else if (fc === FC.claw) this.mark(MK.rake, SH.rake, TN.moon, -1, x, y, ang + Math.PI / 2, 0.18, (2.4 * r) / 44, (2.4 * r) / 44, 1);
+      else this.mark(MK.cut, SH.cut, TN.white, -1, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.4, fc === FC.heavy ? 0.2 : 0.16, (2.6 * r) / 64, fc === FC.heavy ? 1.6 : 1.25, 1);
+    } else if ((fc === FC.talisman || fc === FC.wine) && !calm) {
+      for (let k = 0; k < 3 && this.room(prio); k++) {
+        const a = -Math.PI / 2 + (this.rnd() - 0.5) * 1.1, v = 110 + 90 * this.rnd();
+        this.emit(SH.ember, fc === FC.wine ? TN.gold : TN.gamboge, x + (this.rnd() - 0.5) * r, y + (this.rnd() - 0.5) * r * 0.6, Math.cos(a) * v, Math.sin(a) * v, 0.34 + 0.14 * this.rnd(), 0.8 * Math.max(0.8, sz), 0.3, a, 0, 2.5, PF.stretch, 1);
+      }
+    }
     // the body breaks: pieces of its own sprite flung on along the blow (the droplets and the world's
     // splat stain the paper; the pieces only fly and fade)
+    let broke = false;
     if (id && this.fragBursts < 4 && !W.degrade) {
       this.fragBursts++;
       const Fr = this.fr;
-      const g = boss ? 4 : elite ? 3 : 2;
+      const g = fragGrid(k, W.quality);
       const want = boss ? (W.quality === 'low' ? 8 : 12) : elite ? (W.quality === 'low' ? 6 : 8) : (FRAG_MOB[W.quality] ?? 4);
       const room = Fr.cap - Fr.count - (prio >= 2 ? 0 : Math.floor(Fr.cap * 0.25));
-      const nf = Math.min(want, g * g, Math.max(0, room));
-      const off = Math.floor(this.rnd() * g * g);
-      for (let j = 0; j < nf; j++) {
+      // the pieces that carry some of the body (known once its shards are baked), from a random start
+      const gg = g * g;
+      const solid = this.sprites.solid(id, g) || (gg >= 31 ? 0x7fffffff : (1 << gg) - 1);
+      const nf = Math.min(want, popcount(solid), Math.max(0, room));
+      const off = Math.floor(this.rnd() * gg);
+      const step = gg % 5 === 0 ? 3 : 5;
+      for (let j = 0, c = 0; j < nf && c < gg; c++) {
+        const q = (off + c * step) % gg;
+        if (!(solid & (1 << q))) continue;
         const f = Fr.take();
         if (f < 0) break;
+        j++;
         this.st.frags++;
-        const q = (off + j * 5) % (g * g);
         // it flies out from its place in the body (the renderer adds the piece's exact offset in the sprite)
         const qx = (q % g + 0.5) / g - 0.5, qy = (Math.floor(q / g) + 0.5) / g - 0.5;
         const out = Math.atan2(qy, flip ? -qx : qx);
@@ -800,6 +837,7 @@ export class Feel {
         Fr.rot[f] = 0; Fr.vr[f] = calm ? 0 : (5 + 7 * this.rnd()) * (this.rnd() < 0.5 ? -1 : 1);
         Fr.life[f] = Fr.life0[f] = calm ? 0.25 : (boss ? 0.5 : 0.32) + 0.13 * this.rnd();
         Fr.sc[f] = sc; Fr.g[f] = g; Fr.q[f] = q; Fr.flip[f] = flip; Fr.stamp[f] = 0; Fr.id[f] = id;
+        broke = true;
       }
     }
     // the crown: a wet ring breaking outward
@@ -826,6 +864,7 @@ export class Feel {
         this.vib(15, 1);
       }
     }
+    return broke;
   }
 
   /** The 镜技 landed (the first hit of a cast, rate-limited): a boom, rings of light, a gentle zoom. */
@@ -1092,6 +1131,22 @@ export class Feel {
   }
 
   stats(): FeelStats { return { ...this.st, sparks: this.sp.count }; }
+}
+
+/** The grid a dying body breaks on (g × g pieces): mobs 3 (2 on low), elites 3, bosses 4. */
+export function fragGrid(kind: number, quality: string): number {
+  return kind === EKind.Boss ? 4 : kind === EKind.Elite || kind === EKind.Demon ? 3 : quality === 'low' ? 2 : 3;
+}
+/** A death piece's white window: its first 35 ms are drawn from the white twin (the break's flash);
+ *  never under reduced motion (no flashing), where the pieces break in place in their own ink. */
+export const FRAG_WHITE_S = 0.035;
+export function fragWhite(age: number, calm: boolean): boolean {
+  return !calm && age >= 0 && age < FRAG_WHITE_S;
+}
+function popcount(v: number): number {
+  let n = 0;
+  for (let x = v >>> 0; x; x &= x - 1) n++;
+  return n;
 }
 
 /** A crit number's steady size (× its size by damage): crits read bigger than plain hits. */

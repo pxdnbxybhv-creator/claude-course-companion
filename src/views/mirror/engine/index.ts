@@ -221,7 +221,9 @@ class MirrorEngine implements Engine {
       this.frame(now);
       const ph = this.world.phase;
       if (!this._paused && !this.fatal && (ph === 'wave' || ph === 'ending')) this.raf = raf(tick);
-      else this.drawFrame();
+      // the last picture under a pause, the boss card or the wave's end: the camera stays put (a dt = 0
+      // redraw would close its follow lag in one jump as the card comes up)
+      else this.drawFrame(0, true);
     };
     this.raf = raf(tick);
   }
@@ -258,7 +260,8 @@ class MirrorEngine implements Engine {
     if (this.acc > STEP * MAX_STEPS) this.acc = 0;
     const t1 = performanceNow();
     try { w.feel.frame(real, frozen); } catch { /* cosmetic */ }
-    this.drawFrame(dt);
+    // a hitstop holds the camera with the world (dt = 0 there must not snap its follow lag shut)
+    this.drawFrame(dt, frozen > 0);
     w.perf.canvasMs = w.perf.canvasMs * 0.95 + (performanceNow() - t1) * 0.05;
     // perf: EMA of simulation ms per step; the draw figure is the whole frame interval (the raster
     // work happens after our canvas calls return, so timing them alone says nothing on a slow phone)
@@ -340,26 +343,39 @@ class MirrorEngine implements Engine {
 
   // ─────────────────────────────────────────────── camera and drawing
 
-  private drawFrame(dt = 0): void {
-    const ctx = this.ctx;
+  /**
+   * The camera follows you: a 60 px lead in the direction you move, the boss fit, the arena's edge
+   * kept from drifting far into view. dt = 0 snaps (a resize, a paused redraw); `held` (a hitstop)
+   * keeps it exactly where it is — the world is frozen, so closing the follow lag in that one frame
+   * would jerk the whole picture 15–50 px.
+   */
+  private follow(dt: number, held: boolean): void {
     const w = this.world;
-    if (!ctx || !w.run) return;
+    if (!w.run) return;
     const c = this.cam;
-    // lead 60 px in the direction you move; fit the boss arena during bosses
     const lead = 60 * c.dpr / c.scale;
     const tx = w.px + w.pvx / Math.max(1, w.moveSpd) * lead, ty = w.py + w.pvy / Math.max(1, w.moveSpd) * lead;
-    const k = dt > 0 ? Math.min(1, dt * 6) : 1;
+    const k = held ? 0 : dt > 0 ? Math.min(1, dt * 6) : 1;
     c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
     const zoom = w.bossH.length && w.phase === 'wave' ? 0.84 : 1;
     const target = this.baseScale * zoom;
-    c.scale += (target - c.scale) * (dt > 0 ? Math.min(1, dt * 2) : 1);
-    // keep the arena's edge from drifting far into view
+    c.scale += (target - c.scale) * (held ? 0 : dt > 0 ? Math.min(1, dt * 2) : 1);
     const A = w.arena;
     if (A) {
       const hw = c.w / 2 / c.scale, hh = c.h / 2 / c.scale;
       const mx = Math.max(0, (A.maxX - A.minX) / 2 + 120 - hw), my = Math.max(0, (A.maxY - A.minY) / 2 + 120 - hh);
       c.x = Math.max(-mx, Math.min(mx, c.x)); c.y = Math.max(-my, Math.min(my, c.y));
     }
+  }
+  /** The camera as it follows (tests, the dev probe): a copy, so nobody moves it by accident. */
+  get camera(): Readonly<Camera> { return { ...this.cam }; }
+
+  private drawFrame(dt = 0, held = false): void {
+    this.follow(dt, held);
+    const ctx = this.ctx;
+    const w = this.world;
+    if (!ctx || !w.run) return;
+    const c = this.cam;
     // 打击感: trauma shake and directional kicks (CSS px → world), a zoom punch on big impacts;
     // the feel layer zeroes them under reduced motion (and shake / kicks with the shake setting off)
     const F = w.feel;

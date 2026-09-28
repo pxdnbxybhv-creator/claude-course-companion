@@ -91,6 +91,44 @@ export class FeelSprites {
   dispose(): void {
     for (const c of this.pages) { c.width = 1; c.height = 1; }
     this.pages = []; this.g = null; this.cur = null; this.cache.clear(); this.inks = new WeakMap();
+    this.shardMap = new WeakMap(); this.solidOf.clear(); this.shardN = 0;
+  }
+
+  /** Shard sets by body sprite and grid (index g). */
+  private shardMap = new WeakMap<Sprite, (Shards | null)[]>();
+  /** Which pieces of an atlas id's g × g grid carry some of the body (bit q), once its shards are baked. */
+  private solidOf = new Map<string, number>();
+  /** Shard sets baked so far (a run meets a few dozen bodies; past the cap, deaths cut plain pieces). */
+  private shardN = 0;
+  /** The shards already baked for this sprite and grid (no bake: the frame loop's lookup). */
+  shardsOf(src: Sprite, g: number): Shards | null {
+    return this.shardMap.get(src)?.[g] ?? null;
+  }
+  /** The solid pieces of an atlas id's g × g grid (bit q), 0 while unknown. */
+  solid(id: string, g: number): number {
+    return this.solidOf.get(id + '#' + g) ?? 0;
+  }
+  /**
+   * The body sprite broken into g × g irregular shards — a jittered grid whose cuts wander — each piece
+   * carrying its bit of the body with a white-hot rim along the break, plus a white twin of every piece
+   * (from the painter's flash twin) for a death's first frames. Baked on first sight of the body (it
+   * shares the ink twins' budget of 2 bakes a frame): undefined = not yet, try again; null = can't.
+   * One small canvas per set, at most 200 px across a body (a boss's 360; pieces fly and fade in 0.3–0.5 s).
+   */
+  shards(src: Sprite, g: number, white: Sprite | null, id: string): Shards | null | undefined {
+    let row = this.shardMap.get(src);
+    const hit = row?.[g];
+    if (hit !== undefined) return hit;
+    if (!this.ok) return null;
+    if (this.shardN >= SHARD_SETS) { if (!row) { row = []; this.shardMap.set(src, row); } row[g] = null; return null; }
+    if (this.inkBakes >= 2) return undefined;
+    this.inkBakes++;
+    let out: Shards | null = null;
+    try { out = bakeShards(src, g, white, this.pages); } catch { out = null; }
+    if (!row) { row = []; this.shardMap.set(src, row); }
+    row[g] = out;
+    if (out) { this.shardN++; this.solidOf.set(id + '#' + g, out.solid); }
+    return out;
   }
 
   /** Ink twins of body sprites (the tint a struck body takes after its flash), by the painter's sprite. */
@@ -190,6 +228,140 @@ export class FeelSprites {
     g.restore();
     return { img: at.img, sx: at.x, sy: at.y, sw: pw, sh: ph, w: pw / r, h: ph / r, ax: (1 + ax * w * r) / pw, ay: (1 + ay * h * r) / ph };
   }
+}
+
+/** Shard sets one FeelSprites keeps (a mob's ≈ 0.1–0.3 MB: its pieces twice, at ≤ SHARD_PX across; a
+ *  boss's, broken on a 4 × 4 grid and seen big, up to BOSS_SHARD_PX). */
+const SHARD_SETS = 36;
+const SHARD_PX = 200;
+const BOSS_SHARD_PX = 360;
+
+/** A body sprite broken into g × g irregular pieces (FeelSprites.shards). */
+export interface Shards {
+  img: HTMLCanvasElement;
+  g: number;
+  /** Per piece q, 8 numbers: sx, sy, sw, sh of the plain piece in img (px; its white twin sits `wy`
+   *  lower), the piece's centroid in the body (u from the sprite's anchor, unmirrored), and the top-left
+   *  of its box from that centroid (u). */
+  r: Float32Array;
+  /** The white pieces' row offset in img (px; 0 when there are none). */
+  wy: number;
+  /** World u per px of img. */
+  upx: number;
+  /** Which pieces carry some of the body (bit q). */
+  solid: number;
+}
+
+/** Bake one shard set (see FeelSprites.shards). */
+function bakeShards(src: Sprite, g: number, white: Sprite | null, pages: HTMLCanvasElement[]): Shards | null {
+  if (g < 1 || g > 5 || !(src.sw > 1) || !(src.sh > 1)) return null;
+  const b = Math.min(1, (g >= 4 ? BOSS_SHARD_PX : SHARD_PX) / Math.max(src.sw, src.sh));
+  const pw = src.sw * b, ph = src.sh * b;
+  const upx = src.w / pw;
+  const cw = pw / g, ch = ph / g, N = g + 1;
+  const seed = (Math.round(src.sw) * 131 + Math.round(src.sh) * 7 + g) | 0;
+  // the grid's points wander (±22% of a cell; points on the border slide along it)
+  const gx = new Float32Array(N * N), gy = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+    gx[j * N + i] = i * cw + (i > 0 && i < g ? (h01(seed + i, j * 7 + 1) - 0.5) * 0.44 * cw : 0);
+    gy[j * N + i] = j * ch + (j > 0 && j < g ? (h01(seed + i * 3 + 5, j + 11) - 0.5) * 0.44 * ch : 0);
+  }
+  // every inner cut bends at its middle (the same bend for the two pieces it parts, so they fit)
+  const hMid = (i: number, j: number, o: number[]): void => {
+    const x = (gx[j * N + i] + gx[j * N + i + 1]) / 2, y = (gy[j * N + i] + gy[j * N + i + 1]) / 2;
+    o.push(x, y + (j > 0 && j < g ? (h01(seed + 17 * i + 3, 101 + j) - 0.5) * 0.4 * ch : 0));
+  };
+  const vMid = (i: number, j: number, o: number[]): void => {
+    const x = (gx[j * N + i] + gx[(j + 1) * N + i]) / 2, y = (gy[j * N + i] + gy[(j + 1) * N + i]) / 2;
+    o.push(x + (i > 0 && i < g ? (h01(seed + 29 * i + 7, 211 + j) - 0.5) * 0.4 * cw : 0), y);
+  };
+  const polys: number[][] = [];
+  const box = new Float32Array(g * g * 4);
+  for (let j = 0; j < g; j++) for (let i = 0; i < g; i++) {
+    const p: number[] = [];
+    p.push(gx[j * N + i], gy[j * N + i]); hMid(i, j, p);
+    p.push(gx[j * N + i + 1], gy[j * N + i + 1]); vMid(i + 1, j, p);
+    p.push(gx[(j + 1) * N + i + 1], gy[(j + 1) * N + i + 1]); hMid(i, j + 1, p);
+    p.push(gx[(j + 1) * N + i], gy[(j + 1) * N + i]); vMid(i, j, p);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    for (let k = 0; k < p.length; k += 2) { x0 = Math.min(x0, p[k]); x1 = Math.max(x1, p[k]); y0 = Math.min(y0, p[k + 1]); y1 = Math.max(y1, p[k + 1]); }
+    const q = j * g + i;
+    box[q * 4] = Math.floor(x0) - 2; box[q * 4 + 1] = Math.floor(y0) - 2;
+    box[q * 4 + 2] = Math.ceil(x1) - Math.floor(x0) + 4; box[q * 4 + 3] = Math.ceil(y1) - Math.floor(y0) + 4;
+    polys.push(p);
+  }
+  // shelf-pack the pieces' boxes
+  const n = g * g, r = new Float32Array(n * 8);
+  const maxW = Math.ceil(pw * 1.5) + 8;
+  let cx = 0, cy = 0, rowH = 0, W = 0;
+  for (let q = 0; q < n; q++) {
+    const bw = box[q * 4 + 2], bh = box[q * 4 + 3];
+    if (cx > 0 && cx + bw > maxW) { cx = 0; cy += rowH + 1; rowH = 0; }
+    r[q * 8] = cx; r[q * 8 + 1] = cy; r[q * 8 + 2] = bw; r[q * 8 + 3] = bh;
+    cx += bw + 1; rowH = Math.max(rowH, bh); W = Math.max(W, cx);
+  }
+  const H = cy + rowH;
+  const wy = white ? H + 1 : 0;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.ceil(W)); c.height = Math.max(1, Math.ceil(white ? H * 2 + 1 : H));
+  const g2 = c.getContext('2d');
+  if (!g2) return null;
+  const path = (p: number[]): void => {
+    g2.beginPath();
+    g2.moveTo(p[0], p[1]);
+    for (let k = 2; k < p.length; k += 2) g2.lineTo(p[k], p[k + 1]);
+    g2.closePath();
+  };
+  for (let q = 0; q < n; q++) {
+    const p = polys[q];
+    const bx = box[q * 4], by = box[q * 4 + 1];
+    let mx = 0, my = 0;
+    for (let k = 0; k < p.length; k += 2) { mx += p[k]; my += p[k + 1]; }
+    mx /= p.length / 2; my /= p.length / 2;
+    r[q * 8 + 4] = (mx - src.ax * pw) * upx; r[q * 8 + 5] = (my - src.ay * ph) * upx;
+    r[q * 8 + 6] = (bx - mx) * upx; r[q * 8 + 7] = (by - my) * upx;
+    for (let pass = 0; pass < (white ? 2 : 1); pass++) {
+      const s = pass ? white! : src;
+      g2.save();
+      g2.translate(r[q * 8] - bx, r[q * 8 + 1] - by + (pass ? wy : 0));
+      path(p); g2.clip();
+      g2.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, 0, 0, pw, ph);
+      if (!pass) {
+        // the break: a white-hot rim along the cut, added as light (it glows on the ink and vanishes into
+        // the pale paper halo), then trimmed back to the piece's own alpha
+        g2.globalCompositeOperation = 'lighter';
+        path(p);
+        g2.lineJoin = 'round';
+        g2.strokeStyle = 'rgba(255,236,196,0.45)'; g2.lineWidth = 5 / upx; g2.stroke();
+        g2.strokeStyle = 'rgba(255,252,240,0.9)'; g2.lineWidth = 2 / upx; g2.stroke();
+        g2.globalCompositeOperation = 'destination-in';
+        g2.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, 0, 0, pw, ph);
+      }
+      g2.restore();
+    }
+  }
+  // which pieces carry some of the body (a coarse look at the sprite's alpha)
+  let solid = (1 << n) - 1;
+  try {
+    const m = 4 * g;
+    const t = document.createElement('canvas');
+    t.width = m; t.height = m;
+    const tg = t.getContext('2d');
+    if (tg) {
+      tg.drawImage(src.img, src.sx, src.sy, src.sw, src.sh, 0, 0, m, m);
+      const d = tg.getImageData(0, 0, m, m).data;
+      solid = 0;
+      for (let q = 0; q < n; q++) {
+        const i = q % g, j = (q / g) | 0;
+        let a = 0;
+        for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) a += d[((j * 4 + y) * m + i * 4 + x) * 4 + 3];
+        if (a / 16 > 40) solid |= 1 << q;
+      }
+      if (!solid) solid = (1 << n) - 1;
+    }
+  } catch { /* keep every piece */ }
+  pages.push(c);
+  return { img: c, g, r, wy, upx, solid };
 }
 
 type Paint = (g: CanvasRenderingContext2D, col: string, edge: string | null, frame: number, tint: number) => void;

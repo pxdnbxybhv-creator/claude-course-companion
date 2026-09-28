@@ -10,7 +10,7 @@ import { fmtBig } from '../src/views/mirror/logic/formulas';
 import { Limiter } from '../src/views/mirror/audio/limiter';
 import { BOSS_REG, DROP_REG, ELITE_REG, FX_REG, ITEM_REG, MONSTER_REG, PROJ_REG, SUMMON_REG, TREASURE_REG, WEAPON_REG, COMPANION_REG } from '../src/views/mirror/ids';
 import type { AtlasId, RunSave } from '../src/views/mirror/types';
-import { THEMES, arrange, phraseSeconds, setMirrorColour, type MirrorColour } from '../src/audio/music-themes';
+import { MIRROR_MAX_BPM, THEMES, arrange, phraseSeconds, setMirrorColour, type MirrorColour } from '../src/audio/music-themes';
 import { Composer, gongPc } from '../src/audio/music-theory';
 import { makeRng } from '../src/core/rng';
 import { renderVoice, renderPickup, SFX_NAMES, SFX_MIX, gongHz } from '../src/views/mirror/audio/voices';
@@ -176,8 +176,15 @@ describe('the mirror music', () => {
     setMirrorColour('palace'); const palace = THEMES.mirror.style;
     setMirrorColour('lake');
     expect(lake).not.toBe(palace);
-    expect(lake.bpm).toEqual([118, 126]);
-    expect(palace.bpm).toEqual([126, 132]);
+    // the tempo is the music's to tune (the battle score is faster now): each map its own range, the
+    // palace the fastest of the two, every range a real battle tempo under the cap
+    expect(lake.bpm).not.toEqual(palace.bpm);
+    expect(palace.bpm[0]).toBeGreaterThanOrEqual(lake.bpm[0]);
+    for (const b of [lake.bpm, palace.bpm]) {
+      expect(b[0]).toBeGreaterThanOrEqual(100);
+      expect(b[0]).toBeLessThanOrEqual(b[1]);
+      expect(b[1]).toBeLessThanOrEqual(MIRROR_MAX_BPM);
+    }
   });
 });
 

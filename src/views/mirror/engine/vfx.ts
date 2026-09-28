@@ -19,7 +19,9 @@ import type { World } from './world';
 import { Pool } from './pools';
 import { TAU } from './consts';
 import { SH, TN } from '../paint/feel';
-import { RING_EDGE, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, type VfxSprites, isInkTint, vfxSprites } from '../paint/vfx';
+import { RING_EDGE, STAIN, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, type VfxSprites, isInkTint, vfxSprites } from '../paint/vfx';
+
+const STAIN_CRACK: number = STAIN.crack;
 
 export { VT, STAIN } from '../paint/vfx';
 
@@ -51,6 +53,9 @@ export const VF = {
   rake: 128,
   /** A big moment (boss down, 镜技 landing): a wider band and a slower ring. */
   big: 256,
+  /** A lance drawn whole as a cut mark (thin at both ends, fullest in the middle) that thins away in
+   *  place: a cross-slash's strokes. */
+  cut: 512,
 } as const;
 /** Options of a shockwave. */
 export interface ShockOpts {
@@ -87,10 +92,12 @@ const PROF = new Float32Array(NCR_MAX + 1);
 const NLA = 10;
 const LPROF = new Float32Array(NLA + 1);
 const SPROF = new Float32Array(NLA + 1);
+const CPROF = new Float32Array(NLA + 1);
 for (let k = 0; k <= NLA; k++) {
   const p = k / NLA;
   LPROF[k] = p < 0.78 ? Math.pow(p / 0.78, 0.55) : Math.pow((1 - p) / 0.22, 0.9);
   SPROF[k] = Math.pow(p, 0.8) * (p < 0.88 ? 1 : (1 - p) / 0.12);
+  CPROF[k] = Math.pow(Math.sin(Math.PI * p), 0.75);
 }
 /** Scratch vertices (lightning). */
 const BX = new Float32Array(32), BY = new Float32Array(32);
@@ -143,7 +150,7 @@ export class Vfx {
   clear(): void { for (const p of this.all()) p.clear(); }
   get calm(): boolean { return !!this.W.settings.reduceMotion; }
   /** Live entries of every kind. */
-  count(): number { let n = 0; for (const p of this.all()) n += p.count; return n; }
+  count(): number { const P = this.pools; let n = 0; for (let k = 0; k < P.length; k++) n += P[k].count; return n; }
 
   /** A slot in pool P (prio 2 takes the oldest when full); −1 when the budget says no. */
   private take(P: FxPool, prio: number): number {
@@ -191,7 +198,8 @@ export class Vfx {
     let n = o.debris ?? Math.min(12, 4 + Math.round(r / 22));
     if (this.q === 'low' || this.W.degrade) n >>= 1;
     if (n > 0) this.debris(x, y, r, o.debrisTint ?? tint, n, o.fleck ?? -1);
-    if ((o.stain ?? -1) >= 0) this.stain(x, y, r * 0.55, o.stain!, o.stainLife ?? 1.6);
+    // the ground mark stays local to the blow (a crack across the whole ring reads as a web)
+    if ((o.stain ?? -1) >= 0) this.stain(x, y, Math.min(r * 0.55, o.stain === STAIN_CRACK ? 64 : 84), o.stain!, o.stainLife ?? 1.6);
     return i;
   }
   /** A thin ring (a pulse of sound, a ripple, a ping): no band, no debris. */
@@ -209,8 +217,9 @@ export class Vfx {
     for (let k = 0; k < n; k++) {
       const a = (k / n) * TAU + this.rnd() * 0.5;
       const v = r * (2.6 + 2.2 * this.rnd());
-      // light: every other fleck a spark of the tint, the rest ink chips (ink on paper under the light)
-      const kd = kind >= 0 ? (k & 1 ? kind : FK.ink) : ink ? FK.ink : (k & 1 ? FK.ember : FK.ink);
+      // a blow: every other fleck a spark of the tint, the rest ink chips flung by the pressure wind (ink
+      // on paper under the light); glints and drops (a level, moonlight, water, wine) stay all light
+      const kd = kind === FK.glint || kind === FK.drop ? kind : kind >= 0 ? (k & 1 ? kind : FK.ink) : ink ? FK.ink : (k & 1 ? FK.ember : FK.ink);
       const tn = kd === FK.ink ? VT.ink : tint;
       this.fleck(x + Math.cos(a) * r * 0.2, y + Math.sin(a) * r * 0.2, Math.cos(a) * v, Math.sin(a) * v, kd, tn, 0.3 + 0.2 * this.rnd(), kd === FK.ink ? 0.8 + 0.5 * this.rnd() : 1);
     }
@@ -336,13 +345,23 @@ export class Vfx {
     ctx.globalAlpha = 1;
   }
 
+  /** Columns of light (level-up, the elixir, 嫦娥 rising, a boss breaking): behind the figures, drawn
+   *  with the player's layer before the player, so the light rises behind her instead of washing her out. */
+  drawUnder(ctx: CanvasRenderingContext2D, cam: Camera, spr: (id: AtlasId) => Sprite | null): void {
+    this.sync();
+    if (!this.blooms.count) return;
+    this.drawBlooms(ctx, cam, spr, this.W.degrade ? 0.65 : 1, true);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
   /** Everything else (the effects layer: under both kinds of shot). `spr` looks up the painter's sprites. */
   draw(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, spr: (id: AtlasId) => Sprite | null): void {
     this.sync();
     if (!this.count()) return;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const pa = this.W.degrade ? 0.65 : 1;
-    this.drawBlooms(ctx, cam, spr, pa);
+    this.drawBlooms(ctx, cam, spr, pa, false);
     this.drawRings(ctx, cam, pa);
     this.drawBeams(ctx, cam, pa);
     this.drawBolts(ctx, cam, pa);
@@ -354,14 +373,18 @@ export class Vfx {
     ctx.lineJoin = 'miter'; ctx.lineCap = 'butt';
   }
 
-  private drawBlooms(ctx: CanvasRenderingContext2D, cam: Camera, spr: (id: AtlasId) => Sprite | null, pa: number): void {
+  private drawBlooms(ctx: CanvasRenderingContext2D, cam: Camera, spr: (id: AtlasId) => Sprite | null, pa: number, under: boolean): void {
     const P = this.blooms, S = this.sprites, t = this.W.t, calm = this.calm;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
       const u = (t - P.t0[i]) / P.life[i];
       if (u >= 1) { P.release(i); continue; }
+      const k = P.kind[i];
+      if ((k === BK.column) !== under) continue;
       if (u < 0 || !onScreen(cam, P.x[i], P.y[i], P.r[i] * 1.5)) continue;
-      const k = P.kind[i], tint = P.tint[i], a0 = P.w[i] * pa;
+      const tint = P.tint[i];
+      // reduced motion: a quick pop of light is only a gentle glow
+      const a0 = P.w[i] * pa * (calm && k === BK.glow && P.life[i] < 0.3 ? 0.55 : 1);
       if (k === BK.glow) {
         const s = S.glow(tint);
         if (!s) continue;
@@ -378,7 +401,7 @@ export class Vfx {
       } else if (k === BK.halo) {
         const s = S.ring(tint);
         if (!s) continue;
-        const e = 1 - Math.pow(1 - u, 3);
+        const e = calm ? 1 : 1 - Math.pow(1 - u, 3);
         const sz = (P.r[i] * (0.3 + 0.7 * e)) / (32 * RING_EDGE);
         rot(ctx, cam, s, P.x[i], P.y[i], 0, sz, sz, a0 * (1 - u));
       } else {
@@ -444,8 +467,8 @@ export class Vfx {
     if (ink) {
       stroke(ctx, sx, sy, Rs, edgeW * 1.3, VFX_EDGE, pa * Math.pow(fade, 0.7) * 0.8);
     } else {
-      stroke(ctx, sx, sy, Rs, edgeW * 2.2, VFX_BODY[tint], pa * fade * 0.85);
-      stroke(ctx, sx, sy, Rs, edgeW * (calm ? 0.9 : 0.8), calm ? VFX_HALO[tint] : VFX_CORE[tint], pa * Math.min(1, fade * 1.4));
+      stroke(ctx, sx, sy, Rs, edgeW * 1.85, VFX_BODY[tint], pa * fade * 0.8);
+      stroke(ctx, sx, sy, Rs, edgeW * (calm ? 0.9 : 0.85), calm ? VFX_HALO[tint] : VFX_CORE[tint], pa * Math.min(1, fade * 1.4));
       stroke(ctx, sx, sy, Rs + edgeW * 1.4, 0.8 * d, VFX_EDGE, pa * fade * 0.28);
     }
     if (fl & VF.double) {
@@ -538,7 +561,8 @@ export class Vfx {
       if (u >= 1) { P.release(i); continue; }
       if (u < 0) continue;
       const fl = P.flags[i], tint = P.tint[i];
-      const streakK = (fl & VF.streak) !== 0;
+      const cutK = (fl & VF.cut) !== 0;
+      const streakK = (fl & VF.streak) !== 0 || cutK;
       const ext = streakK ? 1 : Math.min(1, u / 0.22);
       const x = P.x[i], y = P.y[i], dir = P.a[i];
       const len = P.b[i];
@@ -550,9 +574,9 @@ export class Vfx {
       ctx.setTransform(c, s, -s, c, sx, sy);
       // a streak's tail catches up with its head as it fades
       const L = len * ext * cam.scale;
-      const x0 = streakK ? L * Math.min(0.85, u * 0.9) : Math.min(L * 0.1, 12 * cam.scale);
-      const hw = (P.w[i] * cam.scale * 0.5) * (1 - 0.45 * u);
-      const prof = streakK ? SPROF : LPROF;
+      const x0 = cutK ? 0 : streakK ? L * Math.min(0.85, u * 0.9) : Math.min(L * 0.1, 12 * cam.scale);
+      const hw = (P.w[i] * cam.scale * 0.5) * (cutK ? 1 - 0.7 * u : 1 - 0.45 * u);
+      const prof = cutK ? CPROF : streakK ? SPROF : LPROF;
       if (fl & VF.ink) {
         lancePath(ctx, x0, L, hw * 1.25 + d, prof); fill(ctx, VFX_EDGE, fade * 0.16);
         lancePath(ctx, x0, L, hw, prof); fill(ctx, VFX_BODY[tint], fade * 0.85);
@@ -575,7 +599,7 @@ export class Vfx {
         }
       }
       if (star && !calm && !(fl & VF.ink) && u < 0.45) {
-        const hx = x + c * len * ext, hy = y + s * len * ext;
+        const hx = x + c * len * (cutK ? 0.5 : ext), hy = y + s * len * (cutK ? 0.5 : ext);
         rot(ctx, cam, star, hx, hy, dir, 0.36, 0.36, fade * (1 - u * 2));
       }
     }
@@ -694,7 +718,8 @@ export class Vfx {
       } else {
         const s = feel.get(k === FK.drop ? SH.drop : SH.dot, tn);
         const sp = Math.hypot(P.vx[i], P.vy[i]) * ev;
-        const kx = k === FK.drop ? sz * (1 + Math.min(1.4, sp / 260)) : sz * (1 - 0.35 * u);
+        // the pressure wind: a fast chip is a streak along its flight, settling into a dot
+        const kx = k === FK.drop ? sz * (1 + Math.min(1.4, sp / 260)) : sz * (1 - 0.35 * u) * (1 + Math.min(1.8, sp / 170));
         if (s) rot(ctx, cam, s, x, y, Math.atan2(P.vy[i], P.vx[i]), kx, sz * (1 - 0.35 * u), pa * (1 - u * u) * 0.95);
       }
     }

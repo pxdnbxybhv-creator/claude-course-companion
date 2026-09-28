@@ -43,6 +43,8 @@ export interface RenderOpts {
   invert?: boolean;
   /** Replace every colour by white ink on a black halo (镜主). */
   ghost?: boolean;
+  /** Recolour into a two-ink duotone, dark → light by luminance, alpha kept (心魔: plum on lilac). */
+  duo?: readonly [string, string];
   /** Bake the hit-flash twin (default true). Only bodies that flash (enemies, summons, the companion)
    *  need one: everything else shares its sprite as its "flash", which halves its memory. */
   flash?: boolean;
@@ -88,6 +90,7 @@ export function renderSpec(spec: Spec, v: number, o: RenderOpts): Painted {
   const ink = canvas(cw, ch);
   ctx2d(ink).drawImage(sc.c, 0, 0, cw, ch, 0, 0, cw, ch);
   if (o.ghost) ghostify(ink);
+  else if (o.duo) duotone(ink, o.duo[0], o.duo[1]);
   // the white body of the flash twin (before the rim light: a flash is flat white)
   const wantFlash = o.flash !== false;
   const white = wantFlash ? tinted(ink, '#fffdf6') : null;
@@ -179,17 +182,20 @@ function volume(ink: HTMLCanvasElement, d: number, a: number) {
   const w = ink.width, h = ink.height;
   const f = Math.max(2, Math.round(d * 0.75));
   const sw = Math.max(1, Math.ceil(w / f)), sh = Math.max(1, Math.ceil(h / f));
+  // the silhouette is read at full resolution once (downscaled); both bands are cut from that copy
+  const sil = canvas(sw, sh), lg = ctx2d(sil);
+  lg.imageSmoothingEnabled = true;
+  lg.imageSmoothingQuality = 'high';
+  lg.drawImage(ink, 0, 0, sw * f, sh * f, 0, 0, sw, sh);
   const small = canvas(sw, sh), sg = ctx2d(small);
-  sg.imageSmoothingEnabled = true;
-  sg.imageSmoothingQuality = 'high';
   const q = ctx2d(ink);
   q.imageSmoothingEnabled = true;
   q.imageSmoothingQuality = 'high';
   const band = (dx: number, dy: number, color: string, alpha: number) => {
     sg.globalCompositeOperation = 'copy';
-    sg.drawImage(ink, 0, 0, sw * f, sh * f, 0, 0, sw, sh);
+    sg.drawImage(sil, 0, 0);
     sg.globalCompositeOperation = 'destination-out';
-    sg.drawImage(ink, 0, 0, sw * f, sh * f, dx / f, dy / f, sw, sh);
+    sg.drawImage(sil, dx / f, dy / f);
     sg.globalCompositeOperation = 'source-in';
     sg.fillStyle = color;
     sg.fillRect(0, 0, sw, sh);
@@ -202,6 +208,7 @@ function volume(ink: HTMLCanvasElement, d: number, a: number) {
   q.globalAlpha = 1;
   q.globalCompositeOperation = 'source-over';
   small.width = small.height = 1;
+  sil.width = sil.height = 1;
 }
 /** The volume's light: a cool moon-white. */
 const SHEEN = '#eef3ff';
@@ -258,6 +265,24 @@ function ghostify(c: HTMLCanvasElement): void {
     const L = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
     const v = 1 - L * 0.85;
     d[i] = 235 * v + 10; d[i + 1] = 240 * v + 10; d[i + 2] = 250 * v + 5;
+  }
+  g.putImageData(img, 0, 0);
+}
+
+/** Two inks by luminance: each painted pixel becomes dark + (light − dark) · L (alpha kept), so the
+ *  figure keeps every shape and shade in the new pair of inks. */
+function duotone(c: HTMLCanvasElement, dark: string, light: string): void {
+  const g = ctx2d(c);
+  let img: ImageData;
+  try { img = g.getImageData(0, 0, c.width, c.height); } catch { return; }
+  const d = img.data;
+  const a = parseInt(dark.slice(1, 7), 16), b = parseInt(light.slice(1, 7), 16);
+  const r0 = (a >> 16) & 255, g0 = (a >> 8) & 255, b0 = a & 255;
+  const dr = ((b >> 16) & 255) - r0, dg = ((b >> 8) & 255) - g0, db = (b & 255) - b0;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const L = (0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]) / 255;
+    d[i] = r0 + dr * L; d[i + 1] = g0 + dg * L; d[i + 2] = b0 + db * L;
   }
   g.putImageData(img, 0, 0);
 }

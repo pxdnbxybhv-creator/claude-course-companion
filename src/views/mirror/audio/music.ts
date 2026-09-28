@@ -4,9 +4,10 @@
 // wave, a choked 钹 on the clear, a 大鼓 roll into the 大锣 when a boss arrives), and feeds the band the
 // wave clock and the danger. The themes read that state as each phrase is composed
 // (src/audio/music-themes.ts: mirrorTier, mirrorBossStep), so layers enter over the wave, the last 10 s
-// tighten and danger pushes a layer up. A phrase is composed ≈ 4.5 s ahead: a boss's new phase and
-// the danger cue make the band re-compose what it has not played yet (the mirror epoch), and the
-// director plays a cue at once — on the band's next beat, in its tempo (music-player.ts
+// tighten and danger pushes a layer up. A phrase is composed ≈ 4.5 s ahead: the danger cue makes the
+// band re-compose what it has not played yet (the mirror epoch), a boss's new phase cuts the band over
+// at its next bar line past the play-ahead (≈ 1.2–3 s: music-player.ts bandCut), and the director
+// plays a cue at once — on the band's next beat, in its tempo (music-player.ts
 // bandBeat): a 堂鼓 roll into 大鼓 + 小锣 when the danger rises past one half (at most every 12 s), a
 // 大锣 with the 唢呐's call when a boss enters a new phase. Each wave tells the band its number, so the
 // map's call rotates (music-themes.ts WAVE_HEADS).
@@ -20,7 +21,7 @@
 // Volume and the music switch are the app's (settings.music, settings.musicVolume → music.ts), and the
 // music bus has its own compressor and soft clip. No Web Audio here; never throws.
 import { music } from '../../../audio/music';
-import { bandBeat } from '../../../audio/music-player';
+import { bandBeat, bandCut } from '../../../audio/music-player';
 import { getMirrorColour, getMirrorMusic, mirrorBpm, mirrorCue, refreshMirrorBand, setMirrorMusic, type MirrorCue } from '../../../audio/music-themes';
 import type { MusicTheme } from '../../walk/map';
 import type { MapId } from '../ids';
@@ -129,7 +130,7 @@ class MirrorMusic {
       // danger rises at once and falls over about a second, so the band does not flicker
       const d = dangerOf(s, crowd);
       const was = this.danger;
-      let refresh = false;
+      let refresh = false, phaseUp = false;
       this.danger = Math.max(d, this.danger - 0.05);
       // the band hears the danger at its next phrase; the drums answer it now
       if (was < 0.5 && this.danger >= 0.5 && s.hp > 0) {
@@ -147,10 +148,11 @@ class MirrorMusic {
         upd.bossPhase = s.boss.phase;
         this.sawBoss = true;
         // a new boss phase: 大锣 and the 唢呐's call at once (the boss's entry has its own roll into the 锣)
-        if (this.bossPhase >= 0 && s.boss.phase > this.bossPhase && s.hp > 0) onBeat('phase');
+        if (this.bossPhase >= 0 && s.boss.phase > this.bossPhase && s.hp > 0) { onBeat('phase'); phaseUp = true; }
         this.bossPhase = Math.max(this.bossPhase, s.boss.phase);
       }
-      setMirrorMusic(upd); // (a new boss phase re-composes the band's next phrases by itself)
+      setMirrorMusic(upd); // (a new boss phase also re-composes the band's next phrases by itself…)
+      if (phaseUp) bandCut(); // …but the band cuts over to it at its next bar line, not a phrase later
       if (refresh) refreshMirrorBand(); // the danger layer from the next phrase, not a phrase later
       // the clear, heard as it happens (the UI's shop comes ≈ 1.2 s later, after the 「破」 title)
       if (!this.cleared && s.hp > 0 && ((this.now === 'wave' && s.time != null && s.time <= 0.05) || (this.now === 'boss' && this.sawBoss && !s.boss))) this.clear();

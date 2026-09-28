@@ -14,7 +14,8 @@ import { defaultMeta } from '../src/app/mirror';
 import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { CONTENT } from '../src/views/mirror/engine/content';
-import { FC, MK, fcOfWeapon, numPop } from '../src/views/mirror/engine/feel';
+import { FC, MK, STAIN_WASH, STAIN_WASH_S, fcOfWeapon, fragGrid, fragWhite, numPop } from '../src/views/mirror/engine/feel';
+import { EKind } from '../src/views/mirror/engine/pools';
 import { SRCI } from '../src/views/mirror/engine/consts';
 import { SH } from '../src/views/mirror/paint/feel';
 import { FEEL_MIX, FEEL_NAMES, renderFeel } from '../src/views/mirror/audio/voices';
@@ -155,6 +156,96 @@ describe('打击感: the feel layer', () => {
     const h = W.spawn('blot', W.px + 60, W.py, { bloom: false });
     W.kill(h);
     for (let j = 0; j < F.fr.n; j++) if (F.fr.alive[j]) { expect(F.fr.vx[j]).toBe(0); expect(F.fr.vr[j]).toBe(0); }
+    // … and the pieces never flash white (the renderer's white window is off under reduced motion)
+    for (let a = 0; a < 0.5; a += 0.005) expect(fragWhite(a, true)).toBe(false);
+    expect(fragWhite(0, false)).toBe(true);
+    expect(fragWhite(0.02, false)).toBe(true);
+    expect(fragWhite(0.05, false)).toBe(false);
+    eng.dispose();
+  });
+
+  it('a hitstop holds the camera where it is: it never closes its follow lag in one frame', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 21 })), []), wave: 3 });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    let now = 1000;
+    let prev = eng.camera;
+    const stepOf = () => { const c = eng.camera; const d = Math.hypot(c.x - prev.x, c.y - prev.y); prev = c; return d; };
+    eng.input.move(1, 0.25);
+    let walk = 0;
+    for (let f = 0; f < 60; f++) { eng.frame((now += 1000 / 60)); walk = stepOf(); }
+    expect(walk).toBeGreaterThan(0.5); // following a walk …
+    // … from behind its target (you plus a 60 px lead): a lag the old code closed in a stop's first frame
+    const lead = (60 * prev.dpr) / prev.scale, sp = Math.max(1, W.moveSpd);
+    expect(Math.hypot(W.px + (W.pvx / sp) * lead - prev.x, W.py + (W.pvy / sp) * lead - prev.y)).toBeGreaterThan(5 * walk);
+    for (const ms of [40, 75]) {
+      W.hitstopMs = ms;
+      const t0 = W.tWave;
+      // the stop's frames and the first one after it: no step larger than the walk's
+      for (let f = 0; f < Math.ceil(ms / 16.7) + 1; f++) { eng.frame((now += 1000 / 60)); expect(stepOf()).toBeLessThanOrEqual(walk * 1.05 + 1e-6); }
+      expect(W.tWave - t0).toBeLessThanOrEqual(2 / 60 + 1e-6); // the world was held (the stop's tail and the frame after it ran)
+      for (let f = 0; f < 30; f++) { eng.frame((now += 1000 / 60)); walk = stepOf(); }
+    }
+    eng.dispose();
+  });
+
+  it('a kill that breaks the body leaves out the dark ink burst; a death that breaks nothing keeps it', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 12 })), []), wave: 5 });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const F = W.feel, E = W.E, P = W.P;
+    const bursts = () => { let n = 0; for (let j = 0; j < P.n; j++) if (P.alive[j] && P.kind[j] === 'inkBurst') n++; return n; };
+    const body = (dy: number) => {
+      const h = W.spawn('crab', W.px + 100, W.py + dy, { bloom: false });
+      const i = E.slotOf(h);
+      E.hp[i] = E.hpMax[i] = 1000; E.speed[i] = 0; E.dmg[i] = 0;
+      F.hit(i, W.px, W.py, 300, false, FC.slash, false, SRCI.weapon, -1);
+      return h;
+    };
+    P.clear();
+    W.kill(body(0));
+    expect(F.fr.count).toBeGreaterThanOrEqual(3); // the pieces …
+    expect(bursts()).toBe(0); // … are not buried under a black blot
+    // a degraded frame breaks nothing: the ink burst stands in for the pieces
+    F.fr.clear(); F.fr.id.fill(null);
+    W.degrade = 1;
+    W.kill(body(20));
+    expect(F.fr.count).toBe(0);
+    expect(bursts()).toBe(1);
+    eng.dispose();
+  });
+
+  it('the stains dry as you fight: a timed wash of the paper, one sparked stain a step', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 5 })), BUSY), wave: 11, stats: { aspd: 150, crit: 50 } });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const washes: number[] = [];
+    let stamps = 0;
+    const painter = W.painter!;
+    painter.wash = (f: number) => { washes.push(f); };
+    painter.stamp = () => { stamps++; };
+    for (let k = 0; k < 40; k++) W.spawn('blot', W.px + Math.cos(k) * (60 + k * 3), W.py + Math.sin(k) * (60 + k * 3), { bloom: false });
+    const F = W.feel;
+    const kills0 = F.st.kills, w0 = F.st.washes;
+    let worst = 0;
+    const secs = 6;
+    for (let k = 0; k < 60 * secs; k++) {
+      const s0 = F.st.stamps;
+      eng.stepN(1);
+      worst = Math.max(worst, F.st.stamps - s0);
+      if (W.E.count < 20) for (let j = 0; j < 20; j++) W.spawn('blot', W.px + Math.cos(j) * 90, W.py + Math.sin(j) * 90, { bloom: false });
+    }
+    expect(F.st.kills - kills0).toBeGreaterThan(20);
+    expect(stamps).toBeGreaterThan(0);
+    expect(worst).toBeLessThanOrEqual(1); // the feel layer's stains: ≤ 1 a step
+    expect(F.st.washes - w0).toBe(Math.floor(secs / STAIN_WASH_S));
+    expect(washes.length).toBe(Math.floor(secs / STAIN_WASH_S));
+    for (const f of washes) expect(f).toBe(STAIN_WASH);
+    // over a 45 s wave a kill's stain keeps about a third of its ink at most
+    expect(Math.pow(1 - STAIN_WASH, 45 / STAIN_WASH_S)).toBeLessThan(0.4);
     eng.dispose();
   });
 
@@ -328,6 +419,32 @@ describe('打击感: the feel layer', () => {
     }
     expect(peak).toBeLessThanOrEqual(M.cap);
     expect(F.st.marks).toBeLessThan(120 * 12);
+    eng.dispose();
+  });
+
+  it('a death breaks the body on its grid and flings only the pieces that carry some of it', () => {
+    expect([fragGrid(EKind.Mon, 'high'), fragGrid(EKind.Mon, 'low'), fragGrid(EKind.Elite, 'mid'), fragGrid(EKind.Boss, 'low')]).toEqual([3, 2, 3, 4]);
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 12 })), []), wave: 5 });
+    const { eng } = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    const F = W.feel, E = W.E, Fr = F.fr;
+    // the baked shards say which pieces of the 3 × 3 grid hold the body: a plus (the corners are paper)
+    const PLUS = (1 << 1) | (1 << 3) | (1 << 4) | (1 << 5) | (1 << 7);
+    (F.sprites as unknown as { solid: (id: string, g: number) => number }).solid = (_id, g) => (g === 3 ? PLUS : 0);
+    for (let n = 0; n < 6; n++) {
+      Fr.clear(); Fr.id.fill(null);
+      eng.stepN(1);
+      const h = W.spawn('crab', W.px + 100, W.py + n * 7, { bloom: false });
+      const i = E.slotOf(h);
+      E.hp[i] = E.hpMax[i] = 1000; E.speed[i] = 0; E.dmg[i] = 0;
+      F.hit(i, W.px, W.py, 300, false, FC.slash, false, SRCI.weapon, -1);
+      W.kill(h);
+      expect(Fr.count).toBe(5); // high wants 6; the plus has 5
+      const seen = new Set<number>();
+      for (let j = 0; j < Fr.n; j++) if (Fr.alive[j]) { expect(Fr.g[j]).toBe(3); expect(PLUS & (1 << Fr.q[j])).not.toBe(0); seen.add(Fr.q[j]); }
+      expect(seen.size).toBe(5); // each piece once
+    }
     eng.dispose();
   });
 
