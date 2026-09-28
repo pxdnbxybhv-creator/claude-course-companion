@@ -1,12 +1,19 @@
 // 水月幻镜 · the 镜 tab (API.md §4): lobby ↔ run ↔ results, plus the lobby's pages (镜鉴, 镜碑, 心镜,
-// 心得, 设置). On mount a stale or unreadable run is settled (resumeCheck) and the lobby's day is
-// rolled; while a run shows, `.mirror-live` hides the tab bar. The view owns the mirror's audio for
-// its lifetime; `key={r}` in App remounts it on navigation, and the cleanup here disposes and saves.
+// 心得, 设置) and the tutorial 「初入镜中」 (a practice run in memory: no fee, no records). On mount a
+// stale or unreadable run is settled (resumeCheck) and the lobby's day is rolled; a newcomer is offered
+// the tutorial once (tutor/offer.ts). While a run shows, `.mirror-live` hides the tab bar. The view owns
+// the mirror's audio for its lifetime; `key={r}` in App remounts it on navigation, and the cleanup here
+// disposes and saves.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../app/i18n';
 import { mirror, saveMetaNow } from '../../app/mirror';
 import { toast } from '../../ui/kit';
-import { abandon, enter, lobbyVisit, resumeCheck } from './logic/session';
+import { abandon, enter, lobbyVisit, resumeCheck, setTutor } from './logic/session';
+import { todayKey } from '../../core/date';
+import { createTutorSession, type TutorSession } from './tutor/session';
+import { tutorRun } from './tutor/run';
+import { decideTutorOffer } from './tutor/offer';
+import { TutorOffer } from './ui/Tutorial';
 import { createMirrorAudio } from './audio/sfx';
 import type { MirrorAudio, RunReport, RunSave } from './types';
 import type { CharacterId } from '../../data/characters';
@@ -23,7 +30,21 @@ type Scene =
   | { kind: 'lobby' }
   | { kind: 'page'; page: LobbyPage }
   | { kind: 'run'; run: RunSave; ritual: 'paid' | 'free' | null; key: number }
+  | { kind: 'tutor'; sess: TutorSession; key: number }
   | { kind: 'results'; report: RunReport; snap: HTMLCanvasElement | null };
+
+/** `?tutor=0|1` (read once on the 镜 route, then taken out of the address). */
+function tutorParam(): string | null {
+  try {
+    const q = new URLSearchParams(location.search);
+    const v = q.get('tutor');
+    if (v === null) return null;
+    q.delete('tutor');
+    const rest = q.toString();
+    try { history.replaceState(history.state, '', location.pathname + (rest ? '?' + rest : '') + location.hash); } catch { /* sandboxed */ }
+    return v;
+  } catch { return null; }
+}
 
 export default function MirrorView() {
   const t = useT();
@@ -34,6 +55,14 @@ export default function MirrorView() {
     lobbyVisit();
     return report ? { kind: 'results', report, snap: null } : { kind: 'lobby' };
   });
+  // the tutorial's offer: a newcomer's sheet or a veteran's ribbon, decided once as the lobby opens
+  const [offer, setOffer] = useState<'sheet' | 'ribbon' | null>(() => {
+    const param = tutorParam();
+    if (scene.kind !== 'lobby') return null;
+    return decideTutorOffer({ meta: mirror.value, webdriver: !!(typeof navigator !== 'undefined' && navigator.webdriver), param });
+  });
+  /** After the tutorial's 「去入镜」: the lobby's entry button rings once. */
+  const [ring, setRing] = useState(false);
 
   useEffect(() => {
     // the mirror's own WenKai file (item and monster names), fetched as the tab opens
@@ -79,11 +108,34 @@ export default function MirrorView() {
     if (!mirror.value.active) return;
     setScene({ kind: 'results', report: abandon(), snap: null });
   };
+  /** 「初入镜中」: free, nothing recorded; a paused real run is left exactly as it is. */
+  const startTutor = () => {
+    setOffer(null);
+    setTutor({ offered: true });
+    const a = aud();
+    const t0 = performance.now();
+    void a.prime().then(() => { if (performance.now() - t0 < 650) a.sfx('ritualGlint'); });
+    setScene({ kind: 'tutor', sess: createTutorSession(tutorRun(todayKey())), key: Date.now() });
+  };
+  const toLobby = () => { lobbyVisit(); setScene({ kind: 'lobby' }); };
 
-  const live = scene.kind === 'run';
+  const live = scene.kind === 'run' || scene.kind === 'tutor';
   return (
     <div class={'mirror' + (live ? ' mirror-live' : '') + (calmPref.value ? ' mj-calm' : '')}>
-      {scene.kind === 'lobby' && <Lobby onEnter={startRun} onResume={resume} onAbandon={giveUp} onPage={(page) => setScene({ kind: 'page', page })} />}
+      {scene.kind === 'lobby' && (
+        <Lobby
+          onEnter={startRun}
+          onResume={resume}
+          onAbandon={giveUp}
+          onPage={(page) => setScene({ kind: 'page', page })}
+          onTutorial={startTutor}
+          ribbon={offer === 'ribbon'}
+          onRibbonClose={() => setOffer(null)}
+          ring={ring}
+          onRung={() => setRing(false)}
+        />
+      )}
+      {scene.kind === 'lobby' && <TutorOffer open={offer === 'sheet'} onYes={startTutor} onNo={() => setOffer(null)} />}
       {scene.kind === 'page' && (
         <div class="mj-pagewrap page">
           <header class="topbar">
@@ -93,7 +145,7 @@ export default function MirrorView() {
           {scene.page === 'records' && <RecordsPage />}
           {scene.page === 'heart' && <HeartMirror />}
           {scene.page === 'mastery' && <MasteryPage />}
-          {scene.page === 'settings' && <SettingsPage />}
+          {scene.page === 'settings' && <SettingsPage onTutorial={startTutor} />}
         </div>
       )}
       {scene.kind === 'run' && (
@@ -104,6 +156,19 @@ export default function MirrorView() {
           audio={aud()}
           onEnd={(e) => setScene({ kind: 'results', report: e.report, snap: e.snap })}
           onLeave={(note) => { if (note) toast(note, 3200); lobbyVisit(); setScene({ kind: 'lobby' }); }}
+        />
+      )}
+      {scene.kind === 'tutor' && (
+        <RunView
+          key={scene.key}
+          initial={scene.sess.run()}
+          ritual="tutor"
+          audio={aud()}
+          sess={scene.sess}
+          practice
+          onEnd={() => toLobby()}
+          onLeave={(note) => { if (note) toast(note, 3200); toLobby(); }}
+          onTutorEnd={(go) => { toLobby(); if (go) setRing(true); }}
         />
       )}
       {scene.kind === 'results' && (

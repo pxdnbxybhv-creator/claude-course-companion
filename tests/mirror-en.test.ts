@@ -50,3 +50,17 @@ describe('mirror English text', () => {
     expect(out).toEqual([]);
   });
 });
+
+describe('mirror UI sources: no hanzi as a visible JSX text node', () => {
+  it('shows a bare hanzi element only when it is aria-hidden decoration (a brush glyph beside words)', () => {
+    const dir = 'src/views/mirror/ui';
+    const pat = /<(\w+)([^<>]*)>([㐀-鿿·]+)<\/\1>/g;
+    const out: string[] = [];
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.tsx'))) {
+      readFileSync(join(dir, f), 'utf8').split('\n').forEach((line, i) => {
+        for (const m of line.matchAll(pat)) if (!m[2].includes('aria-hidden')) out.push(`${f}:${i + 1} ${m[0]}`);
+      });
+    }
+    expect(out).toEqual([]);
+  });
+});

@@ -238,9 +238,10 @@ export class Trails {
       this.path(ctx, m, 1, 0); this.paint(ctx, VFX_BODY[tint], alpha * 0.62);
       return;
     }
-    if (passes >= 3) { this.path(ctx, m, 2.3, 1.5 * d); this.paint(ctx, VFX_HALO[tint], alpha * 0.26); }
-    this.path(ctx, m, 1, 0); this.paint(ctx, VFX_BODY[tint], alpha * 0.72);
-    this.path(ctx, m, 0.34, 0.5 * d, 0.9 * d); this.paint(ctx, VFX_CORE[tint], alpha * 0.95);
+    // a wide soft halo, the saturated body, a white-hot core that runs the whole length
+    if (passes >= 3) { this.path(ctx, m, 2.7, 2 * d); this.paint(ctx, VFX_HALO[tint], alpha * 0.3); }
+    this.path(ctx, m, 1, 0.4 * d); this.paint(ctx, VFX_BODY[tint], alpha * 0.8);
+    this.path(ctx, m, 0.4, 0.6 * d, 1 * d); this.paint(ctx, VFX_CORE[tint], alpha);
   }
   /** The tapered polygon: widths × k plus `add` px (tapering with them), at least `min` px where the trail has width. */
   private path(ctx: CanvasRenderingContext2D, m: number, k: number, add: number, min = 0): void {

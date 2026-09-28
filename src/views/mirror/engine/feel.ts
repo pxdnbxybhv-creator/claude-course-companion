@@ -29,6 +29,7 @@ import type { AtlasId, SfxName, WClass } from '../types';
 import type { FeelVoice } from '../audio/voices';
 import { FeelSprites, SH, TN, WARM } from '../paint/feel';
 import { EKind, Pool } from './pools';
+import { IF, TN_OF, VT, flavorOfWeapon, tintOfWeapon, vfxOf } from './vfx';
 import { SRCI } from './consts';
 import type { World } from './world';
 
@@ -354,6 +355,9 @@ export class Feel {
   private cutFlip = 0;
   /** A running mean of hit numbers (numbers size by damage against it). */
   numRef = 10;
+  /** The last blow (where the body stood, when, the weapon's id): a kill that follows it on the same
+   *  step takes its light (world.killIn only passes the feel class). */
+  private lhX = 0; private lhY = 0; private lhT = -9; private lhWid = '';
   readonly st: FeelStats = {
     sparks: 0, emitted: 0, hits: 0, kills: 0, voices: 0, stopReqMs: 0, stopMs: 0, stopDenied: 0, frozenMs: 0, realMs: 0, maxShare: 0, lastShare: 0, stamps: 0, q: 1, washes: 0,
     pulses: 0, freezes: 0, freezeS: 0, staggers: 0, marks: 0, frags: 0, camFrames: 0, camOff: 0, camZoom: 0,
@@ -690,7 +694,11 @@ export class Feel {
   hit(i: number, fx: number, fy: number, d: number, crit: boolean, fc: number, dot: boolean, src: number, slot = -1): void {
     const W = this.W, E = W.E;
     this.st.hits++;
-    if (dot) return; // burns and bleeds tick quietly: their marks already show
+    if (dot) {
+      // burns and bleeds tick quietly (their marks already show); a kill by one still takes its light
+      this.lhX = E.x[i]; this.lhY = E.y[i]; this.lhT = W.t; this.lhWid = slot >= 0 && slot < W.slots.length ? W.slots[slot].id : '';
+      return;
+    }
     const def = FXD[fc] ?? FXD[FC.generic];
     const md = MKD[fc] ?? MKD[FC.generic];
     const x = E.x[i], y = E.y[i], r = E.r[i];
@@ -704,6 +712,7 @@ export class Feel {
     const heavyCls = def.weight >= 0.75;
     const t = W.t;
     const wid = slot >= 0 && slot < W.slots.length ? W.slots[slot].id : '';
+    this.lhX = x; this.lhY = y; this.lhT = t; this.lhWid = wid;
     const weighty = WEIGHTY.has(wid);
     // the blow's weight: its class (weighty weapons a notch up) and its damage against the body
     const dmgK = Math.max(0, Math.min(1, d / Math.max(1e-6, 0.2 * E.hpMax[i])));
@@ -716,9 +725,20 @@ export class Feel {
     const lite = W.degrade ? 0.5 : 1;
     const sz = Math.max(0.8, Math.min(1.6, r / 20)) * (crit ? 1.3 : 1);
     const cx = x - ux * r * 0.45, cy = y - uy * r * 0.45;
+    // the marks take the light of the weapon that struck (a 桃木剑 gamboge, a 青萍 jade, a 偃月 gold),
+    // the class's own where the weapon's light is ink (claws, the 砚台, go): ink marks stay ink-and-white
+    const vt = tintOfWeapon(wid || undefined, fc);
+    const tw = vt !== VT.ink ? TN_OF[vt] : -1;
+    const starT = tw >= 0 && md.star !== TN.white ? tw : md.star, markT = tw >= 0 ? tw : md.markT;
+    const haloT = md.halo >= 0 && tw >= 0 ? tw : md.halo, sparkT = tw >= 0 ? tw : md.spark;
     if (this.markRoom(prio) && (tier > 0 || this.rnd() < 0.7 * lite)) {
-      this.mark(MK.pop, SH.star, md.star, i, cx, cy, ang, STAR_LIFE[tier], md.starS * sz * 0.6, md.starS * sz * STAR_GROW[tier], 1);
+      this.mark(MK.pop, SH.star, starT, i, cx, cy, ang, STAR_LIFE[tier], md.starS * sz * 0.6, md.starS * sz * STAR_GROW[tier], 1);
     }
+    // 流光: where the blow meets the body, a hot white core in the weapon's light, sparks flung on
+    // along the blow and what flies off by flavour; a crit's star-burst and radial streaks
+    const flav = flavorOfWeapon(wid || undefined, fc);
+    vfxOf(W).impact(x - ux * r * 0.3, y - uy * r * 0.3, ang, r, vt, flav,
+      (crit ? IF.crit : 0) | (heavyCls || weighty || tier === 2 ? IF.heavy : 0) | (big ? IF.big : 0) | (fc === FC.go ? IF.clack : 0));
     if (crit && this.markRoom(1)) {
       this.mark(MK.pop, SH.star, TN.gold, i, x - ux * r * 0.2, y - uy * r * 0.2, ang + 0.4, 0.13, 0.5 * sz, 0.95 * sz, 1);
       if (this.markRoom(1)) this.mark(MK.cut, SH.cut, TN.white, i, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.5, 0.12, 0.9 * sz, 1.1, 1);
@@ -728,17 +748,17 @@ export class Feel {
         // the blade's path across the body (⟂ the blow), back and forth on a combo
         this.cutFlip ^= 1;
         const a = ang + Math.PI / 2 + (this.cutFlip ? 0.35 : -0.35) + (this.rnd() - 0.5) * 0.3;
-        this.mark(MK.cut, SH.cut, md.markT, i, x, y, a, heavyCls ? 0.14 : 0.11, md.markS * sz, heavyCls ? 1.2 : 1, 1);
+        this.mark(MK.cut, SH.cut, markT, i, x, y, a, heavyCls ? 0.14 : 0.11, md.markS * sz, heavyCls ? 1.2 : 1, 1);
         if (heavyCls && this.markRoom(prio)) this.mark(MK.cut, SH.cut, TN.white, i, x + ux * 5, y + uy * 5, a - 0.5, 0.12, md.markS * sz * 0.8, 0.9, 0.95);
       } else if (md.mark === SH.beam) {
         // the flying sword's 流光 straight through the body, along its flight
-        this.mark(MK.beam, SH.beam, md.markT, i, x + ux * r * 0.5, y + uy * r * 0.5, ang, 0.09, md.markS * sz, 0.75, 1);
+        this.mark(MK.beam, SH.beam, markT, i, x + ux * r * 0.5, y + uy * r * 0.5, ang, 0.09, md.markS * sz, 0.75, 1);
       } else {
-        this.mark(MK.rake, md.mark, md.markT, i, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.4, 0.14, md.markS * sz * 0.8, md.markS * sz, 1);
+        this.mark(MK.rake, md.mark, markT, i, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.4, 0.14, md.markS * sz * 0.8, md.markS * sz, 1);
       }
     }
     if (md.halo >= 0 && (tier === 2 || (heavyCls && tier >= 1)) && this.markRoom(prio)) {
-      this.mark(MK.ring, SH.halo, md.halo, i, x, y, 0, 0.18, (r * 0.5) / 28, (r * 1.6) / 28, 0.9);
+      this.mark(MK.ring, SH.halo, haloT, i, x, y, 0, 0.18, (r * 0.5) / 28, (r * 1.6) / 28, 0.9);
     }
     // the ground takes a splash on medium and heavy blows (under the bodies, drying away)
     if (md.splat >= 0 && tier >= 1 && (tier === 2 || this.rnd() < 0.5) && this.markRoom(prio)) {
@@ -750,7 +770,7 @@ export class Feel {
       for (let k = 0; k < n && this.room(prio); k++) {
         const a = ang + (this.rnd() - 0.5) * 0.9;
         const v = 380 + 260 * this.rnd();
-        this.emit(SH.ember, md.spark, x + ux * r * 0.4, y + uy * r * 0.4, Math.cos(a) * v, Math.sin(a) * v, 0.1 + 0.06 * this.rnd(), 0.9 * sz, 0.35 * sz, a, 0, 9, 0, 1);
+        this.emit(SH.ember, sparkT, x + ux * r * 0.4, y + uy * r * 0.4, Math.cos(a) * v, Math.sin(a) * v, 0.1 + 0.06 * this.rnd(), 0.9 * sz, 0.35 * sz, a, 0, 9, 0, 1);
       }
     }
     // spatter from the side the blow came in, flung on through the body
@@ -789,15 +809,22 @@ export class Feel {
     const calm = !this.motion;
     const id = this.cId, flip = this.cFlip, sc = this.cSc;
     this.cId = null;
+    // the killing blow's light: the weapon of the blow that just landed on this body (same step, same
+    // place), else the class's
+    const wid = this.lhT === W.t && Math.abs(this.lhX - x) < 1 && Math.abs(this.lhY - y) < 1 ? this.lhWid : '';
+    const vt = tintOfWeapon(wid || undefined, fc);
+    const tw = vt !== VT.ink ? TN_OF[vt] : -1;
+    // 流光: the body pops — a flash, a ring of the weapon's light breaking outward, sparks all round
+    vfxOf(W).impact(x, y, ang, r, vt, flavorOfWeapon(wid || undefined, fc), IF.kill | (crit ? IF.crit : 0) | (elite || boss ? IF.big : 0));
     // a pop of light where it broke, a ring of it spreading
-    const popT = md.star === TN.white || md.star === TN.moon ? TN.gold : md.star;
+    const popT = tw >= 0 && tw !== TN.white && tw !== TN.moon ? tw : md.star === TN.white || md.star === TN.moon ? TN.gold : md.star;
     if (this.markRoom(prio)) this.mark(MK.pop, SH.star, popT, -1, x, y, ang, boss ? 0.14 : 0.09, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48 * 0.6, (2 * r * (boss ? 2.4 : elite ? 1.8 : 1.4)) / 48, 1);
-    if (this.markRoom(prio)) this.mark(MK.ring, SH.halo, md.halo >= 0 ? md.halo : md.star === TN.white ? TN.azure : md.star, -1, x, y, 0, 0.22, (0.4 * r) / 28, (2.2 * r) / 28, 0.9);
+    if (this.markRoom(prio)) this.mark(MK.ring, SH.halo, tw >= 0 ? tw : md.halo >= 0 ? md.halo : md.star === TN.white ? TN.azure : md.star, -1, x, y, 0, 0.22, (0.4 * r) / 28, (2.2 * r) / 28, 0.9);
     if ((elite || boss) && this.markRoom(prio)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.36, (0.6 * r) / 28, (3.2 * r) / 28, 0.8);
     // the killing blow's signature: a blade's cut left hanging where the body stood (a flying sword's
     // light straight through it, a claw's rakes), a talisman's embers rising from the burnt paper
     if ((fc === FC.slash || fc === FC.heavy || fc === FC.claw || fc === FC.flying) && this.markRoom(prio)) {
-      if (fc === FC.flying) this.mark(MK.beam, SH.beam, TN.jade, -1, x + Math.cos(ang) * r * 0.9, y + Math.sin(ang) * r * 0.9, ang, 0.14, (3 * r) / 64, 1, 1);
+      if (fc === FC.flying) this.mark(MK.beam, SH.beam, tw >= 0 ? tw : TN.jade, -1, x + Math.cos(ang) * r * 0.9, y + Math.sin(ang) * r * 0.9, ang, 0.14, (3 * r) / 64, 1, 1);
       else if (fc === FC.claw) this.mark(MK.rake, SH.rake, TN.moon, -1, x, y, ang + Math.PI / 2, 0.18, (2.4 * r) / 44, (2.4 * r) / 44, 1);
       else this.mark(MK.cut, SH.cut, TN.white, -1, x, y, ang + Math.PI / 2 + (this.rnd() - 0.5) * 0.4, fc === FC.heavy ? 0.2 : 0.16, (2.6 * r) / 64, fc === FC.heavy ? 1.6 : 1.25, 1);
     } else if ((fc === FC.talisman || fc === FC.wine) && !calm) {
@@ -959,12 +986,18 @@ export class Feel {
   level(x: number, y: number): void {
     // reduced motion: one soft glow, no streaks flying out
     if (!this.motion) { if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 1.2, 1.6, 0, 0, 0, PF.ease, 0.5); this.busLevel++; return; }
-    for (let k = 0; k < 12 && this.room(2); k++) {
-      const a = (k / 12) * Math.PI * 2 + this.rnd() * 0.3, v = 260 + 120 * this.rnd();
-      // the streaks start clear of the figure so the level-up never covers him
-      this.emit(k & 1 ? SH.glint : SH.streak, TN.gold, x + Math.cos(a) * 14, y + Math.sin(a) * 14, Math.cos(a) * v, Math.sin(a) * v, 0.4, 1, 0.4, a, 0, 4, k & 1 ? 0 : PF.stretch, 0.95);
+    // two rings of gold streaks and glints (the inner slower), starting clear of the figure so the
+    // level-up never covers him
+    for (let k = 0; k < 18 && this.room(2); k++) {
+      const outer = k < 12;
+      const streak = outer && !(k & 1);
+      const a = ((outer ? k : k - 12) / (outer ? 12 : 6)) * Math.PI * 2 + (outer ? 0 : Math.PI / 6) + this.rnd() * 0.25;
+      const v = outer ? 260 + 110 * this.rnd() : 150 + 50 * this.rnd();
+      // (a streak is drawn back from its head: it starts far enough out that its tail stays off him)
+      const d0 = streak ? 40 : 22;
+      this.emit(streak ? SH.streak : SH.glint, !streak && k % 3 === 2 ? TN.white : TN.gold, x + Math.cos(a) * d0, y + Math.sin(a) * d0, Math.cos(a) * v, Math.sin(a) * v, outer ? 0.45 : 0.55, outer ? 1.15 : 1.3, 0.4, a, 0, 4, streak ? PF.stretch : 0, 0.95);
     }
-    if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 0.8, 2, 0, 0, 0, PF.ease, 0.8);
+    if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.2, 0.8, 2.1, 0, 0, 0, PF.ease, 0.65);
     this.busLevel++;
   }
   /** 月华 (or a coin) reached you: a glint. */

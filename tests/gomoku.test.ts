@@ -183,7 +183,8 @@ describe('gomoku AI strength', () => {
       while (moves.length < CELLS) {
         const side = colorOfMove(moves.length);
         let m: number;
-        if (side === masterIs) m = think(moves, { level: 'master', timeMs: 70, seed: g }).move;
+        // bounded by depth, not time: a 70 ms budget searched shallower on a busy machine and made the test flaky
+        if (side === masterIs) m = think(moves, { level: 'master', timeMs: 10_000, maxDepth: 2, seed: g }).move;
         else m = greedyMove(moves, rng);
         if (m < 0) break;
         moves.push(m);

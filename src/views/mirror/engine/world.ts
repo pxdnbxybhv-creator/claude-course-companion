@@ -7,14 +7,14 @@ import type {
   ActiveMutator, ArenaGeom, Behaviour, Bilingual, Camera, CoinDrop, ContentRegistry, DamageSrc, DifficultyDef, EngineHooks,
   EngineSettings, EnemyFilter, EnemyView, GameEvent, HeartSource, HitPacket, HudState, MapDef, MirrorAudio, Painter, PlayerView,
   Quality, RunSave, RunStatKey, RunStats, SfxName, ShotSpec, SkillDef, SkillImpl, SkillRun, SpawnOpts, SpawnPlan, Stats,
-  StatMods, StatusKind, TeleSpec, Vec, WaveResult, WaveSetup, WorldApi, ZoneSpec, DeathResult, ActorImpl,
+  StatMods, StatusKind, TeleSpec, Vec, WaveResult, WaveSetup, WorldApi, ZoneSpec, DeathResult, ActorImpl, DownInfo,
 } from '../types';
 import {
   BOSSES, COMPANIONS, DIFFS, ELITES, ENDLESS_BOSS, F, HAZARDS, MAPS, MONSTERS, PASSIVES, SKILLS, TREASURES, WEAPONS,
 } from '../data';
 import {
   clamp, dodgeCapOf, dodgeChance, dmgMul, enemyArmorAdd, enemyHit, healMult, knockback, luckMult, maxHp, pickupRadius, playerHit,
-  regenPerSec, xpNext,
+  regenPerSec, xpNext, REVIVE, canRevive,
 } from '../logic/formulas';
 import { arenaGeom, insideShape } from '../logic/arena';
 import { rngFor, type Rng } from '../logic/rng';
@@ -29,8 +29,10 @@ import { hasDrunk, hitboxOf, liveStats, readMods, type Live, type Mods } from '.
 import { initEnemy, tickEnemies, onEnemyDeath, strikeTele } from './enemies';
 import { fireWeapons, initWeapons, onWeaponKill, tickPlayerShots, tickSummons, tickStones, tickSwords, type WeaponSlot } from './weapons';
 import { FC, Feel } from './feel';
+import { DOWN_ANIM, reviveFx, reviveShimmer } from './down';
 
-export type Phase = 'idle' | 'wave' | 'ending' | 'dead';
+/** 'down': fallen with the revive on offer (破镜重圆): nothing steps until revive() or giveUp(). */
+export type Phase = 'idle' | 'wave' | 'ending' | 'down' | 'dead';
 
 interface Buff { key: string; stats: StatMods; t: number; moveX: number }
 interface Running { b: Behaviour; s: unknown; failed: boolean }
@@ -85,8 +87,13 @@ export class World implements WorldApi {
   settings: EngineSettings;
   /** The UI's hooks; whatever is assigned is wrapped so a throw in UI code never reaches the error rules. */
   get hooks(): EngineHooks { return this._hooks; }
-  set hooks(h: EngineHooks) { this._hooks = guardHooks(h); }
+  set hooks(h: EngineHooks) {
+    this._hooks = guardHooks(h);
+    this.downedHook = typeof h.downed === 'function' ? h.downed.bind(h) : null;
+  }
   private _hooks!: EngineHooks;
+  /** The UI's optional `downed` hook, unguarded: a throw there gives up (never a stuck 'down'). */
+  private downedHook: ((d: DownInfo) => void) | null = null;
   content: ContentRegistry;
   painter: Painter | null;
   audio: MirrorAudio | null;
@@ -180,13 +187,19 @@ export class World implements WorldApi {
   capWin = new Float32Array(4); capN = new Float32Array(4);
   cause = 'hazard';
   godmode = false;
+  /** 破镜重圆: seconds spent down (sim steps while 'down' only advance this), and where you fell. */
+  downAge = 0; downX = 0; downY = 0;
+  /** The revive's shimmer: seconds left (drawn only; the invulnerability itself is invulnT). */
+  reviveT = 0;
+  /** The payload handed to `downed` (reused). */
+  private readonly downInfo: DownInfo = { canRevive: true, price: REVIVE.price, wave: 0, cause: 'hazard' };
 
   // ── stats
   base!: Stats;
   stats!: Stats;
   live: Live = { waveTime: 0, hpFrac: 1, still: 0, swordsAir: 0, weapons: 0 };
   dodgeCap = 60;
-  pickupR = 90;
+  pickupR: number = F.pickupBase;
   moveSpd = 280;
 
   // ── weapons, swords, summons
@@ -337,6 +350,7 @@ export class World implements WorldApi {
     this.shieldV = 0; this.iframes = 0; this.invulnT = 0; this.untargT = 0; this.rootT = 0; this.pslowV = this.pslowT = 0; this.pkT = 0;
     this.dashT = 0; this.leapT = 0; this.leapDur = 0; this.dotDps.fill(0); this.dotT.fill(0); this.dotAcc = 0; this.regenAcc = 0;
     this.blocks = this.mods.blocks; this.yanwangUsed = false; this.lifeUsed = false; this.lives = run.lives; this.once = run.once.slice();
+    this.downAge = 0; this.reviveT = 0;
     this.drunkOn = hasDrunk(run);
     this.drunkCap = this.mods.special.jiangjinjiu ? this.mods.special.jiangjinjiu.cap ?? 200 : F.drunk.cap;
     this.drunk = this.drunkOn ? clamp(run.drunk, 0, this.drunkCap) : 0; this.drunkIdle = 0;
@@ -384,6 +398,10 @@ export class World implements WorldApi {
 
   private hazardFrom(id: HazardId): number { return HAZARDS[id]?.from ?? 1; }
 
+  /** Run an outside Behaviour for the rest of this wave (the tutorial's wave scripts, the first-time-tip
+   *  watcher). Cleared at the wave end like content behaviours. Call after engine.start(). */
+  attach(b: Behaviour, arg?: number): void { this.startBehaviour(b, arg); }
+
   private startBehaviour(b: Behaviour | undefined, arg: number | undefined): void {
     if (!b) return;
     const r: Running = { b, s: undefined, failed: false };
@@ -397,6 +415,8 @@ export class World implements WorldApi {
 
   /** One fixed 60 Hz step. */
   step(dt: number): void {
+    // down: the world holds still; only the fall's clock runs (the renderer reads it)
+    if (this.phase === 'down') { this.downAge += dt; return; }
     if (this.phase !== 'wave' && this.phase !== 'ending') return;
     this.qd = 0;
     this.dt = dt;
@@ -505,6 +525,7 @@ export class World implements WorldApi {
   private tickPlayer(dt: number): void {
     this.iframes = Math.max(0, this.iframes - dt);
     this.invulnT = Math.max(0, this.invulnT - dt);
+    if (this.reviveT > 0) { this.reviveT = Math.max(0, this.reviveT - dt); reviveShimmer(this, dt); }
     this.untargT = Math.max(0, this.untargT - dt);
     this.rootT = Math.max(0, this.rootT - dt);
     this.dodgeWin = Math.max(0, this.dodgeWin - dt);
@@ -1671,14 +1692,85 @@ export class World implements WorldApi {
       return;
     }
     this.hp = 0;
-    this.die();
+    if (this.goDown()) return;
+    this.die(false);
   }
 
-  private die(): void {
+  /**
+   * 破镜重圆: the run's first death (logic canRevive(run)) goes 'down' instead, when the UI answers
+   * `downed`. The world holds still (engine: nothing steps, the fall animates DOWN_ANIM s, then the
+   * frame holds) until revive() or giveUp(). False (die now) without the hook or once revived.
+   */
+  private goDown(): boolean {
+    if (this.phase !== 'wave' || !this.downedHook || !canRevive(this.run)) return false;
+    this.phase = 'down';
+    this.downAge = 0; this.downX = this.px; this.downY = this.py;
+    this.pvx = this.pvy = 0; this.moving = false; this.dashT = 0; this.hitstopMs = 0;
+    this.sfx('shatter');
+    this.pushHud(true);
+    const d = this.downInfo;
+    d.canRevive = true; d.price = REVIVE.price; d.wave = this.wave; d.cause = this.cause;
+    try { this.downedHook(d); } catch (e) {
+      console.error("[mirror engine] the UI's downed hook threw; giving up", e);
+      this.giveUp();
+    }
+    return true;
+  }
+  /** The fall is still animating (the engine keeps drawing frames until then). */
+  get downAnimating(): boolean { return this.phase === 'down' && this.downAge < DOWN_ANIM; }
+
+  /**
+   * Rise where you fell (Engine.revive): REVIVE.hpPct of max 气血, REVIVE.invuln s invulnerable with
+   * the shimmer, your burns and poisons, root and slow washed off; the revival shockwave throws the
+   * crowd within REVIVE.pushR back (bosses stand) and enemy shots within REVIVE.clearR are wiped;
+   * run.revived = true (the engine's run object: the session must persist it). No RNG is drawn, so a
+   * replay that revives at the same step stays deterministic. False unless down.
+   */
+  revive(): boolean {
+    if (this.phase !== 'down') return false;
+    this.run.revived = true;
+    this.phase = 'wave';
+    this.downAge = 0;
+    this.hp = Math.max(1, Math.round(this.hpMax * REVIVE.hpPct));
+    this.invulnT = Math.max(this.invulnT, REVIVE.invuln);
+    this.reviveT = REVIVE.invuln;
+    this.dotDps.fill(0); this.dotT.fill(0); this.dotAcc = 0;
+    this.rootT = 0; this.pslowT = 0; this.pslowV = 0;
+    const x = this.px, y = this.py;
+    // the revival shockwave: the crowd near you is thrown back (a plain scan: this runs once a run)
+    const E = this.E;
+    for (let i = 0; i < E.n; i++) {
+      if (!E.alive[i] || E.kind[i] === EKind.Boss || E.kind[i] === EKind.Ally) continue;
+      if (Math.hypot(E.x[i] - x, E.y[i] - y) < REVIVE.pushR + E.r[i]) this.push(E.handle(i), x, y, REVIVE.push);
+    }
+    // … and the enemy shots near you are gone (a wisp of ink where each was)
+    const ES = this.ES, c2 = REVIVE.clearR * REVIVE.clearR;
+    for (let i = 0; i < ES.n; i++) {
+      if (!ES.alive[i]) continue;
+      const dx = ES.x[i] - x, dy = ES.y[i] - y;
+      if (dx * dx + dy * dy > c2) continue;
+      if ((i & 3) === 0) this.fx('inkBurst', ES.x[i], ES.y[i], { r: 8, life: 0.3 });
+      ES.release(i);
+    }
+    reviveFx(this);
+    this.title({ zh: '破镜重圆', en: 'The Mirror Made Whole' }, 'centre');
+    this.sfx('levelUp');
+    this.sfx('bell');
+    this.pushHud(true);
+    return true;
+  }
+  /** Decline the revive (Engine.giveUp): the normal death, hooks.death → 'dead'. A no-op unless down. */
+  giveUp(): void {
+    if (this.phase !== 'down') return;
+    this.phase = 'wave';
+    this.die(true);
+  }
+
+  private die(quiet: boolean): void {
     if (this.phase !== 'wave') return;
     this.phase = 'dead';
     for (const r of this.running) { if (!r.failed && r.b.end) { try { r.b.end(this, r.s); } catch { /* ignore */ } } }
-    this.sfx('shatter');
+    if (!quiet) this.sfx('shatter');
     const partial = this.result();
     const d: DeathResult = { wave: this.wave, partial, cause: this.cause };
     this.pushHud(true);

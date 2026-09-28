@@ -8,8 +8,8 @@ import { defaultMeta } from '../src/app/mirror';
 import { createEngine, RES_STEPS, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { EKind } from '../src/views/mirror/engine/pools';
-import { ST } from '../src/views/mirror/engine/enemies';
-import { bakeScale, createPainter, DEMON_INK, edgeOf, kindScale, specOf, viewScale } from '../src/views/mirror/paint';
+import { SHOOT_R, ST } from '../src/views/mirror/engine/enemies';
+import { bakeScale, createPainter, DEMON_INK, edgeOf, kindScale, specOf, viewScale, VIEWS, VIEW_SPAN } from '../src/views/mirror/paint';
 import { isSoft, obstacleScale } from '../src/views/mirror/paint/arena';
 import { CHAR_SPECS } from '../src/views/mirror/paint/figures';
 import { B } from '../src/views/mirror/paint/kit';
@@ -35,22 +35,55 @@ describe('resolution: nothing is drawn larger than it was painted', () => {
       expect(dpr / canvasDpr, `${s.name} @${dpr} ${q}`).toBeLessThanOrEqual(1);
     }
   });
-  it('sprites bake at ≥ the camera scale (effective upscale ≤ 1.0 at zoom 1) on every quality, within memory caps', () => {
-    for (const q of QS) for (const s of SCREENS) for (const dpr of s.dprs) {
+  it('sprites bake at ≥ the camera scale (effective upscale ≤ 1.0 at zoom 1) on every quality and view, within memory caps', () => {
+    for (const view of VIEWS) for (const q of QS) for (const s of SCREENS) for (const dpr of s.dprs) {
       const canvasDpr = Math.min(dpr, dprCapOf(q));
-      const cam = viewScale(s.w, s.h) * canvasDpr; // canvas px per u, what the engine draws at
-      const k = bakeScale(s.w, s.h, canvasDpr, q);
-      expect(cam / k, `${s.name} @${dpr} ${q}: cam ${cam.toFixed(2)} k ${k.toFixed(2)}`).toBeLessThanOrEqual(1.0001);
+      const cam = viewScale(s.w, s.h, view) * canvasDpr; // canvas px per u, what the engine draws at
+      const k = bakeScale(s.w, s.h, canvasDpr, q, view);
+      const tag = `${view} ${s.name} @${dpr} ${q}: cam ${cam.toFixed(2)} k ${k.toFixed(2)}`;
+      expect(cam / k, tag).toBeLessThanOrEqual(1.0001);
       expect(k).toBeLessThanOrEqual(3.4);
-      // mid and high keep headroom for the zoom punches
-      if (q !== 'low') expect(k / cam).toBeGreaterThanOrEqual(1.09);
+      // mid and high keep headroom for the zoom punches (unless the floor of 1 px per u already covers it)
+      if (q !== 'low' && k > 1) expect(k / cam, tag).toBeGreaterThanOrEqual(1.09);
+      // and the bake follows the view: never finer than the view needs (memory)
+      if (k > 1) expect(k / cam, tag).toBeLessThanOrEqual(1.1001);
     }
+    // the default view is 'mid' on both sides (the UI's painter and the engine's camera agree without it)
+    expect(bakeScale(390, 844, 3, 'mid')).toBe(bakeScale(390, 844, 3, 'mid', 'mid'));
+    expect(viewScale(390, 844)).toBe(viewScale(390, 844, 'mid'));
+    // a farther view bakes smaller: a DPR-3 390-px phone on mid ≈ 2.93 near, 2.01 mid, 1.72 far
+    expect(bakeScale(390, 844, 3, 'mid', 'near')).toBeCloseTo(2.925, 2);
+    expect(bakeScale(390, 844, 3, 'mid', 'mid')).toBeCloseTo(1.839, 2);
+    expect(bakeScale(390, 844, 3, 'mid', 'far')).toBeCloseTo(1.570, 2);
   });
   it('the engine and the painter start from the same view scale', () => {
-    expect(viewScale(390, 844)).toBeCloseTo(390 / 440, 5);
-    expect(viewScale(1920, 1080)).toBe(1.5);
-    expect(viewScale(200, 300)).toBe(0.7);
-    expect(viewScale(0, 0)).toBe(1);
+    expect(viewScale(390, 844, 'near')).toBeCloseTo(390 / 440, 5);
+    expect(viewScale(390, 844, 'mid')).toBeCloseTo(390 / 700, 5);
+    expect(viewScale(390, 844, 'far')).toBeCloseTo(390 / 820, 5);
+    expect(viewScale(1920, 1080, 'near')).toBe(1.5);
+    expect(viewScale(1920, 1080, 'mid')).toBe(1.25);
+    expect(viewScale(1920, 1080, 'far')).toBe(1.05);
+    expect(viewScale(200, 300, 'near')).toBe(0.7);
+    expect(viewScale(200, 300, 'mid')).toBe(0.5);
+    expect(viewScale(200, 300, 'far')).toBe(0.45);
+    for (const v of VIEWS) expect(viewScale(0, 0, v)).toBe(1);
+    expect(viewScale(390, 844, 'bogus' as never)).toBe(viewScale(390, 844, 'mid'));
+  });
+  it('the views: mid keeps shooters on a portrait phone, far keeps figures readable', () => {
+    // half the width a 390×844 phone shows (u) against the keep distances of the shooters (260–360 u)
+    const half = (v: (typeof VIEWS)[number]) => 390 / viewScale(390, 844, v) / 2;
+    expect(half('near')).toBeCloseTo(220, 0);
+    expect(half('mid')).toBeGreaterThanOrEqual(350); // keepers settle inside lantern and clerk 320, imp 300, 樵鬼 280, spider and star 260
+    expect(half('mid')).toBeGreaterThanOrEqual(SHOOT_R - 70); // a shooter in range is ≤ 70 u past the edge
+    expect(half('far')).toBeGreaterThanOrEqual(400); // 灯笼鬼 360, and nearly all of SHOOT_R
+    // the companion's figure (54 u tall) stays ≥ 25 css px at far on a 390-px phone (30 at mid)
+    const h = CHAR_SPECS.scholar.box[3] - CHAR_SPECS.scholar.box[1];
+    expect(h).toBe(54);
+    expect(h * viewScale(390, 844, 'far')).toBeGreaterThanOrEqual(25);
+    expect(h * viewScale(390, 844, 'mid')).toBeGreaterThanOrEqual(30);
+    // each view shows clearly more than the last
+    expect(VIEW_SPAN.mid / VIEW_SPAN.near).toBeGreaterThanOrEqual(1.4);
+    expect(VIEW_SPAN.far / VIEW_SPAN.mid).toBeGreaterThanOrEqual(1.15);
   });
   it('the painter keeps the bake scale it is given, and its dpr up to 3', () => {
     const p = createPainter('lake', 'mid', 3, 2.9) as unknown as { k: number; dpr: number };
@@ -200,6 +233,29 @@ describe('dynamic resolution', () => {
     expect(low.shed).toBe(false);
     expect(r.eng.resolution).toBe(2.5);
     r.eng.dispose();
+  });
+  it('setView applies live: the camera takes the view at once and the painter re-bakes for it (resize never re-bakes)', async () => {
+    const { eng } = make('mid', 3);
+    const painter = (eng as unknown as { painter: object }).painter;
+    const calls: number[] = [];
+    Object.assign(painter, { k: bakeScale(390, 844, 3, 'mid', 'mid'), rescale: async (k: number) => { calls.push(k); (painter as { k: number }).k = k; return true; } });
+    expect(eng.view).toBe('mid');
+    expect(eng.camera.scale).toBeCloseTo(viewScale(390, 844, 'mid') * 3, 5);
+    expect(await eng.setView('near')).toBe(true);
+    expect(eng.view).toBe('near');
+    expect(eng.camera.scale).toBeCloseTo(viewScale(390, 844, 'near') * 3, 5);
+    expect(calls).toEqual([bakeScale(390, 844, 3, 'mid', 'near')]);
+    // the same view again: nothing to do
+    expect(await eng.setView('near')).toBe(false);
+    // setSettings({ view }) is the same call
+    eng.setSettings({ view: 'far' });
+    await Promise.resolve(); await Promise.resolve();
+    expect(eng.view).toBe('far');
+    expect(eng.camera.scale).toBeCloseTo(viewScale(390, 844, 'far') * 3, 5);
+    expect(calls[1]).toBeCloseTo(bakeScale(390, 844, 3, 'mid', 'far'), 5);
+    eng.resize();
+    expect(calls.length).toBe(2);
+    eng.dispose();
   });
   it('a DPR-1 screen has nothing to step down: the guard cuts effects as before', () => {
     const { eng, W } = make('high', 1);

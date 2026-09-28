@@ -5,16 +5,20 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useT } from '../../../app/i18n';
+import { lang } from '../../../app/store';
 import { COMPANION_REG, MAP_REG, SKILL_REG, type ItemId, type WeaponId } from '../ids';
-import type { BossEvent, LevelCard, RunSave, StatId, Tier, Unlocks } from '../types';
+import type { BossEvent, LevelCard, RunSave, Tier, Unlocks } from '../types';
 import { ITEMS, WEAPONS } from '../data';
+import { CARD_HINT, clsKey, termLine, termName, termOf } from '../data/glossary';
 import {
   cardsView, crateItem, heartOffer, isBossWave, meltValue, pickCard, pickHeart, pickStart, rerollCards, resolveCrate, wavePlan,
 } from '../logic';
 import { Icon, Seal } from './icons';
-import { bossName, className, fmtStat, nameOf, screenKeyGate, statName, tierName, TIER_ROMAN, TIER_ZH, type T } from './text';
+import { describeItem, describeWeapon } from './describe';
+import { itemFit, levelPreview, statDeltaText, statFit, tierWord } from './panelView';
+import { bossName, nameOf, screenKeyGate, statName, TIER_ROMAN, TIER_ZH, type T } from './text';
 
-const sheetOpen = () => typeof document !== 'undefined' && !!document.querySelector('.sheet-backdrop');
+const sheetOpen = () => typeof document !== 'undefined' && !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold');
 
 /**
  * Keys for a between-wave screen (ignored while a sheet is open). `on` returns true when it acted: the
@@ -35,17 +39,26 @@ export function useScreenKeys(on: (key: string, e: KeyboardEvent) => boolean | v
 /** Digit keys 1…n → index 0…n−1, else −1. */
 const digit = (k: string, n: number) => (/^[1-9]$/.test(k) && Number(k) <= n ? Number(k) - 1 : -1);
 
-/** A weapon or item card: icon, name, tier seal, what it does, tags. */
+/** A weapon or item card: icon, name, tier seal, then what it does in plain words (describe.ts): the
+ *  head line (「伤害 10 · 0.9 秒一剑」), what it scales with, the rules line, and the 神品 line at IV. */
 export function GearCard(props: {
   kind: 'weapon' | 'item'; id: WeaponId | ItemId; tier?: Tier; px?: number; t: T; children?: ComponentChildren; class?: string;
-  onClick?: () => void; disabled?: boolean; label?: string; hotkey?: string;
+  onClick?: () => void; disabled?: boolean; label?: string; hotkey?: string; tut?: string;
+  /** The run the card is offered in: an item card then says whether it helps the weapons you hold. */
+  run?: RunSave;
 }) {
   const { t } = props;
   const isW = props.kind === 'weapon';
   const tier = (isW ? props.tier ?? 1 : ITEMS[props.id as ItemId].tier) as Tier;
   const name = nameOf(props.id, t);
-  const text = isW ? WEAPONS[props.id as WeaponId].text : ITEMS[props.id as ItemId].text;
-  const tags = isW ? WEAPONS[props.id as WeaponId].classes : ITEMS[props.id as ItemId].tags;
+  const wd = isW ? describeWeapon(props.id as WeaponId, tier, t) : null;
+  const idesc = isW ? null : describeItem(props.id as ItemId, t);
+  const classes = isW ? WEAPONS[props.id as WeaponId].classes : [];
+  const tags = isW ? [] : ITEMS[props.id as ItemId].tags;
+  const fit = !isW && props.run ? itemFit(props.run, props.id as ItemId, t) : null;
+  // an item's tags only steer the shop (logic/shop.ts classLean): 「相关」, never 「适合」 (which read as "only for")
+  const tagText = tags.length ? t('相关：', 'related: ') + tags.map((c) => termName(clsKey(c), t)).join(' · ') : '';
+  const enItem = !isW && lang.value === 'en';
   const Tag = props.onClick ? 'button' : 'div';
   return (
     <Tag
@@ -54,18 +67,27 @@ export function GearCard(props: {
       onClick={props.onClick}
       disabled={props.disabled}
       aria-label={props.label}
+      data-tut={props.tut}
     >
       {props.hotkey && <kbd class="mj-hotkey" aria-hidden="true">{props.hotkey}</kbd>}
       <div class="mj-card-head">
         <Icon id={`${isW ? 'wpn' : 'item'}:${props.id}`} px={props.px ?? 44} />
         <div class="mj-card-title">
-          <b class="mj-card-name">{name}{isW && <span class="mj-tierroman num"> {TIER_ROMAN[tier]}</span>}</b>
-          <span class="mj-card-tier">{tierName(tier, t)}{tags.length ? ' · ' + tags.map((c) => className(c, t)).join(' · ') : ''}</span>
+          <b class="mj-card-name">{name}{isW && lang.value === 'en' && <span class="mj-tierroman num"> {TIER_ROMAN[tier]}</span>}</b>
+          <span class="mj-card-tier">
+            {/* an English item card spells its tier (the 凡/灵 seal alone says nothing to it); elsewhere the seal
+                shows it and only a screen reader hears the word */}
+            {enItem ? <span class="mj-tierword">{tierWord(tier, t)}</span> : <span class="visually-hidden">{tierWord(tier, t)}{isW || tagText ? ' · ' : ''}</span>}
+            {isW ? classes.map((c) => termName(clsKey(c), t)).join(' · ') : enItem && tagText ? ` · ${tagText}` : tagText}
+          </span>
         </div>
-        <span class={`mj-tierseal tier-${tier}`} aria-hidden="true">{TIER_ZH[tier]}</span>
+        <span class={`mj-tierseal tier-${tier}`} aria-hidden="true" title={tierWord(tier, t)}>{TIER_ZH[tier]}</span>
       </div>
-      <p class="mj-card-text">{t(text.zh, text.en)}</p>
-      {isW && tier === 4 && <p class="mj-card-t4">{t(WEAPONS[props.id as WeaponId].t4.zh, WEAPONS[props.id as WeaponId].t4.en)}</p>}
+      {wd?.head && <p class="mj-card-headline num"><span class="nw">{wd.headParts[0]}</span> · <span class="nw">{wd.headParts[1]}</span></p>}
+      {wd?.scales && <p class="mj-card-scales"><span>{wd.scales}</span></p>}
+      <p class="mj-card-text">{wd ? wd.body : idesc!.body}</p>
+      {wd?.t4 && <p class="mj-card-t4">{wd.t4}</p>}
+      {fit && <p class={'mj-card-fit' + (fit.on ? ' is-on' : ' is-off')}>{fit.text}</p>}
       {props.children}
     </Tag>
   );
@@ -92,10 +114,10 @@ export function StartPick(props: { run: RunSave; onRun: (r: RunSave) => void; on
   const opts = props.run.pending.start ?? [];
   useScreenKeys((k) => { const i = digit(k, opts.length); if (i < 0) return false; props.onRun(pickStart(props.run, opts[i])); return true; }, [props.run]);
   return (
-    <Panel title={t('择器', 'Choose a weapon')} sub={t('入镜之前，先挑一件趁手的。', 'Before the first wave, take the one that fits your hand.')} onPause={props.onPause}>
+    <Panel title={t('挑兵器', 'Choose a weapon')} sub={t('开打之前，先挑一把顺手的兵器。', 'Before the first wave, pick the weapon you like.')} onPause={props.onPause}>
       <div class="mj-cards">
         {opts.map((id, i) => (
-          <GearCard kind="weapon" id={id} tier={1} t={t} hotkey={String(i + 1)} onClick={() => props.onRun(pickStart(props.run, id))} px={52} />
+          <GearCard kind="weapon" id={id} tier={1} t={t} hotkey={String(i + 1)} onClick={() => props.onRun(pickStart(props.run, id))} px={52} tut={`startCard:${i}`} />
         ))}
       </div>
     </Panel>
@@ -103,40 +125,57 @@ export function StartPick(props: { run: RunSave; onRun: (r: RunSave) => void; on
 }
 
 // ───────────────────────────────────────────── level-up cards
-const CARD_GLYPH: Partial<Record<StatId, string>> = {
-  hp: '血', regen: '气', steal: '噬', dmg: '伤', melee: '近', ranged: '远', elem: '行', spirit: '化', aspd: '速', crit: '暴',
-  range: '射', armor: '甲', dodge: '避', speed: '身', luck: '福', harvest: '收',
-};
-export function Cards(props: { run: RunSave; onRun: (r: RunSave) => void; onPause: () => void; onStats: () => void }) {
+export function Cards(props: {
+  run: RunSave; onRun: (r: RunSave) => void; onPause: () => void;
+  /** The 人物 button: opens the 人物 sheet. */
+  onWho?: () => void;
+}) {
   const t = useT();
   const v = cardsView(props.run);
   const pick = (i: number) => { if (!v?.cards[i]) return false; props.onRun(pickCard(props.run, i)); return true; };
   const reroll = () => { const r = rerollCards(props.run); if (r) props.onRun(r); return !!r; };
   useScreenKeys((k) => (k === 'r' ? reroll() : pick(digit(k, 9))), [props.run]);
   if (!v) return null;
+  const onWho = props.onWho;
   return (
     <Panel
       title={t(`升 · 第 ${v.level} 级`, `Level ${v.level}`)}
-      sub={v.left > 1 ? t(`尚有 ${v.left} 次升级待选`, `${v.left} level-ups to choose`) : t('择一项，永久加成', 'Pick one; it lasts the run')}
+      sub={v.left > 1 ? t(`还有 ${v.left} 次升级可挑`, `${v.left} level-ups to choose`) : t('挑一张，加成这一局一直有效', 'Pick one; it lasts the whole run')}
       onPause={props.onPause}
     >
-      <div class="mj-cards mj-cards-lv">
-        {v.cards.map((c: LevelCard, i) => (
-          <button type="button" class={`mj-card mj-lvcard tier-${c.tier}`} onClick={() => pick(i)} aria-label={`${i + 1}. ${fmtStat(c.stat, c.v, t)} · ${tierName(c.tier, t)}`}>
-            <kbd class="mj-hotkey" aria-hidden="true">{i + 1}</kbd>
-            <span class="mj-lvglyph brush" aria-hidden="true">{CARD_GLYPH[c.stat] ?? '升'}</span>
-            <b class="mj-lvval num">{fmtStat(c.stat, c.v, t).split(' ')[0]}</b>
-            <span class="mj-lvname">{statName(c.stat, t)}</span>
-            <span class={`mj-tierseal tier-${c.tier}`} aria-hidden="true">{TIER_ZH[c.tier]}</span>
-          </button>
-        ))}
+      <div class="mj-cards mj-cards-lv" data-tut="cards">
+        {v.cards.map((c: LevelCard, i) => {
+          const val = statDeltaText(c.stat, c.v);
+          const pv = levelPreview(props.run, c.stat, c.v, t);
+          const hint = CARD_HINT[c.stat];
+          const fit = statFit(props.run, c.stat, t);
+          return (
+            <button
+              type="button"
+              class={`mj-card mj-lvcard tier-${c.tier}`}
+              data-tut={`card:${i}`}
+              onClick={() => pick(i)}
+              aria-label={`${i + 1}. ${statName(c.stat, t)} ${val} · ${hint ? t(hint.zh, hint.en) + ' · ' : ''}${pv.line}${fit ? ' · ' + fit.text : ''} · ${tierWord(c.tier, t)}`}
+              title={termLine(c.stat, t)}
+            >
+              <kbd class="mj-hotkey" aria-hidden="true">{i + 1}</kbd>
+              <span class="mj-lvglyph brush" aria-hidden="true">{termOf(c.stat).icon ?? termOf('level').icon ?? '升'}</span>
+              <b class="mj-lvval num" aria-hidden="true">{val}</b>
+              <span class="mj-lvname" aria-hidden="true">{statName(c.stat, t)}</span>
+              {hint && <span class="mj-lvhint" aria-hidden="true">{t(hint.zh, hint.en)}</span>}
+              <span class="mj-lvnow num" aria-hidden="true">{pv.line}</span>
+              {fit && <span class={'mj-lvfit' + (fit.on ? ' is-on' : ' is-off')} aria-hidden="true">{fit.text}</span>}
+              <span class={`mj-tierseal tier-${c.tier}`} aria-hidden="true">{TIER_ZH[c.tier]}</span>
+            </button>
+          );
+        })}
       </div>
       <div class="mj-row-actions">
-        <button type="button" class="btn btn-small" onClick={reroll} disabled={props.run.moon < v.rerollCost}>
-          {t('重抽', 'Reroll')} <span class="mj-moon-cost num">{v.rerollCost}</span> <kbd class="mj-hotkey-inline">R</kbd>
+        <button type="button" class="btn btn-small" data-tut="cardReroll" onClick={reroll} disabled={props.run.moon < v.rerollCost}>
+          {termName('reroll', t)} <span class="mj-moon-cost num">{v.rerollCost}</span> <kbd class="mj-hotkey-inline">R</kbd>
         </button>
-        <span class="mj-have">{t('月华', 'Moonlight')} <b class="num">{Math.floor(props.run.moon)}</b></span>
-        <button type="button" class="btn btn-small btn-ghost" onClick={props.onStats}>{t('属性', 'Stats')}</button>
+        <span class="mj-have">{termName('moon', t)} <b class="num">{Math.floor(props.run.moon)}</b></span>
+        {onWho && <button type="button" class="btn btn-small mj-cardwho" data-tut="cardWho" onClick={onWho}><span class="brush" aria-hidden="true">人</span> {termName('panel', t)}</button>}
       </div>
     </Panel>
   );
@@ -155,12 +194,16 @@ export function Crate(props: { run: RunSave; unlocks: Unlocks; onRun: (r: RunSav
     return false;
   }, [props.run]);
   return (
-    <Panel title={t('镜奁', 'Mirror casket')} sub={props.run.pending.crates > 1 ? t(`共 ${props.run.pending.crates} 只`, `${props.run.pending.crates} to open`) : undefined} onPause={props.onPause}>
+    <Panel title={termName('crate', t)} sub={props.run.pending.crates > 1 ? t(`一共 ${props.run.pending.crates} 个`, `${props.run.pending.crates} to open`) : undefined} onPause={props.onPause}>
       <div class="mj-crate">
-        <GearCard kind="item" id={id} t={t} px={64} class="mj-crate-card" />
+        <GearCard kind="item" id={id} t={t} px={64} class="mj-crate-card" tut="crateCard" run={props.run} />
         <div class="mj-row-actions">
-          <button type="button" class="btn btn-primary mj-big" onClick={keep}><span class="brush">收</span> {t('收下', 'Keep')} <kbd class="mj-hotkey-inline">1</kbd></button>
-          <button type="button" class="btn mj-big" onClick={sell}><span class="brush">化</span> <span class="mj-moon-cost num">+{melt}</span> <kbd class="mj-hotkey-inline">2</kbd></button>
+          <button type="button" class="btn btn-primary mj-big" data-tut="crateKeep" onClick={keep} title={termLine('keep', t)}>
+            <span class="brush" aria-hidden="true">收</span> {termName('keep', t)} <kbd class="mj-hotkey-inline">1</kbd>
+          </button>
+          <button type="button" class="btn mj-big" data-tut="crateMelt" onClick={sell} title={termLine('melt', t)} aria-label={t(`${termName('melt', t)}，得 ${melt} 月华`, `Melt it for ${melt} moonlight`)}>
+            <span class="brush" aria-hidden="true">化</span> {termName('melt', t)} <span class="mj-moon-cost num">+{melt}</span> <kbd class="mj-hotkey-inline">2</kbd>
+          </button>
         </div>
       </div>
     </Panel>
@@ -177,11 +220,11 @@ export function HeartPick(props: { run: RunSave; unlocks: Unlocks; onRun: (r: Ru
   return (
     <Panel
       title={t('镜心', 'Mirror heart')}
-      sub={src === 'flower' ? t('镜中花开，择其一', 'The mirror flower opens: take one') : t('首领已破，择一件仙神之物；下一重满血，再送一次重抽', 'The boss fell: take one; you start the next wave at full HP, with a free reroll')}
+      sub={src === 'flower' ? t('镜中花开了：挑一件。', 'The mirror flower opens: take one.') : t('首领倒了：挑一件。下一重开始时满血，还送一次免费刷新。', 'The boss fell: take one. You start the next wave at full HP, with a free reroll.')}
       onPause={props.onPause}
     >
       <div class="mj-cards">
-        {opts.map((id, i) => <GearCard kind="item" id={id} t={t} px={56} hotkey={String(i + 1)} onClick={() => pick(i)} />)}
+        {opts.map((id, i) => <GearCard kind="item" id={id} t={t} px={56} hotkey={String(i + 1)} onClick={() => pick(i)} tut={`heartCard:${i}`} run={props.run} />)}
       </div>
     </Panel>
   );
@@ -204,37 +247,55 @@ export function Ready(props: { run: RunSave; onGo: () => void; onPause: () => vo
       {boss ? (
         <p class="mj-ready-kind is-boss"><Seal text="首" size={22} /> {boss.name} · <i>{boss.verse}</i></p>
       ) : plan.kind === 'elite' ? (
-        <p class="mj-ready-kind">{t('精怪出没', 'Elites abroad')}</p>
+        <p class="mj-ready-kind">{t(`这一重有${termName('elite', (z) => z)}`, 'Elites this wave')}</p>
       ) : plan.kind === 'horde' ? (
-        <p class="mj-ready-kind">{t('群魔蜂拥', 'A horde')}</p>
+        <p class="mj-ready-kind">{termName('horde', t)}</p>
       ) : w === 1 ? (
         <p class="mj-ready-kind">{t(`${c.zh}入镜 · 镜技「${sk.zh}」`, `${c.en} steps in · skill “${sk.en}”`)}</p>
       ) : null}
       {props.run.inWave === null && props.run.interruptions > 0 && w === props.run.wave + 1 && (
-        <p class="mj-ready-note">{t(`此重曾中断 ${props.run.interruptions}/3 次`, `Interrupted ${props.run.interruptions}/3 times`)}</p>
+        <p class="mj-ready-note">{t(`这一重已经中断过 ${props.run.interruptions}/3 次`, `Interrupted ${props.run.interruptions}/3 times`)}</p>
       )}
-      <button type="button" class="btn btn-seal mj-big mj-go" onClick={props.onGo} disabled={props.baking !== null}>
-        {props.baking !== null ? t(`研墨 ${Math.round(props.baking * 100)}%`, `Grinding ink ${Math.round(props.baking * 100)}%`) : t('入此重', 'Begin')}
+      <button type="button" class="btn btn-seal mj-big mj-go" data-tut="go" onClick={props.onGo} disabled={props.baking !== null}>
+        {props.baking !== null ? t(`研墨 ${Math.round(props.baking * 100)}%`, `Grinding ink ${Math.round(props.baking * 100)}%`) : termName('go', t)}
       </button>
       <p class="mj-ready-keys">{t('移动：摇杆 / WASD · 镜技：技 / Q · 暂停：Esc', 'Move: stick / WASD · Skill: glyph button / Q · Pause: Esc')}</p>
-      {isBossWave(w) && <p class="mj-ready-note">{t('首领之重不计时；首领倒下即破。', 'Boss waves are untimed; the wave falls with the boss.')}</p>}
+      {isBossWave(w) && <p class="mj-ready-note">{t('首领这一重不计时，打倒首领就过。', 'Boss waves have no timer: beat the boss to win.')}</p>}
     </div>
   );
 }
 
 // ───────────────────────────────────────────── the boss's entrance card (1.5 s, skippable)
-export function BossCard(props: { ev: BossEvent & { kind: 'intro' }; onDone: () => void }) {
+/**
+ * The boss's name card. Without `tip` it closes itself after 1.5 s (a tap skips). With a `tip` (the
+ * tutorial's first boss, a first-time tip) it stays until its `go` button, which fires onDone.
+ */
+export function BossCard(props: { ev: BossEvent & { kind: 'intro' }; onDone: () => void; tip?: { line: string; go: string } | null }) {
   const t = useT();
   const b = bossName(props.ev.id, t);
   const zh = bossName(props.ev.id, (z) => z).name;
   const [gone, setGone] = useState(false);
+  const tip = props.tip ?? null;
   useEffect(() => {
+    if (tip) return;
     const k = setTimeout(() => { setGone(true); props.onDone(); }, 1500);
     return () => clearTimeout(k);
-  }, []);
+  }, [!!tip]);
   if (gone) return null;
+  const done = () => { setGone(true); props.onDone(); };
+  if (tip) {
+    return (
+      <div class="mj-bosscard is-tip" data-tut="bossCard" role="dialog" aria-label={b.name}>
+        <Seal text={zh.slice(0, 4)} size={64} class="mj-bosscard-seal" label={b.name} />
+        <h2 class="brush">{b.name}</h2>
+        <p class="mj-bosscard-verse">{b.verse}</p>
+        <p class="mj-bosscard-tip">{tip.line}</p>
+        <button type="button" class="btn btn-seal mj-big" data-tut="bossGo" onClick={done}>{tip.go}</button>
+      </div>
+    );
+  }
   return (
-    <button type="button" class="mj-bosscard" onClick={() => { setGone(true); props.onDone(); }} aria-label={t(`${b.name}，轻触继续`, `${b.name}, tap to continue`)}>
+    <button type="button" class="mj-bosscard" data-tut="bossCard" onClick={done} aria-label={t(`${b.name}，轻触继续`, `${b.name}, tap to continue`)}>
       <Seal text={zh.slice(0, 4)} size={64} class="mj-bosscard-seal" label={b.name} />
       <h2 class="brush">{b.name}</h2>
       <p class="mj-bosscard-verse">{b.verse}</p>

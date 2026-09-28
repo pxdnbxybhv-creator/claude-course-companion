@@ -8,9 +8,10 @@ import type {
 } from '../types';
 import { World } from './world';
 import { Renderer } from './render';
+import type { HudRect } from './threats';
 import { createDebugPainter } from './debugPainter';
 import { installDev } from './dev';
-import { viewScale } from '../paint/draw';
+import { bakeScale, viewOf, viewScale, type ViewSize } from '../paint/draw';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 4;
@@ -25,6 +26,16 @@ const RES_FLOOR = { low: 1, mid: 1.5, high: 1.5 } as const;
  *  slows again at the higher notch settles one below it). */
 const RES_UP_AFTER = 20;
 const RES_UPS = 3;
+/** The camera's lead in the direction you move: 60 css px, at most this many u (a far view must not
+ *  swing 100+ u ahead and drop the shooters behind you off the screen). */
+const LEAD_U = 70;
+/** A boss fight's zoom-out by view: the close view widens most; the far view already shows the field. */
+const BOSS_ZOOM: Readonly<Record<ViewSize, number>> = { near: 0.84, mid: 0.92, far: 1 };
+/** A painter that can re-bake its atlas at a new sprite scale (paint/index.ts InkPainter.rescale). */
+type Rescalable = Painter & { k?: number; rescale?: (pxPerU: number, onProgress?: (done: number, total: number) => void, sliceMs?: number | (() => number)) => Promise<boolean> };
+/** Re-bake slices: 6 ms a frame while you play, 24 ms behind a pause sheet or between waves. */
+const REBAKE_SLICE = 6;
+const REBAKE_SLICE_IDLE = 24;
 
 class MirrorEngine implements Engine {
   readonly world: World;
@@ -67,7 +78,67 @@ class MirrorEngine implements Engine {
       cursor: (sx, sy) => { w.cursorX = sx; w.cursorY = sy; w.cursorT = 0; },
     };
     this.resize();
+    // a painter baked for another view (or none given one) is re-baked when it would be drawn enlarged
+    if (typeof document !== 'undefined') void this.ensureBake(true);
     installDev(this);
+  }
+
+  /** The view size in use (settings.view; 'mid' when unset). */
+  get view(): ViewSize { return viewOf(this.deps.settings.view); }
+  /** Whether sprites are being re-baked for a new view (the old ones draw meanwhile). */
+  get baking(): boolean { return this.bakingN > 0; }
+  private bakingN = 0;
+  /**
+   * Change the view size live: the camera takes the new scale at once (one resize; the picture under a
+   * pause sheet redraws), and the painter re-bakes its sprites for it in the background (≈ 6 ms a
+   * frame in play, 24 ms while paused; the old sprites draw until the new set is swapped in whole).
+   * Resolves true once re-baked, false when no re-bake was needed. Same as setSettings({ view }).
+   */
+  setView(view: ViewSize): Promise<boolean> {
+    const v = viewOf(view);
+    if (this.view !== v) {
+      this.deps.settings.view = v;
+      this.world.settings.view = v;
+      this.resize();
+    }
+    return this.ensureBake(false);
+  }
+  private rebake: Promise<boolean> = Promise.resolve(false);
+  /**
+   * Re-bake the painter's sprites for the view when its scale is off: by > 8% either way after a view
+   * change (`upOnly` false), or (at construction) only when sprites would be drawn > 15% enlarged.
+   * A window resize never re-bakes (it only changes the camera).
+   */
+  private ensureBake(upOnly: boolean): Promise<boolean> {
+    const P = this.painter as Rescalable;
+    if (this.disposed || typeof P.rescale !== 'function' || typeof P.k !== 'number' || !(P.k > 0)) return Promise.resolve(false);
+    const target = this.bakeTarget();
+    const off = (target - P.k) / P.k;
+    if (upOnly ? off < 0.15 : Math.abs(off) < 0.08) return this.bakingN ? this.rebake : Promise.resolve(false);
+    this.bakingN++;
+    const slice = () => (this._paused || this.world.phase !== 'wave' ? REBAKE_SLICE_IDLE : REBAKE_SLICE);
+    const p = P.rescale(target, undefined, slice).then((ok) => {
+      // the new sprites under a pause sheet or the wave's end: redraw the still picture
+      if (ok && !this.disposed && (this._paused || this.world.phase !== 'wave')) this.drawFrame(0, true);
+      return ok;
+    }, (e) => { console.warn('[mirror engine] rebake', e); return false; });
+    p.then(() => { this.bakingN--; }, () => { this.bakingN--; });
+    this.rebake = p;
+    return p;
+  }
+  /** The sprite scale this screen and view want (as ui/Run.tsx spriteScale: a desktop window may grow,
+   *  so with a fine pointer it bakes for a short side of at least 600 css px). */
+  private bakeTarget(): number {
+    let w = this.cssW, h = this.cssH;
+    let fine = false;
+    try { fine = typeof matchMedia === 'function' && !matchMedia('(pointer: coarse)').matches; } catch { fine = false; }
+    if (fine) { w = Math.max(w, 600); h = Math.max(h, 600); }
+    return bakeScale(w, h, this.dprTop(), this.deps.settings.quality, this.view);
+  }
+  /** The top canvas dpr (the settings' cap, no dynamic notch): what sprites are baked for. */
+  private dprTop(): number {
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    return Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2));
   }
 
   get phase(): EnginePhase {
@@ -111,6 +182,21 @@ class MirrorEngine implements Engine {
     this.acc = 0;
     this.loop();
   }
+  /** 破镜重圆 (types.ts Engine.revive): rise, and play on (a pause is lifted). False unless down. */
+  revive(): boolean {
+    if (this.disposed || this.fatal || !this.world.revive()) return false;
+    this._paused = false;
+    this.last = 0;
+    this.acc = 0;
+    this.loop();
+    return true;
+  }
+  /** Decline the revive (types.ts Engine.giveUp): hooks.death, phase 'dead'. */
+  giveUp(): void {
+    if (this.disposed || this.world.phase !== 'down') return;
+    this.world.giveUp();
+    if (!this.raf) this.drawFrame(0, true);
+  }
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -130,9 +216,9 @@ class MirrorEngine implements Engine {
     const pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
     if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; }
     this.cam.w = pw; this.cam.h = ph; this.cam.dpr = dpr;
-    // the shorter side shows ≈ 440 u (a phone sees ~440 × 950 u, a desktop ~950 × 590 u); the painter
-    // bakes its sprites from the same viewScale (paint/index.ts bakeScale), so they are drawn ≤ 1:1
-    this.baseScale = viewScale(w, h) * dpr;
+    // the shorter side shows the view's span (paint/draw.ts VIEW_SPAN: 440 / 700 / 820 u); the painter
+    // bakes its sprites from the same viewScale (bakeScale), so they are drawn ≤ 1:1
+    this.baseScale = viewScale(w, h, this.view) * dpr;
     this.cam.scale = this.baseScale;
     if (this._paused || this.world.phase !== 'wave') this.drawFrame();
   }
@@ -198,10 +284,24 @@ class MirrorEngine implements Engine {
     const c = this.cam;
     return { x: (sx * c.dpr - c.w / 2) / c.scale + c.x, y: (sy * c.dpr - c.h / 2) / c.scale + c.y };
   }
+  /**
+   * The rectangles the UI's HUD covers, in css px from the canvas's top-left (negative x / y: from the
+   * right / bottom edge), so the off-screen chevrons never sit under it and a threat under it counts as
+   * unseen (engine/threats.ts). null: the default for today's HUD (threats.ts HUD_DEFAULT: the top 68
+   * px, the 镇 button's 104 × 108 corner); []: none. Call it on mount and whenever the HUD's layout
+   * changes (a resize, the skill button shown or hidden); at most 8 rectangles, applied from the next
+   * frame. No allocation per frame.
+   */
+  setHudRects(rects: readonly HudRect[] | null): void {
+    this.renderer.threats.setHud(rects);
+  }
+  /** Settings apply live; `view` goes through setView (a new camera scale, a background re-bake). */
   setSettings(p: Partial<EngineSettings>): void {
-    Object.assign(this.deps.settings, p);
-    Object.assign(this.world.settings, p);
+    const { view, ...rest } = p;
+    Object.assign(this.deps.settings, rest);
+    Object.assign(this.world.settings, rest);
     if (p.dprCap !== undefined) this.resize();
+    if (view !== undefined) void this.setView(view);
   }
   snapshot(w: number, h: number): HTMLCanvasElement | null {
     if (!this.arenaKey) return null;
@@ -210,20 +310,32 @@ class MirrorEngine implements Engine {
 
   // ─────────────────────────────────────────────── the loop
 
+  /** Frames run: in play, and while the fall of 'down' animates — even under a pause (the UI's dialog
+   *  may pause on `downed`; the world is frozen while down anyway, only the fall's clock runs). */
+  private running(): boolean {
+    if (this.disposed || this.fatal) return false;
+    if (this.world.downAnimating) return true;
+    const ph = this.world.phase;
+    return !this._paused && (ph === 'wave' || ph === 'ending');
+  }
   private loop(): void {
-    if (this.raf || this.disposed || this._paused || this.fatal) return;
+    if (this.raf || this.disposed || this.fatal) return;
+    if (this._paused && !this.world.downAnimating) return;
     // no animation frames (node tests): the caller drives stepN()
     if (typeof requestAnimationFrame !== 'function') return;
     const raf = requestAnimationFrame;
     const tick = (now: number) => {
       this.raf = 0;
-      if (this.disposed || this._paused || this.fatal) return;
+      if (this.disposed || this.fatal || (this._paused && !this.world.downAnimating)) return;
       this.frame(now);
-      const ph = this.world.phase;
-      if (!this._paused && !this.fatal && (ph === 'wave' || ph === 'ending')) this.raf = raf(tick);
+      // one loop only: a hook that answered inside this frame (a synchronous revive(), a resume) has
+      // already scheduled the next frame
+      if (this.raf) return;
+      // (down: until the fall has settled, then its last frame holds — see engine/down.ts)
+      if (this.running()) this.raf = raf(tick);
       // the last picture under a pause, the boss card or the wave's end: the camera stays put (a dt = 0
       // redraw would close its follow lag in one jump as the card comes up)
-      else this.drawFrame(0, true);
+      else if (!this.disposed) this.drawFrame(0, true);
     };
     this.raf = raf(tick);
   }
@@ -255,7 +367,7 @@ class MirrorEngine implements Engine {
       steps++;
       if (!this.safeStep()) return;
       if (w.pauseRequest) { w.pauseRequest = false; this.pause(); break; }
-      if (w.phase !== 'wave' && w.phase !== 'ending') break;
+      if (w.phase !== 'wave' && w.phase !== 'ending' && w.phase !== 'down') break;
     }
     if (this.acc > STEP * MAX_STEPS) this.acc = 0;
     const t1 = performanceNow();
@@ -344,7 +456,7 @@ class MirrorEngine implements Engine {
   // ─────────────────────────────────────────────── camera and drawing
 
   /**
-   * The camera follows you: a 60 px lead in the direction you move, the boss fit, the arena's edge
+   * The camera follows you: a 60 px lead (≤ 70 u) in the direction you move, the boss fit, the arena's edge
    * kept from drifting far into view. dt = 0 snaps (a resize, a paused redraw); `held` (a hitstop)
    * keeps it exactly where it is — the world is frozen, so closing the follow lag in that one frame
    * would jerk the whole picture 15–50 px.
@@ -353,11 +465,11 @@ class MirrorEngine implements Engine {
     const w = this.world;
     if (!w.run) return;
     const c = this.cam;
-    const lead = 60 * c.dpr / c.scale;
+    const lead = Math.min(LEAD_U, 60 * c.dpr / c.scale);
     const tx = w.px + w.pvx / Math.max(1, w.moveSpd) * lead, ty = w.py + w.pvy / Math.max(1, w.moveSpd) * lead;
     const k = held ? 0 : dt > 0 ? Math.min(1, dt * 6) : 1;
     c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
-    const zoom = w.bossH.length && w.phase === 'wave' ? 0.84 : 1;
+    const zoom = w.bossH.length && (w.phase === 'wave' || w.phase === 'down') ? BOSS_ZOOM[this.view] : 1;
     const target = this.baseScale * zoom;
     c.scale += (target - c.scale) * (held ? 0 : dt > 0 ? Math.min(1, dt * 2) : 1);
     const A = w.arena;
@@ -407,4 +519,5 @@ function performanceNow(): number {
 
 export const createEngine: CreateEngine = (canvas, run, deps) => new MirrorEngine(canvas, run, deps);
 export type { MirrorEngine };
+export type { HudRect } from './threats';
 export { World } from './world';

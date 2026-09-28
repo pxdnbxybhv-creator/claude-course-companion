@@ -27,8 +27,11 @@ describe('mirror ui · words', () => {
   it('writes a stat change with its sign and unit', () => {
     expect(fmtStat('aspd', 10, zh)).toBe('+10% 攻速');
     expect(fmtStat('armor', -2, en)).toBe('−2 Armour');
-    expect(fmtStat('range', 30, zh)).toBe('+30 u 射程');
-    expect(fmtStatValue('dodge', 12.34)).toBe('12.3%');
+    expect(fmtStat('range', 30, zh)).toBe('+30 射程'); // no `u`: distances are bare numbers
+    expect(fmtStat('critDmg', 30, zh)).toBe('+0.3 暴击倍数'); // stored 30, read as +0.3 of a crit multiplier
+    expect(fmtStatValue('dodge', 12.34)).toBe('12.34%');
+    expect(fmtStatValue('critDmg', 50)).toBe('+0.5');
+    expect(fmtStatValue('range', 30)).toBe('30');
   });
   it('describes every 节气 modifier in both languages', () => {
     for (const t of TERM_MOD_REG) {
@@ -74,7 +77,7 @@ describe('mirror ui · the pay lines of the scroll', () => {
     const labels = lines.map((l) => l.label).join('|');
     expect(labels).toContain('× 镜境');
     expect(labels).toContain('× 镜誓');
-    expect(labels).toContain('今日镜钱余 10 / 300');
+    expect(labels).toContain('今天还能结算 10 / 300');
     expect(labels).toContain('退回本钱');
     const free = payLines({ ...base, fee: 0, rate: 0.5, rated: 18, income: 18, net: 21 }, true, en);
     expect(free.some((l) => l.label.includes('free run'))).toBe(true);
@@ -197,7 +200,7 @@ describe('mirror ui · what a void run gave back', () => {
     expect(voidNote({ free: false, refunded: 0, freeBack: false }, zh)).not.toContain('已退回');
   });
   it('a free run speaks of the free run, not of money', () => {
-    expect(voidNote({ free: true, refunded: 0, freeBack: true }, zh)).toContain('今日免费仍在');
+    expect(voidNote({ free: true, refunded: 0, freeBack: true }, zh)).toContain('今天的免费局还在');
     expect(voidNote({ free: true, refunded: 0, freeBack: false }, en)).not.toMatch(/fee|coins are back/);
     for (const o of [{ free: true, refunded: 0, freeBack: true }, { free: true, refunded: 0, freeBack: false }]) {
       expect(voidNote(o, zh)).not.toContain('本钱');

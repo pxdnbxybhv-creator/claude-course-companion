@@ -82,9 +82,7 @@ export interface WeaponDef {
    * ret, discs, fork, speedDmg, stack, ghost, bigX, healChance, critBurn …
    */
   p: Readonly<Record<string, number | PerTier>>;
-  /** Card text: the special, and the tier-IV 神 effect. */
-  text: Bilingual;
-  t4: Bilingual;
+  // Card text lives in data/say.ts (WEAPON_SAY: a sentence with data slots); ui/describe.ts renders it.
   /** An idiom or line of verse for the codex. */
   verse?: Bilingual;
 }
@@ -172,7 +170,7 @@ export interface ItemDef {
   curse?: number;
   /** Earliest shop wave (神品: 8). */
   from?: number;
-  text: Bilingual;
+  /** Its words live in data/say.ts (ITEM_SAY; stats-only items are generated); ui/describe.ts renders them. */
   verse?: Bilingual;
 }
 
@@ -322,9 +320,8 @@ export interface SkillDef {
   /** Auto-target search radius (u), when it has one. */
   reach?: number;
   cd: number;
-  /** Every number of the skill text: base, k, r, dur, slow, root, amp, n, cap, iframe, len … */
+  /** Every number of the skill text (data/say.ts SKILL_SAY slots): base, k, r, dur, slow, root, amp, n, cap, iframe, len … */
   p: Readonly<Record<string, number>>;
-  text: Bilingual;
 }
 export interface PassiveDef {
   id: PassiveId;
@@ -333,8 +330,7 @@ export interface PassiveDef {
   stats?: StatMods;
   fx?: readonly Effect[];
   p: Readonly<Record<string, number>>;
-  text: Bilingual;
-  cost: Bilingual;
+  // Its line and 代价 live in data/say.ts (PASSIVE_SAY); ui/describe.ts renders them.
 }
 
 export type ArenaShape = { kind: 'circle'; r: number } | { kind: 'rect'; w: number; h: number } | { kind: 'octagon'; r: number };
@@ -530,6 +526,20 @@ export interface RunSave {
   lastBuy: WeaponId | ItemId | null;
   /** Real ms spent in waves (fastest 照破). */
   ms: number;
+  /**
+   * 破镜重圆: the run's one paid revive (REVIVE.price 文) has been used. Absent or false: the engine
+   * offers `hooks.downed` on the next death. The engine sets it on its own run object at revive();
+   * the session must persist it (validateRun keeps it; only `true` is written).
+   */
+  revived?: boolean;
+  /** A tutorial run: never offered the revive (its death goes straight to `hooks.death`). Set by the tutorial flow. */
+  tutorial?: boolean;
+  /**
+   * The wave you went down in, awaiting the revive answer (the UI commits it when `downed` fires and
+   * clears it on revive). A reload that finds downAt === inWave settles the run as a death (镜碎) —
+   * a closed tab never dodges a death (API.md §3 破镜重圆).
+   */
+  downAt?: number;
 }
 
 /** What the account has open (logic/meta unlocksOf); stable for the life of a run. */
@@ -628,7 +638,22 @@ export interface MirrorSettings {
   shake: boolean;
   left: boolean;
   quality: 'auto' | Quality;
+  /** 新手提示: a line the first time you meet a boss, an elite, a casket, a curse item or low HP. On unless
+   *  false; sanitizeMirror always writes it. */
+  tips: boolean;
+  /** 视野 (EngineSettings.view): 'near' 近 · 'mid' 中 (the default; missing means 'mid') · 'far' 远. The
+   *  UI half keeps it (sanitizeMirror must copy it), shows it in the settings sheet and forwards it to
+   *  the engine's setSettings({ view }) and the painter's bakeScale (scratchpad/mirror4/UI-HALF.md). */
+  view?: 'near' | 'mid' | 'far';
 }
+/** The tutorial's first-time tips (ui/tips.ts): one line each, shown once per account. */
+export type TutorTipId = 'boss' | 'crate' | 'crateOpen' | 'elite' | 'curse' | 'lowHp' | 'cards' | 'shop';
+/**
+ * The tutorial 「初入镜中」 (ui/Tutorial.tsx): `offered` once the sheet, ribbon or tutorial was seen,
+ * `done` once it was played to its end card; `tips` the first-time tips already shown. They unlock
+ * nothing and pay nothing. Unknown well-formed tip keys are kept (a newer build's tips).
+ */
+export interface TutorFlags { offered: boolean; done: boolean; tips: Partial<Record<TutorTipId, true>> }
 export interface MirrorMeta {
   v: 1;
   ticketsUsed: number;
@@ -663,6 +688,9 @@ export interface MirrorMeta {
   /** Chapter rims earned; the lobby shows `rim`. */
   rims: RimId[];
   rim: RimId | null;
+  /** The tutorial's flags (TutorFlags). Always set by sanitizeMirror / defaultMeta; read it through
+   *  ui/tips.ts tutorOf(). */
+  tutor: TutorFlags;
 }
 
 // ═════════════════════════════════════════════════════════════ 5 · engine ↔ UI (engine/index.ts: createEngine)
@@ -676,6 +704,11 @@ export interface EngineSettings {
   shake: boolean;
   aim: 'auto' | 'manual';
   lang: 'zh' | 'en';
+  /** View size (paint/draw.ts VIEW_SPAN): how much of the arena the screen shows — 'near' (the old
+   *  close view: the shorter side shows 440 u), 'mid' (the default: 700 u), 'far' (820 u). Optional:
+   *  missing means 'mid'. Applies live through `setSettings({ view })` (the engine re-bakes its sprites
+   *  for the new size in the background). */
+  view?: 'near' | 'mid' | 'far';
 }
 
 /** HUD snapshot, pushed ≈8 Hz. The object is reused: copy what you keep; write refs, not Preact state. */
@@ -747,6 +780,21 @@ export type BossEvent =
   | { kind: 'phase'; id: BossId | EndlessBossId; phase: number }
   | { kind: 'dead'; id: BossId | EndlessBossId };
 
+/**
+ * 破镜重圆: you fell and the run's one revive is on offer. The engine is in phase 'down' (the world
+ * frozen, your figure sinking into an ink blot) and waits for engine.revive() or engine.giveUp().
+ */
+export interface DownInfo {
+  /** true whenever the hook fires (the engine offers it only while logic canRevive(run)); the purse is the UI's. */
+  canRevive: boolean;
+  /** The price in 文 (REVIVE.price = 50): the UI charges it (session), then calls engine.revive(). */
+  price: number;
+  /** The wave being played. */
+  wave: number;
+  /** Registry id of what dealt the last hit (or 'hazard'), as DeathResult.cause. */
+  cause: string;
+}
+
 export interface EngineHooks {
   /** ≈8 Hz. Never set Preact state per frame from here. */
   hud(s: HudState): void;
@@ -761,6 +809,13 @@ export interface EngineHooks {
   /** The wave was won; the engine is idle until start() is called again. */
   waveEnd(r: WaveResult): void;
   death(r: DeathResult): void;
+  /**
+   * Optional. The first death of a run that may be revived (logic canRevive(run): not yet revived, not a
+   * tutorial): the engine goes 'down' instead of dying and calls this once. Answer with engine.revive()
+   * (after charging) or engine.giveUp() (→ `death` as usual). Without this hook, or on any later death,
+   * the engine dies at once exactly as before. If it throws, the engine gives up.
+   */
+  downed?(d: DownInfo): void;
   /** fatal = the second throw within 5 s (GDD §23); the UI voids or settles the run. */
   error(e: unknown, fatal: boolean): void;
 }
@@ -776,7 +831,8 @@ export interface EngineInput {
   cursor(sx: number, sy: number): void;
 }
 
-export type EnginePhase = 'idle' | 'wave' | 'ending' | 'dead' | 'disposed';
+/** 'down': fallen, waiting for revive() or giveUp() (nothing steps; the ink blot settles over ≈ 1 s, then the frame holds). */
+export type EnginePhase = 'idle' | 'wave' | 'ending' | 'down' | 'dead' | 'disposed';
 export interface Engine {
   readonly phase: EnginePhase;
   readonly paused: boolean;
@@ -796,6 +852,15 @@ export interface Engine {
   setSettings(p: Partial<EngineSettings>): void;
   /** The arena's ink so far, for the 画卷 and 存画 (null before the first wave). */
   snapshot(w: number, h: number): HTMLCanvasElement | null;
+  /**
+   * 破镜重圆, the answer to `downed`: rise where you fell at REVIVE.hpPct (50%) of max 气血 with
+   * REVIVE.invuln (2 s) of invulnerability (a jade shimmer), a jade-and-moon shockwave that throws the
+   * nearby crowd back and wipes enemy shots near you; sets run.revived = true and resumes (a pause is
+   * lifted). Returns false (and does nothing) unless the phase is 'down'. Charge the 文 first.
+   */
+  revive(): boolean;
+  /** The other answer to `downed`: the normal death (hooks.death → phase 'dead'). A no-op unless 'down'. */
+  giveUp(): void;
 }
 export interface EngineDeps {
   painter: Painter;

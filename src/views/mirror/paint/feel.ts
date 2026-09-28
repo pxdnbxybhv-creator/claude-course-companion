@@ -708,4 +708,8 @@ export const WARM: readonly (readonly [number, number])[] = [
   [SH.halo, TN.indigo], [SH.halo, TN.moon], [SH.halo, TN.green], [SH.splat, TN.ink], [SH.splat, TN.indigo], [SH.splat, TN.wine], [SH.shard, TN.ink],
   [SH.ember, TN.azure], [SH.ember, TN.jade], [SH.ember, TN.gold], [SH.ember, TN.gamboge], [SH.ember, TN.moon], [SH.ember, TN.white],
   [SH.ember, TN.indigo], [SH.ember, TN.green], [SH.rake, TN.white], [SH.rake, TN.moon],
+  // the marks in the light of the weapon that struck, and what flies off a blow (engine/vfx.ts impact)
+  [SH.cut, TN.jade], [SH.cut, TN.gamboge], [SH.cut, TN.moon], [SH.cut, TN.indigo], [SH.cut, TN.green],
+  [SH.beam, TN.gamboge], [SH.beam, TN.wine], [SH.beam, TN.green], [SH.beam, TN.indigo], [SH.halo, TN.gamboge],
+  [SH.ember, TN.wine], [SH.glint, TN.white], [SH.glint, TN.green], [SH.glint, TN.jade], [SH.rake, TN.azure],
 ];

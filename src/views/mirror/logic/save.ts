@@ -90,6 +90,10 @@ export function validateRun(raw: unknown): RunSave | null {
       lastBuy: typeof r.lastBuy === 'string' && (WEAPONS.has(r.lastBuy) || ITEMS.has(r.lastBuy)) ? (r.lastBuy as RunSave['lastBuy']) : null,
       ms: Math.max(0, fin(r.ms)),
     };
+    // 破镜重圆 and the tutorial: optional, written only when set (older saves lack them)
+    if (r.revived === true) run.revived = true;
+    if (r.tutorial === true) run.tutorial = true;
+    if (typeof r.downAt === 'number' && Number.isFinite(r.downAt) && r.downAt >= 1) run.downAt = nat(r.downAt, 9999);
     return run;
   } catch {
     return null;

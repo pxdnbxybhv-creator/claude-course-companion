@@ -61,7 +61,7 @@ const SPRITE_HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 }
 const VOID = '#08090c';
 const VOID_A = 0.55;
 
-interface ObstSprite { img: HTMLCanvasElement; x0: number; y0: number; w: number; h: number }
+export interface ObstSprite { img: HTMLCanvasElement; x0: number; y0: number; w: number; h: number }
 
 /** The obstacles' px per u for a sprite bake scale `sk` (the camera's scale × the painter's headroom). */
 export function obstacleScale(sk: number, q: Quality): number {
@@ -87,8 +87,9 @@ export class ArenaLayer {
   /** ms the last paint took (lab). */
   lastMs = 0;
 
-  /** `sk`: the sprite scale (px per u the painter bakes figures at: the camera's scale). */
-  constructor(readonly map: MapId, readonly quality: Quality, readonly dpr: number, readonly sk = dpr) {
+  /** `sk`: the sprite scale (px per u the painter bakes figures at: the camera's scale). A view change
+   *  moves it (the painter's rescale: rescaleObstacle / setObstacles re-bake the obstacle sprites). */
+  constructor(readonly map: MapId, readonly quality: Quality, readonly dpr: number, public sk = dpr) {
     this.pal = MAP_PAL[map];
   }
 
@@ -101,8 +102,12 @@ export class ArenaLayer {
   /** The stain layer's px per u. */
   private get kS(): number { return this.k * STAIN_K[this.quality]; }
 
+  /** Bumped by every paint (a new arena, 倒影's inversion): a re-bake begun before it is dropped. */
+  paintGen = 0;
+
   paint(geom: ArenaGeom, seed: number, inverted: boolean): void {
     const t0 = performance.now();
+    this.paintGen++;
     if (inverted && !this.inverted && this.base && this.geom === geom && this.seed === seed) {
       // the endless stage: invert what is painted (base, stains, obstacles) — no repaint
       this.inverted = true;
@@ -190,15 +195,9 @@ export class ArenaLayer {
         shade.ops.length = leadingWashes(shade.ops, from);
       }
       strokes(shade, 1);
-      for (const o of geom.obstacles) {
-        const R = o.r * 1.35 + 12;
-        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => { const from = b.ops.length; obstacle(b, o, P, seed); b.ops.splice(from, leadingWashes(b.ops, from) - from); } };
-        try {
-          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0, flash: false });
-          if (inverted) invertLightness(p.img);
-          // the spec's anchor (0, 0) is the world origin: the canvas's corner sits at −anchor × size
-          this.obst.push({ img: p.img, x0: -p.ax * p.w, y0: -p.ay * p.h, w: p.w, h: p.h });
-        } catch (e) { console.warn('[mirror paint] obstacle', e); }
+      for (let j = 0; j < geom.obstacles.length; j++) {
+        const o = this.obstacleSprite(j, ks);
+        if (o) this.obst.push(o);
       }
     }
     if (!this.obst.length) {
@@ -237,6 +236,42 @@ export class ArenaLayer {
     this.stains = new Tiles(sw, sh);
     this.bakeStamps(inverted);
     this.lastMs = performance.now() - t0;
+  }
+
+  /** Obstacle j of the painted arena as its own sprite at `ks` px per u (null: none, or it failed). */
+  private obstacleSprite(j: number, ks: number): ObstSprite | null {
+    const geom = this.geom, o = geom?.obstacles[j];
+    if (!o) return null;
+    const P = this.pal, seed = this.seed;
+    const R = o.r * 1.35 + 12;
+    const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => { const from = b.ops.length; obstacle(b, o, P, seed); b.ops.splice(from, leadingWashes(b.ops, from) - from); } };
+    try {
+      const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0, flash: false });
+      if (this.inverted) invertLightness(p.img);
+      // the spec's anchor (0, 0) is the world origin: the canvas's corner sits at −anchor × size
+      return { img: p.img, x0: -p.ax * p.w, y0: -p.ay * p.h, w: p.w, h: p.h };
+    } catch (e) { console.warn('[mirror paint] obstacle', e); return null; }
+  }
+  /**
+   * A view change (the painter's rescale): how many obstacle sprites to re-bake for sprite scale `sk`
+   * — 0 when the obstacles are painted into the base (a scale no finer than it: they stay there) or
+   * their scale would move < 3%. The base and the stains keep their resolution (memory-capped anyway).
+   */
+  obstaclesToRebake(sk: number): number {
+    if (!this.geom || !this.obst.length || this.obst.length !== this.geom.obstacles.length) return 0;
+    const now = obstacleScale(this.sk, this.quality), next = obstacleScale(sk, this.quality);
+    return Math.abs(next - now) / now < 0.03 ? 0 : this.obst.length;
+  }
+  /** Re-bake obstacle j for sprite scale `sk` (into a pending list; setObstacles swaps it in). */
+  rebakeObstacle(j: number, sk: number): ObstSprite | null { return this.obstacleSprite(j, obstacleScale(sk, this.quality)); }
+  /** Swap in a full set of re-baked obstacle sprites (freeing the old ones); `sk` becomes the scale.
+   *  `gen`: paintGen when the re-bake began (a paint since: the set is dropped). False when dropped. */
+  setObstacles(list: readonly (ObstSprite | null)[], sk: number, gen: number): boolean {
+    if (gen !== this.paintGen || list.length !== this.obst.length || list.some((o) => !o)) { for (const o of list) if (o) { o.img.width = 1; o.img.height = 1; } return false; }
+    for (const o of this.obst) { o.img.width = 1; o.img.height = 1; }
+    this.obst = list as ObstSprite[];
+    this.sk = sk;
+    return true;
   }
 
   private bakeStamps(inverted: boolean) {

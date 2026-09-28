@@ -286,7 +286,8 @@ describe('流光: the renderer', () => {
     let ink = 0, gold = 0;
     for (let i = 0; i < V.rings.n; i++) if (V.rings.alive[i]) { if (V.rings.flags[i] & VF.ink) ink++; if (V.rings.tint[i] === VT.gold) gold++; }
     expect(ink).toBe(1);
-    expect(gold).toBe(1);
+    // the level-up: a wide gold shockwave and a second gold ring breaking after it
+    expect(gold).toBe(2);
     expect(V.blooms.count).toBeGreaterThan(0);
     eng.dispose();
   });
@@ -501,26 +502,32 @@ describe('流光: fix round (calm rings, answers on the press, the 琴 pulse, th
     eng.dispose();
   });
 
-  it('a 桃木剑 shot flies as the peachwood blade (its own sprite), not the steel flying sword', () => {
+  it('a 桃木剑 shot flies as its own peachwood projectile (proj:peachSword), not the steel flying sword', () => {
     const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 4, char: 'taoist' as CharId })), [['peach', 3]]), wave: 6 });
     const eng = make(run);
     eng.start(run, setup);
     const W = quiet(eng);
     crowd(W, 12, 160);
-    const K = PROJ_IDS.indexOf('flySword' as (typeof PROJ_IDS)[number]);
-    let shots = 0;
-    for (let k = 0; k < 240 && !shots; k++) { eng.stepN(1); for (let i = 0; i < W.PS.n; i++) if (W.PS.alive[i] && W.PS.kind[i] === K) shots++; }
+    const K = PROJ_IDS.indexOf('peachSword' as (typeof PROJ_IDS)[number]);
+    const KF = PROJ_IDS.indexOf('flySword' as (typeof PROJ_IDS)[number]);
+    expect(K).toBeGreaterThanOrEqual(0);
+    let shots = 0, steel = 0;
+    for (let k = 0; k < 240 && !shots; k++) {
+      eng.stepN(1);
+      for (let i = 0; i < W.PS.n; i++) if (W.PS.alive[i]) { if (W.PS.kind[i] === K) shots++; else if (W.PS.kind[i] === KF) steel++; }
+    }
     expect(shots).toBeGreaterThan(0);
+    expect(steel).toBe(0);
     const P = createDebugPainter(run.map, 'high', 1);
     const asked: string[] = [];
     const orig = P.sprite.bind(P);
-    const blade = { img: {} as CanvasImageSource, sx: 0, sy: 0, sw: 44, sh: 12, w: 44, h: 12, ax: 0.23, ay: 0.5 };
-    P.sprite = ((id: string, v?: number) => { asked.push(id); return id === 'wpn:peach' ? blade : orig(id as never, v); }) as typeof P.sprite;
+    P.sprite = ((id: string, v?: number) => { asked.push(id); return orig(id as never, v); }) as typeof P.sprite;
     const r = new Renderer(P);
     r.draw(W, nullCtx(), camOf(W));
-    // the held 桃木剑 asks once, every peach shot once more, the resting ones once; the steel sword only
-    // for the orbit pass
-    expect(asked.filter((id) => id === 'wpn:peach').length).toBe(1 + shots + (W.idleSwords > 0 ? 1 : 0));
+    // the held 桃木剑 asks once; every peach shot, and the resting peach blades once, ask for the
+    // peachwood projectile; the steel sword only for the orbit pass
+    expect(asked.filter((id) => id === 'wpn:peach').length).toBe(1);
+    expect(asked.filter((id) => id === 'proj:peachSword').length).toBe(shots + (W.idleSwords > 0 ? 1 : 0));
     expect(asked.filter((id) => id === 'proj:flySword').length).toBe(1);
     eng.dispose();
   });

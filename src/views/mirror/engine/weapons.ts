@@ -261,6 +261,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
       const V = vfxOf(W), tn = tintOf(s);
       V.lance(tx, ty - r * 0.95, Math.PI / 2, r * 0.9, 13, tn, 0.14, VF.streak);
       V.shock(tx, ty, r, tn, { stain: STAIN.crack, life: 0.34 });
+      V.bloom(tx, ty, r * 0.55, tn, 0.2, BK.glow, 0.95, 0);
       if (n && W.erng() < ((p.healChance as number) ?? 0.1) * s.proc) W.heal(1);
       if (n && t === 4) W.shield(n, (p.shieldMax as number) ?? 10);
       W.feel.swing(s.i, px, py, W.lastDir, 40, 90, s.fc);
@@ -303,7 +304,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
         for (let k = 0; k < n; k++) {
           if (W.swordsAir >= SWORDS_ON_SCREEN - W.blades - W.canjian) break;
           const a = dir + (k - (n - 1) / 2) * 0.25;
-          const i = shot(W, s, PK.flySword, a, s.def.speed ?? 600, range / (s.def.speed ?? 600) + 0.6, k === 0 ? d : d * F.swordExtra, cp, cm, 8);
+          const i = shot(W, s, PK.peachSword, a, s.def.speed ?? 600, range / (s.def.speed ?? 600) + 0.6, k === 0 ? d : d * F.swordExtra, cp, cm, 8);
           if (i < 0) break;
           W.PS.mode[i] = SMode.Homing; W.PS.homing[i] = 5; W.PS.flags[i] |= SF.sword | SF.ghostX | (t === 4 ? SF.peach : 0);
           W.PS.target[i] = target >= 0 ? E.handle(target) : -1;
@@ -888,13 +889,16 @@ function landLob(W: World, i: number): void {
     const V = vfxOf(W);
     V.streak(x, y - 90, x, y, 7, VT.jade, 0.2, 0);
     V.shock(x, y, r * 0.8, VT.jade, { flags: VF.double, debris: 4, life: 0.28, prio: 0 });
+    V.bloom(x, y, r * 0.5, VT.jade, 0.18, BK.glow, 0.85, 0);
     return;
   }
   {
     // the talisman bursts into fire and scorches the paper; the gourd splashes wine
     const V = vfxOf(W);
-    if (flags & SF.gourd) V.shock(x, y, r, VT.wine, { flags: VF.double, debris: 8, fleck: FK.drop, life: 0.32 });
-    else {
+    if (flags & SF.gourd) {
+      V.shock(x, y, r, VT.wine, { flags: VF.double, debris: 8, fleck: FK.drop, life: 0.32 });
+      V.bloom(x, y, r * 0.6, VT.wine, 0.2, BK.glow, 0.7, 0);
+    } else {
       V.shock(x, y, r, VT.gamboge, { debris: 10, fleck: FK.ember, stain: STAIN.burn, life: 0.36 });
       V.bloom(x, y, r * 0.75, VT.gamboge, 0.24, BK.glow, 0.9, 0);
     }

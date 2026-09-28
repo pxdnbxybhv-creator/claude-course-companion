@@ -20,6 +20,8 @@ import { MASTERY } from '../data';
 import { entryQuote, fmtBig } from '../logic';
 import { Icon, Portrait, Seal } from './icons';
 import { BuildRow } from './Shop';
+import { CharacterPanel } from './Panel';
+import { termName } from '../data/glossary';
 import { titleName } from './Lobby';
 import { CODEX_TOTAL, fmtInt, nameOf, payLines } from './text';
 
@@ -69,7 +71,7 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
             <Portrait id={run.char} size={88} />
             <div>
               <h1 class="brush">{nameOf(run.char, t)}</h1>
-              <p class="muted">{t(MAP_REG.find((x) => x.id === run.map)!.zh, MAP_REG.find((x) => x.id === run.map)!.en)} · {t(DIFF_REG[run.diff].zh, DIFF_REG[run.diff].en)}{run.heat > 0 ? t(` · 劫火 ${run.heat}`, ` · heat ${run.heat}`) : ''}{run.daily ? t(' · 今日镜', ' · daily') : ''}</p>
+              <p class="muted">{t(MAP_REG.find((x) => x.id === run.map)!.zh, MAP_REG.find((x) => x.id === run.map)!.en)} · {t(DIFF_REG[run.diff].zh, DIFF_REG[run.diff].en)}{run.heat > 0 ? ` · ${termName('heat', t)} ${run.heat}` : ''}{run.daily ? t(' · 今日镜', ' · daily') : ''}</p>
             </div>
             <div class="mj-res-seals">
               <Seal text="镜碎" size={62} label={t('镜碎', 'The glass broke')} />
@@ -81,10 +83,14 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
           <p class="mj-res-wave brush">{t(`第 ${reached} 重`, `Wave ${reached}`)}</p>
           <p class="mj-res-sub">{t(`已过 ${report.W} 重`, `${report.W} waves cleared`)}{run.ms >= 60_000 ? ` · ${Math.round(run.ms / 60000)} ${t('分', 'min')}` : ''}</p>
 
-          {snapUrl && <img class="mj-res-snap" src={snapUrl} alt={t('此照的墨迹', 'The ink of this run')} />}
+          {snapUrl && <img class="mj-res-snap" src={snapUrl} alt={t('这一局的墨迹', 'The ink of this run')} />}
 
           <h2 class="mj-h3">{t('行装', 'Build')}</h2>
           <BuildRow run={run} t={t} px={34} />
+          <details class="mj-res-who">
+            <summary>{t('这一局的人物', 'Your character this run')}</summary>
+            <CharacterPanel run={run} t={t} density="card" base={null} />
+          </details>
 
           <dl class="mj-res-nums">
             <div><dt>{t('击破', 'Kills')}</dt><dd class="num">{fmtInt(rs.kills ?? 0)}</dd></div>
@@ -116,7 +122,7 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
           {pay.coins > 0 && <p class="mj-small muted">{t('一路铜钱每破一重即已入囊；袖中未入囊者随镜沉池。', 'Coins went to your purse as each wave fell; those still in your sleeve sank with the glass.')}</p>}
 
           <div class="mj-res-meta">
-            <p><b>{t('镜屑', 'Mirror dust')}</b> <span class="num">+{report.dust}</span> <span class="muted">({t('共', 'total')} {fmtInt(mirror.value.dust)})</span></p>
+            <p><b>{termName('dust', t)}</b> <span class="num">+{report.dust}</span> <span class="muted">({t('共', 'total')} {fmtInt(mirror.value.dust)})</span></p>
             <div class="mj-mastery">
               <span>{t(`${nameOf(m.char, t)} · 心得 ${m.level} 级`, `${nameOf(m.char, t)} · mastery ${m.level}`)}</span>
               <i class="mj-bar"><b style={{ width: `${frac * 100}%` }} /></i>
