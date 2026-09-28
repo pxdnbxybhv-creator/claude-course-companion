@@ -1,17 +1,19 @@
 // 水月幻镜 · the fee ritual (GDD §2, §18.3) and 研墨. Paid: two strings of coins drop into the pond and
 // a ripple opens the glass. Free: the old polisher breathes on the bronze, 「今日头一照，老朽请了」, a
-// moon-glint. 0.8 s, a tap skips it. Then the inkstone grinds while the sprites bake, with tips.
+// moon-glint. The tutorial: the same glint with the polisher's offer to walk you through. 0.8 s, a tap
+// skips it. Then the inkstone grinds while the sprites bake, with tips.
 import { useEffect, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
+import { LINES } from '../tutor/lines';
 
-export function Ritual(props: { kind: 'paid' | 'free'; onDone: () => void; reduced: boolean }) {
+export function Ritual(props: { kind: 'paid' | 'free' | 'tutor'; onDone: () => void; reduced: boolean }) {
   const t = useT();
   useEffect(() => {
-    const k = setTimeout(props.onDone, props.reduced ? 250 : 800);
+    const k = setTimeout(props.onDone, props.kind === 'tutor' ? (props.reduced ? 1200 : 1800) : props.reduced ? 250 : 800);
     return () => clearTimeout(k);
   }, []);
   return (
-    <button type="button" class={`mj-ritual is-${props.kind}`} onClick={props.onDone} aria-label={t('轻触跳过', 'Tap to skip')}>
+    <button type="button" class={`mj-ritual is-${props.kind === 'tutor' ? 'free' : props.kind}`} onClick={props.onDone} aria-label={t('轻触跳过', 'Tap to skip')}>
       <span class="mj-ritual-pond" aria-hidden="true">
         <i class="mj-ritual-ripple" /><i class="mj-ritual-ripple is-2" />
         {props.kind === 'paid' ? (
@@ -21,7 +23,9 @@ export function Ritual(props: { kind: 'paid' | 'free'; onDone: () => void; reduc
           </>
         ) : <i class="mj-ritual-glint" />}
       </span>
-      <span class="mj-ritual-line brush">{props.kind === 'free' ? t('今日头一照，老朽请了。', 'The first look today is on me.') : t('投钱入镜', 'Coins into the mirror')}</span>
+      <span class={'mj-ritual-line' + (props.kind === 'tutor' ? '' : ' brush')}>
+        {props.kind === 'tutor' ? t(LINES.ritual.base.zh, LINES.ritual.base.en) : props.kind === 'free' ? t('今日头一照，老朽请了。', 'The first look today is on me.') : t('投钱入镜', 'Coins into the mirror')}
+      </span>
     </button>
   );
 }

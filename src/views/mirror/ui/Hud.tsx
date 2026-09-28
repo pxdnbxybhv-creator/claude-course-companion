@@ -6,12 +6,17 @@ import { useEffect, useRef } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { lang } from '../../../app/store';
 import { armorReduction, fmtBig } from '../logic';
-import { SKILL_REG, type SkillId } from '../ids';
-import type { Engine, HudState } from '../types';
+import { COMPANION_REG, SKILL_REG, type SkillId } from '../ids';
+import type { CharacterId, Engine, HudState } from '../types';
+import { termLine, termName } from '../data/glossary';
+import { Portrait } from './icons';
+import { armourWords } from './panelView';
 import { bossName, fmtClock, skillDrag, stickVector, STICK_R } from './text';
 
 export interface HudApi {
   push(s: HudState): void;
+  /** The last push (the pause sheet's 「此刻」: live HP, the skill's readiness, the marks). */
+  last(): HudState | null;
   levelUp(level: number): void;
   crate(total: number): void;
   coin(sleeve: number): void;
@@ -19,14 +24,23 @@ export interface HudApi {
 
 const RING = 2 * Math.PI * 31;
 
-export function Hud(props: { api: { current: HudApi | null }; onPause: () => void; wave: number; skill: SkillId; showSleeve: boolean; armor: number }) {
+/** An attribute value with its quotes escaped (the marks are written as HTML at the push rate). */
+const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+export function Hud(props: {
+  api: { current: HudApi | null }; onPause: () => void; wave: number; skill: SkillId; showSleeve: boolean; armor: number;
+  /** The companion (the portrait); defaults to the skill's owner. */
+  char?: CharacterId;
+  /** The portrait button: Run passes pause, and the pause sheet opens on 人物. Defaults to onPause. */
+  onWho?: () => void;
+}) {
   const t = useT();
   const root = useRef<HTMLDivElement>(null);
   const hpBar = useRef<HTMLElement>(null);
   const hpText = useRef<HTMLElement>(null);
   const shield = useRef<HTMLElement>(null);
   const moon = useRef<HTMLElement>(null);
-  const sleeve = useRef<HTMLDivElement>(null);
+  const sleeve = useRef<HTMLElement>(null);
   const sleeveN = useRef<HTMLElement>(null);
   const xp = useRef<HTMLElement>(null);
   const lvl = useRef<HTMLElement>(null);
@@ -38,11 +52,16 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
   const marks = useRef<HTMLDivElement>(null);
   const crates = useRef<HTMLElement>(null);
   const last = useRef({ hp: '', moon: -1, time: '', lvl: -1, boss: '', marks: '' });
+  const lastState = useRef<HudState | null>(null);
+  const char: CharacterId = props.char ?? (SKILL_REG.find((x) => x.id === props.skill)?.char as CharacterId | undefined) ?? 'scholar';
+  const who = COMPANION_REG.find((c) => c.id === char);
 
   useEffect(() => {
     const lng = () => (lang.value === 'en' ? 'en' : 'zh');
     props.api.current = {
+      last() { return lastState.current; },
       push(s) {
+        lastState.current = s;
         const L = last.current;
         const hpMax = Math.max(1, s.hpMax);
         const frac = Math.max(0, Math.min(1, s.hp / hpMax));
@@ -82,10 +101,12 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
         if (marks.current && mk !== L.marks) {
           L.marks = mk;
           const parts: string[] = [];
-          if (s.drunk !== null) parts.push(`<span class="mj-mark" title="${t('醉', 'Drunk')}">醉 <b>${Math.round(s.drunk)}</b></span>`);
-          if (s.moonPhase !== null) parts.push(`<span class="mj-mark mj-moonphase" style="--ph:${s.moonPhase}" title="${t('月相', 'Moon phase')}"><i class="mj-phase" style="--k:${Math.abs(4 - Math.max(0, Math.min(7, s.moonPhase | 0))) / 4}"></i></span>`);
-          if (s.lives !== null) parts.push(`<span class="mj-mark" title="${t('九命', 'Lives')}">命 <b>${s.lives}</b></span>`);
-          if (s.curse > 0) parts.push(`<span class="mj-mark mj-curse" title="${t('劫数', 'Curse')}">劫 <b>${s.curse}</b></span>`);
+          const mark = (cls: string, label: string, line: string, body: string, style = '') =>
+            `<span class="mj-mark${cls}" role="img" aria-label="${attr(`${label}：${line}`)}" title="${attr(line)}"${style}><span aria-hidden="true">${body}</span></span>`;
+          if (s.drunk !== null) parts.push(mark('', t(`醉意 ${Math.round(s.drunk)}`, `Drunk ${Math.round(s.drunk)}`), termLine('drunk', t), `醉 <b>${Math.round(s.drunk)}</b>`));
+          if (s.moonPhase !== null) parts.push(mark(' mj-moonphase', termName('moonPhase', t), termLine('moonPhase', t), `<i class="mj-phase" style="--k:${Math.abs(4 - Math.max(0, Math.min(7, s.moonPhase | 0))) / 4}"></i>`, ` style="--ph:${s.moonPhase}"`));
+          if (s.lives !== null) parts.push(mark('', t(`九命 ${s.lives}`, `Lives ${s.lives}`), termLine('lives', t), `命 <b>${s.lives}</b>`));
+          if (s.curse > 0) parts.push(mark(' mj-curse', t(`劫数 ${s.curse}`, `Curse ${s.curse}`), termLine('curse', t), `劫 <b>${s.curse}</b>`));
           marks.current.innerHTML = parts.join('');
         }
         root.current?.classList.toggle('is-low', s.lowHp);
@@ -98,13 +119,13 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
       },
       levelUp(level) {
         if (lvl.current) { lvl.current.textContent = String(level); last.current.lvl = level; }
-        const el = root.current?.querySelector('.mj-lvl');
+        const el = root.current?.querySelector('.mj-lvbadge');
         el?.classList.remove('is-flash');
         void (el as HTMLElement | null)?.offsetWidth;
         el?.classList.add('is-flash');
       },
       crate(total) {
-        if (crates.current) { crates.current.hidden = total <= 0; crates.current.textContent = `奁 ${total}`; }
+        if (crates.current) { crates.current.hidden = total <= 0; crates.current.textContent = t(`奁 ${total}`, `Caskets ${total}`); }
       },
       coin(n) {
         if (sleeve.current) sleeve.current.hidden = false;
@@ -117,33 +138,42 @@ export function Hud(props: { api: { current: HudApi | null }; onPause: () => voi
     return () => { props.api.current = null; };
   }, []);
 
+  const whoLabel = t(`${termName('panel', t)}（会暂停）`, `${termName('panel', t)} (pauses the game)`);
   return (
     <div class="mj-hud" ref={root}>
       <div class="mj-hud-tl">
-        <div class="mj-hp" role="img" aria-label={t('气血', 'HP')}>
-          <i class="mj-hp-fill" ref={hpBar} />
-          <i class="mj-hp-shield" ref={shield} />
-          <b class="mj-hp-text num" ref={hpText} />
+        <button type="button" class="mj-who" data-tut="who" onClick={props.onWho ?? props.onPause} aria-label={who ? `${whoLabel} · ${t(who.zh, who.en)}` : whoLabel} title={whoLabel}>
+          <Portrait id={char} size={36} class="mj-who-face" />
+          <span class="mj-lvbadge num" data-tut="lvl" aria-hidden="true"><b ref={lvl} /></span>
+        </button>
+        <div class="mj-hud-stack">
+          <div class="mj-hp" data-tut="hp" role="img" aria-label={termName('hp', t)}>
+            <i class="mj-hp-fill" ref={hpBar} />
+            <i class="mj-hp-shield" ref={shield} />
+            <b class="mj-hp-text num" ref={hpText} />
+          </div>
+          <div class="mj-hud-row">
+            <span class="mj-armor" title={termLine('armor', t)}>{armourWords(armorReduction(props.armor), t)}</span>
+            <span class="mj-moon" data-tut="moon"><i class="mj-moon-dot" aria-hidden="true" /><b class="num" ref={moon} /><span class="visually-hidden">{termName('moon', t)}</span></span>
+            <span class="mj-sleeve" data-tut="sleeve" ref={sleeve} hidden={!props.showSleeve} title={termLine('sleeve', t)}>
+              <i class="coin-icon" style={{ width: '13px', height: '13px' }} aria-hidden="true" /><b class="num" ref={sleeveN}>0</b>
+            </span>
+          </div>
+          <div class="mj-xp" data-tut="xp" role="img" aria-label={termName('xp', t)}><i ref={xp} /></div>
+          <span class="mj-crates" data-tut="crates" ref={crates} title={termLine('crate', t)} hidden />
         </div>
-        <div class="mj-armor" title={t('护甲 · 减伤', 'Armour · damage reduction')}>{t(`甲 ${Math.round(props.armor)} · 减伤 ${armorReduction(props.armor)}%`, `Armour ${Math.round(props.armor)} · −${armorReduction(props.armor)}%`)}</div>
-        <div class="mj-moon"><i class="mj-moon-dot" aria-hidden="true" /><b class="num" ref={moon} /><span class="visually-hidden">{t('月华', 'Moonlight')}</span></div>
-        <div class="mj-sleeve" ref={sleeve} hidden={!props.showSleeve} title={t('袖中铜钱（本重）', 'coins in your sleeve this wave')}>
-          <i class="coin-icon" style={{ width: '13px', height: '13px' }} aria-hidden="true" /><b class="num" ref={sleeveN}>0</b>
-        </div>
-        <div class="mj-xp"><i ref={xp} /><span class="mj-lvl num">Lv <b ref={lvl} /></span></div>
-        <span class="mj-crates" ref={crates} hidden />
       </div>
       <div class="mj-hud-tc">
-        <span class="mj-wave brush" ref={waveEl}>{t(`第 ${props.wave} 重`, `Wave ${props.wave}`)}</span>
-        <span class="mj-timer brush num" ref={timer} aria-live="off" />
+        <span class="mj-wave brush" data-tut="wave" ref={waveEl}>{t(`第 ${props.wave} 重`, `Wave ${props.wave}`)}</span>
+        <span class="mj-timer brush num" data-tut="timer" ref={timer} aria-live="off" />
         <div class="mj-boss" ref={boss} hidden>
           <span class="mj-boss-name brush" ref={bossLabel} />
           <div class="mj-boss-bar"><i ref={bossBar} /></div>
         </div>
       </div>
       <div class="mj-hud-tr">
-        <div class="mj-marks" ref={marks} />
-        <button type="button" class="mj-pause" onClick={props.onPause} aria-label={t('暂停', 'Pause')}>‖</button>
+        <div class="mj-marks" data-tut="marks" ref={marks} />
+        <button type="button" class="mj-pause" data-tut="pause" onClick={props.onPause} aria-label={termName('pause', t)}>‖</button>
       </div>
     </div>
   );
@@ -292,6 +322,7 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       <button
         type="button"
         class={'mj-skill brush' + (props.skillLive === false ? ' is-off' : '')}
+        data-tut="skill"
         ref={skillBtn}
         aria-disabled={props.skillLive === false ? 'true' : undefined}
         aria-label={t(`镜技「${SKILL_REG.find((s) => s.id === props.skill)?.zh ?? ''}」（Q / 空格）`, `Mirror skill ${SKILL_REG.find((s) => s.id === props.skill)?.en ?? ''} (Q / Space)`)}

@@ -1,0 +1,446 @@
+## zh
+qingfeng 1 | 伤害 10 · 0.9 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 神品：暴击率再 +20%。
+qingfeng 2 | 伤害 16 · 0.86 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 神品：暴击率再 +20%。
+qingfeng 3 | 伤害 26 · 0.81 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 神品：暴击率再 +20%。
+qingfeng 4 | 伤害 42 · 0.77 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 4 个敌人。 | 神品：暴击率再 +20%。
+longquan 1 | 伤害 5 · 0.7 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每第 3 轮转身砍一整圈。
+longquan 2 | 伤害 9 · 0.66 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每第 3 轮转身砍一整圈。
+longquan 3 | 伤害 14 · 0.63 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每第 3 轮转身砍一整圈。
+longquan 4 | 伤害 22 · 0.6 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每第 3 轮转身砍一整圈。
+yanyue 1 | 伤害 20 · 1.8 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每第 4 刀伤害翻倍，还甩出一道刀气飞向远处。
+yanyue 2 | 伤害 33 · 1.71 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每第 4 刀伤害翻倍，还甩出一道刀气飞向远处。
+yanyue 3 | 伤害 53 · 1.62 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每第 4 刀伤害翻倍，还甩出一道刀气飞向远处。
+yanyue 4 | 伤害 82 · 1.53 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每第 4 刀伤害翻倍，还甩出一道刀气飞向远处。
+hoe 1 | 伤害 12 · 1.2 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 10% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 2 | 伤害 19 · 1.14 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 15% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 3 | 伤害 30 · 1.08 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 20% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 4 | 伤害 48 · 1.02 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 25% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+pestle 1 | 伤害 9 · 1.1 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 2 | 伤害 15 · 1.05 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 3 | 伤害 24 · 0.99 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 4 | 伤害 38 · 0.94 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+claw 1 | 伤害 5 · 0.4 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 神品：流血最多叠 15 层。
+claw 2 | 伤害 8 · 0.38 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 神品：流血最多叠 15 层。
+claw 3 | 伤害 13 · 0.36 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 神品：流血最多叠 15 层。
+claw 4 | 伤害 20 · 0.34 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 15 层）。
+drunkfist 1 | 伤害 8 · 0.8 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
+drunkfist 2 | 伤害 13 · 0.76 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
+drunkfist 3 | 伤害 21 · 0.72 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
+drunkfist 4 | 伤害 33 · 0.68 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
+dart 1 | 伤害 5 · 0.45 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 神品：能弹到 3 个敌人身上。
+dart 2 | 伤害 8 · 0.43 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 神品：能弹到 3 个敌人身上。
+dart 3 | 伤害 13 · 0.41 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 神品：能弹到 3 个敌人身上。
+dart 4 | 伤害 20 · 0.38 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 3 个敌人身上。
+coindart 1 | 伤害 6 · 0.7 秒一镖 | 受远程加成 | 甩出铜钱镖。身上每攒 25 点月华，伤害 +1（最多 +10）。 | 神品：打倒的敌人有 25% 几率多掉 1 点月华。
+coindart 2 | 伤害 10 · 0.66 秒一镖 | 受远程加成 | 甩出铜钱镖。身上每攒 25 点月华，伤害 +1（最多 +15）。 | 神品：打倒的敌人有 25% 几率多掉 1 点月华。
+coindart 3 | 伤害 16 · 0.63 秒一镖 | 受远程加成 | 甩出铜钱镖。身上每攒 25 点月华，伤害 +1（最多 +20）。 | 神品：打倒的敌人有 25% 几率多掉 1 点月华。
+coindart 4 | 伤害 25 · 0.6 秒一镖 | 受远程加成 | 甩出铜钱镖。身上每攒 25 点月华，伤害 +1（最多 +30）。 | 神品：打倒的敌人有 25% 几率多掉 1 点月华。
+sunbow 1 | 伤害 14 · 1.3 秒一箭 | 受远程加成 | 射出一支长箭，一箭最多射中 2 个敌人。 | 神品：暴击打倒敌人时，再补射一箭。
+sunbow 2 | 伤害 23 · 1.23 秒一箭 | 受远程加成 | 射出一支长箭，一箭最多射中 2 个敌人。 | 神品：暴击打倒敌人时，再补射一箭。
+sunbow 3 | 伤害 37 · 1.17 秒一箭 | 受远程加成 | 射出一支长箭，一箭最多射中 2 个敌人。 | 神品：暴击打倒敌人时，再补射一箭。
+sunbow 4 | 伤害 58 · 1.11 秒一箭 | 受远程加成 | 射出一支长箭，一箭最多射中 4 个敌人。 | 神品：暴击打倒敌人时，再补射一箭。
+repeater 1 | 伤害 4 · 1 秒一轮 | 受远程加成 | 一轮连射 3 支弩箭，每支让敌人护甲 −1（破甲）。 | 神品：弩箭打倒敌人时，分成两支继续飞（各 50% 伤害）。
+repeater 2 | 伤害 7 · 0.95 秒一轮 | 受远程加成 | 一轮连射 3 支弩箭，每支让敌人护甲 −1（破甲）。 | 神品：弩箭打倒敌人时，分成两支继续飞（各 50% 伤害）。
+repeater 3 | 伤害 11 · 0.9 秒一轮 | 受远程加成 | 一轮连射 3 支弩箭，每支让敌人护甲 −1（破甲）。 | 神品：弩箭打倒敌人时，分成两支继续飞（各 50% 伤害）。
+repeater 4 | 伤害 17 · 0.85 秒一轮 | 受远程加成 | 一轮连射 3 支弩箭，每支让敌人护甲 −1（破甲）。 | 神品：弩箭打倒敌人时，分成两支继续飞（各 50% 伤害）。
+rod 1 | 伤害 11 · 1 秒一竿 | 受远程、福缘加成 | 甩竿钩住 1 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。 | 神品：一竿钩 3 个敌人。
+rod 2 | 伤害 18 · 0.95 秒一竿 | 受远程、福缘加成 | 甩竿钩住 1 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。 | 神品：一竿钩 3 个敌人。
+rod 3 | 伤害 28 · 0.9 秒一竿 | 受远程、福缘加成 | 甩竿钩住 2 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。 | 神品：一竿钩 3 个敌人。
+rod 4 | 伤害 44 · 0.85 秒一竿 | 受远程、福缘加成 | 甩竿钩住 3 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。
+qingping 1 | 伤害 9 · 1.2 秒一次 | 受远程加成 | 放出飞剑，最多刺中 2 个敌人；领头那把会飞回来，回程再打一次（50% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 2 | 伤害 15 · 1.14 秒一次 | 受远程加成 | 放出飞剑，最多刺中 2 个敌人；领头那把会飞回来，回程再打一次（50% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 3 | 伤害 24 · 1.08 秒一次 | 受远程加成 | 放出飞剑，最多刺中 2 个敌人；领头那把会飞回来，回程再打一次（50% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 4 | 伤害 38 · 1.02 秒一次 | 受远程加成 | 放出飞剑，最多刺中 2 个敌人；领头那把会飞回来，回程再打一次（75% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
+casket 1 | 伤害 6 · 0.5 秒碰一次 | 受远程、近战加成 | 2 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
+casket 2 | 伤害 10 · 0.48 秒碰一次 | 受远程、近战加成 | 2 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
+casket 3 | 伤害 16 · 0.45 秒碰一次 | 受远程、近战加成 | 3 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
+casket 4 | 伤害 25 · 0.43 秒碰一次 | 受远程、近战加成 | 4 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
+peach 1 | 伤害 9 · 1 秒一次 | 受远程、法术加成 | 放出会追着敌人飞的桃木剑，打鬼类敌人伤害 +50%；飞剑数越多，剑越多。 | 神品：剑打中后留下一张桃符，1 秒后炸开（50% 伤害）。
+peach 2 | 伤害 15 · 0.95 秒一次 | 受远程、法术加成 | 放出会追着敌人飞的桃木剑，打鬼类敌人伤害 +50%；飞剑数越多，剑越多。 | 神品：剑打中后留下一张桃符，1 秒后炸开（50% 伤害）。
+peach 3 | 伤害 24 · 0.9 秒一次 | 受远程、法术加成 | 放出会追着敌人飞的桃木剑，打鬼类敌人伤害 +50%；飞剑数越多，剑越多。 | 神品：剑打中后留下一张桃符，1 秒后炸开（50% 伤害）。
+peach 4 | 伤害 38 · 0.85 秒一次 | 受远程、法术加成 | 放出会追着敌人飞的桃木剑，打鬼类敌人伤害 +50%；飞剑数越多，剑越多。 | 神品：剑打中后留下一张桃符，1 秒后炸开（50% 伤害）。
+seven 1 | 伤害 7 · 2.2 秒一轮 | 受远程加成 | 从天上落下 3 把剑，各砸一小圈；飞剑数越多，落得越多。 | 神品：最后一把剑晕住敌人 0.5 秒。
+seven 2 | 伤害 12 · 2.09 秒一轮 | 受远程加成 | 从天上落下 3 把剑，各砸一小圈；飞剑数越多，落得越多。 | 神品：最后一把剑晕住敌人 0.5 秒。
+seven 3 | 伤害 19 · 1.98 秒一轮 | 受远程加成 | 从天上落下 4 把剑，各砸一小圈；飞剑数越多，落得越多。 | 神品：最后一把剑晕住敌人 0.5 秒。
+seven 4 | 伤害 30 · 1.87 秒一轮 | 受远程加成 | 从天上落下 7 把剑，各砸一小圈；飞剑数越多，落得越多。 | 神品：最后一把剑晕住敌人 0.5 秒。
+thunder 1 | 伤害 16 · 1.3 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 2 个敌人身上，每跳一次伤害少 15%。 | 神品：每次打中有 15% 几率晕住敌人 0.5 秒。
+thunder 2 | 伤害 26 · 1.23 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 2 个敌人身上，每跳一次伤害少 15%。 | 神品：每次打中有 15% 几率晕住敌人 0.5 秒。
+thunder 3 | 伤害 42 · 1.17 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 3 个敌人身上，每跳一次伤害少 15%。 | 神品：每次打中有 15% 几率晕住敌人 0.5 秒。
+thunder 4 | 伤害 66 · 1.11 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 6 个敌人身上，每跳一次伤害少 15%。 | 神品：每次打中有 15% 几率晕住敌人 0.5 秒。
+fire 1 | 伤害 8 · 1.2 秒一张 | 受法术加成 | 扔出火符，炸开一小圈，让敌人燃烧 3 秒（最多叠 3 层）。 | 神品：烧死的敌人会把火传给旁边 2 个敌人。
+fire 2 | 伤害 13 · 1.14 秒一张 | 受法术加成 | 扔出火符，炸开一小圈，让敌人燃烧 3 秒（最多叠 3 层）。 | 神品：烧死的敌人会把火传给旁边 2 个敌人。
+fire 3 | 伤害 21 · 1.08 秒一张 | 受法术加成 | 扔出火符，炸开一小圈，让敌人燃烧 3 秒（最多叠 3 层）。 | 神品：烧死的敌人会把火传给旁边 2 个敌人。
+fire 4 | 伤害 33 · 1.02 秒一张 | 受法术加成 | 扔出火符，炸开一小圈，让敌人燃烧 3 秒（最多叠 5 层）。 | 神品：烧死的敌人会把火传给旁边 2 个敌人。
+gourd 1 | 伤害 12 · 1.3 秒扔一次 | 受法术加成 | 酒葫芦溅湿一小圈，敌人站不稳 1 秒；每溅到一个，醉意 +2；暴击会点着敌人。 | 神品：落地处留一滩火，烧 3 秒。
+gourd 2 | 伤害 19 · 1.23 秒扔一次 | 受法术加成 | 酒葫芦溅湿一小圈，敌人站不稳 1 秒；每溅到一个，醉意 +2；暴击会点着敌人。 | 神品：落地处留一滩火，烧 3 秒。
+gourd 3 | 伤害 31 · 1.17 秒扔一次 | 受法术加成 | 酒葫芦溅湿一小圈，敌人站不稳 1 秒；每溅到一个，醉意 +2；暴击会点着敌人。 | 神品：落地处留一滩火，烧 3 秒。
+gourd 4 | 伤害 48 · 1.11 秒扔一次 | 受法术加成 | 酒葫芦溅湿一小圈，敌人站不稳 1 秒；每溅到一个，醉意 +2；暴击会点着敌人。 | 神品：落地处留一滩火，烧 3 秒。
+qin 1 | 伤害 8 · 1.2 秒一圈 | 受法术加成 | 琴音向四周震开一圈；每第 4 圈是「共鸣」：伤害翻倍，还让敌人慢 30%。 | 神品：每第 3 圈就共鸣，共鸣时给你回 1 点血。
+qin 2 | 伤害 13 · 1.14 秒一圈 | 受法术加成 | 琴音向四周震开一圈；每第 4 圈是「共鸣」：伤害翻倍，还让敌人慢 30%。 | 神品：每第 3 圈就共鸣，共鸣时给你回 1 点血。
+qin 3 | 伤害 21 · 1.08 秒一圈 | 受法术加成 | 琴音向四周震开一圈；每第 4 圈是「共鸣」：伤害翻倍，还让敌人慢 30%。 | 神品：每第 3 圈就共鸣，共鸣时给你回 1 点血。
+qin 4 | 伤害 33 · 1.02 秒一圈 | 受法术加成 | 琴音向四周震开一圈；每第 3 圈是「共鸣」：伤害翻倍，还让敌人慢 30%。 | 神品：每第 3 圈就共鸣，共鸣时给你回 1 点血。
+flute 1 | 伤害 5 · 0.6 秒一个音 | 受法术加成 | 吹出会追人的音符；每第 6 个音迷惑一个小怪 2 秒。 | 神品：每第 4 个音就迷惑，一次迷惑 4 秒。
+flute 2 | 伤害 8 · 0.57 秒一个音 | 受法术加成 | 吹出会追人的音符；每第 6 个音迷惑一个小怪 2 秒。 | 神品：每第 4 个音就迷惑，一次迷惑 4 秒。
+flute 3 | 伤害 13 · 0.54 秒一个音 | 受法术加成 | 吹出会追人的音符；每第 6 个音迷惑一个小怪 2 秒。 | 神品：每第 4 个音就迷惑，一次迷惑 4 秒。
+flute 4 | 伤害 20 · 0.51 秒一个音 | 受法术加成 | 吹出会追人的音符；每第 4 个音迷惑一个小怪 4 秒。
+brush 1 | 伤害 8 · 4 秒画一只 | 受造物加成 | 画一只墨雀替你啄敌人，能留 10 秒（占 1 个墨宝名额）。 | 神品：改画墨虎，每 0.9 秒扑一次，还会把敌人引到身上。
+brush 2 | 伤害 14 · 3.8 秒画一只 | 受造物加成 | 画一只墨鲤替你冲撞敌人，能留 10 秒（占 1 个墨宝名额）。 | 神品：改画墨虎，每 0.9 秒扑一次，还会把敌人引到身上。
+brush 3 | 伤害 22 · 3.6 秒画一只 | 受造物加成 | 画一只墨鹤替你俯冲扑向敌人，能留 10 秒（占 1 个墨宝名额）。 | 神品：改画墨虎，每 0.9 秒扑一次，还会把敌人引到身上。
+brush 4 | 伤害 36 · 3.4 秒画一只 | 受造物加成 | 画一只墨虎替你扑咬敌人，能留 10 秒（占 1 个墨宝名额）。 | 神品：改画墨虎，每 0.9 秒扑一次，还会把敌人引到身上。
+inkstone 1 | 伤害 5 · 6 秒放一方 | 受造物加成 | 在脚下放一方砚台，8 秒里每 0.8 秒吐一颗墨丸；它算一只墨宝。 | 神品：一次吐 2 颗，还会跟着你走。
+inkstone 2 | 伤害 8 · 5.7 秒放一方 | 受造物加成 | 在脚下放一方砚台，8 秒里每 0.8 秒吐一颗墨丸；它算一只墨宝。 | 神品：一次吐 2 颗，还会跟着你走。
+inkstone 3 | 伤害 13 · 5.4 秒放一方 | 受造物加成 | 在脚下放一方砚台，8 秒里每 0.8 秒吐一颗墨丸；它算一只墨宝。 | 神品：一次吐 2 颗，还会跟着你走。
+inkstone 4 | 伤害 20 · 5.1 秒放一方 | 受造物加成 | 在脚下放一方砚台，8 秒里每 0.8 秒吐一颗墨丸；它算一只墨宝。 | 神品：一次吐 2 颗，还会跟着你走。
+crane 1 | 伤害 10 · 1 秒扑一次 | 受造物加成 | 一只纸鹤一直陪着你，绕着你飞，看见敌人就俯冲下去（不占墨宝名额）。 | 神品：俯冲时炸开一小圈。
+crane 2 | 伤害 16 · 0.95 秒扑一次 | 受造物加成 | 一只纸鹤一直陪着你，绕着你飞，看见敌人就俯冲下去（不占墨宝名额）。 | 神品：俯冲时炸开一小圈。
+crane 3 | 伤害 26 · 0.9 秒扑一次 | 受造物加成 | 一只纸鹤一直陪着你，绕着你飞，看见敌人就俯冲下去（不占墨宝名额）。 | 神品：俯冲时炸开一小圈。
+crane 4 | 伤害 40 · 0.85 秒扑一次 | 受造物加成 | 一只纸鹤一直陪着你，绕着你飞，看见敌人就俯冲下去（不占墨宝名额）。 | 神品：俯冲时炸开一小圈。
+gobowl 1 | 伤害 14 · 1.2 秒落一子 | 受造物加成 | 在敌人扎堆的地方落下棋子，敌人一碰就炸，还会连着引爆旁边的棋子。 | 神品：炸开之前，先把附近的敌人吸过来。
+gobowl 2 | 伤害 23 · 1.14 秒落一子 | 受造物加成 | 在敌人扎堆的地方落下棋子，敌人一碰就炸，还会连着引爆旁边的棋子。 | 神品：炸开之前，先把附近的敌人吸过来。
+gobowl 3 | 伤害 37 · 1.08 秒落一子 | 受造物加成 | 在敌人扎堆的地方落下棋子，敌人一碰就炸，还会连着引爆旁边的棋子。 | 神品：炸开之前，先把附近的敌人吸过来。
+gobowl 4 | 伤害 58 · 1.02 秒落一子 | 受造物加成 | 在敌人扎堆的地方落下棋子，敌人一碰就炸，还会连着引爆旁边的棋子。 | 神品：炸开之前，先把附近的敌人吸过来。
+moonwheel 1 | 伤害 9 · 1.1 秒飞一次 | 受远程加成 | 月轮飞出再飞回，穿过路上所有敌人；移速每 +1%，伤害 +1%（最多 +50%）。 | 神品：一次扔出 2 个，朝相反的方向飞。
+moonwheel 2 | 伤害 15 · 1.05 秒飞一次 | 受远程加成 | 月轮飞出再飞回，穿过路上所有敌人；移速每 +1%，伤害 +1%（最多 +50%）。 | 神品：一次扔出 2 个，朝相反的方向飞。
+moonwheel 3 | 伤害 24 · 0.99 秒飞一次 | 受远程加成 | 月轮飞出再飞回，穿过路上所有敌人；移速每 +1%，伤害 +1%（最多 +50%）。 | 神品：一次扔出 2 个，朝相反的方向飞。
+moonwheel 4 | 伤害 38 · 0.94 秒飞一次 | 受远程加成 | 月轮飞出再飞回，穿过路上所有敌人；移速每 +1%，伤害 +1%（最多 +50%）。 | 神品：一次扔出 2 个，朝相反的方向飞。
+moonmirror 1 | 伤害 12 · 1.2 秒一道光 | 受法术加成 | 射出一道月光，瞬间穿过一条直线上的所有敌人；闪避后 2 秒内每次多射一道。 | 神品：光束一分为 3，左右各偏 15°。
+moonmirror 2 | 伤害 19 · 1.14 秒一道光 | 受法术加成 | 射出一道月光，瞬间穿过一条直线上的所有敌人；闪避后 2 秒内每次多射一道。 | 神品：光束一分为 3，左右各偏 15°。
+moonmirror 3 | 伤害 31 · 1.08 秒一道光 | 受法术加成 | 射出一道月光，瞬间穿过一条直线上的所有敌人；闪避后 2 秒内每次多射一道。 | 神品：光束一分为 3，左右各偏 15°。
+moonmirror 4 | 伤害 48 · 1.02 秒一道光 | 受法术加成 | 射出一道月光，瞬间穿过一条直线上的所有敌人；闪避后 2 秒内每次多射一道。 | 神品：光束一分为 3，左右各偏 15°。
+songzi | 气血 +4
+tea | 回血 +2
+sandals | 移速 +5%
+whetstone | 近战 +2
+fletch | 远程 +2，射程 +15
+cinnabar | 法术 +2
+pineink | 造物 +2
+guardmirror | 护甲 +2，移速 −2%
+bell | 攻速 +6%
+eagle | 暴击率 +4%
+redstring | 福缘 +8
+ginseng | 气血 +8，回血 +1，移速 −2%
+tigertally | 伤害 +8%
+amulet | 闪避 +6%
+balm | 吸血 +3%
+elixir | 气血 +12，伤害 +6%，护甲 +2，回血 +1
+drumroll | 每重开始后的前 8 秒，攻速 +40%。
+gall | 每打完一重，气血上限 +2。
+backwater | 气血低于 40% 时：伤害 +30%，攻速 +20%。
+atease | 站着不动 0.5 秒后：攻速 +25%，护甲 +2。
+versatile | 你的兵器每多一个类别，伤害 +3%，攻速 +2%。
+chasewind | 移速每高 3%，伤害 +1%（最多 +30%）。
+ironbone | 每 1 点护甲，伤害 +1%（最多 +30%）。
+physician | 把回血的 50% 加到近战、远程、法术、造物上（每样最多 +15）。
+basket | 收成 +6
+coinstring | 拾取范围 +30%，收成 +2
+lots | 每次商店多 1 次免费刷新。
+pawn | 卖兵器能拿回现价的 60%（平常是 25%）。
+luckycat | 福缘 +10。打倒敌人有 2% 几率掉一块金月华，值 4 点（福缘越高越容易）。
+miser | 身上每攒 10 点月华，伤害 +1%（最多 +40%）；商店价格 +8%。
+abacus | 每重结束，手里每剩 10 点月华，再多给 1 点（每个算盘最多 +25）。
+xuan | 墨宝上限 +1，造物 +1
+duanyan | 造物 +3。墨宝多留 30% 的时间。
+splash | 墨宝消失时炸开一团墨：10 点伤害（受造物加成），炸到的敌人慢 40%，持续 2 秒。
+inkbamboo | 每 12 秒脚下长出一棵墨竹，留 10 秒，朝敌人射竹叶（受造物加成）。
+inkcrane | 一只墨鹤一直陪着你，每 0.8 秒啄一下敌人（受造物加成），还会把附近的月华叼回来。
+inkpool | 墨宝上限 +1。场上每有一只墨宝，护甲 +1（最多 +10）。
+dotting | 墨宝也能暴击（用你的暴击率，暴击打 2 倍），攻速 +20%。
+tassel | 飞剑类兵器：攻速 +5%，射程 +15。
+swordqi | 飞剑多穿过 1 个敌人，飞过的路上留下剑气（30% 伤害）。
+swordheart | 空中有 3 把以上飞剑时：飞剑类兵器暴击率 +15%，暴击倍数 +0.3。
+washpool | 每把飞回来的剑给你回 1 点血（每秒最多 2 点）。
+yujian | 飞剑数 +1
+swordtomb | 一重里飞剑每打倒 15 个敌人，就多一把残剑绕着你转到重末（最多 8 把）。
+yellowpaper | 法术 +1。燃烧多叠 1 层，多烧 1 秒。
+fivethunder | 雷多跳 1 个敌人；雷打倒敌人时会点着旁边的；每道雷有 10% 几率晕住 0.5 秒。
+lingering | 乐器每打中一次，0.4 秒后再响一次（50% 伤害）。
+boya | 迷惑几率变成 1.5 倍；被迷惑的敌人伤害 +50%，迷惑结束时炸开（受法术加成）。
+dukang | 暴击率 +8%。每次暴击醉意 +2（出手快的兵器少一些）；不带酒类兵器也有醉意条。
+nightcup | 暴击倍数 +0.5。每次暴击回 1 点血（每秒最多 3 点）。
+dragblade | 重器每第 3 下伤害翻倍，击退 +100。
+thorns | 挨打时，反打对方 3 点伤害（受护甲加成）。
+goldenbell | 每重开头挡掉 1 次攻击；贴身打你的敌人会被反伤（受护甲加成）。
+gomanual | 棋子上限 +2。棋子炸开范围 +20%。
+capture | 被 3 颗棋子围住的敌人会被「吃掉」：受 3 倍棋子伤害，无视护甲。
+moonsoul | 每闪避一次，射出 3 枚会追人的月魄（受法术加成）。
+osmanthus | 闪避上限 +10；闪避后 2 秒内伤害 +30%。
+lingbo | 走动时留下脚印，每 0.5 秒伤到踩着的敌人；移速越高越痛。
+cushion | 站着不动 1 秒后，回血 +50%（带几个就加几份）。
+cuthair | 伤害 +10%，气血 −2。劫数 +1。
+burnboats | 伤害 +15%，攻速 +15%。从此不能再刷新，也不能锁货。劫数 +1。
+yanwang | 每重一次：挨了致命一击不倒，剩 1 点血。劫数 +2。
+delusion | 每重多来 20% 的敌人；月华 +10%。劫数 +2。
+innerdemon | 伤害 +20%。每重会冒出你的心魔（40% 的气血和伤害），打倒它掉一个镜奁。劫数 +2。
+crackedmirror | 商店多 1 个货位；仙品几率 +5%，神品几率 +5%。劫数 +3。
+wanjian | 飞剑数 +2。有 8 把以上飞剑时，每 8 秒全部扑向敌人最多处，各砍 2 下（60% 伤害）。
+inkdragon | 总有一只墨宝变成墨龙：伤害 5 倍，会飞，能穿过敌人。墨龙没了，12 秒后再变一只。
+dugu | 只带 1 把兵器时：它算作同类 6 把，伤害变成 3 倍，攻速 +60%。
+samadhi | 你身边 300 以内的燃烧永远不灭；燃烧层数上限翻倍。
+treasurebowl | 每重结束，手里的月华多给 15% 利息（最多 60）；每次商店多 1 次免费刷新。
+penglai | 气血 +20，回血 +4。一局一次：倒下时带着 50% 气血站起来，并清掉敌人的子弹。
+ambush | 乐器或符箓每打第 4 下，你其他的乐器和符箓一起出手（40% 伤害）。
+needle | 护甲 +8。不会被击退；每点护甲伤害 +1%（和铁骨加起来最多 +40%）。
+jiangjinjiu | 醉意上限变成 200；醉意到 100 以上每下都暴击；醉意消得快一倍。
+watermoon | 每件兵器出手时，还会朝身后打出一次镜像（50% 伤害）。护甲 −4。
+yizi | 在敌人最多的地方写下一个大「镇」字，砸出 30 点伤害（受你最高的那项伤害加成）。字在地上留 5 秒，里面的敌人慢 40%，多受 20% 伤害。
+manyuan | 脚下种一片花圃，开 12 秒（最多 2 片）：花瓣每 0.8 秒打圃里 4 个敌人（受造物、回血加成），敌人慢 25%；你站在里面每秒回 1.5 点血。
+yiwang | 往敌人扎堆处撒网，把网里的敌人拖到中间定住 2 秒（精英 1 秒）；之后 4 秒它们多受 25% 伤害，打倒掉 2 倍月华。附近的月华也会飞过来。
+guangling | 弹琴 6 秒：每 0.5 秒一拍，震伤身边的敌人（受法术加成）并让它们慢 40%；小怪每秒有 15% 几率倒戈 6 秒（福缘越高越容易）。
+yijian | 往前冲一段，冲的时候 0.35 秒打不着你，所有飞剑跟着一路砍过去（150% 伤害）。之后 3 秒绕身的剑转得飞快。冲刺中打倒敌人，冷却少 1 秒。
+jiji | 钉下一道符，化成旋涡 5 秒把敌人吸进来（精英只吸 50%，首领不吸）；每 0.5 秒落雷劈 2 个敌人（受法术加成），还会点着它们。
+dianhua | 画轴向前一扫：最多 5 个小怪变成你的墨友，帮你打 10 秒（受造物加成）；精英和首领改为挨一记重的（60 点，受造物加成）。
+wei | 八颗棋子在身边围成一圈，1 秒后收拢：圈里最多 30 个小怪直接被吃掉；精英和首领掉 8% 当前气血，晕住 1 秒。
+pudie | 扑向附近最强的敌人，在空中的 0.4 秒谁也打不到你。落地打 25 点伤害（受近战加成），晕住身边敌人 0.5 秒。落地打倒敌人，扑蝶马上能再用。
+daoyao | 站定 1.2 秒，这时少受 50% 伤害，连捣 3 下震伤身边的敌人（受回血、气血加成）；然后吃药回 15% 气血，6 秒里伤害 +20%。
+yaoyue | 一口喝到醉意 100：6 秒里暴击率 +30%，每次暴击射出一个追人的诗字（受远程加成，再跳 2 个敌人）；之后宿醉 2 秒，移速 −30%。
+tuodao | 假装往后退一步（这时 0.3 秒打不着你），回身一刀扫一整圈：受你最强的重器和近战加成，把敌人打飞，晕住 1 秒。
+qinghui | 飞上天 2.5 秒，打不着你；落地砸出月光池（40 点伤害，受法术加成），留 6 秒：池里敌人伤害 −30%、慢 20%，你回血 +5。月亮随即变满。
+tishi | 沿着你走的路写下 7 个字，变成墙留 4 秒：敌人碰到会受伤（受远程加成），还慢 30%。
+cuihua | 场上的花和竹子一起开：每一株给你回 2 点血，并定住附近的敌人 1.5 秒。
+dudiao | 站着不动蓄力（最多 2 秒），然后把附近最强的敌人钩到面前：50 点伤害（受远程加成），蓄满时伤害翻倍。
+gaoshan | 6 秒里乐器每拍出手两次，每拍给你回 1 点血，还有墨鸟去啄敌人（受法术加成）。
+qinggong | 1.5 秒内能连冲 3 次，每次冲的时候 0.2 秒打不着你；每冲一次，下一剑一定暴击。
+yufeng | 身边刮起旋风 4 秒：把敌人往外推，托着你飘过地上的险地，还会把敌人身上的效果传给旁边的敌人。
+shenbi | 拖动画一笔，一条墨龙顺着笔画飞过去（60 点伤害，受造物加成）；你的墨宝全部回满血。
+tuiyan | 3 秒里敌人慢 70%，你照常走；这时的棋子都落在敌人最多的地方。
+maoyue | 远远跳出去，落地晕住身边的敌人 0.5 秒；之后 5 秒附近的月华自己跳过来，打倒的敌人多掉 1 点月华。
+dengyue | 一跳 0.8 秒谁也打不着你，落地打 20 点伤害（受远程加成），留下月尘让敌人慢 20%。
+doujiu | 醉意 +50，6 秒里攻速 +40%；每次暴击迸出诗字，打附近 3 个敌人（暴击伤害的 30%）。
+chitu | 骑上赤兔马 5 秒：移速 +60%，不怕减速、定住和击退；撞到的敌人每 0.3 秒受一次伤（受近战、护甲加成）。
+benyue | 飘在空中 3 秒谁也碰不到你，月光每秒打 6 个敌人（受法术加成）。
+bolan | 升级时有 5 张卡可挑（别人 4 张）；每次商店第一次刷新免费；经验 +10%；开局从 3 把兵器里自己挑一把。 | -
+chunzhong | 收成 +8，而且收成每重涨 8%（别人是 5%）。 | 攻速 −15%
+yuanzhe | 福缘 +15，拾取范围 +40%；打倒的敌人有 5% 几率变成金鲤，多给 5 点月华（福缘越高越容易）。 | 伤害 −5%
+zhiyin | 乐器跟着拍子出手（最多等 0.25 秒），伤害 +20%，范围 +15%。 | 主要受近战加成的兵器，伤害 −25%
+jianyi | 飞剑数 +1；飞剑类兵器暴击率 +10%。 | 主要受近战加成的兵器，伤害 −25%
+tongzi | 你给敌人的减速、燃烧这类效果多持续 50%；个子更小（身体半径 11，别人 14），更难被打中。 | 主要受近战加成的兵器，伤害 −25%
+chengzhu | 墨宝上限 +2；墨宝多留 50% 的时间，伤害 +35%。 | 墨宝以外的兵器，伤害 −25%
+luozi | 棋子上限 +2，棋子一直留到这一重结束；每次商店多 1 次免费刷新；商店里能先看到下一重的精英和险地。 | 攻速 −10%
+jiuming | 一局有 8 次（每重最多一次）：挨了致命一击不倒，剩 1 点血，1.5 秒打不着。 | 加的气血只算 50%；不能用重器、弓弩
+yaoxiang | 回血回满后，多出来的部分变成护盾（最多到气血上限的 25%，每秒少 2%）；治疗效果 +15%。 | 射程 −15%
+baipian | 不带酒类兵器也有醉意条，醉意涨得快一倍。 | 自动瞄准会左右晃 10°
+yibo | 一下最多掉气血上限的 20%；每打完 3 重近战 +1（最多 +10）；身边 150 以内的敌人伤害 −10%。 | 只有 5 个兵器位；商店不卖暗器
+yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；能飘过地上的险地。 | 加的护甲只算 75%
+## en
+qingfeng 1 | 10 damage · every 0.9 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | Divine: +20% more crit chance.
+qingfeng 2 | 16 damage · every 0.86 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | Divine: +20% more crit chance.
+qingfeng 3 | 26 damage · every 0.81 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | Divine: +20% more crit chance.
+qingfeng 4 | 42 damage · every 0.77 s | scales with Melee | Thrusts straight ahead, hitting up to 4 enemies in a line. | Divine: +20% more crit chance.
+longquan 1 | 5 damage · every 0.7 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
+longquan 2 | 9 damage · every 0.66 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
+longquan 3 | 14 damage · every 0.63 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
+longquan 4 | 22 damage · every 0.6 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
+yanyue 1 | 20 damage · every 1.8 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 2 | 33 damage · every 1.71 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 3 | 53 damage · every 1.62 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 4 | 82 damage · every 1.53 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+hoe 1 | 12 damage · every 1.2 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 10% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 2 | 19 damage · every 1.14 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 15% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 3 | 30 damage · every 1.08 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 20% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 4 | 48 damage · every 1.02 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 25% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+pestle 1 | 9 damage · every 1.1 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 2 | 15 damage · every 1.05 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 3 | 24 damage · every 0.99 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 4 | 38 damage · every 0.94 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
+claw 1 | 5 damage · every 0.4 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | Divine: Bleed stacks up to 15.
+claw 2 | 8 damage · every 0.38 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | Divine: Bleed stacks up to 15.
+claw 3 | 13 damage · every 0.36 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | Divine: Bleed stacks up to 15.
+claw 4 | 20 damage · every 0.34 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 15 stacks).
+drunkfist 1 | 8 damage · every 0.8 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
+drunkfist 2 | 13 damage · every 0.76 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
+drunkfist 3 | 21 damage · every 0.72 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
+drunkfist 4 | 33 damage · every 0.68 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
+dart 1 | 5 damage · every 0.45 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | Divine: Bounces to 3 more enemies.
+dart 2 | 8 damage · every 0.43 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | Divine: Bounces to 3 more enemies.
+dart 3 | 13 damage · every 0.41 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | Divine: Bounces to 3 more enemies.
+dart 4 | 20 damage · every 0.38 s | scales with Ranged | Throws a dart that bounces to 3 more enemies after a hit.
+coindart 1 | 6 damage · every 0.7 s | scales with Ranged | Throws coin darts: +1 damage for every 25 moonlight you hold (max +10). | Divine: Kills have a 25% chance to drop 1 extra moonlight.
+coindart 2 | 10 damage · every 0.66 s | scales with Ranged | Throws coin darts: +1 damage for every 25 moonlight you hold (max +15). | Divine: Kills have a 25% chance to drop 1 extra moonlight.
+coindart 3 | 16 damage · every 0.63 s | scales with Ranged | Throws coin darts: +1 damage for every 25 moonlight you hold (max +20). | Divine: Kills have a 25% chance to drop 1 extra moonlight.
+coindart 4 | 25 damage · every 0.6 s | scales with Ranged | Throws coin darts: +1 damage for every 25 moonlight you hold (max +30). | Divine: Kills have a 25% chance to drop 1 extra moonlight.
+sunbow 1 | 14 damage · every 1.3 s | scales with Ranged | Fires a long arrow that hits up to 2 enemies in a line. | Divine: A crit kill looses a follow-up arrow.
+sunbow 2 | 23 damage · every 1.23 s | scales with Ranged | Fires a long arrow that hits up to 2 enemies in a line. | Divine: A crit kill looses a follow-up arrow.
+sunbow 3 | 37 damage · every 1.17 s | scales with Ranged | Fires a long arrow that hits up to 2 enemies in a line. | Divine: A crit kill looses a follow-up arrow.
+sunbow 4 | 58 damage · every 1.11 s | scales with Ranged | Fires a long arrow that hits up to 4 enemies in a line. | Divine: A crit kill looses a follow-up arrow.
+repeater 1 | 4 damage · every 1 s | scales with Ranged | Fires a burst of 3 bolts; each lowers enemy armour by 1 (Shred). | Divine: On a kill the bolt splits in two (50% damage each).
+repeater 2 | 7 damage · every 0.95 s | scales with Ranged | Fires a burst of 3 bolts; each lowers enemy armour by 1 (Shred). | Divine: On a kill the bolt splits in two (50% damage each).
+repeater 3 | 11 damage · every 0.9 s | scales with Ranged | Fires a burst of 3 bolts; each lowers enemy armour by 1 (Shred). | Divine: On a kill the bolt splits in two (50% damage each).
+repeater 4 | 17 damage · every 0.85 s | scales with Ranged | Fires a burst of 3 bolts; each lowers enemy armour by 1 (Shred). | Divine: On a kill the bolt splits in two (50% damage each).
+rod 1 | 11 damage · every 1 s | scales with Ranged and Luck | Hooks 1 enemy and reels it in; kills have a 25% chance to drop 1 extra moonlight. | Divine: Hooks 3 enemies at once.
+rod 2 | 18 damage · every 0.95 s | scales with Ranged and Luck | Hooks 1 enemy and reels it in; kills have a 25% chance to drop 1 extra moonlight. | Divine: Hooks 3 enemies at once.
+rod 3 | 28 damage · every 0.9 s | scales with Ranged and Luck | Hooks 2 enemies and reels them in; kills have a 25% chance to drop 1 extra moonlight. | Divine: Hooks 3 enemies at once.
+rod 4 | 44 damage · every 0.85 s | scales with Ranged and Luck | Hooks 3 enemies and reels them in; kills have a 25% chance to drop 1 extra moonlight.
+qingping 1 | 9 damage · every 1.2 s | scales with Ranged | Launches flying swords that hit up to 2 enemies; the lead sword flies back and hits again (50% damage). | Divine: A sword splits into 3 on its first crit.
+qingping 2 | 15 damage · every 1.14 s | scales with Ranged | Launches flying swords that hit up to 2 enemies; the lead sword flies back and hits again (50% damage). | Divine: A sword splits into 3 on its first crit.
+qingping 3 | 24 damage · every 1.08 s | scales with Ranged | Launches flying swords that hit up to 2 enemies; the lead sword flies back and hits again (50% damage). | Divine: A sword splits into 3 on its first crit.
+qingping 4 | 38 damage · every 1.02 s | scales with Ranged | Launches flying swords that hit up to 2 enemies; the lead sword flies back and hits again (75% damage). | Divine: A sword splits into 3 on its first crit.
+casket 1 | 6 damage · every 0.5 s | scales with Ranged and Melee | 2 swords circle you and cut whatever they touch; Extra swords add more. | Divine: Every 4 s the ring flares out to a large area for 1 s.
+casket 2 | 10 damage · every 0.48 s | scales with Ranged and Melee | 2 swords circle you and cut whatever they touch; Extra swords add more. | Divine: Every 4 s the ring flares out to a large area for 1 s.
+casket 3 | 16 damage · every 0.45 s | scales with Ranged and Melee | 3 swords circle you and cut whatever they touch; Extra swords add more. | Divine: Every 4 s the ring flares out to a large area for 1 s.
+casket 4 | 25 damage · every 0.43 s | scales with Ranged and Melee | 4 swords circle you and cut whatever they touch; Extra swords add more. | Divine: Every 4 s the ring flares out to a large area for 1 s.
+peach 1 | 9 damage · every 1 s | scales with Ranged and Elemental | Launches homing peachwood swords; +50% damage to ghosts. Extra swords add more. | Divine: Hits leave a charm that bursts after 1 s (50% damage).
+peach 2 | 15 damage · every 0.95 s | scales with Ranged and Elemental | Launches homing peachwood swords; +50% damage to ghosts. Extra swords add more. | Divine: Hits leave a charm that bursts after 1 s (50% damage).
+peach 3 | 24 damage · every 0.9 s | scales with Ranged and Elemental | Launches homing peachwood swords; +50% damage to ghosts. Extra swords add more. | Divine: Hits leave a charm that bursts after 1 s (50% damage).
+peach 4 | 38 damage · every 0.85 s | scales with Ranged and Elemental | Launches homing peachwood swords; +50% damage to ghosts. Extra swords add more. | Divine: Hits leave a charm that bursts after 1 s (50% damage).
+seven 1 | 7 damage · every 2.2 s | scales with Ranged | Drops 3 swords from the sky, each hitting a small area; Extra swords add more. | Divine: The last sword stuns for 0.5 s.
+seven 2 | 12 damage · every 2.09 s | scales with Ranged | Drops 3 swords from the sky, each hitting a small area; Extra swords add more. | Divine: The last sword stuns for 0.5 s.
+seven 3 | 19 damage · every 1.98 s | scales with Ranged | Drops 4 swords from the sky, each hitting a small area; Extra swords add more. | Divine: The last sword stuns for 0.5 s.
+seven 4 | 30 damage · every 1.87 s | scales with Ranged | Drops 7 swords from the sky, each hitting a small area; Extra swords add more. | Divine: The last sword stuns for 0.5 s.
+thunder 1 | 16 damage · every 1.3 s | scales with Elemental | Lightning strikes an enemy, then jumps to 2 more nearby, losing 15% each jump. | Divine: Each hit has a 15% chance to stun for 0.5 s.
+thunder 2 | 26 damage · every 1.23 s | scales with Elemental | Lightning strikes an enemy, then jumps to 2 more nearby, losing 15% each jump. | Divine: Each hit has a 15% chance to stun for 0.5 s.
+thunder 3 | 42 damage · every 1.17 s | scales with Elemental | Lightning strikes an enemy, then jumps to 3 more nearby, losing 15% each jump. | Divine: Each hit has a 15% chance to stun for 0.5 s.
+thunder 4 | 66 damage · every 1.11 s | scales with Elemental | Lightning strikes an enemy, then jumps to 6 more nearby, losing 15% each jump. | Divine: Each hit has a 15% chance to stun for 0.5 s.
+fire 1 | 8 damage · every 1.2 s | scales with Elemental | Throws a fire charm that bursts over a small area and burns enemies for 3 s (up to 3 stacks). | Divine: Enemies that burn to death pass the fire to 2 nearby.
+fire 2 | 13 damage · every 1.14 s | scales with Elemental | Throws a fire charm that bursts over a small area and burns enemies for 3 s (up to 3 stacks). | Divine: Enemies that burn to death pass the fire to 2 nearby.
+fire 3 | 21 damage · every 1.08 s | scales with Elemental | Throws a fire charm that bursts over a small area and burns enemies for 3 s (up to 3 stacks). | Divine: Enemies that burn to death pass the fire to 2 nearby.
+fire 4 | 33 damage · every 1.02 s | scales with Elemental | Throws a fire charm that bursts over a small area and burns enemies for 3 s (up to 5 stacks). | Divine: Enemies that burn to death pass the fire to 2 nearby.
+gourd 1 | 12 damage · every 1.3 s | scales with Elemental | Splashes a small area: enemies stagger for 1 s, each one hit adds 2 Drunk, and crits set them alight. | Divine: Leaves a fire puddle for 3 s.
+gourd 2 | 19 damage · every 1.23 s | scales with Elemental | Splashes a small area: enemies stagger for 1 s, each one hit adds 2 Drunk, and crits set them alight. | Divine: Leaves a fire puddle for 3 s.
+gourd 3 | 31 damage · every 1.17 s | scales with Elemental | Splashes a small area: enemies stagger for 1 s, each one hit adds 2 Drunk, and crits set them alight. | Divine: Leaves a fire puddle for 3 s.
+gourd 4 | 48 damage · every 1.11 s | scales with Elemental | Splashes a small area: enemies stagger for 1 s, each one hit adds 2 Drunk, and crits set them alight. | Divine: Leaves a fire puddle for 3 s.
+qin 1 | 8 damage · every 1.2 s | scales with Elemental | Sends a ring of sound over a medium area; every 4th ring resonates: twice the damage and a 30% slow. | Divine: Resonates every 3rd ring and heals you 1 HP.
+qin 2 | 13 damage · every 1.14 s | scales with Elemental | Sends a ring of sound over a medium area; every 4th ring resonates: twice the damage and a 30% slow. | Divine: Resonates every 3rd ring and heals you 1 HP.
+qin 3 | 21 damage · every 1.08 s | scales with Elemental | Sends a ring of sound over a medium area; every 4th ring resonates: twice the damage and a 30% slow. | Divine: Resonates every 3rd ring and heals you 1 HP.
+qin 4 | 33 damage · every 1.02 s | scales with Elemental | Sends a ring of sound over a medium area; every 3rd ring resonates: twice the damage and a 30% slow. | Divine: Resonates every 3rd ring and heals you 1 HP.
+flute 1 | 5 damage · every 0.6 s | scales with Elemental | Plays homing notes; every 6th note charms a small enemy for 2 s. | Divine: Every 4th note charms, for 4 s.
+flute 2 | 8 damage · every 0.57 s | scales with Elemental | Plays homing notes; every 6th note charms a small enemy for 2 s. | Divine: Every 4th note charms, for 4 s.
+flute 3 | 13 damage · every 0.54 s | scales with Elemental | Plays homing notes; every 6th note charms a small enemy for 2 s. | Divine: Every 4th note charms, for 4 s.
+flute 4 | 20 damage · every 0.51 s | scales with Elemental | Plays homing notes; every 4th note charms a small enemy for 4 s.
+brush 1 | 8 damage · every 4 s | scales with Craft | Paints an ink sparrow that pecks enemies for 10 s (uses 1 ink summon slot). | Divine: Paints an ink tiger instead: it pounces every 0.9 s and draws enemies to itself.
+brush 2 | 14 damage · every 3.8 s | scales with Craft | Paints an ink carp that rams enemies for 10 s (uses 1 ink summon slot). | Divine: Paints an ink tiger instead: it pounces every 0.9 s and draws enemies to itself.
+brush 3 | 22 damage · every 3.6 s | scales with Craft | Paints an ink crane that dives at enemies for 10 s (uses 1 ink summon slot). | Divine: Paints an ink tiger instead: it pounces every 0.9 s and draws enemies to itself.
+brush 4 | 36 damage · every 3.4 s | scales with Craft | Paints an ink tiger that pounces on enemies for 10 s (uses 1 ink summon slot). | Divine: Paints an ink tiger instead: it pounces every 0.9 s and draws enemies to itself.
+inkstone 1 | 5 damage · every 6 s | scales with Craft | Sets an inkstone at your feet that spits an ink blob every 0.8 s for 8 s; it counts as an ink summon. | Divine: Spits 2 blobs at a time and follows you.
+inkstone 2 | 8 damage · every 5.7 s | scales with Craft | Sets an inkstone at your feet that spits an ink blob every 0.8 s for 8 s; it counts as an ink summon. | Divine: Spits 2 blobs at a time and follows you.
+inkstone 3 | 13 damage · every 5.4 s | scales with Craft | Sets an inkstone at your feet that spits an ink blob every 0.8 s for 8 s; it counts as an ink summon. | Divine: Spits 2 blobs at a time and follows you.
+inkstone 4 | 20 damage · every 5.1 s | scales with Craft | Sets an inkstone at your feet that spits an ink blob every 0.8 s for 8 s; it counts as an ink summon. | Divine: Spits 2 blobs at a time and follows you.
+crane 1 | 10 damage · every 1 s | scales with Craft | A paper crane stays with you, circling and diving at enemies (it doesn't use an ink summon slot). | Divine: Its dives burst over a small area.
+crane 2 | 16 damage · every 0.95 s | scales with Craft | A paper crane stays with you, circling and diving at enemies (it doesn't use an ink summon slot). | Divine: Its dives burst over a small area.
+crane 3 | 26 damage · every 0.9 s | scales with Craft | A paper crane stays with you, circling and diving at enemies (it doesn't use an ink summon slot). | Divine: Its dives burst over a small area.
+crane 4 | 40 damage · every 0.85 s | scales with Craft | A paper crane stays with you, circling and diving at enemies (it doesn't use an ink summon slot). | Divine: Its dives burst over a small area.
+gobowl 1 | 14 damage · every 1.2 s | scales with Craft | Drops go stones where enemies crowd; a stone blasts when touched and sets off stones nearby. | Divine: Each blast first pulls nearby enemies in.
+gobowl 2 | 23 damage · every 1.14 s | scales with Craft | Drops go stones where enemies crowd; a stone blasts when touched and sets off stones nearby. | Divine: Each blast first pulls nearby enemies in.
+gobowl 3 | 37 damage · every 1.08 s | scales with Craft | Drops go stones where enemies crowd; a stone blasts when touched and sets off stones nearby. | Divine: Each blast first pulls nearby enemies in.
+gobowl 4 | 58 damage · every 1.02 s | scales with Craft | Drops go stones where enemies crowd; a stone blasts when touched and sets off stones nearby. | Divine: Each blast first pulls nearby enemies in.
+moonwheel 1 | 9 damage · every 1.1 s | scales with Ranged | A moon disc flies out and back through every enemy in its path; +1% damage per 1% move speed (max +50%). | Divine: Throws 2 discs in opposite directions.
+moonwheel 2 | 15 damage · every 1.05 s | scales with Ranged | A moon disc flies out and back through every enemy in its path; +1% damage per 1% move speed (max +50%). | Divine: Throws 2 discs in opposite directions.
+moonwheel 3 | 24 damage · every 0.99 s | scales with Ranged | A moon disc flies out and back through every enemy in its path; +1% damage per 1% move speed (max +50%). | Divine: Throws 2 discs in opposite directions.
+moonwheel 4 | 38 damage · every 0.94 s | scales with Ranged | A moon disc flies out and back through every enemy in its path; +1% damage per 1% move speed (max +50%). | Divine: Throws 2 discs in opposite directions.
+moonmirror 1 | 12 damage · every 1.2 s | scales with Elemental | Fires an instant moonbeam through every enemy in a line; for 2 s after a dodge, each shot adds another beam. | Divine: The beam forks into 3, 15° apart.
+moonmirror 2 | 19 damage · every 1.14 s | scales with Elemental | Fires an instant moonbeam through every enemy in a line; for 2 s after a dodge, each shot adds another beam. | Divine: The beam forks into 3, 15° apart.
+moonmirror 3 | 31 damage · every 1.08 s | scales with Elemental | Fires an instant moonbeam through every enemy in a line; for 2 s after a dodge, each shot adds another beam. | Divine: The beam forks into 3, 15° apart.
+moonmirror 4 | 48 damage · every 1.02 s | scales with Elemental | Fires an instant moonbeam through every enemy in a line; for 2 s after a dodge, each shot adds another beam. | Divine: The beam forks into 3, 15° apart.
+songzi | +4 HP
+tea | +2 HP Regen
+sandals | +5% Move speed
+whetstone | +2 Melee
+fletch | +2 Ranged, +15 Range
+cinnabar | +2 Elemental
+pineink | +2 Craft
+guardmirror | +2 Armour, −2% Move speed
+bell | +6% Attack speed
+eagle | +4% Crit chance
+redstring | +8 Luck
+ginseng | +8 HP, +1 HP Regen, −2% Move speed
+tigertally | +8% Damage
+amulet | +6% Dodge
+balm | +3% Lifesteal
+elixir | +12 HP, +6% Damage, +2 Armour, +1 HP Regen
+drumroll | For the first 8 s of every wave: +40% attack speed.
+gall | +2 max HP every time you clear a wave.
+backwater | Below 40% HP: +30% damage, +20% attack speed.
+atease | After standing still for 0.5 s: +25% attack speed, +2 armour.
+versatile | For each different weapon class you carry: +3% damage, +2% attack speed.
+chasewind | +1% damage for every 3% move speed (max +30%).
+ironbone | +1% damage per 1 armour (max +30%).
+physician | Adds 50% of your HP Regen to Melee, Ranged, Elemental and Craft (max +15 each).
+basket | +6 Harvest
+coinstring | +30% Pickup range, +2 Harvest
+lots | +1 free reroll in every shop.
+pawn | Weapons sell for 60% of their price (normally 25%).
+luckycat | +10 Luck. Kills have a 2% chance to drop gold moonlight worth 4 (more with Luck).
+miser | +1% damage per 10 moonlight you hold (max +40%); shop prices +8%.
+abacus | At wave end, +1 moonlight for every 10 you haven't spent (max +25 per abacus).
+xuan | +1 Ink summon limit, +1 Craft
+duanyan | +3 Craft. Ink summons last 30% longer.
+splash | When an ink summon ends it bursts: 10 damage (scales with Craft) and a 40% slow for 2 s.
+inkbamboo | Every 12 s an ink bamboo sprouts at your feet for 10 s, shooting leaves at enemies (scales with Craft).
+inkcrane | An ink crane stays with you, pecking an enemy every 0.8 s (scales with Craft) and fetching nearby moonlight.
+inkpool | +1 Ink summon limit. +1 armour for each ink summon out (max +10).
+dotting | Ink summons can crit (with your crit chance, ×2) and get +20% attack speed.
+tassel | Flying-sword weapons: +5% attack speed, +15 range.
+swordqi | Flying swords pierce 1 more and leave a sword trail (30% damage).
+swordheart | With 3+ swords in the air: flying-sword weapons get +15% crit chance and +0.3 crit multiplier.
+washpool | Each returning sword heals you 1 HP (max 2 a second).
+yujian | +1 Extra swords
+swordtomb | Every 15 flying-sword kills in a wave adds a broken sword that circles you until the wave ends (max 8).
+yellowpaper | +1 Elemental. Burns stack 1 higher and last 1 s longer.
+fivethunder | Lightning jumps to 1 more; lightning kills set nearby enemies alight; each strike has a 10% chance to stun 0.5 s.
+lingering | Music hits echo 0.4 s later for 50% damage.
+boya | Charm chances ×1.5; charmed enemies deal +50% and burst when the charm ends (scales with Elemental).
+dukang | +8% Crit chance. Each crit adds 2 Drunk (less for fast weapons); you get the Drunk meter even without a wine weapon.
+nightcup | +0.5 Crit multiplier. Each crit heals 1 HP (max 3 a second).
+dragblade | Every 3rd Heavy swing hits twice as hard, with +100 knockback.
+thorns | When hit, deals 3 damage back to the attacker (scales with Armour).
+goldenbell | Blocks the first hit of every wave; melee attackers are hurt back (scales with Armour).
+gomanual | +2 Stone limit. Stone blasts +20% area.
+capture | An enemy surrounded by 3 stones is captured: 3× stone damage, ignoring armour.
+moonsoul | Each dodge fires 3 homing moon shards (scales with Elemental).
+osmanthus | Dodge cap +10; +30% damage for 2 s after a dodge.
+lingbo | Moving leaves footprints that hurt enemies on them every 0.5 s; the faster you move, the harder.
+cushion | After standing still for 1 s: +50% HP Regen (each copy adds more).
+cuthair | +10% Damage, −2 HP. Curse +1.
+burnboats | +15% Damage, +15% Attack speed. No more rerolls or locks after this. Curse +1.
+yanwang | Once a wave, a lethal hit leaves you at 1 HP. Curse +2.
+delusion | 20% more enemies each wave; +10% moonlight. Curse +2.
+innerdemon | +20% Damage. Each wave your inner demon appears (40% of your HP and damage); beating it drops a casket. Curse +2.
+crackedmirror | +1 shop slot; Immortal odds +5%, Divine odds +5%. Curse +3.
+wanjian | +2 Extra swords. With 8+ swords, every 8 s all swords dive at the thickest crowd, striking 2 times each at 60%.
+inkdragon | One ink summon is always an ink dragon: 5× damage, flies and passes through enemies. If it's gone, another turns in 12 s.
+dugu | With exactly 1 weapon: it counts as 6 of its class, deals 3× damage and gets +60% attack speed.
+samadhi | Burns within 300 of you never go out; the burn stack limit is twice as high.
+treasurebowl | At wave end, +15% interest on moonlight held (max 60); +1 free reroll every shop.
+penglai | +20 HP, +4 HP Regen. Once a run, when you go down you get back up with 50% HP and every enemy shot is cleared.
+ambush | Every 4th Music or Talisman attack fires all your other Music and Talisman weapons at 40%.
+needle | +8 Armour. Immune to knockback; +1% damage per armour (with Iron Bones, max +40%).
+jiangjinjiu | Drunk cap becomes 200; at 100+ Drunk every hit crits; Drunk drains twice as fast.
+watermoon | Every weapon also attacks behind you as a mirror image (50% damage). −4 Armour.
+yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest damage stat). It stays 5 s: enemies inside are 40% slower and take 20% more damage.
+manyuan | Plants a flowerbed at your feet for 12 s (max 2): every 0.8 s petals hit 4 enemies inside (scales with Craft and HP Regen), enemies are 25% slower, and you heal 1.5 HP a second inside.
+yiwang | Throws a net where enemies crowd: they're dragged to the middle and held 2 s (elites 1 s). For 4 s they take 25% more damage and drop 2× moonlight. Loose moonlight nearby flies to you.
+guangling | Plays for 6 s: every 0.5 s a beat hits enemies around you (scales with Elemental) and slows them 40%; each second small enemies have a 15% chance to switch sides for 6 s (more with Luck).
+yijian | Dashes forward, untouchable for 0.35 s, with every sword slashing along the path (150% damage). Then orbiting swords spin fast for 3 s. A kill during the dash takes 1 s off the cooldown.
+jiji | Pins a talisman that becomes a vortex for 5 s, pulling enemies in (elites 50%, not bosses); every 0.5 s lightning strikes 2 enemies (scales with Elemental) and sets them alight.
+dianhua | Sweeps a scroll ahead: up to 5 small enemies become your ink allies for 10 s (scales with Craft); elites and bosses take a heavy hit instead (60 damage, scales with Craft).
+wei | Eight stones ring you and close in over 1 s: up to 30 small enemies inside are captured; elites and bosses lose 8% of their current HP and are stunned 1 s.
+pudie | Pounces on the strongest enemy nearby, untouchable for 0.4 s in the air. Landing deals 25 damage (scales with Melee) and stuns enemies around you 0.5 s. A kill on landing resets the cooldown.
+daoyao | Stands still for 1.2 s taking 50% less damage and pounds 3 times, hurting enemies around you (scales with HP Regen and HP); then drinks: heals 15% of max HP and +20% damage for 6 s.
+yaoyue | Drinks to 100 Drunk: for 6 s +30% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to 2 more; then 2 s of hangover at −30% move speed.
+tuodao | Feigns a retreat (untouchable for 0.3 s), then spins a full-circle sweep that scales with your best Heavy weapon and Melee, knocking enemies away and stunning them 1 s.
+qinghui | Rises for 2.5 s where nothing can touch you, then lands in a moon pool (40 damage, scales with Elemental) that lasts 6 s: enemies inside deal 30% less and are 20% slower; you get +5 HP Regen. The moon turns full.
+tishi | Brushes 7 glyphs of verse along your path; they stand as walls for 4 s, hurting enemies that touch them (scales with Ranged) and slowing them 30%.
+cuihua | Every flower and bamboo you've grown blooms at once: each heals you 2 HP and roots enemies near it for 1.5 s.
+dudiao | Hold still to charge (up to 2 s), then hook the strongest enemy nearby to you: 50 damage (scales with Ranged), twice as hard at full charge.
+gaoshan | For 6 s Music weapons fire twice a beat, each beat heals you 1 HP, and ink birds peck enemies (scales with Elemental).
+qinggong | Dash up to 3 times within 1.5 s, untouchable for 0.2 s each; every dash makes your next sword hit a sure crit.
+yufeng | A whirlwind around you for 4 s pushes enemies out, carries you over ground hazards, and spreads enemies' effects to their neighbours.
+shenbi | Drag a stroke and an ink dragon flies along it (60 damage, scales with Craft); all your ink summons heal to full.
+tuiyan | For 3 s enemies are 70% slower while you move at full speed; stones land where enemies crowd thickest.
+maoyue | Leaps far and stuns enemies where you land for 0.5 s; for 5 s nearby moonlight leaps to you and kills drop 1 extra.
+dengyue | A 0.8 s hop where nothing can touch you; landing deals 20 damage (scales with Ranged) and leaves moon dust that slows enemies 20%.
+doujiu | +50 Drunk and +40% attack speed for 6 s; each crit bursts into verse that hits 3 nearby enemies for 30% of the crit.
+chitu | Ride Red Hare for 5 s: +60% move speed, immune to slow, root and knockback; enemies you run through take damage every 0.3 s (scales with Melee and Armour).
+benyue | Float for 3 s where nothing can touch you while moonbeams strike 6 enemies a second (scales with Elemental).
+bolan | 5 cards to choose from at each level-up (others get 4); the first reroll in every shop is free; +10% XP; picks his starting weapon from 3. | -
+chunzhong | +8 Harvest, and Harvest grows 8% a wave (others 5%). | −15% attack speed
+yuanzhe | +15 Luck, +40% pickup range; kills have a 5% chance to become a golden carp worth 5 moonlight (more with Luck). | −5% damage
+zhiyin | Music weapons fire on the beat (waiting at most 0.25 s): +20% damage, +15% area. | Weapons that mainly scale with Melee deal −25%
+jianyi | +1 Extra sword; flying-sword weapons +10% crit chance. | Weapons that mainly scale with Melee deal −25%
+tongzi | Slows, burns and other effects you inflict last 50% longer; your body is smaller (radius 11, others 14), so you're harder to hit. | Weapons that mainly scale with Melee deal −25%
+chengzhu | +2 ink summon limit; ink summons last 50% longer and deal +35%. | Non-ink weapons deal −25%
+luozi | +2 stone limit, and stones last until the wave ends; +1 free reroll every shop; the shop shows the next wave's elites and hazards. | −10% attack speed
+jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP and untouchable for 1.5 s. | HP gains count 50%; no Heavy or Bow weapons
+yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing. | −15% range
+baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. | Auto-aim sways 10°
+yibo | No hit takes more than 20% of max HP; +1 Melee every 3 waves cleared (max +10); enemies within 150 deal 10% less. | Only 5 weapon slots; no Hidden weapons in his shop
+yinqing | A 16 s moon cycle: full moon +30% damage; new moon −15% damage and +15% dodge. Floats over ground hazards. | Armour gains count 75%

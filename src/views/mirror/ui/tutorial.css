@@ -1,0 +1,139 @@
+/* 水月幻镜 · the tutorial's coach, end card, offer, ribbon and 设置 rows (d-tutorial §1.4, §4.2–4.3).
+   Every selector carries .mj-tut (or an extra class) so this file may load before mirror.css. Coach ink
+   is gold with an ink hairline — never vermilion, which means danger. */
+.mj-tut {
+  --coach-gold: #b8892a;
+  --coach-ink: var(--ink, #1b1916);
+  --coach-paper: var(--paper-2, #e8dec9);
+  --coach-dim: rgba(27, 25, 22, 0.28);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .mj-tut { --coach-gold: #e0b95a; }
+}
+:root[data-theme='dark'] .mj-tut, .mj-dark .mj-tut { --coach-gold: #e0b95a; }
+
+/* ── the overlay */
+.mj-tut.mj-coach { position: absolute; inset: 0; z-index: 55; overflow: hidden; pointer-events: none; }
+.mj-tut .mj-tut-block { position: absolute; inset: 0; pointer-events: auto; background: transparent; }
+.mj-tut .mj-tut-dim { position: absolute; display: none; background: var(--coach-dim); pointer-events: none; }
+.mj-tut .mj-tut-stroke { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.mj-tut .mj-tut-stroke path { fill: none; stroke: var(--coach-gold); stroke-width: 2.5; stroke-linecap: round; filter: drop-shadow(0 0 1px var(--coach-ink)); display: none; }
+.mj-tut .mj-tut-ring {
+  position: absolute; left: 0; top: 0; display: none; border-radius: 10px; pointer-events: none;
+  border: 2px solid var(--coach-gold); box-shadow: 0 0 0 1px var(--coach-ink), inset 0 0 0 1px var(--coach-ink);
+  animation: mj-tut-pulse 1.6s ease-in-out infinite;
+}
+.mj-tut .mj-tut-ring.is-whisper { border-style: dashed; animation: none; }
+.mj-tut.is-calm .mj-tut-ring { animation: none; }
+@keyframes mj-tut-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.mj-tut .mj-tut-tag {
+  position: absolute; left: 0; top: 0; display: none; padding: 2px 8px; border-radius: 10px; font-size: 13px; line-height: 1.4;
+  background: var(--coach-gold); color: #1b1916; box-shadow: 0 0 0 1px var(--coach-ink); pointer-events: none; white-space: nowrap;
+}
+
+/* the lane: top under the HUD in a wave; top or bottom between waves */
+.mj-tut .mj-tut-lane {
+  position: absolute; left: 50%; transform: translateX(-50%); width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 8px; align-items: stretch; pointer-events: none;
+}
+.mj-tut.is-wave .mj-tut-lane { top: calc(env(safe-area-inset-top) + 108px); }
+.mj-tut.is-between .mj-tut-lane.is-top { top: calc(env(safe-area-inset-top) + 12px); }
+.mj-tut.is-between .mj-tut-lane.is-bottom { bottom: calc(env(safe-area-inset-bottom) + 16px); flex-direction: column-reverse; }
+@media (min-width: 600px) and (min-height: 600px) {
+  .mj-tut .mj-tut-lane { width: min(420px, calc(100vw - 32px)); }
+  .mj-tut.is-wave .mj-tut-lane { top: calc(env(safe-area-inset-top) + 96px); }
+}
+.mj-tut .mj-tut-bubble {
+  position: relative; padding: 12px 14px; border-radius: 12px; background: var(--coach-paper); color: var(--coach-ink);
+  border: 2px solid var(--coach-gold); box-shadow: 0 0 0 1px var(--coach-ink), 0 10px 24px -12px rgba(20, 15, 5, 0.5);
+  pointer-events: auto; animation: mj-tut-in 0.22s var(--ease, ease-out);
+}
+.mj-tut.is-wave .mj-tut-bubble:not(.is-hold) { pointer-events: none; }
+.mj-tut.is-calm .mj-tut-bubble { animation: mj-tut-fade 0.12s linear; }
+@keyframes mj-tut-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@keyframes mj-tut-fade { from { opacity: 0; } to { opacity: 1; } }
+.mj-tut .mj-tut-text { margin: 0; font-size: 15px; line-height: 1.55; overflow-wrap: anywhere; }
+:root[lang='en'] .mj-tut .mj-tut-text, .mj-tut .mj-tut-text:lang(en) { font-size: 14px; }
+.mj-tut .mj-tut-sub { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink-2, #4a443c); }
+.mj-tut .mj-tut-ok { display: block; margin: 10px 0 0 auto; min-height: 44px; min-width: 88px; }
+.mj-tut .mj-tut-whisper {
+  margin: 0; padding: 8px 12px; border-radius: 10px; font-size: 14px; line-height: 1.5; text-align: center;
+  background: color-mix(in srgb, var(--coach-paper) 92%, transparent); color: var(--coach-ink);
+  border: 1px solid var(--coach-gold); box-shadow: 0 0 0 1px color-mix(in srgb, var(--coach-ink) 40%, transparent);
+  pointer-events: none; animation: mj-tut-fade 0.2s linear;
+}
+
+/* keycaps (W A S D) and the ghost stick (wave 1) */
+.mj-tut .mj-tut-keys { display: grid; grid-template-columns: repeat(3, 34px); gap: 4px; justify-content: center; margin-top: 8px; }
+.mj-tut .mj-tut-keys kbd {
+  display: grid; place-items: center; height: 30px; border-radius: 6px; border: 1.5px solid var(--coach-ink); background: var(--paper, #f1e9d8);
+  font: 600 13px/1 var(--font-latin, serif); color: var(--coach-ink);
+}
+.mj-tut .mj-tut-keys kbd.is-on { background: var(--coach-gold); }
+.mj-tut .mj-tut-ghost {
+  position: absolute; left: 22%; top: 72%; transform: translate(-50%, -50%); border-radius: 50%;
+  border: 2px dashed color-mix(in srgb, var(--coach-ink) 55%, transparent); background: color-mix(in srgb, var(--coach-gold) 12%, transparent);
+  pointer-events: none;
+}
+.mj-tut .mj-tut-ghost.is-left { left: 78%; }
+.mj-tut .mj-tut-ghost-knob {
+  position: absolute; left: 50%; top: 50%; width: 40%; height: 40%; margin: -20% 0 0 -20%; border-radius: 50%;
+  background: color-mix(in srgb, var(--coach-ink) 55%, transparent); box-shadow: 0 0 0 2px var(--coach-gold);
+  animation: mj-tut-knob 1.6s ease-in-out infinite;
+}
+.mj-tut .mj-tut-ghost.is-calm .mj-tut-ghost-knob { animation: none; transform: translate(45%, -20%); }
+.mj-tut .mj-tut-ghost-arrow { position: absolute; right: -22px; top: 50%; transform: translateY(-50%); color: var(--coach-gold); font-size: 20px; text-shadow: 0 0 2px var(--coach-ink); }
+@keyframes mj-tut-knob {
+  0%, 100% { transform: translate(0, 0); } 25% { transform: translate(55%, -35%); } 50% { transform: translate(70%, 10%); } 75% { transform: translate(25%, 40%); }
+}
+
+/* the foe card (wave 3) and its mini scroll */
+.mj-tut .mj-tut-foe {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px;
+  background: rgba(20, 18, 14, 0.55); color: #fbf5ea; text-align: center; pointer-events: auto; animation: mj-tut-fade 0.25s linear;
+}
+.mj-tut .mj-tut-foe-card {
+  display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 16px 16px; width: min(360px, calc(100vw - 32px));
+  border-radius: 14px; background: rgba(20, 18, 14, 0.86); border: 2px solid var(--coach-gold); box-shadow: 0 0 0 1px #000, 0 16px 40px -16px rgba(0, 0, 0, 0.7);
+  animation: mj-tut-pop 0.25s var(--ease, ease-out);
+}
+.mj-tut.is-calm .mj-tut-foe-card { animation: mj-tut-fade 0.12s linear; }
+@keyframes mj-tut-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+.mj-tut .mj-tut-foe .mj-tut-ok { margin: 4px auto 0; }
+.mj-tut .mj-tut-foe h2 { margin: 0; font-size: 34px; }
+.mj-tut .mj-tut-foe p { margin: 4px 0 4px; font-size: 15px; line-height: 1.55; }
+.mj-tut .mj-tut-foetag { font-size: 13px; padding: 1px 10px; border-radius: 10px; border: 1px solid var(--coach-gold); color: var(--coach-gold); }
+.mj-tut .mj-tut-foebar {
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 28px); transform: translateX(-50%); width: min(200px, 42vw); height: 8px;
+  border-radius: 4px; background: rgba(27, 25, 22, 0.45); box-shadow: 0 0 0 1px var(--coach-gold); overflow: hidden;
+}
+.mj-tut .mj-tut-foebar i { display: block; height: 100%; background: var(--coach-gold); transform-origin: left center; transition: transform 0.25s linear; }
+
+/* ── the end card (replaces the wave-3 shop) */
+.mj-tut.mj-tut-end { max-width: 460px; margin: 0 auto; padding: 24px 4px; text-align: center; }
+.mj-tut .mj-tut-end-title { font-size: 40px; margin: 8px 0 0; }
+.mj-tut .mj-tut-end-sub { margin: 4px 0 16px; color: var(--ink-2, #4a443c); }
+.mj-tut .mj-tut-end-lines { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 10px; text-align: left; }
+.mj-tut .mj-tut-end-lines li { padding: 10px 12px; border-radius: 10px; background: var(--paper-2, #e8dec9); border-left: 3px solid var(--coach-gold); line-height: 1.55; }
+.mj-tut .mj-tut-end-actions { justify-content: center; flex-wrap: wrap; }
+
+/* ── the offer, the ribbon, 设置 */
+.mj-tut.mj-tut-offer p { line-height: 1.6; }
+.mj-tut.mj-tut-ribbon { display: flex; align-items: center; gap: 10px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--coach-gold); }
+.mj-tut.mj-tut-ribbon p { flex: 1; margin: 0; font-size: 14px; line-height: 1.5; min-width: 0; }
+.mj-tut .mj-tut-ribbon-glyph { font-size: 22px; color: var(--coach-gold); }
+.mj-tut .mj-tut-row { width: 100%; text-align: left; background: none; border: 0; color: inherit; font: inherit; cursor: pointer; }
+.mj-tut .mj-tut-row:disabled { opacity: 0.5; cursor: default; }
+
+/* the lobby footer with its sixth button 「初 · 教程」 */
+.mj-footer.has-tut { grid-template-columns: repeat(6, 1fr); }
+@media (max-width: 359px) { .mj-footer.has-tut { grid-template-columns: repeat(3, 1fr); } }
+.mj-footer.has-tut .mj-footer-btn { position: relative; }
+.mj-footer.has-tut .mj-tut-dot { position: absolute; top: 4px; right: 22%; width: 7px; height: 7px; border-radius: 50%; background: var(--ink, #1b1916); }
+
+/* the lobby's entry button, rung once after the tutorial's 「去入镜」 */
+.mj-entry.mj-tut-rung .mj-enter { animation: mj-tut-ring 0.8s ease-in-out 3; box-shadow: 0 0 0 3px #b8892a, 0 0 0 4px #1b1916; }
+@keyframes mj-tut-ring { 0%, 100% { transform: none; } 25% { transform: rotate(-2deg); } 75% { transform: rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) { .mj-entry.mj-tut-rung .mj-enter { animation: none; } }
+.mj-calm .mj-entry.mj-tut-rung .mj-enter { animation: none; }
+.mj-lobby .mj-diff-line { margin: 6px 2px 0; }

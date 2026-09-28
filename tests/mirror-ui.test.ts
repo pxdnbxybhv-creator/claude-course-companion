@@ -27,8 +27,11 @@ describe('mirror ui · words', () => {
   it('writes a stat change with its sign and unit', () => {
     expect(fmtStat('aspd', 10, zh)).toBe('+10% 攻速');
     expect(fmtStat('armor', -2, en)).toBe('−2 Armour');
-    expect(fmtStat('range', 30, zh)).toBe('+30 u 射程');
-    expect(fmtStatValue('dodge', 12.34)).toBe('12.3%');
+    expect(fmtStat('range', 30, zh)).toBe('+30 射程'); // no `u`: distances are bare numbers
+    expect(fmtStat('critDmg', 30, zh)).toBe('+0.3 暴击倍数'); // stored 30, read as +0.3 of a crit multiplier
+    expect(fmtStatValue('dodge', 12.34)).toBe('12.34%');
+    expect(fmtStatValue('critDmg', 50)).toBe('+0.5');
+    expect(fmtStatValue('range', 30)).toBe('30');
   });
   it('describes every 节气 modifier in both languages', () => {
     for (const t of TERM_MOD_REG) {

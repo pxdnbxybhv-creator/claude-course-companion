@@ -428,8 +428,18 @@ export const lifestealChance = (stats: Stats, proc: number) => (clamp(stats.stea
 export const healMult = (stats: Stats) => Math.max(0.1, 1 + Math.max(CLAMP.healMin, stats.heal) / 100);
 /** HP/s from 回气 (0.1 per point, none at ≤ 0), after 疗效. */
 export const regenPerSec = (stats: Stats) => (stats.regen > 0 ? F.regenPerPoint * stats.regen * healMult(stats) : 0);
-/** Pickup radius (u). */
+/** Pickup radius (u): F.pickupBase (135 u since the 150% pass; 90 before) × (1 + 拾取%), ≥ 10. */
 export const pickupRadius = (stats: Stats) => Math.max(10, F.pickupBase * (1 + stats.pickup / 100));
+/**
+ * 破镜重圆, the run's one paid revive (API.md §3). price: 文 from the purse (2.5 tickets). hpPct: you
+ * rise at half your max 气血, as 蓬莱仙丹 does (the fight goes on at the same second with the same
+ * crowd, so a full heal would make it a free second wave; 心镜 回魂 gives 30%). invuln: seconds of
+ * invulnerability (the shimmer). pushR / push: the revival shockwave's reach and throw (u, before
+ * resist; bosses stand). clearR: enemy shots within this reach are wiped.
+ */
+export const REVIVE = { price: 50, hpPct: 0.5, invuln: 2, pushR: 230, push: 170, clearR: 420 } as const;
+/** May this run still be revived? Not after the revive was used, never in a tutorial. The purse is the UI's to check. */
+export const canRevive = (run: Pick<RunSave, 'revived' | 'tutorial'>): boolean => run.revived !== true && run.tutorial !== true;
 /** Movement speed (u/s), 身法 clamped −60…+100%. */
 export const moveSpeed = (stats: Stats) => F.baseSpeed * (1 + clamp(stats.speed, CLAMP.speedMin, CLAMP.speedMax) / 100);
 /** Luck factor for chances (福缘 ≥ −80). */

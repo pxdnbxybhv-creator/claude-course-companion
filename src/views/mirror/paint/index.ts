@@ -26,8 +26,8 @@ import type {
   ArenaGeom, AtlasId, BakeStage, Camera, MoonLook, NumStyle, Painter, Quality, RunSave, Sprite, StampKind, TeleShape,
 } from '../types';
 import { canvas, ctx2d, pack, Pages, renderSpec, warmGrain } from './atlas';
-import { viewScale } from './draw';
-import { ArenaLayer } from './arena';
+import { K_MAX } from './draw';
+import { ArenaLayer, type ObstSprite } from './arena';
 import { Ambience } from './ambient';
 import { BOSS_SPEC, MOON_SPEC } from './bosses';
 import { CHAR_SPECS } from './figures';
@@ -39,18 +39,11 @@ import { Numbers } from './numbers';
 import { Tele } from './tele';
 import { DROP_SPECS, FX_SPECS, isZone } from './things';
 
-export { blit, blitRot, viewScale } from './draw';
+export { bakeScale, blit, blitRot, K_MAX, viewScale, viewOf, VIEWS, VIEW_DEFAULT, VIEW_SPAN, type ViewSize } from './draw';
 export { abbrev } from './numbers';
 
 /** Sprite resolution when no bake scale is given (the lab, icons): px per u = dpr × this. */
 const PX_PER_U: Record<Quality, number> = { low: 0.85, mid: 1, high: 1.15 };
-/** Bake scale over the camera's base px per u: zoom punches reach +3–10% for a tenth of a second, and a
- *  little supersample keeps rotating blades and thin lines crisp (high as mid: its 1.15 cost a desktop
- *  at DPR 2 ≈ 9% more bake time for no visible gain). Low paints exactly at the drawn size. */
-const HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 };
-/** The bake scale's ceiling (memory grows with k²: the start atlas is ≈ 3 MB × k²). Mid's 3.3 lets any
- *  DPR-3 phone up to 440 px wide keep its full headroom (camera ≤ 3.0 × 1.1). */
-const K_MAX: Record<Quality, number> = { low: 3, mid: 3.3, high: 3.4 };
 /** Zone looks a run shows large and for long, baked at the size they are drawn instead (≤ ZONE_PX
  *  across): the map's standing field (月湖's 月影, 墨林's 墨雨 puddles) and your own 镜技's field — at
  *  r 90–220 they are 3–7× the ±32 u disc the others are painted on. Low keeps ZONE_K. */
@@ -69,15 +62,6 @@ const BIG_ZONE_MIN_R = 48;
 /** Zone looks (a ±32 u disc the engine draws at r 40–360 u) bake at least this many px per u. */
 const ZONE_K: Record<Quality, number> = { low: 2, mid: 2.6, high: 2.6 };
 
-/**
- * The sprite resolution (px per u) for a viewport: the camera's base scale there (viewScale × the
- * canvas dpr) × a small headroom by quality, within [1, K_MAX]. Sprites are then drawn at ≤ 1.0× their
- * baked pixels at every quality (bosses and a few ids adjust by how large they are drawn: kindScale).
- */
-export function bakeScale(cssW: number, cssH: number, dpr: number, quality: Quality): number {
-  const cam = viewScale(cssW, cssH) * Math.max(1, dpr || 1);
-  return Math.max(1, Math.min(K_MAX[quality], cam * HEADROOM[quality]));
-}
 /** Effects the engine draws larger than they are painted (fx(name, …, { r }) blits at r / 32 of the
  *  sprite: kill bursts reach r 50–120, strikes r 64): baked this much larger, so the big ones stay
  *  near 1:1 while the common small ones are only drawn down to ≈ 0.4–0.6. */
@@ -253,10 +237,13 @@ const nextFrame = () => new Promise<void>((r) => {
 
 interface Entry { s: Sprite[]; f: Sprite[] }
 
+/** Where a bake writes: the live atlas, or a re-bake's fresh one (rescale) until it is swapped in. */
+interface Target { pages: Pages; normal: Map<string, Entry>; inv: Map<string, Entry>; bigZone: Map<string, Sprite>; bigK: Map<string, number>; k: number }
+
 class InkPainter implements Painter {
   readonly dpr: number;
-  /** px per u of sprites. */
-  readonly k: number;
+  /** px per u of sprites (a rescale changes it). */
+  k: number;
   private pages = new Pages();
   private normal = new Map<string, Entry>();
   private inv = new Map<string, Entry>();
@@ -278,6 +265,12 @@ class InkPainter implements Painter {
   private bigK = new Map<string, number>();
   /** The large bakes of those zone looks that also keep a small sprite (drawZone picks by r). */
   private bigZone = new Map<string, Sprite>();
+  /** The zone looks planZones chose from (a rescale re-plans them at the new scale). */
+  private zoneLooks: FxName[] = [];
+  /** bake() and rescale() run one at a time, in call order (a rescale never swaps pages under a bake). */
+  private lock: Promise<void> = Promise.resolve();
+  /** The newest rescale (an older one still running gives up at its next slice). */
+  private rescaleGen = 0;
 
   constructor(readonly map: MapId, readonly quality: Quality, dpr: number, pxPerU?: number) {
     this.dpr = Math.max(1, Math.min(dpr || 1, 3));
@@ -327,22 +320,40 @@ class InkPainter implements Painter {
 
   /** The zone looks this run draws large, and the px per u each bakes at (none on low). */
   private planZones(run: RunSave): void {
-    this.bigK.clear();
+    const looks: FxName[] = [];
+    for (const look of [...(MAP_ZONES[run.map] ?? []), SKILL_ZONES[run.char]]) if (look) looks.push(look);
+    this.zoneLooks = looks;
+    this.bigK = this.zoneKs(this.k);
+  }
+  /** px per u of each planned zone look's large bake at sprite scale k. */
+  private zoneKs(k0: number): Map<string, number> {
+    const out = new Map<string, number>();
     const cap = ZONE_PX[this.quality];
-    if (!cap) return;
-    const looks = [...(MAP_ZONES[run.map] ?? []), SKILL_ZONES[run.char]];
-    for (const look of looks) {
-      const R = look ? ZONE_R[look] : undefined;
-      if (!look || !R) continue;
+    if (!cap) return out;
+    for (const look of this.zoneLooks) {
+      const R = ZONE_R[look];
+      if (!R) continue;
       // the disc spans ±34 u (its 2 u margin); drawn at r / 32 of it
-      const k = Math.min(this.k * (R / 32), cap / 68);
-      if (k > Math.max(this.k, ZONE_K[this.quality]) * 1.15) this.bigK.set(`fx:${look}`, k);
+      const k = Math.min(k0 * (R / 32), cap / 68);
+      if (k > Math.max(k0, ZONE_K[this.quality]) * 1.15) out.set(`fx:${look}`, k);
     }
+    return out;
+  }
+  /** The live atlas as a bake target. */
+  private live(): Target { return { pages: this.pages, normal: this.normal, inv: this.inv, bigZone: this.bigZone, bigK: this.bigK, k: this.k }; }
+  /** Run bake / rescale jobs one at a time. */
+  private serial<T>(f: () => Promise<T>): Promise<T> {
+    const p = this.lock.then(f, f);
+    this.lock = p.then(() => undefined, () => undefined);
+    return p;
   }
   /** px per u a zone look's large bake uses (0: none), for the lab and the tests. */
   zoneScale(look: FxName): number { return this.bigK.get(`fx:${look}`) ?? 0; }
 
-  async bake(ids: readonly AtlasId[], onProgress?: (done: number, total: number) => void): Promise<void> {
+  bake(ids: readonly AtlasId[], onProgress?: (done: number, total: number) => void): Promise<void> {
+    return this.serial(() => this.bakeNow(ids, onProgress));
+  }
+  private async bakeNow(ids: readonly AtlasId[], onProgress?: (done: number, total: number) => void): Promise<void> {
     await fontsReady();
     if (this.disposed) return;
     this.nums.ensure();
@@ -382,7 +393,7 @@ class InkPainter implements Painter {
       const t0 = performance.now();
       do {
         const j = jobs[done];
-        this.bakeOne(j.id, j.v, j.inv, j.n, pending);
+        this.bakeOne(j.id, j.v, j.inv, j.n, pending, this.live());
         done++;
       } while (done < total && performance.now() - t0 < slice);
       onProgress?.(done, total);
@@ -392,7 +403,60 @@ class InkPainter implements Painter {
     this.tele.blot = this.sprite('fx:teleInk');
   }
 
-  private bakeOne(id: AtlasId, v: number, inv: boolean, n: number, pending: Map<string, Entry>) {
+  /**
+   * Re-bake every sprite baked so far at a new sprite scale (px per u, within the quality's K_MAX) into
+   * fresh pages, frame-budgeted like bake() (`sliceMs` per frame: a number, or read each frame — the
+   * engine gives more while paused), then swap them in at once: the old sprites keep drawing until the
+   * new ones are all ready, and their pages are freed after. Runs after any bake in flight. Resolves
+   * true when swapped in; false when there was nothing to do (within 3% of the current scale), a newer
+   * rescale superseded it, or the painter was disposed. The arena's obstacle sprites are re-baked with
+   * the atlas (the arena's base and stains and the ambience keep the resolution they were painted at:
+   * memory-capped); the feel layer's marks follow at the next wave.
+   */
+  rescale(pxPerU: number, onProgress?: (done: number, total: number) => void, sliceMs: number | (() => number) = SLICE_MS): Promise<boolean> {
+    const gen = ++this.rescaleGen;
+    return this.serial(() => this.rescaleNow(gen, pxPerU, onProgress, sliceMs));
+  }
+  private async rescaleNow(gen: number, pxPerU: number, onProgress: ((done: number, total: number) => void) | undefined, sliceMs: number | (() => number)): Promise<boolean> {
+    if (this.disposed || gen !== this.rescaleGen || !(pxPerU > 0) || !Number.isFinite(pxPerU)) return false;
+    const k = Math.max(0.5, Math.min(K_MAX[this.quality], pxPerU));
+    if (Math.abs(k - this.k) / this.k < 0.03) return false;
+    await fontsReady();
+    if (this.disposed || gen !== this.rescaleGen) return false;
+    const T: Target = { pages: new Pages(), normal: new Map(), inv: new Map(), bigZone: new Map(), bigK: this.zoneKs(k), k };
+    const jobs: { id: AtlasId; v: number; inv: boolean; n: number }[] = [];
+    const add = (m: Map<string, Entry>, inv: boolean) => { for (const [id, e] of m) for (let v = 0; v < e.s.length; v++) jobs.push({ id: id as AtlasId, v, inv, n: e.s.length }); };
+    add(this.normal, false); add(this.inv, true);
+    // the arena's obstacle sprites follow too (a few; the base keeps its memory-capped resolution)
+    const A = this.arena, nObst = A.obstaclesToRebake(k), arenaGen = A.paintGen;
+    const obst: (ObstSprite | null)[] = [];
+    const total = jobs.length + nObst;
+    const pending = new Map<string, Entry>();
+    let done = 0;
+    onProgress?.(0, total);
+    const drop = () => { T.pages.dispose(); for (const o of obst) if (o) { o.img.width = 1; o.img.height = 1; } };
+    while (done < total) {
+      const t0 = performance.now();
+      const slice = typeof sliceMs === 'function' ? sliceMs() : sliceMs;
+      do {
+        if (done < jobs.length) { const j = jobs[done]; this.bakeOne(j.id, j.v, j.inv, j.n, pending, T); }
+        else obst.push(A.rebakeObstacle(done - jobs.length, k));
+        done++;
+      } while (done < total && performance.now() - t0 < slice);
+      onProgress?.(done, total);
+      if (done < total) await nextFrame();
+      if (this.disposed || gen !== this.rescaleGen) { drop(); return false; }
+    }
+    // the swap: one assignment each (the frame loop reads these maps; it never sees a half-baked atlas)
+    if (nObst) A.setObstacles(obst, k, arenaGen);
+    const old = this.pages;
+    this.pages = T.pages; this.normal = T.normal; this.inv = T.inv; this.bigZone = T.bigZone; this.bigK = T.bigK; this.k = k;
+    this.tele.blot = this.sprite('fx:teleInk');
+    old.dispose();
+    return true;
+  }
+
+  private bakeOne(id: AtlasId, v: number, inv: boolean, n: number, pending: Map<string, Entry>, T: Target) {
     const sp = specOf(id, this.self);
     if (!sp) return;
     const key = id;
@@ -401,25 +465,25 @@ class InkPainter implements Painter {
     try {
       const big = id.startsWith('boss:');
       const zone = isZone(sp.spec);
-      const kBig = zone ? this.bigK.get(id) ?? 0 : 0;
+      const kBig = zone ? T.bigK.get(id) ?? 0 : 0;
       const live = kBig > 0 && LIVE_ZONES.has(id.slice(3));
-      const k = zone ? (live ? kBig : Math.max(this.k, ZONE_K[this.quality])) : this.k * kindScale(id);
+      const k = zone ? (live ? kBig : Math.max(T.k, ZONE_K[this.quality])) : T.k * kindScale(id);
       const edge = edgeOf(id);
       // the halo in px follows the bake scale (≈ 1 u; bosses 1.8 u), never under 1 px
       const halo = Math.max(1, Math.round(k * (big ? 1.8 : 1)));
       const opts = { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, duo: sp.duo, flash: flashes(id), rim: edge.rim, outline: edge.outline, volume: edge.volume };
       const painted = renderSpec(sp.spec, v, opts);
-      const { s, f } = pack(this.pages, painted);
+      const { s, f } = pack(T.pages, painted);
       e.s[v] = s; e.f[v] = f;
       // a zone look drawn large this run also gets its large bake (same seed: the same marks)
-      if (kBig > 0 && !live && v === 0 && !inv) this.bigZone.set(id.slice(3), pack(this.pages, renderSpec(sp.spec, 0, { ...opts, k: kBig, halo: Math.max(1, Math.round(kBig)) })).s);
+      if (kBig > 0 && !live && v === 0 && !inv) T.bigZone.set(id.slice(3), pack(T.pages, renderSpec(sp.spec, 0, { ...opts, k: kBig, halo: Math.max(1, Math.round(kBig)) })).s);
     } catch (err) {
       console.warn('[mirror paint]', id, err);
     }
     if (v === n - 1) {
       // fill any failed frame with frame 0 so variants() stays honest
       for (let i = 0; i < n; i++) { if (!e.s[i]) e.s[i] = e.s[0]; if (!e.f[i]) e.f[i] = e.f[0]; }
-      if (e.s[0]) (inv ? this.inv : this.normal).set(key, e);
+      if (e.s[0]) (inv ? T.inv : T.normal).set(key, e);
       pending.delete(key + (inv ? '|i' : ''));
     }
   }

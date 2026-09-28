@@ -1,7 +1,8 @@
 // 水月幻镜 · pause (GDD §18.9): resume, settings, the build so far, 暂离 and 弃镜. Mid-wave 暂离 warns
-// first (「此重将重来 · 第 k/3 次」); 弃镜 always confirms with what 镜碎 would pay now. No confirm():
+// first (「这一重要重打 · 第 k/3 次」); 弃镜 always confirms with what 镜碎 would pay now. No confirm():
 // every question is a Sheet.
 import type { ComponentChildren } from 'preact';
+import { useEffect, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { mirror } from '../../../app/mirror';
 import { setSettings, state } from '../../../app/store';
@@ -9,8 +10,9 @@ import { todayKey } from '../../../core/date';
 import { Sheet, Toggle } from '../../../ui/kit';
 import { quoteNow } from '../logic';
 import { setMirrorSettings } from '../logic/session';
-import type { MirrorSettings, RunSave } from '../types';
-import { BuildRow } from './Shop';
+import type { HudState, MirrorSettings, RunSave } from '../types';
+import { termName } from '../data/glossary';
+import { CharacterPanel } from './Panel';
 import { calmPref, osReduced, setCalm } from './prefs';
 import { signal } from '@preact/signals';
 import { setVibrate } from '../engine/feel';
@@ -121,37 +123,74 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
 export function PauseSheet(props: {
   open: boolean; run: RunSave; midWave: boolean; onResume: () => void; onLeave: () => void; onAbandon: () => void;
   onSettings: (p: Partial<MirrorSettings>) => void; confirm: 'leave' | 'abandon' | null; setConfirm: (c: 'leave' | 'abandon' | null) => void;
+  /** Mid-wave: the HUD's last push (live HP, the skill, the marks) for the 人物 view. */
+  live?: HudState | null;
+  /** The tutorial's practice run: 「暂停 · 练习」, and one 「离开教程」 in place of 暂离 / 弃镜. */
+  practice?: boolean;
 }) {
   const t = useT();
   const { run } = props;
   const X = quoteNow(mirror.value, run, todayKey());
   const k = run.interruptions + 1;
+  // every opening starts on 人物 (the HUD portrait and the 人物 key both land here)
+  const [seg, setSeg] = useState<'who' | 'settings'>('who');
+  useEffect(() => { if (props.open) setSeg('who'); }, [props.open]);
+  const segs: ['who' | 'settings', string][] = [['who', termName('panel', t)], ['settings', t('设置', 'Settings')]];
+  const onSegKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next = seg === 'who' ? 'settings' : 'who';
+    setSeg(next);
+    (e.currentTarget as HTMLElement).querySelector<HTMLButtonElement>(`[data-tut="seg:${next}"]`)?.focus();
+  };
+  const title = props.practice ? t('暂停 · 练习', 'Paused · practice') : termName('pause', t);
   return (
     <>
-      <Sheet open={props.open && props.confirm === null} onClose={props.onResume} title={t('镜中暂歇', 'Paused')} label={t('暂停', 'Pause')}>
+      <Sheet open={props.open && props.confirm === null} onClose={props.onResume} title={title} label={title}>
         <div class="mj-pausebody">
-          <button type="button" class="btn btn-primary mj-big mj-wide" onClick={props.onResume}>{t('继续', 'Resume')}</button>
-          <h3 class="mj-h3">{t('此照行装', 'Your build')}</h3>
-          <BuildRow run={run} t={t} px={30} />
-          <h3 class="mj-h3">{t('设置', 'Settings')}</h3>
-          <SettingsRows onChange={props.onSettings} />
-          <div class="mj-row-actions mj-pause-exits">
-            <button type="button" class="btn" onClick={() => (props.midWave ? props.setConfirm('leave') : props.onLeave())}>
-              {t('暂离', 'Step away')}{!props.midWave && <small class="muted"> · {t('存档，不花钱', 'saved, free')}</small>}
-            </button>
-            <button type="button" class="btn btn-ghost mj-danger" onClick={() => props.setConfirm('abandon')}>{t('弃镜', 'Give up the run')}</button>
+          <button type="button" class="btn btn-primary mj-big mj-wide" data-tut="resume" onClick={props.onResume}>{t('继续', 'Resume')}</button>
+          <div class="seg mj-pause-seg" role="group" aria-label={t('暂停时看什么', 'Show')} onKeyDown={onSegKey}>
+            {segs.map(([id, label]) => (
+              <button type="button" data-tut={`seg:${id}`} aria-pressed={seg === id} onClick={() => setSeg(id)}>{label}</button>
+            ))}
           </div>
+          {seg === 'who'
+            ? <CharacterPanel run={run} t={t} density="compact" live={props.midWave ? props.live ?? null : null} />
+            : <SettingsRows onChange={props.onSettings} />}
+          {props.practice ? (
+            <div class="mj-row-actions mj-pause-exits" data-tut="pauseExit">
+              <button type="button" class="btn" data-tut="leaveTutor" onClick={() => props.setConfirm('leave')}>{t('离开教程', 'Leave the tutorial')}</button>
+            </div>
+          ) : (
+            <div class="mj-row-actions mj-pause-exits" data-tut="pauseExit">
+              <button type="button" class="btn" onClick={() => (props.midWave ? props.setConfirm('leave') : props.onLeave())}>
+                {termName('leave', t)}{!props.midWave && <small class="muted"> · {t('存档，不花钱', 'saved, free')}</small>}
+              </button>
+              <button type="button" class="btn btn-ghost mj-danger" onClick={() => props.setConfirm('abandon')}>{t('弃镜', 'Give up the run')}</button>
+            </div>
+          )}
         </div>
       </Sheet>
+      {props.practice && (
+        <Confirm
+          open={props.open && props.confirm === 'leave'}
+          title={t('离开教程', 'Leave the tutorial')}
+          yes={t('离开', 'Leave')}
+          onYes={props.onLeave}
+          onNo={() => props.setConfirm(null)}
+        >
+          <p>{t('离开后，镜前点「教程」随时可以再来。', 'You can come back any time: tap Tutorial in front of the mirror.')}</p>
+        </Confirm>
+      )}
       <Confirm
-        open={props.open && props.confirm === 'leave'}
+        open={props.open && !props.practice && props.confirm === 'leave'}
         title={t('暂离', 'Step away')}
         yes={t('暂离', 'Step away')}
         onYes={props.onLeave}
         onNo={() => props.setConfirm(null)}
       >
-        <p class="mj-confirm-big brush">{t(`此重将重来 · 第 ${k}/3 次`, `This wave will replay · ${k} of 3`)}</p>
-        <p>{t('此重未破，回来时从这一重之前重新开始；袖中铜钱不计，届时照样再落。第三次中断即以镜碎结算。', 'The wave is not won: you will replay it from just before; coins picked up now are not banked, and fall again. A third interruption settles the run as broken.')}</p>
+        <p class="mj-confirm-big">{t(`这一重要重打 · 第 ${k}/3 次`, `This wave will replay · ${k} of 3`)}</p>
+        <p>{t('这一重还没打完：回来时从这一重开头重新打。这一重捡的铜钱先不算，重打时还会再掉。中断到第三次，这一局就直接结算。', 'The wave is not won: you will replay it from the start. Coins picked up in it are not kept, and drop again. A third interruption ends the run.')}</p>
       </Confirm>
       <Confirm
         open={props.open && props.confirm === 'abandon'}
@@ -161,8 +200,8 @@ export function PauseSheet(props: {
         onYes={props.onAbandon}
         onNo={() => props.setConfirm(null)}
       >
-        <p class="mj-confirm-big brush">{t(`弃镜即镜碎：结算已过 ${run.wave} 重，约 ${X} 文`, `Giving up breaks the glass: settle ${run.wave} waves, about ${X} coins`)}</p>
-        {props.midWave && <p>{t('此重未破，不计；袖中铜钱随镜沉池。', 'This wave is not won and does not count; the coins in your sleeve sink with the glass.')}</p>}
+        <p class="mj-confirm-big">{t(`放弃这一局：按打完的 ${run.wave} 重结算，大约 ${X} 文`, `Give up the run: it is settled on ${run.wave} waves won, about ${X} coins`)}</p>
+        {props.midWave && <p>{t('正在打的这一重不算，这一重捡的铜钱也会丢掉。', 'The wave in progress does not count, and the coins picked up in it are lost.')}</p>}
       </Confirm>
     </>
   );

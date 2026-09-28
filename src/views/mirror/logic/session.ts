@@ -8,8 +8,8 @@ import { hashString } from '../../../core/rng';
 import { todayKey } from '../../../core/date';
 import { DIFF_REG, type HeartFaceId, type MapId, type RimId, type VowId } from '../ids';
 import type {
-  CharacterId, CodexKey, DeathResult, DiffIndex, EndCause, MirrorMeta, MirrorSettings, RunReport, RunSave, TitleId, VowRanks,
-  WaveResult, WaveSetup,
+  CharacterId, CodexKey, DeathResult, DiffIndex, EndCause, MirrorMeta, MirrorSettings, RunReport, RunSave, TitleId, TutorFlags, Unlocks,
+  VowRanks, WaveResult, WaveSetup,
 } from '../types';
 import { RUN_VER } from '../types';
 import { PAY, VOWS, HEAT_MAX, rateOf } from '../data';
@@ -293,4 +293,45 @@ export function markSeen(keys: readonly CodexKey[]): void {
   const codex = { ...m.codex };
   for (const k of keys) if (!codex[k]) codex[k] = 1;
   mirror.value = { ...m, codex };
+}
+
+// ───────────────────────────────────────────── the run's session (the RunView seam)
+/**
+ * What a run on screen calls at each moment (ui/Run.tsx). The real one below is this module: it writes
+ * meta.active, the purse and the counters. The tutorial's (tutor/session.ts) keeps its run in memory
+ * and writes nothing but its own flags. `practice` tells the view which one it has.
+ */
+export interface RunSession {
+  readonly practice: boolean;
+  commit(run: RunSave): void;
+  startWave(run: RunSave): { run: RunSave; setup: WaveSetup };
+  waveWon(res: WaveResult): RunSave | null;
+  died(d: DeathResult): RunReport | null;
+  leaveMidWave(): { interruptions: number; report: RunReport | null };
+  abandon(): RunReport | null;
+  engineFailed(): RunReport | null;
+  markSeen(keys: readonly CodexKey[]): void;
+  /** What the account has open, for the shop, crates and 镜心 (fixed for the run). */
+  unlocks(): Unlocks;
+}
+/** The real session: this module's writers, unchanged. */
+export const realSession: RunSession = {
+  practice: false,
+  commit, startWave, waveWon, died, leaveMidWave, abandon, engineFailed, markSeen,
+  unlocks: () => unlocksOf(mirror.value),
+};
+
+// ───────────────────────────────────────────── the tutorial's flags
+const tutorNow = (m: MirrorMeta): TutorFlags => m.tutor ?? { offered: false, done: false, tips: {} };
+/** Set the tutorial's flags (`done` always implies `offered`); written at once. */
+export function setTutor(p: Partial<Pick<TutorFlags, 'offered' | 'done'>>): void {
+  updateMeta((m) => {
+    const cur = tutorNow(m);
+    const done = p.done ?? cur.done;
+    return { ...m, tutor: { ...cur, done, offered: (p.offered ?? cur.offered) || done } };
+  });
+}
+/** 重看新手提示: every first-time tip shows again. */
+export function resetTips(): void {
+  updateMeta((m) => ({ ...m, tutor: { ...tutorNow(m), tips: {} } }));
 }

@@ -151,17 +151,17 @@ export type ItemId = (typeof ITEM_REG)[number]['id'];
 // ─────────────────────────────────────────────────────────────── archetypes (流派, 14)
 export const ARCHETYPE_REG = [
   { id: 'mobao', zh: '墨宝 · 召唤', en: 'Ink Summoner', look: 'paint an army, then kite while it fights' },
-  { id: 'xianjian', zh: '仙剑 · 飞剑', en: 'Flying Swords', look: 'swords orbit, launch, pierce and return' },
+  { id: 'xianjian', zh: '御剑 · 飞剑', en: 'Flying Swords', look: 'swords orbit, launch, pierce and return' },
   { id: 'zhongbing', zh: '偃月 · 重兵', en: 'Crescent Arms', look: 'huge slow sweeps and knockback' },
   { id: 'jinzhong', zh: '金钟 · 反伤', en: 'Golden Bell', look: 'stand in the crowd while your armour hits back' },
-  { id: 'fulu', zh: '符箓 · 五行', en: 'Talismans', look: 'thunder that chains, fire that spreads' },
+  { id: 'fulu', zh: '符箓 · 法术', en: 'Talismans', look: 'thunder that chains, fire that spreads' },
   { id: 'qinxin', zh: '琴心 · 控场', en: 'Heart of the Qin', look: 'slow, stun and charm so enemies fight each other' },
   { id: 'zuixian', zh: '醉仙 · 暴击', en: 'Drunken Immortal', look: 'ride 醉 into chains of crits' },
   { id: 'fuyuan', zh: '福缘 · 生财', en: 'Fortune', look: 'invest first, then turn wealth into power' },
   { id: 'huichun', zh: '回春 · 续命', en: 'Spring Returns', look: 'out-heal everything; regen becomes damage' },
   { id: 'qizhen', zh: '棋阵 · 布子', en: 'Go Formation', look: 'lure the horde through a minefield, then capture' },
   { id: 'yueying', zh: '月影 · 闪避', en: 'Moon Shadow', look: 'every dodge fires moonlight' },
-  { id: 'jifeng', zh: '疾风 · 身法', en: 'Swift Wind', look: 'speed is damage; never stop moving' },
+  { id: 'jifeng', zh: '疾风 · 移速', en: 'Swift Wind', look: 'speed is damage; never stop moving' },
   { id: 'jiehuo', zh: '劫火 · 负劫', en: 'Curse Fire', look: 'take the curse, take the power' },
   { id: 'dugubaijia', zh: '独孤 / 百家', en: 'Lone Sword / Hundred Schools', look: 'one weapon counting as six, or six classes at their 2-sets' },
 ] as const satisfies readonly Named[];
@@ -482,7 +482,7 @@ export const DEED_REG = [
   { id: 'guanClear', unlocks: 'needle', stat: 'cleared30', goal: 1, mode: 'max', char: 'guan', zh: '关公照破', en: 'Lord Guan Breaks Through', look: '照破 as 关公' },
   { id: 'speedSixty', unlocks: 'lingbo', stat: 'peakSpeed', goal: 60, mode: 'max', zh: '身轻六成', en: 'Sixty Percent Lighter', look: 'reach +60% 身法' },
   { id: 'dodgeFifty', unlocks: 'osmanthus', stat: 'peakDodge', goal: 50, mode: 'max', zh: '半避', en: 'Half Untouchable', look: 'reach 50% 闪避' },
-  { id: 'regenTwenty', unlocks: 'physician', stat: 'peakRegen', goal: 20, mode: 'max', zh: '回气二十', en: 'Twenty Breaths', look: 'reach 20 回气' },
+  { id: 'regenTwenty', unlocks: 'physician', stat: 'peakRegen', goal: 20, mode: 'max', zh: '回血二十', en: 'Twenty Breaths', look: 'reach 20 回气' },
   { id: 'healRun', unlocks: 'penglai', stat: 'healed', goal: 2000, mode: 'max', zh: '一照两千', en: 'Two Thousand in One Run', look: 'heal 2,000 HP in one run' },
   { id: 'burnThirty', unlocks: 'samadhi', stat: 'peakBurning', goal: 30, mode: 'max', zh: '三十焚身', en: 'Thirty Ablaze', look: '30 enemies burning at once' },
   { id: 'moonRun', unlocks: 'treasurebowl', stat: 'moonCollected', goal: 1500, mode: 'max', zh: '一照千五', en: 'Fifteen Hundred in One Run', look: 'collect 1,500 月华 in one run' },
@@ -613,6 +613,7 @@ export const PROJ_REG = [
   { id: 'eFoxfire', zh: '狐焰', en: 'Fox Flame', look: 'enemy: pink-cinnabar fox-flame' },
   { id: 'eMoonShard', zh: '月刃', en: 'Moon Blade', look: 'enemy: homing moon shard (水中月)' },
   { id: 'eOrb', zh: '魇珠', en: 'Nightmare Orb', look: 'enemy: generic round shot, white core, 朱砂 rim' },
+  { id: 'peachSword', zh: '桃木飞剑', en: 'Peachwood Sword', look: 'flying peachwood blade in gamboge light, carved notches, a gold tassel (桃木剑)' },
 ] as const satisfies readonly Named[];
 export type ProjKind = (typeof PROJ_REG)[number]['id'];
 

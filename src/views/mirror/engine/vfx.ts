@@ -20,6 +20,7 @@ import { Pool } from './pools';
 import { TAU } from './consts';
 import { SH, TN } from '../paint/feel';
 import { RING_EDGE, STAIN, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, type VfxSprites, isInkTint, vfxSprites } from '../paint/vfx';
+import { VIEW_SPAN, viewOf } from '../paint/draw';
 
 const STAIN_CRACK: number = STAIN.crack;
 
@@ -27,9 +28,9 @@ export { VT, STAIN } from '../paint/vfx';
 
 /** Concurrent budgets by quality (the frame guard halves them and drops halos and shot glows). */
 export const VFX_CAP = {
-  low: { rings: 6, halos: 1, slashes: 6, lances: 6, bolts: 10, beams: 6, flecks: 40, blooms: 8, stains: 8, glows: 0, trails: 12, passes: 2 },
-  mid: { rings: 12, halos: 2, slashes: 12, lances: 10, bolts: 18, beams: 10, flecks: 90, blooms: 16, stains: 16, glows: 60, trails: 40, passes: 3 },
-  high: { rings: 20, halos: 4, slashes: 20, lances: 16, bolts: 28, beams: 14, flecks: 160, blooms: 24, stains: 24, glows: 160, trails: 96, passes: 3 },
+  low: { rings: 6, halos: 1, slashes: 6, lances: 6, bolts: 10, beams: 6, flecks: 40, blooms: 8, stains: 8, glows: 0, trails: 12, passes: 2, impacts: 8, impStep: 2, impGlows: 4, sheds: 0 },
+  mid: { rings: 12, halos: 2, slashes: 12, lances: 10, bolts: 18, beams: 10, flecks: 90, blooms: 16, stains: 16, glows: 60, trails: 40, passes: 3, impacts: 14, impStep: 4, impGlows: 8, sheds: 5 },
+  high: { rings: 20, halos: 4, slashes: 20, lances: 16, bolts: 28, beams: 14, flecks: 160, blooms: 24, stains: 24, glows: 160, trails: 96, passes: 3, impacts: 30, impStep: 6, impGlows: 20, sheds: 10 },
 } as const satisfies Record<Quality, Record<string, number>>;
 export type VfxCaps = (typeof VFX_CAP)[Quality];
 
@@ -64,8 +65,17 @@ export interface ShockOpts {
 const NO_OPTS: ShockOpts = {};
 /** Bloom kinds. */
 export const BK = { glow: 0, column: 1, halo: 2, glyph: 3 } as const;
-/** Fleck kinds. */
-export const FK = { ink: 0, ember: 1, glint: 2, drop: 3 } as const;
+/** Fleck kinds: an ink chip, a spark of light, a twinkle, a droplet, a jade chip, a go stone, a note
+ *  drifting up, a fire ember rising. */
+export const FK = { ink: 0, ember: 1, glint: 2, drop: 3, chip: 4, stone: 5, note: 6, flame: 7 } as const;
+/** Impact flags: a crit (star-burst, long radial streaks), a kill (a ring and a flash), a heavy blow, a
+ *  big body (elite, boss), a go stone's clack, ink (no light). */
+export const IF = { crit: 1, kill: 2, heavy: 4, big: 8, clack: 16, ink: 32 } as const;
+/** Impact flavours: what flies off a blow besides its sparks (by weapon: WPN_FLAVOR). */
+export const FL = {
+  blade: 0, heavy: 1, claw: 2, fist: 3, arrow: 4, coin: 5, jade: 6, peach: 7, fire: 8, thunder: 9, wine: 10, ink: 11, moon: 12, go: 13,
+  music: 14, skill: 15, plain: 16,
+} as const;
 
 /** One pool of timed entries (fields are shared by the kinds; each kind reads what it needs). */
 export class FxPool extends Pool {
@@ -114,12 +124,17 @@ export class Vfx {
   q: Quality;
   caps: VfxCaps;
   rings!: FxPool; slashes!: FxPool; lances!: FxPool; bolts!: FxPool; beams!: FxPool; flecks!: FxPool; blooms!: FxPool; stains!: FxPool;
+  /** Impacts: where a blow meets a body (a hot white core, a halo in the weapon's light, sparks). */
+  impacts!: FxPool;
+  /** The step whose impacts are counted, and how many it made (a crowd under a fast weapon). */
+  private impT = -1;
+  private impN = 0;
   sprites: VfxSprites;
   /** Simulation time seen last (a smaller one means a new wave). */
   private lastT = 0;
   private seedN = 0x9e3779b9;
   /** Counts (dev, tests). */
-  readonly st = { rings: 0, slashes: 0, lances: 0, bolts: 0, beams: 0, flecks: 0, blooms: 0, stains: 0, dropped: 0 };
+  readonly st = { rings: 0, slashes: 0, lances: 0, bolts: 0, beams: 0, flecks: 0, blooms: 0, stains: 0, impacts: 0, dropped: 0 };
 
   constructor(private W: World) {
     this.q = W.quality;
@@ -133,7 +148,8 @@ export class Vfx {
     const c = this.caps;
     this.rings = new FxPool(c.rings); this.slashes = new FxPool(c.slashes); this.lances = new FxPool(c.lances); this.bolts = new FxPool(c.bolts);
     this.beams = new FxPool(c.beams); this.flecks = new FxPool(c.flecks); this.blooms = new FxPool(c.blooms); this.stains = new FxPool(c.stains);
-    this.pools = [this.rings, this.slashes, this.lances, this.bolts, this.beams, this.flecks, this.blooms, this.stains];
+    this.impacts = new FxPool(c.impacts);
+    this.pools = [this.rings, this.slashes, this.lances, this.bolts, this.beams, this.flecks, this.blooms, this.stains, this.impacts];
   }
   private all(): readonly FxPool[] { return this.pools; }
 
@@ -180,6 +196,8 @@ export class Vfx {
   }
   private seed(): number { let x = this.seedN; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.seedN = x >>> 0; return this.seedN; }
   private rnd(): number { return this.seed() / 4294967296; }
+  /** A cosmetic random in [0, 1) (the renderer's jitter; never the simulation's streams). */
+  rnd01(): number { return this.rnd(); }
 
   // ───────────────────────────────────────────────────── emitters
 
@@ -254,7 +272,7 @@ export class Vfx {
     if (i < 0) return -1;
     P.x[i] = x; P.y[i] = y; P.a[i] = dir; P.r[i] = Math.max(16, r); P.b[i] = Math.max(20, Math.min(360, deg)); P.tint[i] = tint; P.life[i] = life;
     P.flags[i] = flags | (isInkTint(tint) ? VF.ink : 0);
-    P.w[i] = Math.max(6, Math.min(28, r * 0.17));
+    P.w[i] = Math.max(8, Math.min(34, r * 0.21));
     this.st.slashes++;
     return i;
   }
@@ -307,6 +325,87 @@ export class Vfx {
     if (i < 0) return -1;
     P.x[i] = x; P.y[i] = y; P.r[i] = r; P.kind[i] = kind; P.life[i] = life; P.a[i] = this.rnd() * TAU;
     this.st.stains++;
+    return i;
+  }
+
+  /**
+   * Where a blow meets a body (x, y): a hot white core, a halo in the weapon's light that swells and
+   * fades, sparks of that light flung out along the blow (`ang`; a crit's and a kill's all round), and
+   * what flies off by flavour (FL: embers rise off a talisman's fire, arcs crackle off 雷符, wine and ink
+   * splash, moonlight glints, jade chips, go stones clack). A crit adds a star-burst and long radial
+   * streaks (IF.crit); a kill a ring and a flash (IF.kill). `r` is the body's radius. Budgeted per step
+   * (a fast weapon in a crowd keeps a few a step; crits and kills get twice the room) and by the pool;
+   * reduced motion keeps a gentle halo, no sparks, no flash.
+   */
+  impact(x: number, y: number, ang: number, r: number, tint: number, flav: number, flags = 0): number {
+    const W = this.W;
+    this.sync();
+    if (W.t !== this.impT) { this.impT = W.t; this.impN = 0; }
+    const special = (flags & (IF.crit | IF.kill | IF.big)) !== 0;
+    const lim = this.caps.impStep * (W.degrade ? 0.5 : 1) * (special ? 2 : 1);
+    if (this.impN >= lim) { this.st.dropped++; return -1; }
+    const P = this.impacts;
+    const i = this.take(P, flags & IF.big ? 2 : special ? 1 : 0);
+    if (i < 0) return -1;
+    this.impN++;
+    // a wider view draws everything smaller: the blow's light grows back part of the way (impactViewK)
+    r *= impactViewK(W.settings.view);
+    P.x[i] = x; P.y[i] = y; P.a[i] = ang; P.r[i] = Math.max(8, Math.min(80, r)); P.tint[i] = tint; P.kind[i] = flav;
+    P.flags[i] = flags | (isInkTint(tint) ? IF.ink : 0);
+    P.life[i] = flags & IF.kill ? (flags & IF.big ? 0.42 : 0.3) : flags & IF.crit ? 0.26 : flags & IF.heavy ? 0.2 : 0.16;
+    this.st.impacts++;
+    // what flies off by flavour (half on low, under the frame guard and with reduced motion)
+    let n = flags & IF.kill ? 4 : flags & IF.crit ? 3 : flags & IF.heavy ? 3 : 2;
+    if (flags & IF.big) n += 2;
+    if (this.q === 'low' || W.degrade || this.calm) n = Math.max(1, n >> 1);
+    const R = P.r[i];
+    for (let k = 0; k < n; k++) {
+      // mostly along the blow (out of the far side), a kill's all round
+      const a = flags & IF.kill ? (k / n) * TAU + this.rnd() * 0.8 : ang + (this.rnd() - 0.5) * 1.8;
+      const c = Math.cos(a), s = Math.sin(a);
+      const v = R * (5 + 5 * this.rnd());
+      const x0 = x + c * R * 0.3, y0 = y + s * R * 0.3;
+      switch (flav) {
+        case FL.fire: case FL.peach:
+          // embers lifting off the burnt paper
+          this.fleck(x0, y0, c * v * 0.45, s * v * 0.3 - 40, FK.flame, k & 1 ? VT.gold : VT.gamboge, 0.42 + 0.2 * this.rnd(), 0.9 + 0.4 * this.rnd());
+          break;
+        case FL.thunder:
+          if (k < 2 && !this.calm) {
+            // arcs crackle off the struck body (reduced motion: no flicker of lightning, a glint)
+            const L = R * (1.2 + 0.9 * this.rnd());
+            this.bolt(x + c * R * 0.4, y + s * R * 0.4, x + c * (R * 0.4 + L), y + s * (R * 0.4 + L), VT.gold, 0.1, 0.5, 0);
+          } else this.fleck(x0, y0, c * v, s * v, FK.glint, VT.gold, 0.22, 0.7);
+          break;
+        case FL.wine: case FL.fist:
+          this.fleck(x0, y0, c * v, s * v - 30, FK.drop, VT.wine, 0.3 + 0.12 * this.rnd(), 0.9 + 0.5 * this.rnd());
+          break;
+        case FL.ink: case FL.claw:
+          this.fleck(x0, y0, c * v, s * v, FK.ink, k === 0 ? VT.ink : VT.indigo, 0.3 + 0.15 * this.rnd(), 0.8 + 0.6 * this.rnd());
+          break;
+        case FL.moon: case FL.arrow:
+          this.fleck(x0, y0, c * v * 0.6, s * v * 0.6 - 20, FK.glint, VT.moon, 0.3 + 0.15 * this.rnd(), 0.75 + 0.4 * this.rnd());
+          break;
+        case FL.coin: case FL.skill:
+          this.fleck(x0, y0, c * v * 0.7, s * v * 0.7, FK.glint, VT.gold, 0.28 + 0.12 * this.rnd(), 0.8 + 0.4 * this.rnd());
+          break;
+        case FL.jade:
+          this.fleck(x0, y0, c * v, s * v, FK.chip, VT.jade, 0.3 + 0.12 * this.rnd(), 0.9 + 0.4 * this.rnd());
+          break;
+        case FL.go:
+          this.fleck(x0, y0, c * v * 0.8, s * v * 0.8, FK.stone, k & 1 ? VT.ink : VT.white, 0.32, 0.8 + 0.3 * this.rnd());
+          break;
+        case FL.music:
+          this.fleck(x0, y0, c * v * 0.25, s * v * 0.2 - 50, k & 1 ? FK.glint : FK.note, VT.green, 0.5 + 0.2 * this.rnd(), 0.9);
+          break;
+        case FL.heavy:
+          this.fleck(x0, y0, c * v, s * v, k & 1 ? FK.ember : FK.ink, k & 1 ? tint : VT.ink, 0.26 + 0.12 * this.rnd(), 1 + 0.4 * this.rnd());
+          break;
+        default:
+          // steel: white-hot sparks off the blade
+          this.fleck(x0, y0, c * v * 1.2, s * v * 1.2, FK.ember, k & 1 ? VT.white : tint, 0.14 + 0.08 * this.rnd(), 0.9);
+      }
+    }
     return i;
   }
 
@@ -372,6 +471,7 @@ export class Vfx {
     this.drawBolts(ctx, cam, pa);
     this.drawSlashes(ctx, cam, feel, pa);
     this.drawLances(ctx, cam, feel, pa);
+    this.drawImpacts(ctx, cam, pa);
     this.drawFlecks(ctx, cam, feel, pa);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
@@ -437,8 +537,13 @@ export class Vfx {
   }
   /** Soft halo bands left this frame (large soft fills are the costly part). */
   private halosLeft = 0;
-  /** Reset the frame's halo budget (the renderer calls this before drawing legacy rings). */
-  frameStart(): void { this.halosLeft = this.W.degrade ? 0 : this.caps.halos; }
+  /** Soft impact glows (halo and white core) left this frame: past them an impact is its vectors only. */
+  private impGlowsLeft = 0;
+  /** Reset the frame's halo budgets (the renderer calls this before drawing legacy rings). */
+  frameStart(): void {
+    this.halosLeft = this.W.degrade ? 0 : this.caps.halos;
+    this.impGlowsLeft = this.W.degrade ? this.caps.impGlows >> 1 : this.caps.impGlows;
+  }
 
   /**
    * One shockwave ring at progress u (0..1) out to r: the soft band (sprite, budgeted), a trailing band,
@@ -536,26 +641,34 @@ export class Vfx {
         fill(ctx, '#f4efe4', fade * 0.55);
         continue;
       }
-      // halo, a smear behind the head (the afterimage), the body, the white core
-      crescent(ctx, sx, sy, R, aT, aH, th * 1.45 + 3 * d, 3 * d + th * 0.25);
-      fill(ctx, VFX_HALO[tint], fade * 0.34);
-      if (q !== 'low' && !calm) {
-        const back = 0.22 * sg;
-        crescent(ctx, sx, sy, R * 0.97, aT - back, aH - back, th * 0.8, 0);
-        fill(ctx, VFX_BODY[tint], fade * 0.26);
+      // halo, two afterimages lagging behind the head (the smear), the body, the white core, a bright
+      // hairline along the cutting edge
+      crescent(ctx, sx, sy, R, aT, aH, th * 1.5 + 3.5 * d, 3.5 * d + th * 0.3);
+      fill(ctx, VFX_HALO[tint], fade * 0.4);
+      if (!calm) {
+        const ghosts = q === 'low' ? 1 : 2;
+        for (let gk = ghosts; gk >= 1; gk--) {
+          const back = 0.2 * gk * sg;
+          crescent(ctx, sx, sy, R * (1 - 0.025 * gk), aT - back, aH - back, th * (0.9 - 0.12 * gk), 0);
+          fill(ctx, VFX_BODY[tint], fade * (gk === 1 ? 0.32 : 0.16));
+        }
       }
-      crescent(ctx, sx, sy, R, aT, aH, th, th * 0.05);
-      fill(ctx, VFX_BODY[tint], fade * 0.9);
+      crescent(ctx, sx, sy, R, aT, aH, th, th * 0.06);
+      fill(ctx, VFX_BODY[tint], fade * 0.92);
       if (fl & VF.edge) {
         crescent(ctx, sx, sy, R + th * 0.06, aT, aH, th * 0.16, 0.9 * d);
         fill(ctx, VFX_EDGE, fade * 0.7);
       }
-      crescent(ctx, sx, sy, R - th * 0.08, aT, aH, th * 0.34, th * 0.04);
+      crescent(ctx, sx, sy, R - th * 0.06, aT, aH, th * 0.42, th * 0.04);
       fill(ctx, VFX_CORE[tint], fade);
-      // a glint on the leading tip
-      if (star && !calm && u < 0.5) {
+      crescent(ctx, sx, sy, R + th * 0.02, aT, aH, th * 0.1, 0);
+      fill(ctx, '#ffffff', fade * 0.9);
+      // the light gathered at the leading tip: a soft bloom and a glint
+      if (!calm && u < 0.55) {
         const hx = P.x[i] + Math.cos(aH) * P.r[i] * 0.74, hy = P.y[i] + Math.sin(aH) * P.r[i] * 0.74;
-        rot(ctx, cam, star, hx, hy, aH, 0.42, 0.42, fade * (1 - u * 1.6));
+        const g = this.sprites.glow(tint);
+        if (g) rot(ctx, cam, g, hx, hy, 0, (P.w[i] * 1.6) / 16, (P.w[i] * 1.6) / 16, fade * 0.8 * (1 - u * 1.5));
+        if (star) rot(ctx, cam, star, hx, hy, aH, 0.5, 0.5, fade * (1 - u * 1.6));
       }
     }
     ctx.globalAlpha = 1;
@@ -611,7 +724,101 @@ export class Vfx {
       }
       if (star && !calm && !(fl & VF.ink) && u < 0.45) {
         const hx = x + c * len * (cutK ? 0.5 : ext), hy = y + s * len * (cutK ? 0.5 : ext);
-        rot(ctx, cam, star, hx, hy, dir, 0.36, 0.36, fade * (1 - u * 2));
+        const g = cutK ? null : this.sprites.glow(tint);
+        if (g) rot(ctx, cam, g, hx, hy, 0, (P.w[i] * 1.4) / 16, (P.w[i] * 1.4) / 16, fade * 0.8 * (1 - u * 2));
+        rot(ctx, cam, star, hx, hy, dir, 0.44, 0.44, fade * (1 - u * 2));
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /**
+   * The impacts (impact()): the weapon's halo swelling and fading, the hot white core, a kill's ring,
+   * a crit's star-burst (a go stone's small clack star), then the sparks as short vector streaks —
+   * two strokes per impact (the tint, then the white core), no sprite per spark.
+   */
+  private drawImpacts(ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
+    const P = this.impacts, t = this.W.t, S = this.sprites, calm = this.calm;
+    if (!P.count) return;
+    const d = cam.dpr || 1, k0 = cam.scale;
+    const white = S.glow(VT.white);
+    for (let i = 0; i < P.n; i++) {
+      if (!P.alive[i]) continue;
+      const u = (t - P.t0[i]) / P.life[i];
+      if (u >= 1) { P.release(i); continue; }
+      if (u < 0) continue;
+      const x = P.x[i], y = P.y[i], r = P.r[i], fl = P.flags[i], tint = P.tint[i], ang = P.a[i];
+      if (!onScreen(cam, x, y, r * 4)) continue;
+      const ink = (fl & IF.ink) !== 0, kill = (fl & IF.kill) !== 0, crit = (fl & IF.crit) !== 0, heavy = (fl & IF.heavy) !== 0;
+      const big = (fl & IF.big) !== 0 ? 1.35 : 1;
+      const e = 1 - (1 - u) * (1 - u);
+      // 1 · the halo in the weapon's light (reduced motion: a gentle glow that does not pop)
+      const Rh = r * (kill ? 2.5 : crit ? 2.2 : heavy ? 1.9 : 1.55) * big;
+      // (soft glows are budgeted per frame, in pool order: past the budget an impact is its vectors only)
+      const soft = this.impGlowsLeft > 0;
+      if (soft) this.impGlowsLeft--;
+      const g = soft ? S.glow(tint) : null;
+      if (g) {
+        const sz = (Rh / 16) * (calm ? 0.9 : 0.6 + 0.5 * e);
+        rot(ctx, cam, g, x, y, 0, sz, sz, pa * (calm ? 0.5 : 0.95) * Math.pow(1 - u, 1.25));
+      }
+      // 2 · the hot white core (ink has none), a kill's a larger flash
+      if (soft && !ink && white) {
+        const sz = ((Rh * (kill ? 0.66 : crit ? 0.56 : 0.46)) / 16) * (calm ? 0.8 : 1.2 - 0.5 * u);
+        rot(ctx, cam, white, x, y, 0, sz, sz, pa * (calm ? 0.35 : 1) * (1 - u) * (1 - u));
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const sx = (x - cam.x) * k0 + cam.w / 2, sy = (y - cam.y) * k0 + cam.h / 2;
+      // 3 · a kill's ring of light breaking outward
+      if (kill) {
+        const R = r * (calm ? 1.9 : 0.7 + 1.9 * (1 - Math.pow(1 - u, 3))) * big * k0;
+        const w = Math.max(1.2 * d, Math.min(5 * d, r * 0.16 * k0)) * (1 - 0.6 * u);
+        if (ink) stroke(ctx, sx, sy, R, w * 1.3, VFX_EDGE, pa * (1 - u) * 0.7);
+        else {
+          stroke(ctx, sx, sy, R, w * 1.9, VFX_BODY[tint], pa * (1 - u) * (calm ? 0.45 : 0.75));
+          stroke(ctx, sx, sy, R, w * 0.7, VFX_CORE[tint], pa * (1 - u) * (calm ? 0.5 : 1));
+        }
+      }
+      // 4 · a crit's star-burst (gold with a white heart), a go stone's small clack star
+      if (crit || (fl & IF.clack)) {
+        const grow = calm ? 0.85 : u < 0.22 ? 0.45 + 2.5 * u : 1 - 0.3 * ((u - 0.22) / 0.78);
+        const L = r * (crit ? 2.0 : 1.05) * big * grow * k0;
+        const rays = crit ? 8 : 4;
+        const a0 = ang + (calm ? 0 : u * 0.5);
+        starPath(ctx, sx, sy, L, rays, a0, 0.14);
+        fill(ctx, crit ? VFX_BODY[VT.gold] : VFX_EDGE, pa * (calm ? 0.55 : 0.95) * (1 - Math.pow(u, 1.6)));
+        starPath(ctx, sx, sy, L * 0.62, rays, a0, 0.12);
+        fill(ctx, crit ? VFX_CORE[VT.gold] : '#ffffff', pa * (calm ? 0.6 : 1) * (1 - Math.pow(u, 1.4)));
+      }
+      // 5 · the sparks: short streaks of the weapon's light flung out (none with reduced motion)
+      if (calm) continue;
+      const n = (kill ? 9 : crit ? 8 : heavy ? 6 : 4) + (big > 1 ? 3 : 0);
+      const all = kill || crit;
+      const seed = P.seed[i];
+      const reach = r * (kill ? 2.4 : crit ? 2.1 : heavy ? 1.9 : 1.6) * big;
+      const len0 = r * (crit ? 1.15 : kill ? 0.95 : heavy ? 0.9 : 0.8) * big;
+      const ek = 1 - Math.pow(1 - u, 2.2), tail = Math.pow(1 - u, 0.8);
+      for (let pass = 0; pass < 2; pass++) {
+        if (pass === 1 && ink) break;
+        ctx.beginPath();
+        for (let k = 0; k < n; k++) {
+          const h = h01(seed, k), sp = 0.55 + 0.65 * h01(seed, k + 31);
+          const a = all ? ang + (k / n) * TAU + (h - 0.5) * 0.55 : k === n - 1 ? ang + Math.PI + (h - 0.5) * 1.2 : ang + (h - 0.5) * 1.9;
+          const c = Math.cos(a), s = Math.sin(a);
+          const r0 = (r * 0.25 + reach * sp * ek) * k0, r1 = r0 + len0 * sp * tail * k0 * (crit && k % 2 === 0 ? 1.5 : 1);
+          ctx.moveTo(sx + c * r0, sy + s * r0);
+          ctx.lineTo(sx + c * r1, sy + s * r1);
+        }
+        if (pass === 0) {
+          ctx.lineWidth = Math.max(1.3 * d, (heavy || kill ? 3.5 : 3) * d * (1 - 0.5 * u));
+          ctx.strokeStyle = ink ? VFX_EDGE : VFX_BODY[tint];
+          ctx.globalAlpha = Math.min(1, pa * (1 - u) * (ink ? 0.8 : 0.95));
+        } else {
+          ctx.lineWidth = Math.max(0.8 * d, 1.3 * d * (1 - 0.4 * u));
+          ctx.strokeStyle = VFX_CORE[tint];
+          ctx.globalAlpha = Math.min(1, pa * (1 - u * u));
+        }
+        ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;
@@ -713,12 +920,26 @@ export class Vfx {
       if (u >= 1) { P.release(i); continue; }
       if (u < 0) continue;
       const k = P.kind[i];
-      const drag = k === FK.glint ? 1.5 : 6;
+      const drag = k === FK.glint ? 1.5 : k === FK.flame ? 2.5 : k === FK.note ? 2 : 6;
       const f = (1 - Math.exp(-drag * age)) / drag, ev = Math.exp(-drag * age);
-      const x = P.x[i] + P.vx[i] * f, y = P.y[i] + P.vy[i] * f;
+      // embers rise off the fire, notes drift up
+      const lift = k === FK.flame ? 60 * age * age * 2.2 : 0;
+      const x = P.x[i] + P.vx[i] * f, y = P.y[i] + P.vy[i] * f - lift;
       if (!onScreen(cam, x, y, 16)) continue;
       const tn = TN_OF[P.tint[i]] ?? TN.ink;
       const sz = P.r[i];
+      if (k === FK.flame) {
+        const s = feel.get(SH.ember, tn);
+        const vy = P.vy[i] * ev - 264 * age;
+        if (s) rot(ctx, cam, s, x, y, Math.atan2(vy, P.vx[i] * ev), sz * (0.75 + 0.3 * Math.sin(age * 30 + (P.seed[i] & 7))), sz, pa * (u < 0.2 ? 1 : (1 - u) / 0.8));
+        continue;
+      }
+      if (k === FK.chip || k === FK.stone || k === FK.note) {
+        const s = feel.get(k === FK.chip ? SH.chip : k === FK.stone ? SH.stone : SH.note, k === FK.stone ? (P.tint[i] === VT.white ? TN.white : TN.black) : tn);
+        const spin = k === FK.note ? Math.sin(age * 6 + (P.seed[i] & 7)) * 0.4 : age * 14 + (P.seed[i] & 7);
+        if (s) rot(ctx, cam, s, x, y, spin, sz, sz, pa * (u < 0.5 ? 1 : (1 - u) / 0.5));
+        continue;
+      }
       if (k === FK.glint) {
         const s = feel.get(SH.glint, tn);
         if (s) rot(ctx, cam, s, x, y, age * 5 + (P.seed[i] & 7), sz * (1 - 0.4 * u), sz * (1 - 0.4 * u), pa * (u < 0.3 ? 1 : (1 - u) / 0.7));
@@ -785,6 +1006,19 @@ function crescent(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: numb
   ctx.closePath();
 }
 let profN = -1;
+/** A star of `rays` points about (cx, cy): the rays alternate long and half-long (a 4-ray star: all
+ *  long), `inner` × L between them, the first ray along a0. */
+function starPath(ctx: CanvasRenderingContext2D, cx: number, cy: number, L: number, rays: number, a0: number, inner: number): void {
+  ctx.beginPath();
+  const m = rays * 2;
+  for (let k = 0; k < m; k++) {
+    const a = a0 + (k / m) * TAU;
+    const rr = k & 1 ? L * inner : rays > 4 && (k >> 1) & 1 ? L * 0.5 : L;
+    const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+    if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+}
 /** A lance along +x from x0 to L (the current transform is the lance's frame), half-width hw by profile. */
 function lancePath(ctx: CanvasRenderingContext2D, x0: number, L: number, hw: number, prof: Float32Array): void {
   ctx.beginPath();
@@ -814,7 +1048,12 @@ export function slashTint(fc: number): number {
     case 3: case 7: return VT.wine; // fist, wine
     case 8: return VT.indigo; // ink brush
     case 9: return VT.jade; // flying
-    default: return VT.azure; // blades
+    case 4: case 12: case 14: return VT.moon; // arrows, moon, generic
+    case 6: return VT.gamboge; // talismans
+    case 10: return VT.white; // go
+    case 11: return VT.green; // music
+    case 13: return VT.gold; // the 镜技
+    default: return VT.azure; // blades, darts
   }
 }
 /** The slash flags of a feel class (a glaive's ink rim, a claw's three rakes). */
@@ -834,6 +1073,40 @@ export const WPN_TINT: Readonly<Record<WeaponId, number>> = {
   thunder: VT.gold, fire: VT.gamboge, gourd: VT.wine, qin: VT.green, flute: VT.green,
   brush: VT.indigo, inkstone: VT.ink, crane: VT.moon, gobowl: VT.ink, moonwheel: VT.moon, moonmirror: VT.moon,
 };
+/**
+ * The impacts' size by view (EngineSettings.view): √(VIEW_SPAN / near's), at most 1.3 — 1 at 'near'
+ * (the close view the impacts were tuned at), 1.26 at 'mid', 1.3 at 'far'. The halo, the core, the
+ * streaks' and sparks' reach and a kill's ring all follow the impact's radius. Cosmetic only: the
+ * simulation never reads it.
+ */
+export function impactViewK(view: unknown): number {
+  return Math.min(1.3, Math.sqrt(VIEW_SPAN[viewOf(view)] / VIEW_SPAN.near));
+}
+
+/** What flies off a blow, per weapon (impact()): steel sparks, a glaive's ink chips and gold sparks,
+ *  claw and brush ink, wine drops, arrow and moon glints, gilt glints, jade chips, peach and fire embers,
+ *  thunder arcs, go stones, notes. */
+export const WPN_FLAVOR: Readonly<Record<WeaponId, number>> = {
+  qingfeng: FL.blade, longquan: FL.blade, yanyue: FL.heavy, hoe: FL.heavy, pestle: FL.jade, claw: FL.claw, drunkfist: FL.fist,
+  dart: FL.blade, coindart: FL.coin, sunbow: FL.arrow, repeater: FL.arrow, rod: FL.arrow,
+  qingping: FL.jade, casket: FL.jade, peach: FL.peach, seven: FL.jade,
+  thunder: FL.thunder, fire: FL.fire, gourd: FL.wine, qin: FL.music, flute: FL.music,
+  brush: FL.ink, inkstone: FL.ink, crane: FL.moon, gobowl: FL.go, moonwheel: FL.moon, moonmirror: FL.moon,
+};
+/** A feel class's flavour (a blow with no weapon slot: summons, skills, items). */
+export function flavorOfClass(fc: number): number {
+  switch (fc) {
+    case 1: return FL.heavy; case 2: return FL.claw; case 3: return FL.fist; case 4: return FL.arrow; case 5: return FL.blade;
+    case 6: return FL.fire; case 7: return FL.wine; case 8: return FL.ink; case 9: return FL.jade; case 10: return FL.go;
+    case 11: return FL.music; case 12: return FL.moon; case 13: return FL.skill; case 14: return FL.plain;
+    default: return FL.blade;
+  }
+}
+/** A weapon slot's flavour (by its id; a missing id falls back to its feel class). */
+export function flavorOfWeapon(id: string | undefined, fc: number): number {
+  const f = id ? (WPN_FLAVOR as Record<string, number>)[id] : undefined;
+  return f ?? flavorOfClass(fc);
+}
 /** A weapon slot's light (by its id; a missing id falls back to its feel class). */
 export function tintOfWeapon(id: string | undefined, fc: number): number {
   const t = id ? (WPN_TINT as Record<string, number>)[id] : undefined;

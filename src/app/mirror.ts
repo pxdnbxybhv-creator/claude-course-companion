@@ -7,7 +7,7 @@ import type { CharacterId } from '../data/characters';
 import { CHARACTERS } from '../data/characters';
 import type { DateKey } from '../core/types';
 import { todayKey } from '../core/date';
-import type { Best, MirrorMeta, MirrorSettings, PayDay, RunSave } from '../views/mirror/types';
+import type { Best, MirrorMeta, MirrorSettings, PayDay, RunSave, TutorFlags } from '../views/mirror/types';
 import { RUN_VER } from '../views/mirror/types';
 import { backupExtras } from './store';
 import { earnFrom, play, record } from './play';
@@ -26,8 +26,9 @@ export function defaultMeta(today: DateKey = todayKey()): MirrorMeta {
     payDay: { day: today, runs: 0, free: false, paid: 0, drops: 0, refunded: false },
     coinsPaid: 0, owed: 0, firstsHeld: 0, lastDay: today,
     lobby: { char: 'scholar', map: 'lake', diff: 1, vows: {} },
-    settings: { aim: 'auto', nums: 1, shake: true, left: false, quality: 'auto' },
+    settings: { aim: 'auto', nums: 1, shake: true, left: false, quality: 'auto', tips: true },
     records: {}, titles: [], title: null, rims: [], rim: null,
+    tutor: { offered: false, done: false, tips: {} },
   };
 }
 
@@ -59,6 +60,22 @@ function activeShape(v: unknown): RunSave | null {
   if (!Array.isArray(v.weapons) || !isObj(v.items) || !isObj(v.pending) || !isObj(v.stats) || !isObj(v.runStats)) return null;
   if (typeof v.wave !== 'number' || !Number.isFinite(v.wave)) return null;
   return v as unknown as RunSave;
+}
+
+/** A tip key: lower camel case, 2–16 letters (the known ids and a newer build's). */
+const TIP = /^[a-z][A-Za-z]{1,15}$/;
+/** The tutorial's flags: `done` implies `offered`; tips are `true` under a well-formed key, at most 32. */
+function tutorFlags(v: unknown): TutorFlags {
+  const tu = isObj(v) ? v : {};
+  const tips: Record<string, true> = {};
+  if (isObj(tu.tips)) {
+    for (const [k, x] of Object.entries(tu.tips)) {
+      if (Object.keys(tips).length >= 32) break;
+      if (x === true && TIP.test(k)) tips[k] = true;
+    }
+  }
+  const done = tu.done === true;
+  return { offered: tu.offered === true || done, done, tips: tips as TutorFlags['tips'] };
 }
 
 /** Repair anything loaded or imported into a valid MirrorMeta; junk becomes defaultMeta(). Never throws. */
@@ -93,6 +110,7 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
       shake: st.shake !== false, // on unless turned off: big moments only (a hard blow you take, boss slams and phases; ≤ 3 px); reduced motion removes it
       left: st.left === true,
       quality: st.quality === 'low' || st.quality === 'mid' || st.quality === 'high' ? st.quality : 'auto',
+      tips: st.tips !== false, // 新手提示: on unless turned off
     };
     const lastDay = date(r.lastDay, base.lastDay);
     const titles = strList<MirrorMeta['titles'][number]>(r.titles);
@@ -134,6 +152,7 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
       title: typeof r.title === 'string' && titles.includes(r.title as MirrorMeta['titles'][number]) ? (r.title as MirrorMeta['title']) : null,
       rims,
       rim: typeof r.rim === 'string' && rims.includes(r.rim as MirrorMeta['rims'][number]) ? (r.rim as MirrorMeta['rim']) : null,
+      tutor: tutorFlags(r.tutor),
     };
   } catch {
     return base;

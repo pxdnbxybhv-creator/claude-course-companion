@@ -1,6 +1,7 @@
 // 水月幻镜 · the frame's drawing (GDD §20, §24.3): setTransform + drawImage from the painter's
-// atlases, in the contract's order (drawOrder): arena → telegraphs → zones → drops → enemies → summons
-// → player → effects → player shots → numbers → enemy shots → low-HP edge and titles (the vermilion
+// atlases, in the contract's order (drawOrder): arena → telegraphs → zones → drops → enemies → their HP bars → summons
+// → player → effects → player shots → your HP bar → numbers → enemy shots → low-HP edge and titles →
+// off-screen threat chevrons (the vermilion
 // enemy shots stay on top of everything the player's side makes, numbers included). In the dark
 // (暗月, 大雪, 天狗食月) the darkness goes over the field but under the danger: the enemy's ground,
 // telegraphs and enemy shots are drawn after it. No shadowBlur,
@@ -17,7 +18,10 @@ import { drawAmbience } from '../paint/ambient';
 import { BK, FK, VF, VT, tintOfWeapon, vfxOf, type Vfx } from './vfx';
 import { TG, TSY, Trails } from './trails';
 import { vfxSprites } from '../paint/vfx';
+import { HpBars } from './bars';
+import { Threats } from './threats';
 import type { World } from './world';
+import { drawDown } from './down';
 
 /**
  * 流光 per projectile kind: trail width (u), trail length (s), trail style (0 none, 1 light, 2 ink),
@@ -25,24 +29,28 @@ import type { World } from './world';
  * look is the painter's).
  */
 const SHOT_LOOK: Readonly<Record<string, readonly [number, number, number, number, number]>> = {
-  flySword: [6.5, 0.2, 1, 2.8, 1.3], sunArrow: [3.8, 0.11, 1, 2.3, 1.2], crossBolt: [3.4, 0.09, 1, 2.3, 1.2], dartStar: [3.8, 0.1, 1, 2.4, 1.2],
-  coinBlade: [4.2, 0.1, 1, 2.4, 1.2], noteGlyph: [5.2, 0.18, 1, 2.8, 1.25], moonDisc: [10, 0.14, 1, 2.2, 1.05], crescentWave: [24, 0.12, 1, 1.3, 1],
-  inkBlob: [6, 0.1, 2, 0, 1], bambooLeaf: [3.2, 0.09, 1, 1.8, 1], fireLob: [6.5, 0.15, 1, 2.4, 1], gourdLob: [5.5, 0.11, 2, 0, 1],
-  verseGlyph: [5.5, 0.16, 1, 2.4, 1.1], moonMote: [3.2, 0.13, 1, 2.6, 1], hookLine: [2.2, 0.07, 1, 0, 1],
+  flySword: [8, 0.24, 1, 3, 1.3], peachSword: [8, 0.24, 1, 3, 1.3], sunArrow: [4.8, 0.14, 1, 2.5, 1.2], crossBolt: [4.2, 0.11, 1, 2.5, 1.2],
+  dartStar: [4.6, 0.12, 1, 2.6, 1.2], coinBlade: [5, 0.12, 1, 2.6, 1.2], noteGlyph: [6, 0.2, 1, 2.9, 1.25], moonDisc: [11, 0.16, 1, 2.4, 1.05],
+  crescentWave: [26, 0.14, 1, 1.4, 1], inkBlob: [6.5, 0.11, 2, 0, 1], bambooLeaf: [3.8, 0.1, 1, 1.9, 1], fireLob: [7.5, 0.18, 1, 2.6, 1],
+  gourdLob: [5.5, 0.11, 2, 0, 1], verseGlyph: [6, 0.18, 1, 2.5, 1.1], moonMote: [3.8, 0.15, 1, 2.7, 1], hookLine: [2.2, 0.07, 1, 0, 1],
 };
+/** Where a shot's head is (u ahead of its centre, along its flight): the white-hot point of light. */
+const HEAD_OF: Readonly<Record<string, number>> = { flySword: 18, peachSword: 18, sunArrow: 16, crossBolt: 10, moonDisc: 0, crescentWave: 6, fireLob: 0, noteGlyph: 0, dartStar: 0, coinBlade: 0, verseGlyph: 0, moonMote: 3, bambooLeaf: 6 };
 const NPK = PROJ_IDS.length;
 const TR_W = new Float32Array(NPK), TR_DUR = new Float32Array(NPK), TR_GLOW = new Float32Array(NPK), TR_SZ = new Float32Array(NPK).fill(1);
 const TR_STY = new Uint8Array(NPK);
+/** The head's offset (u, −1: no head glow) by kind. */
+const TR_HEAD = new Float32Array(NPK).fill(-1);
 /** The light of a shot with no weapon slot (summons' shots, items'), by kind. */
 const KIND_TINT = new Uint8Array(NPK).fill(VT.moon);
 PROJ_IDS.forEach((id, k) => {
   const L = SHOT_LOOK[id];
   if (L) { TR_W[k] = L[0]; TR_DUR[k] = L[1]; TR_STY[k] = L[2]; TR_GLOW[k] = L[3]; TR_SZ[k] = L[4]; }
-  KIND_TINT[k] = id === 'inkBlob' ? VT.ink : id === 'bambooLeaf' ? VT.green : id === 'verseGlyph' ? VT.wine : id === 'flySword' ? VT.jade : VT.moon;
+  const hd = HEAD_OF[id];
+  if (hd !== undefined) TR_HEAD[k] = hd;
+  KIND_TINT[k] = id === 'inkBlob' ? VT.ink : id === 'bambooLeaf' ? VT.green : id === 'verseGlyph' ? VT.wine : id === 'flySword' ? VT.jade : id === 'peachSword' ? VT.gamboge : VT.moon;
 });
-/** The flying sword's kind: a 桃木剑 shot flies as the peachwood blade itself (the weapon's own sprite,
- *  drawn a touch smaller than it is baked for the hand) until it has a projectile of its own. */
-const K_FLYSWORD = PROJ_IDS.indexOf('flySword' as (typeof PROJ_IDS)[number]);
+/** The resting 桃木剑 blades (their share of the idle swords) are drawn this much smaller than in flight. */
 const PEACH_SZ = 0.85;
 /** 嫦娥's height (u) while she rises (广寒清辉). */
 const RISE_H = 22;
@@ -97,16 +105,25 @@ export class Renderer {
   private lastPing = -9;
   /** Slot → light tint, refreshed each frame (no lookup per shot). */
   private readonly slotTint = new Uint8Array(16);
-  /** Slots (bits) holding the 桃木剑, refreshed each frame. */
-  private peachMask = 0;
   /** 嫦娥's rise (广寒清辉): how long it was when it began, and the untargetable time seen last. */
   private riseDur = 0;
   private lastUntarg = 0;
   private readonly pt = { x: 0, y: 0 };
   /** Shot glows left this frame. */
   private glowsLeft = 0;
+  /** Frames drawn (the shots take turns shedding motes), and the world time they last shed at. */
+  private shedN = 0;
+  private shedT = -1;
   /** The painter's sprite lookup, bound once (the VFX layer's glyph). */
   private readonly spr = (id: AtlasId): Sprite | null => this.sprite(id);
+  /** HP bars over the bodies and you (engine/bars.ts): recorded by the enemy layer, the bodies' drawn
+   *  by 'enemyBars' (under your figure and the blows), yours by 'bars'. */
+  readonly bars = new HpBars();
+  /** Off-screen threat chevrons at the screen's edge (engine/threats.ts): the 'threats' layer. */
+  readonly threats = new Threats();
+  /** Your figure and lift as drawn this frame (your bar sits over them). */
+  private youS: Sprite | null = null;
+  private youLift = 0;
 
   constructor(private painter: Painter) {
     this.trails = new Trails(painter.quality);
@@ -124,6 +141,7 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     this.beginVfx(W);
+    this.bars.begin(W);
     const order = drawOrder(W.lightR !== null);
     for (let k = 0; k < order.length; k++) this.layer(order[k], W, ctx, cam);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -145,11 +163,14 @@ export class Renderer {
       case 'player': vfxOf(W).drawUnder(ctx, cam, this.spr); this.drawSwords(W, ctx, cam); this.drawPlayer(W, ctx, cam); break;
       case 'effects': this.drawEffects(W, ctx, cam); break;
       case 'playerShots': this.drawPlayerShots(W, ctx, cam); break;
+      case 'enemyBars': this.bars.drawEnemies(ctx, cam); break;
+      case 'bars': this.bars.drawYou(W, ctx, cam, this.youS, this.youLift); break;
       case 'numbers': this.drawNumbers(W, ctx, cam); break;
       case 'darkness': this.drawDarkness(W, ctx, cam); break;
       case 'enemyShots': this.drawEnemyShots(W, ctx, cam); break;
       case 'reticle': this.drawReticle(W, ctx, cam); break;
       case 'overlays': this.overlays(W, ctx, cam); break;
+      case 'threats': this.threats.draw(W, ctx, cam); break;
     }
   }
 
@@ -243,7 +264,8 @@ export class Renderer {
   }
 
   private drawEnemies(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    // enemies; 打击感: the ground's splashes under them, their pieces and the marks of the blows over them
+    // enemies; 打击感: the ground's splashes under them, the marks of the blows over them (the dead
+    // bodies' pieces fly in the effects layer, over the blows' light)
     const E = W.E, F = W.feel;
     if (F.mk.count) this.drawMarks(W, ctx, cam, true);
     this.passes = 0;
@@ -259,7 +281,6 @@ export class Renderer {
       }
       this.drawEnemy(W, ctx, cam, i);
     }
-    if (F.fr.count) this.drawFrags(W, ctx, cam);
     if (F.mk.count) this.drawMarks(W, ctx, cam, false);
   }
 
@@ -315,10 +336,8 @@ export class Renderer {
     this.trails.begin(W.quality, W.t);
     this.glowsLeft = W.degrade ? 0 : V.caps.glows;
     const n = Math.min(16, W.slots.length);
-    this.peachMask = 0;
     for (let k = 0; k < n; k++) {
       this.slotTint[k] = tintOfWeapon(W.slots[k].id, W.slots[k].fc);
-      if (W.slots[k].id === 'peach') this.peachMask |= 1 << k;
     }
     // 月华 reaching you: a small ping of moonlight (at most 6 a second)
     if (W.xpGot < this.seenXp - 1e-6) { this.seenXp = 0; this.lastPing = -9; }
@@ -371,10 +390,14 @@ export class Renderer {
   }
   /** A mid-wave level: a gold double ring with a bright edge, a column of light, rising glints. */
   private levelUp(_W: World, V: Vfx, x: number, y: number): void {
-    // (the feel layer adds its gold burst at your feet: this is the light around it — no ink chips)
-    V.shock(x, y, 150, VT.gold, { flags: VF.double | VF.halo, debris: 6, fleck: FK.glint, life: 0.55, prio: 2 });
-    V.bloom(x, y + 6, 120, VT.gold, 0.6, BK.column, 0.85, 2);
-    V.motes(x, y, 40, 8, VT.gold, 0.8);
+    // (the feel layer adds its gold burst at your feet: this is the light around it — no ink chips):
+    // a wide gold double ring with a halo, a moon-white ring after it, a tall column of light behind
+    // the figure, a soft gold bloom at the feet and glints rising all round
+    V.shock(x, y, 200, VT.gold, { flags: VF.double | VF.halo | VF.big, debris: 10, fleck: FK.glint, life: 0.6, prio: 2 });
+    const j = V.ring(x, y, 130, VT.gold, 0.5, VF.double);
+    if (j >= 0) V.rings.t0[j] += 0.1;
+    V.bloom(x, y + 6, 170, VT.gold, 0.75, BK.column, 1, 2);
+    V.motes(x, y, 60, 16, VT.gold, 0.95);
   }
 
   private drawEffects(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -399,6 +422,8 @@ export class Renderer {
     V.draw(ctx, cam, W.feel.sprites.ok ? W.feel.sprites : null, this.spr);
     // 打击感: spatter, rings, flares, crowns (under both kinds of shot)
     this.drawSparks(W, ctx, cam, pa);
+    // the dead bodies' pieces fly over the blows' light (a slash or a flash never buries them)
+    if (W.feel.fr.count) this.drawFrags(W, ctx, cam);
   }
 
   private drawPlayerShots(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -411,6 +436,10 @@ export class Renderer {
     if (this.shotLife.length < PS.cap) { this.shotLife = new Float32Array(PS.cap); this.shotKind = new Int16Array(PS.cap).fill(-1); this.shotMode = new Uint8Array(PS.cap); }
     const lim = Math.max(1, (W.degrade ? TR.cap >> 1 : TR.cap) - 3);
     const nsl = W.slots.length;
+    const hot = VS.glow(VT.white);
+    // (only while the world moves: a hitstop or a held frame sheds nothing, so motes never pile up)
+    let sheds = W.degrade || calm || W.phase !== 'wave' || W.t === this.shedT ? 0 : vfxOf(W).caps.sheds;
+    this.shedT = W.t;
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) { this.shotKind[i] = -1; continue; }
       const k = PS.kind[i], mode = PS.mode[i];
@@ -432,11 +461,9 @@ export class Renderer {
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) continue;
       const k = PS.kind[i];
-      const sl0 = PS.slot[i];
-      const peach = k === K_FLYSWORD && sl0 >= 0 && sl0 < 16 && (this.peachMask & (1 << sl0)) !== 0;
-      const s = peach ? (this.sprite('wpn:peach' as AtlasId) ?? this.sprite(PROJ_ATLAS[k])) : this.sprite(PROJ_ATLAS[k]);
+      const s = this.sprite(PROJ_ATLAS[k]);
       let ang = Math.atan2(PS.vy[i], PS.vx[i]);
-      let sz = peach ? PEACH_SZ : TR_SZ[k];
+      let sz = TR_SZ[k];
       let y = PS.y[i];
       if (PS.mode[i] === SMode.Lob) {
         const u = 1 - PS.life[i] / PS.life0[i];
@@ -445,17 +472,31 @@ export class Renderer {
         sz = 1 + Math.sin(u * Math.PI) * 0.3;
       } else if (PS.mode[i] === SMode.BoomOut || PS.mode[i] === SMode.BoomBack) ang = tt * 16;
       // the glow under it: a white-hot heart in the weapon's light
+      const sl = PS.slot[i];
+      const tint = sl >= 0 && sl < nsl && sl < 16 ? this.slotTint[sl] : KIND_TINT[k];
       if (this.glowsLeft > 0 && TR_GLOW[k] > 0) {
-        const sl = PS.slot[i];
-        const g = VS.glow(sl >= 0 && sl < nsl && sl < 16 ? this.slotTint[sl] : KIND_TINT[k]);
+        const g = VS.glow(tint);
         // (capped: a falling 七星 sword's r is its landing's reach, not its size)
-        if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.5 * pa); }
+        if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.6 * pa); }
       }
-      // (the peachwood blade is anchored at its grip: set back so the blade, not the hilt, is on the shot)
-      if (s && peach) blitRot(ctx, cam, s, PS.x[i] - Math.cos(ang) * 14 * sz, y - Math.sin(ang) * 14 * sz, ang, sz, pa);
-      else if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
+      if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
       else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
+      // its head burns white: a small hot point of light over the tip (light shots only)
+      if (TR_HEAD[k] >= 0 && TR_STY[k] === 1 && this.glowsLeft > 0 && hot) {
+        this.glowsLeft--;
+        const hx = PS.x[i] + Math.cos(ang) * TR_HEAD[k] * sz, hy = y + Math.sin(ang) * TR_HEAD[k] * sz;
+        const flick = calm ? 1 : 0.9 + 0.1 * Math.sin(tt * 40 + i);
+        blit(ctx, cam, hot, hx, hy, (Math.min(10, Math.max(4, PS.r[i] * 0.8)) / 16) * flick, false, 0.85 * pa);
+      }
+      // 流光 sheds a few motes of its light in its wake (budgeted per frame; none on low or calm)
+      if (sheds > 0 && TR_STY[k] === 1 && PS.mode[i] !== SMode.Lob && ((this.shedN + i) & 7) === 0) {
+        sheds--;
+        const V = vfxOf(W);
+        const vx = PS.vx[i], vy = PS.vy[i], L = Math.hypot(vx, vy) || 1;
+        V.fleck(PS.x[i] - (vx / L) * 14, y - (vy / L) * 14, -vx * 0.06 + (V.rnd01() - 0.5) * 50, -vy * 0.06 + (V.rnd01() - 0.5) * 50, FK.glint, tint, 0.3, 0.6);
+      }
     }
+    this.shedN++;
   }
 
   private drawNumbers(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -569,14 +610,8 @@ export class Renderer {
     else if (E.burnN[i] > 0) this.mark(ctx, cam, 'fx:burnMark', mx, my - 4, 0.35);
     else if (E.rootT[i] > 0) this.mark(ctx, cam, 'fx:rootMark', mx, my + E.r[i] * 0.6, 0.4);
     else if (E.slowT[i] > 0) this.mark(ctx, cam, 'fx:slowMark', mx, my + E.r[i] * 0.6, 0.35);
-    // elites and treasures: a thin bar
-    if ((k === EKind.Elite || k === EKind.Demon) && E.hp[i] < E.hpMax[i]) {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      const sx = (mx - cam.x) * cam.scale + cam.w / 2, sy = (my - E.r[i] - 10 - cam.y) * cam.scale + cam.h / 2;
-      const w = E.r[i] * 2 * cam.scale;
-      ctx.fillStyle = 'rgba(20,20,20,0.5)'; ctx.fillRect(sx - w / 2, sy, w, 3 * cam.dpr);
-      ctx.fillStyle = '#c0412f'; ctx.fillRect(sx - w / 2, sy, w * Math.max(0, E.hp[i] / E.hpMax[i]), 3 * cam.dpr);
-    }
+    // its HP bar over its head (engine/bars.ts; drawn in the 'enemyBars' layer, all in a few fill runs)
+    this.bars.enemy(W, cam, i, s, x, y, scale);
   }
 
   /**
@@ -747,18 +782,20 @@ export class Renderer {
     let fly = 0, fpeach = 0;
     if (W.idleSwords > 0) for (let j = 0; j < W.slots.length; j++) { const sl = W.slots[j]; if (sl.kind === 'launch' || (sl.kind === 'homing' && sl.flying)) { fly++; if (sl.id === 'peach') fpeach++; } }
     const nPeach = fly > 0 ? Math.round((W.idleSwords * fpeach) / fly) : 0;
-    const peachS = nPeach > 0 ? this.sprite('wpn:peach' as AtlasId) : null;
+    const peachS = nPeach > 0 ? this.sprite('proj:peachSword' as AtlasId) : null;
     for (let k = 0; k < W.idleSwords && drawn < SWORDS_ON_SCREEN; k++, drawn++) {
       const a = W.t * TAU * 0.9 + (k / Math.max(1, W.idleSwords)) * TAU;
       const x = W.px + Math.cos(a) * 44, y = W.py + Math.sin(a) * 44;
       const pk = peachS !== null && k >= W.idleSwords - nPeach;
       if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 44, a, calm ? 0.3 : 0.75, 1, 3.2, pk ? VT.gamboge : VT.jade, passes, 0.7); }
-      if (pk) { const ta = a + Math.PI / 2, sz = PEACH_SZ * 0.8; blitRot(ctx, cam, peachS, x - Math.cos(ta) * 14 * sz, y - Math.sin(ta) * 14 * sz, ta, sz, 0.85); }
+      if (pk) blitRot(ctx, cam, peachS, x, y, a + Math.PI / 2, PEACH_SZ * 0.94, 0.85);
       else if (sword) blitRot(ctx, cam, sword, x, y, a + Math.PI / 2, 0.8, 0.85); else circle(ctx, cam, x, y, 3, '#3f6f8f');
     }
   }
 
   private drawPlayer(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    // 破镜重圆: fallen, your figure is an ink blot (engine/down.ts)
+    if (drawDown(W, ctx, cam)) return;
     const pool = this.sprite('fx:moonPool');
     if (pool) blit(ctx, cam, pool, W.px, W.py + 4, 0.55, false, 0.45);
     const id = `char:${W.run.char}` as AtlasId;
@@ -788,6 +825,7 @@ export class Renderer {
     const hs = !calm && F.hurtAge < 0.2 ? Math.exp(-F.hurtAge / 0.06) * F.hurtK : 0;
     // … and knocks your figure back a few u (drawn only; the hitbox dot stays where you are)
     const kb = 7 * hs;
+    this.youS = s; this.youLift = lift;
     if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.16 * hs, 1 - 0.14 * hs);
     else circle(ctx, cam, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 14, '#f4f1e8', a);
     // weapons held around you, pointing at the last attack: a wind-up as the cooldown ends
@@ -917,17 +955,19 @@ export class Renderer {
 
 /** The frame's layers (Renderer.layer draws one). */
 export type Layer =
-  | 'arena' | 'telegraphs' | 'zones' | 'dangerZones' | 'ground' | 'drops' | 'enemies' | 'summons' | 'player' | 'effects'
-  | 'playerShots' | 'numbers' | 'darkness' | 'enemyShots' | 'reticle' | 'overlays';
-/** The contract's order (API.md §3): the vermilion enemy shots on top of everything the player's side makes. */
+  | 'arena' | 'telegraphs' | 'zones' | 'dangerZones' | 'ground' | 'drops' | 'enemies' | 'enemyBars' | 'summons' | 'player' | 'effects'
+  | 'playerShots' | 'bars' | 'numbers' | 'darkness' | 'enemyShots' | 'reticle' | 'overlays' | 'threats';
+/** The contract's order (API.md §3): the vermilion enemy shots on top of everything the player's side
+ *  makes; the bodies' HP bars right over the bodies (under your figure, your summons and the blows'
+ *  light: a crowd's bars never bury you), your own bar late ('bars'). */
 const LIT: readonly Layer[] = [
-  'arena', 'telegraphs', 'zones', 'ground', 'drops', 'enemies', 'summons', 'player', 'effects', 'playerShots', 'numbers', 'enemyShots', 'reticle', 'overlays',
+  'arena', 'telegraphs', 'zones', 'ground', 'drops', 'enemies', 'enemyBars', 'summons', 'player', 'effects', 'playerShots', 'bars', 'numbers', 'enemyShots', 'reticle', 'overlays', 'threats',
 ];
 /** In the dark the field goes under the darkness; the danger (the enemy's ground, telegraphs, enemy
  *  shots) and your aim stay above it, readable wherever they are. */
 const DARK: readonly Layer[] = [
-  'arena', 'zones', 'ground', 'drops', 'enemies', 'summons', 'player', 'effects', 'playerShots', 'numbers',
-  'darkness', 'dangerZones', 'telegraphs', 'enemyShots', 'reticle', 'overlays',
+  'arena', 'zones', 'ground', 'drops', 'enemies', 'enemyBars', 'summons', 'player', 'effects', 'playerShots', 'bars', 'numbers',
+  'darkness', 'dangerZones', 'telegraphs', 'enemyShots', 'reticle', 'overlays', 'threats',
 ];
 /** The render order list: what draw() walks, lit or in the dark. */
 export function drawOrder(dark: boolean): readonly Layer[] { return dark ? DARK : LIT; }

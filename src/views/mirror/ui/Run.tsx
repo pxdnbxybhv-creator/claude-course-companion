@@ -3,20 +3,24 @@
 // through session.startWave / waveWon / died, and the engine only reports back through its hooks. The
 // canvas and the engine live for the whole run (one engine, many waves). Unmount disposes both and
 // saves; the between-wave state is already saved, and a wave cut short replays (resumeCheck counts it).
+// The session is a seam (`sess`): the tutorial 「初入镜中」 plays through the same view with an
+// in-memory session (tutor/session.ts), its wave scripts (engine/tutor.ts) and the coach
+// (ui/Tutorial.tsx); real runs get the first-time tips through the same coach. The pause sheet, the
+// boss card and a coach hold are one set of holds: the engine resumes only when the set is empty.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { lang } from '../../../app/store';
 import { mirror, saveMetaNow } from '../../../app/mirror';
-import { openSheets, Sheet, toast } from '../../../ui/kit';
+import { openSheets, toast } from '../../../ui/kit';
 import { coinToast } from '../../../ui/coins';
 import { coins } from '../../../app/play';
 import { todayKey } from '../../../core/date';
 import { bakeScale, createPainter } from '../paint';
 import { arenaGeom, computeStats, nextScreen, openShop, unlocksOf } from '../logic';
-import { abandon, commit, died, engineFailed, leaveMidWave, markSeen, startWave, waveWon } from '../logic/session';
+import { realSession, type RunSession } from '../logic/session';
 import { COMPANIONS } from '../data';
 import type {
-  BakeStage, BossEvent, CodexKey, DeathResult, Engine, EngineHooks, EngineSettings, MirrorAudio, MirrorSettings, Painter, Quality,
+  BakeStage, BossEvent, CodexKey, DeathResult, Engine, EngineHooks, EngineSettings, HudState, MirrorAudio, MirrorSettings, Painter, Quality,
   RunReport, RunSave, WaveResult,
 } from '../types';
 import { loadEngine } from './engineHost';
@@ -24,7 +28,17 @@ import { Controls, Hud, type HudApi } from './Hud';
 import { PauseSheet } from './Pause';
 import { Bake, Ritual } from './Ritual';
 import { BossCard, Cards, Crate, HeartPick, Ready, StartPick } from './Screens';
-import { Shop, StatsPanel } from './Shop';
+import { Shop } from './Shop';
+import { WhoSheet } from './Panel';
+import { rememberPanelBase } from './panelView';
+import { attachScript, attachTipWatch } from '../engine/tutor';
+import { classify } from '../tutor/classify';
+import { tutorScript } from '../tutor/run';
+import type { RunEvent, RunScreen } from '../tutor/events';
+import type { TutorSession } from '../tutor/session';
+import { LINES } from '../tutor/lines';
+import { Coach, TipsBrain, TutorBrain, TutorEnd, type CoachBrain } from './Tutorial';
+import { tipDue } from './tips';
 import { keysVector, voidNote } from './text';
 import { calmNow, rememberPlayed } from './prefs';
 
@@ -66,16 +80,32 @@ export function spriteScale(quality: Quality, el?: Element | null): number {
   if (!coarse) { w = Math.max(w, 600); h = Math.max(h, 600); }
   return bakeScale(w, h, dpr, quality);
 }
-function engineSettings(): EngineSettings {
+/** The engine's settings; the tutorial always auto-aims (its lines speak of auto-aim; the setting is kept). */
+function engineSettings(practice = false): EngineSettings {
   const s = mirror.value.settings;
   const quality = qualityOf(s.quality);
   const reduceMotion = prefersReduced();
-  return { quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: s.aim, lang: lang.value === 'en' ? 'en' : 'zh' };
+  return { quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: practice ? 'auto' : s.aim, lang: lang.value === 'en' ? 'en' : 'zh' };
 }
-const sheetOpen = () => !!document.querySelector('.sheet-backdrop');
+/** A sheet or a coach hold is up: the run's own keys wait (Space during a hold never casts the skill). */
+const sheetOpen = () => !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold');
 
-export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | null; audio: MirrorAudio; onEnd: (e: RunEnd) => void; onLeave: (note?: string) => void }) {
+type Hold = 'pause' | 'intro' | 'coach';
+
+export function RunView(props: {
+  initial: RunSave; ritual: 'paid' | 'free' | 'tutor' | null; audio: MirrorAudio; onEnd: (e: RunEnd) => void; onLeave: (note?: string) => void;
+  /** The session (default: the real one, logic/session.ts). The tutorial passes its in-memory one. */
+  sess?: RunSession;
+  /** The tutorial's practice run: the coach, no records, the end card instead of the wave-3 shop. */
+  practice?: boolean;
+  /** Everything the run reports (tutor/events.ts), for a listener outside. */
+  onEvent?: (e: RunEvent) => void;
+  /** The tutorial's end card: 「去入镜」 (true) or 「回镜前」 (false). */
+  onTutorEnd?: (enter: boolean) => void;
+}) {
   const t = useT();
+  const S = props.sess ?? realSession;
+  const practice = !!props.practice && S.practice;
   const [run, setRunState] = useState(props.initial);
   const runRef = useRef(run);
   const setRun = (r: RunSave) => { runRef.current = r; setRunState(r); };
@@ -95,7 +125,19 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const [intro, setIntroState] = useState<(BossEvent & { kind: 'intro' }) | null>(null);
   const introRef = useRef<typeof intro>(null);
   const setIntro = (v: typeof intro) => { introRef.current = v; setIntroState(v); };
-  const [statsOpen, setStatsOpen] = useState(false);
+  const [whoOpen, setWhoOpenState] = useState(false);
+  const setWhoOpen = (o: boolean) => { setWhoOpenState(o); emit({ k: 'who', open: o }); };
+  /** The holds on the engine (pause sheet, boss card, coach): it resumes only when none is left. */
+  const holds = useRef(new Set<Hold>());
+  const [holdN, setHoldN] = useState(0);
+  const addHold = (h: Hold) => { holds.current.add(h); engine.current?.pause(); setHoldN(holds.current.size); };
+  const dropHold = (h: Hold) => {
+    holds.current.delete(h);
+    setHoldN(holds.current.size);
+    if (!holds.current.size && stageRef.current === 'wave' && engine.current?.phase === 'wave') engine.current.resume();
+  };
+  /** The boss card's first-time tip (real runs), fixed when the card comes up. */
+  const [bossTip, setBossTip] = useState<{ line: string; go: string } | null>(null);
   /** False when the loaded content has no 镜技 for this companion (its lane failed to load): the 技
    *  button then shows as spent instead of looking live and doing nothing. */
   const [skillLive, setSkillLive] = useState(true);
@@ -110,7 +152,34 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   const ended = useRef(false);
   const P = useRef(props);
   P.current = props;
-  const unlocks = useMemo(() => unlocksOf(mirror.value), []);
+  const unlocks = useMemo(() => (props.sess ? S.unlocks() : unlocksOf(mirror.value)), []);
+  // ── the coach: the tutorial's step machine, or the real runs' first-time tips
+  const brain = useMemo<CoachBrain>(() => (practice
+    ? new TutorBrain(S as TutorSession, {
+      left: () => mirror.value.settings.left, unlocks,
+      onRun: (r) => setRun(r),
+      onCloseWho: () => setWhoOpen(false),
+    })
+    : new TipsBrain({ run: () => runRef.current, unlocks, busy: () => holds.current.size > 0 || !!document.querySelector('.sheet-backdrop') })), []);
+  /** Report an event to the coach and the listener; true when the coach wants the engine held. */
+  const emit = (ev: RunEvent): boolean => {
+    try { P.current.onEvent?.(ev); } catch { /* a listener's */ }
+    let hold = false;
+    try { hold = brainRef.current?.event(ev) === true; } catch (e) { console.warn('[mirror] coach', e); }
+    return hold;
+  };
+  const brainRef = useRef<CoachBrain | null>(null);
+  brainRef.current = brain;
+  /** A script's cue or the tip watcher's: true holds the engine (it pauses after this step). */
+  const cue = (key: string, v?: number): boolean => {
+    const hold = emit({ k: 'cue', key, v });
+    if (hold) { holds.current.add('coach'); setHoldN(holds.current.size); }
+    return hold;
+  };
+  const coachOk = () => {
+    brain.ok();
+    if (holds.current.has('coach') && !(brain.bubble && brain.bubble.mode === 'hold')) dropHold('coach');
+  };
   const settings = mirror.value.settings;
   const reduced = prefersReduced();
   const lowQ = useMemo(() => qualityOf(settings.quality) === 'low', []);
@@ -145,9 +214,9 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     const s = nextScreen(r);
     if (s === 'shop') {
       const o = openShop(r, unlocks);
-      if (o !== r) { r = o; commit(r); }
+      if (o !== r) { r = o; S.commit(r); }
       const seen = (r.shop?.slots ?? []).filter((x) => !!x).map((x) => `${x!.kind === 'weapon' ? 'wpn' : 'item'}:${x!.id}` as CodexKey);
-      if (seen.length) markSeen(seen);
+      if (seen.length) S.markSeen(seen);
       backgroundBake(r);
     }
     setRun(r);
@@ -170,10 +239,13 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   };
 
   const onRun = (r: RunSave, sfx?: 'buy' | 'reroll' | 'merge') => {
-    commit(r);
+    const prev = runRef.current;
+    S.commit(r);
+    const act = classify(prev, r);
     P.current.audio.sfx(sfx ?? 'uiTap');
     between(r);
     settleFocus();
+    if (act) emit({ k: 'act', a: act.a, slot: act.slot });
   };
   /** After a pick made with the pointer, focus leaves the clicked button (Enter / Space then mean the
    *  screen's default, never that button again); a keyboard user's focus stays where it was. */
@@ -191,15 +263,20 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     if (bgP.current) await bgP.current;
     const eng = engine.current;
     if (!eng || stageRef.current !== 'between') return;
-    const { run: r, setup } = startWave(runRef.current);
+    const { run: r, setup } = S.startWave(runRef.current);
     setRun(r);
     setStage('wave');
     setPaused(false);
+    holds.current.clear();
+    setHoldN(0);
     pauseAfterEnd.current = false;
-    rememberPlayed(todayKey(), r.seed);
+    if (!practice) { rememberPlayed(todayKey(), r.seed); rememberPanelBase(r); }
     waveDrawn.current = true;
     try {
       eng.start(r, setup);
+      // the tutorial's wave script, or the real run's read-only first-time-tip watcher
+      if (practice) attachScript(eng, tutorScript(setup.wave), cue);
+      else if (tipDue(mirror.value, 'elite')) attachTipWatch(eng, (k) => { cue(k); });
     } catch (e) {
       onError(e, true);
       return;
@@ -211,11 +288,11 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   // ── engine hooks (a stable object: everything it touches is a ref)
   const onWaveEnd = (res: WaveResult) => {
     const before = runRef.current.coins;
-    const next = waveWon(res);
+    const next = S.waveWon(res);
     if (!next || ended.current) return;
-    rememberPlayed(todayKey(), next.seed);
+    if (!practice) rememberPlayed(todayKey(), next.seed);
     const banked = next.coins - before;
-    if (banked > 0) coinToast(banked, { note: t('入囊', 'into your purse') });
+    if (banked > 0 && !practice) coinToast(banked, { note: t('入囊', 'into your purse') });
     between(next);
   };
   const onDeath = (d: DeathResult) => {
@@ -223,7 +300,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     setSank(d.partial.sleeve.reduce((n, c) => n + c.worth, 0));
     setStage('dying');
     const image = snap();
-    const report = died(d);
+    const report = S.died(d);
     P.current.audio.music('results', runRef.current.map);
     setTimeout(() => {
       if (ended.current) return;
@@ -236,10 +313,17 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     console.error('[mirror] engine', e);
     if (!fatal || ended.current) return;
     engine.current?.pause();
+    if (practice) {
+      // the tutorial has nothing to give back: a line, and back to the lobby
+      ended.current = true;
+      toast(t(LINES.snag.base.zh, LINES.snag.base.en), 4000);
+      P.current.onLeave();
+      return;
+    }
     // say what the void really gave back: the fee (once a day), today's free run, or nothing
     const free = runRef.current.free;
     const purse = coins.value;
-    const report = engineFailed();
+    const report = S.engineFailed();
     if (report) end(report);
     else {
       ended.current = true;
@@ -248,11 +332,18 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     }
   };
   const hooks = useMemo<EngineHooks>(() => ({
-    hud: (s) => hud.current?.push(s),
-    levelUp: (l) => hud.current?.levelUp(l),
-    crate: (n) => hud.current?.crate(n),
+    hud: (s) => { hud.current?.push(s); emit({ k: 'hud', s }); },
+    levelUp: (l) => { hud.current?.levelUp(l); emit({ k: 'levelUp', level: l }); },
+    crate: (n) => { hud.current?.crate(n); emit({ k: 'crate', total: n }); },
     coin: (_d, sleeve) => hud.current?.coin(sleeve),
-    boss: (ev) => { if (ev.kind === 'intro') setIntro(ev); },
+    boss: (ev) => {
+      emit({ k: 'boss', ev });
+      if (ev.kind !== 'intro') return;
+      holds.current.add('intro');
+      setHoldN(holds.current.size);
+      setBossTip(!practice && brainRef.current instanceof TipsBrain ? brainRef.current.bossTip() : null);
+      setIntro(ev);
+    },
     waveEnd: (r) => onWaveEnd(r),
     death: (d) => onDeath(d),
     error: (e, fatal) => onError(e, fatal),
@@ -264,7 +355,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     let dead = false;
     void (async () => {
       const r = runRef.current;
-      const es = engineSettings();
+      const es = engineSettings(practice);
       const p = painter.current ?? (painter.current = createPainter(r.map, es.quality, Math.min(es.dprCap, window.devicePixelRatio || 1), spriteScale(es.quality, wrap.current)));
       const engP = loadEngine();
       engP.catch(() => {});
@@ -320,19 +411,29 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
     const s = stageRef.current;
     if ((s !== 'wave' && s !== 'between') || pausedRef.current) return;
     if (s === 'wave' && engine.current?.phase === 'ending') { pauseAfterEnd.current = true; return; }
-    engine.current?.pause();
+    if (s === 'wave') addHold('pause');
+    else engine.current?.pause();
     setPaused(true);
+    emit({ k: 'pause', open: true });
   };
   const resume = () => {
     setPaused(false);
     setConfirm(null);
-    if (stageRef.current === 'wave' && !introRef.current) engine.current?.resume();
+    emit({ k: 'pause', open: false });
+    if (stageRef.current === 'wave') dropHold('pause');
     wrap.current?.focus({ preventScroll: true });
   };
   const leave = () => {
+    if (practice) {
+      // leaving the tutorial: nothing to save or settle (its flags stay as they are)
+      engine.current?.pause();
+      ended.current = true;
+      P.current.onLeave();
+      return;
+    }
     if (stageRef.current === 'wave') {
       engine.current?.pause();
-      const res = leaveMidWave();
+      const res = S.leaveMidWave();
       if (res.report) { end(res.report); return; }
       ended.current = true;
       P.current.onLeave(t(`此重将重来 · 已中断 ${res.interruptions}/3 次`, `This wave will replay · ${res.interruptions}/3 interruptions`));
@@ -344,7 +445,9 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
   };
   const giveUp = () => {
     engine.current?.pause();
-    end(abandon());
+    const report = S.abandon();
+    if (report) end(report);
+    else { ended.current = true; P.current.onLeave(); }
   };
 
   // auto-pause when the page hides or loses focus mid-wave
@@ -370,6 +473,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
       if (sheetOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === 'escape' || k === 'p') { e.preventDefault(); pause(); }
+      else if (k === 'c') { e.preventDefault(); setWhoOpen(true); }
     };
     window.addEventListener('keydown', down);
     return () => window.removeEventListener('keydown', down);
@@ -392,7 +496,7 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
         engine.current?.skill(mirror.value.settings.aim === 'manual' && c ? { kind: 'screen', sx: c.x, sy: c.y } : { kind: 'auto' });
         return;
       }
-      if (k === 'escape' || k === 'p') { e.preventDefault(); pause(); }
+      if (k === 'escape' || k === 'p' || k === 'c') { e.preventDefault(); pause(); }
     };
     const up = (e: KeyboardEvent) => { const k = e.key.toLowerCase(); if (held.delete(k)) push(); };
     const clear = () => { if (held.size) { held.clear(); push(); } };
@@ -424,13 +528,19 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
 
   /** A setting changed in the pause sheet: the live ones reach the engine now (quality waits for the next entry). */
   const onSettings = () => {
-    const s = engineSettings();
+    const s = engineSettings(practice);
     engine.current?.setSettings({ nums: s.nums, shake: s.shake, aim: s.aim, lang: s.lang, reduceMotion: s.reduceMotion });
   };
 
   const scr = stage === 'between' ? nextScreen(run) : null;
   const armorNow = useMemo(() => computeStats(run).armor, [run]);
   const midWave = stage === 'wave';
+  /** The tutorial ends after its third wave: the end card stands where that shop would be. */
+  const tutorEnd = practice && scr === 'shop' && run.wave >= 3;
+  // the screen the coach and the tips follow
+  const screenNow: RunScreen = stage === 'between' ? (tutorEnd ? 'tutorEnd' : (scr as RunScreen)) : stage;
+  useEffect(() => { emit({ k: 'screen', s: screenNow }); }, [screenNow]);
+  const liveHud = (): HudState | null => hud.current?.last() ?? null;
   // 倒影: from wave 31 the arena is painted inverted (engine/index.ts), so the HUD turns paper-light
   const inverted = (run.inWave ?? run.wave + 1) > 30;
   return (
@@ -438,8 +548,8 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
       <canvas class="mj-canvas" ref={canvas} aria-hidden="true" />
       {stage === 'wave' && (
         <>
-          <Hud api={hud} onPause={pause} wave={run.wave + 1} skill={COMPANIONS[run.char].skill} showSleeve={run.coins > 0} armor={armorNow} />
-          <Controls engine={() => engine.current} left={settings.left} manualAim={settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={!paused && !intro} />
+          <Hud api={hud} onPause={pause} wave={run.wave + 1} skill={COMPANIONS[run.char].skill} showSleeve={run.coins > 0} armor={armorNow} char={run.char} onWho={pause} />
+          <Controls engine={() => engine.current} left={settings.left} manualAim={!practice && settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={holdN === 0 && !paused && !intro} />
         </>
       )}
       {stage === 'ritual' && props.ritual && <Ritual kind={props.ritual} reduced={reduced} onDone={() => { if (stageRef.current === 'ritual') setStage('bake'); }} />}
@@ -447,11 +557,12 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
       {stage === 'between' && (
         <div class="mj-between">
           {scr === 'start' && <StartPick run={run} onRun={onRun} onPause={pause} />}
-          {scr === 'cards' && <Cards run={run} onRun={onRun} onPause={pause} onStats={() => setStatsOpen(true)} />}
+          {scr === 'cards' && <Cards run={run} onRun={onRun} onPause={pause} onWho={() => setWhoOpen(true)} />}
           {scr === 'crate' && <Crate run={run} unlocks={unlocks} onRun={onRun} onPause={pause} />}
           {scr === 'heart' && <HeartPick run={run} unlocks={unlocks} onRun={onRun} onPause={pause} />}
           {scr === 'ready' && <Ready run={run} onGo={() => void nextWave()} onPause={pause} baking={bg} />}
-          {scr === 'shop' && <Shop run={run} unlocks={unlocks} onRun={onRun} onNext={() => void nextWave()} onLeave={leave} baking={bg} onPause={pause} />}
+          {scr === 'shop' && !tutorEnd && <Shop run={run} unlocks={unlocks} onRun={onRun} onNext={() => void nextWave()} onLeave={practice ? pause : leave} baking={bg} onPause={pause} onWho={() => setWhoOpen(true)} />}
+          {tutorEnd && <TutorEnd onEnter={() => { ended.current = true; P.current.onTutorEnd?.(true); }} onLobby={() => { ended.current = true; P.current.onTutorEnd?.(false); }} />}
         </div>
       )}
       {stage === 'dying' && (
@@ -463,7 +574,8 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
           {sank > 0 && <p class="mj-shatter-note">{t(`袖中铜钱 ${sank} 文，随镜沉池`, `The ${sank} coins in your sleeve sink with the glass`)}</p>}
         </div>
       )}
-      {intro && <BossCard ev={intro} onDone={() => { setIntro(null); if (!pausedRef.current && stageRef.current === 'wave') engine.current?.resume(); }} />}
+      {intro && <BossCard ev={intro} tip={bossTip} onDone={() => { setIntro(null); setBossTip(null); dropHold('intro'); }} />}
+      <Coach brain={brain} inWave={stage === 'wave'} left={settings.left} hidden={paused || stage === 'ritual' || stage === 'bake' || stage === 'dying' || !!intro} onOk={coachOk} />
       <PauseSheet
         open={paused}
         run={run}
@@ -474,10 +586,10 @@ export function RunView(props: { initial: RunSave; ritual: 'paid' | 'free' | nul
         onSettings={onSettings}
         confirm={confirm}
         setConfirm={setConfirm}
+        live={paused && midWave ? liveHud() : null}
+        practice={practice}
       />
-      <Sheet open={statsOpen} onClose={() => setStatsOpen(false)} title={t('属性', 'Stats')}>
-        <StatsPanel run={run} t={t} />
-      </Sheet>
+      <WhoSheet open={whoOpen} run={run} onClose={() => setWhoOpen(false)} />
     </div>
   );
 }

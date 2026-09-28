@@ -111,6 +111,14 @@ class StubEngine implements Engine {
 
   private finish(dead: boolean, sleeve = false) {
     if (this.phase !== 'wave' || !this.setup) return;
+    // 破镜重圆: the first death of a run goes down when the UI answers `downed` (as the real engine)
+    if (dead && this.deps.hooks.downed && this.run.revived !== true && this.run.tutorial !== true) {
+      this.phase = 'down';
+      this.downSleeve = sleeve;
+      this.deps.audio.sfx('shatter');
+      this.deps.hooks.downed({ canRevive: true, price: 50, wave: this.setup.wave, cause: 'stub' });
+      return;
+    }
     if (dead) {
       this.phase = 'dead';
       this.deps.audio.sfx('shatter');
@@ -173,6 +181,30 @@ class StubEngine implements Engine {
     g.fillStyle = 'rgba(27,25,22,0.45)';
     g.font = `${Math.round(13 * (window.devicePixelRatio || 1))}px serif`;
     g.fillText('stub engine', 12 * (window.devicePixelRatio || 1), h - 12 * (window.devicePixelRatio || 1));
+  }
+
+  private downSleeve = false;
+  revive(): boolean {
+    if (this.phase !== 'down' || !this.setup) return false;
+    this.run.revived = true;
+    this.hp = Math.max(1, Math.round(maxHp(this.setup.stats) * 0.5));
+    this.phase = 'wave';
+    this.paused = false;
+    this.last = performance.now();
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(this.frame);
+    return true;
+  }
+  giveUp(): void {
+    if (this.phase !== 'down') return;
+    this.phase = 'wave';
+    this.finishDead(this.downSleeve);
+  }
+  private finishDead(sleeve: boolean) {
+    if (!this.setup) return;
+    this.phase = 'dead';
+    const partial = this.result();
+    this.deps.hooks.death({ wave: this.setup.wave, partial: { ...partial, moon: 0, xp: 0, sleeve: sleeve ? partial.sleeve : [] }, cause: 'stub' });
   }
 
   pause(): void { this.paused = true; }

@@ -12,6 +12,7 @@ import {
 } from '../src/views/mirror/logic';
 import { MS_AT_30 } from '../src/views/mirror/logic/run';
 import { STARTER_ITEMS, STARTER_WEAPONS } from '../src/views/mirror/ids';
+import { decideTutorOffer } from '../src/views/mirror/tutor/offer';
 
 const DAY = '2026-09-27';
 function run(o: Partial<NewRunOpts> = {}, r: Partial<RunSave> = {}): RunSave {
@@ -53,11 +54,41 @@ describe('sanitizeMirror', () => {
     expect(m.codex).toEqual({ 'mon:blot': 2 });
     expect(m.seals).toEqual({ 'painter|1': true });
     expect(m.lobby).toEqual({ char: 'scholar', map: 'lake', diff: 2, vows: { qunmo: 2 } });
-    expect(m.settings).toEqual({ aim: 'manual', nums: 1, shake: true, left: false, quality: 'auto' });
+    expect(m.settings).toEqual({ aim: 'manual', nums: 1, shake: true, left: false, quality: 'auto', tips: true });
     expect(m.titles).toEqual(['migrant']);
     expect(m.title).toBeNull();
     const r = run();
     expect(sanitizeMirror({ ...defaultMeta(DAY), active: r }, DAY).active).toEqual(r);
+  });
+});
+
+describe('sanitizeMirror: the tutorial flags (d-tutorial §4.1)', () => {
+  it('defaults to nothing offered, nothing done, no tips, tips on', () => {
+    const m = sanitizeMirror(null, DAY);
+    expect(m.tutor).toEqual({ offered: false, done: false, tips: {} });
+    expect(m.settings.tips).toBe(true);
+    expect(defaultMeta(DAY).tutor).toEqual({ offered: false, done: false, tips: {} });
+  });
+  it('repairs junk: non-boolean flags, bad tip keys and values, more than 32 tips', () => {
+    const tips: Record<string, unknown> = { boss: true, crate: 'yes', 'bad key': true, Elite: true, x: true, lowHp: 1, curse: true };
+    for (let i = 0; i < 40; i++) tips[`tipNumber${String.fromCharCode(97 + (i % 26))}${String.fromCharCode(97 + Math.floor(i / 26))}`] = true;
+    const m = sanitizeMirror({ ...defaultMeta(DAY), tutor: { offered: 'yes', done: 1, tips }, settings: { tips: 'no' } }, DAY);
+    expect(m.tutor!.offered).toBe(false);
+    expect(m.tutor!.done).toBe(false);
+    expect(m.tutor!.tips.boss).toBe(true);
+    expect(m.tutor!.tips.curse).toBe(true);
+    expect((m.tutor!.tips as Record<string, unknown>).crate).toBeUndefined();
+    expect((m.tutor!.tips as Record<string, unknown>)['bad key']).toBeUndefined();
+    expect((m.tutor!.tips as Record<string, unknown>).Elite).toBeUndefined();
+    expect((m.tutor!.tips as Record<string, unknown>).x).toBeUndefined();
+    expect(Object.keys(m.tutor!.tips).length).toBeLessThanOrEqual(32);
+    expect(m.settings.tips).toBe(true);
+    for (const junk of [null, 3, 'x', [], { tips: [1, 2] }]) expect(sanitizeMirror({ ...defaultMeta(DAY), tutor: junk }, DAY).tutor).toEqual({ offered: false, done: false, tips: {} });
+  });
+  it('done implies offered; a turned-off 新手提示 stays off; a newer build\'s tip key is kept', () => {
+    const m = sanitizeMirror({ ...defaultMeta(DAY), tutor: { offered: false, done: true, tips: { futureTip: true } }, settings: { tips: false } }, DAY);
+    expect(m.tutor).toEqual({ offered: true, done: true, tips: { futureTip: true } });
+    expect(m.settings.tips).toBe(false);
   });
 });
 
@@ -108,6 +139,23 @@ describe('backups', () => {
     expect(importJSON(JSON.stringify(old))).toBe(true);
     expect(mirror.value.dust).toBe(0); // an older backup without the mirror replaces it too
     expect(MIRROR_KEY).toBe('banmu.mirror.v1');
+  });
+  it('keeps the tutorial flags through a backup; an old backup without them gets the ribbon, not the sheet', () => {
+    mirror.value = { ...defaultMeta(DAY), tutor: { offered: true, done: true, tips: { boss: true, elite: true } }, settings: { ...defaultMeta(DAY).settings, tips: false } };
+    const json = exportJSON();
+    resetAll();
+    expect(mirror.value.tutor).toEqual({ offered: false, done: false, tips: {} });
+    expect(importJSON(json)).toBe(true);
+    expect(mirror.value.tutor).toEqual({ offered: true, done: true, tips: { boss: true, elite: true } });
+    expect(mirror.value.settings.tips).toBe(false);
+    // an older backup: a player with history and no tutor field
+    const old = JSON.parse(json) as { mirror: Record<string, unknown> };
+    delete old.mirror.tutor;
+    old.mirror.codex = { 'char:scholar': 2 };
+    old.mirror.ticketsUsed = 4;
+    expect(importJSON(JSON.stringify(old))).toBe(true);
+    expect(mirror.value.tutor!.offered).toBe(false);
+    expect(decideTutorOffer({ meta: mirror.value, webdriver: false, param: null })).toBe('ribbon');
   });
 });
 

@@ -150,6 +150,19 @@ export const PROJ_SPECS: Record<ProjKind, Spec> = {
   eFoxfire: shot(9, (b) => { b.fill('#e04a5a', [[-10, 0], [-4, -6], [4, -7], [9, 0], [4, 7], [-4, 6]], 0.9, 0.6); b.disc(1, 0, 4, '#fff0f4'); }, 'none', 10),
   eMoonShard: shot(8, (b) => { b.fill(DANGER, [[-8, 0], [0, -6], [10, 0], [0, 6]], 0.95, 0.2); b.fill('#ffffff', [[-5, 0], [0, -3.4], [7, 0], [0, 3.4]], 0.97, 0.2); }, 'none', 10),
   eOrb: shot(8, (b) => eshot(b, 7.4)),
+  // 桃木剑 in flight: a peachwood blade in its gamboge light — warm wood with carved notches, a white-hot
+  // spine and tip, a gold guard and tassel (no cinnabar: red stays the enemy's)
+  peachSword: shot(4, (b) => {
+    glowLine(b, -10, 18, 4.8, '#f2cf6a');
+    b.dry([[-22, 0, 4.4], [-6, 0, 3.2]], 0.5, '#e2b45a');
+    b.fill('#c88a5a', [[-6, -2.1], [13, -2.1], [18, 0], [13, 2.1], [-6, 2.1]], 0.96, 0.3);
+    b.line([[-6, -2.1], [13, -2.1], [18, 0], [13, 2.1], [-6, 2.1]], 0.4, 0.8, '#5a3418');
+    for (const x of [0, 5, 10]) b.line([[x, -1.3], [x + 1.6, 1.3]], 0.4, 0.8, '#6b3a1a');
+    b.line([[-4, -0.45], [12, -0.45]], 0.45, 0.9, '#fff6dc');
+    b.disc(16, 0, 0.9, '#ffffff');
+    b.brush([[-10, 0, 1.8], [-6, 0, 1.8]], 0.95, WOOD); b.brush([[-6, -2.7, 1.2], [-6, 2.7, 1.2]], 0.95, GOLD);
+    b.brush([[-10, 0, 1], [-13, 3, 0.8], [-12, 6, 0.3]], 0.9, GOLD);
+  }, 'none', 22),
 };
 
 // ───────────────────────────────────────────── summons (allies: indigo washes, never 焦墨 silhouettes)

@@ -61,12 +61,27 @@ function steer(W: World, i: number, tx: number, ty: number, speed: number): void
   if (d < 1) { E.vx[i] = 0; E.vy[i] = 0; return; }
   E.vx[i] = (dx / d) * speed; E.vy[i] = (dy / d) * speed;
 }
-/** Keep `dist` away from the target: close in, back off, strafe a little. */
+/**
+ * How near (u) a ranged monster must be to start its wind-up: the lantern, imp, spider, 樵鬼, clerk, 冰魄
+ * and the 莲蓬 turret. A fixed distance, never the camera's (the sims have none, and a phone and a desktop
+ * must play the same game), sized to the views (paint/draw.ts VIEW_SPAN): at the default view a phone's
+ * half-width and a desktop's half-height are 350 u, so a shooter in range is on screen or within a
+ * body or two of its edge, where the off-screen chevron (engine/threats.ts) marks its tell. (It was
+ * 700 u, and 冰魄 and the turret had none: a third of the enemy's shots came from off the screen.)
+ */
+export const SHOOT_R = 420;
+/** The keep band's width (u): a keeper holds between `dist − KEEP_BAND` and `dist`. */
+export const KEEP_BAND = 60;
+/**
+ * Keep `dist` away from the target: close in, back off, strafe a little. One-sided: a keeper settles
+ * inside its keep distance (dist − KEEP_BAND … dist), never past it, so a lantern at its keep (320)
+ * stays in the picture (it held ±30 around it: up to 350 u, off a phone's side at the default view).
+ */
 function keep(W: World, i: number, tx: number, ty: number, dist: number, speed: number): void {
   const E = W.E;
   const dx = tx - E.x[i], dy = ty - E.y[i], d = Math.hypot(dx, dy) || 1;
   const ux = dx / d, uy = dy / d;
-  const radial = d > dist + 30 ? 1 : d < dist - 30 ? -1 : 0;
+  const radial = d > dist ? 1 : d < dist - KEEP_BAND ? -1 : 0;
   const side = Math.sin(E.age[i] * 0.7 + i) * 0.6;
   E.vx[i] = (ux * radial - uy * side) * speed;
   E.vy[i] = (uy * radial + ux * side) * speed;
@@ -373,7 +388,8 @@ function role(W: World, i: number, dt: number): void {
     case ROLE.leaper: case ROLE.deflector: hopRole(W, i, dt, tx, ty, p, sp); break;
     case ROLE.turret: {
       E.vx[i] = 0; E.vy[i] = 0;
-      if (E.st[i] === ST.move && E.cool[i] <= 0) { E.st[i] = ST.tell; E.stT[i] = p.tell ?? 0.7; }
+      // (in range only: SHOOT_R, as every shooter)
+      if (E.st[i] === ST.move && E.cool[i] <= 0 && Math.hypot(W.px - E.x[i], W.py - E.y[i]) < SHOOT_R) { E.st[i] = ST.tell; E.stT[i] = p.tell ?? 0.7; }
       else if (E.st[i] === ST.tell) {
         E.stT[i] -= dt;
         if (E.stT[i] <= 0) {
@@ -488,7 +504,8 @@ function shooterRole(W: World, i: number, dt: number, tx: number, ty: number, di
     keep(W, i, tx, ty, p.keep ?? 300, sp);
     if (id === 'ghostlamp') healAura(W, i, dt, p);
     if (E.role[i] === ROLE.laser) { laserMove(W, i, dt, p); return; }
-    if (E.cool[i] <= 0 && dist < 700 && id !== 'ghostlamp') {
+    // (within SHOOT_R of you — whom it fires at — whatever it keeps its distance from)
+    if (E.cool[i] <= 0 && id !== 'ghostlamp' && Math.hypot(W.px - E.x[i], W.py - E.y[i]) < SHOOT_R) {
       E.st[i] = ST.tell; E.stT[i] = p.tell ?? 0.8;
       E.tx[i] = W.px; E.ty[i] = W.py;
       if (id === 'imp') {
@@ -617,7 +634,8 @@ function orbitRole(W: World, i: number, dt: number, tx: number, ty: number, dist
   const id = E.id[i];
   if (id === 'frost') {
     orbit(W, i, tx, ty, R, sp, dir);
-    if (E.cool[i] <= 0 && E.st[i] === ST.move) { E.st[i] = ST.tell; E.stT[i] = p.tell ?? 0.5; }
+    // (in range only: SHOOT_R from you, as every shooter; it orbits its target at 260)
+    if (E.cool[i] <= 0 && E.st[i] === ST.move && Math.hypot(W.px - E.x[i], W.py - E.y[i]) < SHOOT_R) { E.st[i] = ST.tell; E.stT[i] = p.tell ?? 0.5; }
     if (E.st[i] === ST.tell) { E.stT[i] -= dt; if (E.stT[i] <= 0) { E.st[i] = ST.move; shooterFire(W, i, 'eFrost', p); E.cool[i] = p.every ?? 2; } }
     return;
   }

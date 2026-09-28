@@ -26,7 +26,8 @@ export const F = {
   regenPerPoint: 0.1,
   stealPerSec: 10,
   baseSpeed: 280,
-  pickupBase: 90,
+  /** Pickup radius (u) before 拾取: 135, 150% of the old 90 (the owner: 「拾取掉落物的范围初始扩大至当前的150%」). */
+  pickupBase: 135,
   pickupMaxSpeed: 700,
   critXDefault: 1.5,
   /** ⚖ 暴击 over 100 becomes +1% 暴伤 per point. */
