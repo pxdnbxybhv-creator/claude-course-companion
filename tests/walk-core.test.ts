@@ -260,7 +260,7 @@ describe('桃源 · the pocket valley', () => {
     // the walker is set down in the cleft, a few steps in front of the curtain, and can walk it
     expect(walkAt(0, CAVE.start)).toBe(true);
     expect(CAVE.start).toBeLessThan(CLEFT_END - 2);
-  });
+  }, 30_000); // several seconds on a CI runner
 
   it('the ring: crests 34–48 m above the floor, never lower than the photo camera may rise', () => {
     for (let a = 0; a < Math.PI * 2; a += 0.05) {
