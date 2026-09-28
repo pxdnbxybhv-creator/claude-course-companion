@@ -17,6 +17,8 @@ import { mirrorMusic } from './music';
 import { FEEL_MIX, FEEL_NAMES, JITTER, PITCHED_JITTER, renderFeel, renderPickup, renderVoice, SFX_MIX, SFX_NAMES, type FeelVoice } from './voices';
 
 /** The impact layer on top of the contract's MirrorAudio (the engine's feel bus duck-types it). */
+/** The impact voices' trim against the battle score (≈ −1.5 dB). */
+const FEEL_TRIM = 0.84;
 export interface FeelAudio { feel(name: FeelVoice, gain?: number, rate?: number): void }
 
 class MirrorSound implements MirrorAudio, FeelAudio {
@@ -27,6 +29,19 @@ class MirrorSound implements MirrorAudio, FeelAudio {
   private stopSettings: (() => void) | null = null;
   private priming: Promise<void> | null = null;
   private disposed = false;
+  private lastDuck = -Infinity;
+  private lastDepth = 1;
+
+  /** At most one music duck per 1.2 s, unless a deeper one comes (a busy fight kept the battle
+   *  score ducked about a third of the time). */
+  private duckMusic(depth: number, ms: number, now: number) {
+    // (a sound nobody hears never ducks the music: the sound switch off or its volume at 0)
+    const s = state.value.settings;
+    if (!s.sound || !(s.volume > 0)) return;
+    if (now - this.lastDuck < 1.2 && depth >= this.lastDepth) return;
+    this.lastDuck = now; this.lastDepth = depth;
+    music.duck(depth, ms);
+  }
 
   prime(): Promise<void> {
     if (!this.priming) this.priming = this.doPrime().catch((e) => { console.warn('[mirror audio]', e); });
@@ -73,7 +88,7 @@ class MirrorSound implements MirrorAudio, FeelAudio {
     try {
       const rate = (o.rate ?? 1) * (1 + (Math.random() * 2 - 1) * (m.pitched ? PITCHED_JITTER : JITTER));
       mix.play(buf, now + 0.005, { gain: m.gain * (o.gain ?? 1), send: m.send, rate, pan: (Math.random() - 0.5) * 0.3 });
-      if (m.duck) music.duck(m.duck, 700);
+      if (m.duck) this.duckMusic(m.duck, 700, now);
     } catch { /* a closed context */ }
   }
 
@@ -87,9 +102,10 @@ class MirrorSound implements MirrorAudio, FeelAudio {
     if (!m || !this.limiter.allow('~' + name, m.cap, !!m.spam, now)) return;
     try {
       const r = rate * (1 + (Math.random() * 2 - 1) * (m.pitched ? PITCHED_JITTER : JITTER));
-      const g = m.gain * gain * (0.88 + Math.random() * 0.24);
+      // the impact layer runs ≈ 1.5 dB under its table, leaving the battle score room (FEEL_TRIM)
+      const g = m.gain * gain * FEEL_TRIM * (0.88 + Math.random() * 0.24);
       mix.play(buf, now + 0.002, { gain: g, send: m.send, rate: r, pan: (Math.random() - 0.5) * 0.25 });
-      if (m.duck) music.duck(m.duck, 500);
+      if (m.duck) this.duckMusic(m.duck, 500, now);
     } catch { /* a closed context */ }
   }
 

@@ -749,8 +749,9 @@ export const MIRROR_MAX_BPM = 152;
 
 /** Per-colour level (the music lab asks for −24…−18 dBFS at full volume; a wave is never quieter than the shop). */
 const MIRROR_CALM_LEVEL: Record<MirrorColour, number> = { lake: 0.95, forest: 0.9, palace: 1.0 };
-const MIRROR_LEVEL: Record<MirrorColour, number> = { lake: 0.8, forest: 0.8, palace: 0.8 };
-const MIRROR_BOSS_LEVEL: Record<MirrorColour, number> = { lake: 0.78, forest: 0.78, palace: 0.78 };
+// the battle score sits ≈ 2.5 dB over the other themes: under a fight's impacts it was ≈ 4 dB buried
+const MIRROR_LEVEL: Record<MirrorColour, number> = { lake: 1.07, forest: 1.07, palace: 1.07 };
+const MIRROR_BOSS_LEVEL: Record<MirrorColour, number> = { lake: 1.04, forest: 1.04, palace: 1.04 };
 
 const between = (x: number, [lo, hi]: [number, number]) => clamp(x, lo, hi);
 

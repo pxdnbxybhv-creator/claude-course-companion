@@ -26,9 +26,9 @@ import type { World } from './world';
  */
 const SHOT_LOOK: Readonly<Record<string, readonly [number, number, number, number, number]>> = {
   flySword: [6.5, 0.2, 1, 2.8, 1.3], sunArrow: [3.8, 0.11, 1, 2.3, 1.2], crossBolt: [3.4, 0.09, 1, 2.3, 1.2], dartStar: [3.8, 0.1, 1, 2.4, 1.2],
-  coinBlade: [4.2, 0.1, 1, 2.4, 1.2], noteGlyph: [3.6, 0.15, 1, 2.6, 1.2], moonDisc: [10, 0.14, 1, 2.2, 1.05], crescentWave: [24, 0.12, 1, 1.3, 1],
+  coinBlade: [4.2, 0.1, 1, 2.4, 1.2], noteGlyph: [5.2, 0.18, 1, 2.8, 1.25], moonDisc: [10, 0.14, 1, 2.2, 1.05], crescentWave: [24, 0.12, 1, 1.3, 1],
   inkBlob: [6, 0.1, 2, 0, 1], bambooLeaf: [3.2, 0.09, 1, 1.8, 1], fireLob: [6.5, 0.15, 1, 2.4, 1], gourdLob: [5.5, 0.11, 2, 0, 1],
-  verseGlyph: [5, 0.15, 1, 2.2, 1], moonMote: [3.2, 0.13, 1, 2.6, 1], hookLine: [2.2, 0.07, 1, 0, 1],
+  verseGlyph: [5.5, 0.16, 1, 2.4, 1.1], moonMote: [3.2, 0.13, 1, 2.6, 1], hookLine: [2.2, 0.07, 1, 0, 1],
 };
 const NPK = PROJ_IDS.length;
 const TR_W = new Float32Array(NPK), TR_DUR = new Float32Array(NPK), TR_GLOW = new Float32Array(NPK), TR_SZ = new Float32Array(NPK).fill(1);
@@ -40,6 +40,12 @@ PROJ_IDS.forEach((id, k) => {
   if (L) { TR_W[k] = L[0]; TR_DUR[k] = L[1]; TR_STY[k] = L[2]; TR_GLOW[k] = L[3]; TR_SZ[k] = L[4]; }
   KIND_TINT[k] = id === 'inkBlob' ? VT.ink : id === 'bambooLeaf' ? VT.green : id === 'verseGlyph' ? VT.wine : id === 'flySword' ? VT.jade : VT.moon;
 });
+/** The flying sword's kind: a 桃木剑 shot flies as the peachwood blade itself (the weapon's own sprite,
+ *  drawn a touch smaller than it is baked for the hand) until it has a projectile of its own. */
+const K_FLYSWORD = PROJ_IDS.indexOf('flySword' as (typeof PROJ_IDS)[number]);
+const PEACH_SZ = 0.85;
+/** 嫦娥's height (u) while she rises (广寒清辉). */
+const RISE_H = 22;
 /** The companion's own light (dash and leap ribbons, afterimages). Never vermilion (关公's red stays in his sprite). */
 const CHAR_TINT: Readonly<Record<string, number>> = {
   swordsman: VT.azure, guan: VT.gold, change: VT.moon, cat: VT.gold, rabbit: VT.jade, poet: VT.wine, taoist: VT.gamboge, painter: VT.indigo,
@@ -91,6 +97,11 @@ export class Renderer {
   private lastPing = -9;
   /** Slot → light tint, refreshed each frame (no lookup per shot). */
   private readonly slotTint = new Uint8Array(16);
+  /** Slots (bits) holding the 桃木剑, refreshed each frame. */
+  private peachMask = 0;
+  /** 嫦娥's rise (广寒清辉): how long it was when it began, and the untargetable time seen last. */
+  private riseDur = 0;
+  private lastUntarg = 0;
   private readonly pt = { x: 0, y: 0 };
   /** Shot glows left this frame. */
   private glowsLeft = 0;
@@ -272,7 +283,7 @@ export class Renderer {
         const dx = x - this.sumX[i], dy = y - this.sumY[i], sp = Math.hypot(dx, dy) / dtl;
         if (sp > 280 && sp < 4000) {
           const paper = kind === SK.zhihe;
-          TR.feed(TG.summon, i, x, y, tt, paper ? 7 : S.dragon[i] ? 12 : 9, (paper ? 0.2 : 0.16) * (calm ? 0.5 : 1), paper ? VT.moon : VT.ink, paper ? TSY.light : TSY.ink, lim - 2, 70);
+          TR.feed(TG.summon, i, x, y, tt, paper ? 9 : S.dragon[i] ? 12 : 9, (paper ? 0.24 : 0.16) * (calm ? 0.5 : 1), paper ? VT.moon : VT.ink, paper ? TSY.light : TSY.ink, lim - 2, 70);
         }
       } else if (dtl < 0 || dtl >= 0.2) TR.cut(TG.summon, i);
       this.sumX[i] = x; this.sumY[i] = y; this.sumT[i] = tt;
@@ -304,7 +315,11 @@ export class Renderer {
     this.trails.begin(W.quality, W.t);
     this.glowsLeft = W.degrade ? 0 : V.caps.glows;
     const n = Math.min(16, W.slots.length);
-    for (let k = 0; k < n; k++) this.slotTint[k] = tintOfWeapon(W.slots[k].id, W.slots[k].fc);
+    this.peachMask = 0;
+    for (let k = 0; k < n; k++) {
+      this.slotTint[k] = tintOfWeapon(W.slots[k].id, W.slots[k].fc);
+      if (W.slots[k].id === 'peach') this.peachMask |= 1 << k;
+    }
     // 月华 reaching you: a small ping of moonlight (at most 6 a second)
     if (W.xpGot < this.seenXp - 1e-6) { this.seenXp = 0; this.lastPing = -9; }
     if (W.xpGot > this.seenXp + 1e-6) {
@@ -355,12 +370,11 @@ export class Renderer {
     return false;
   }
   /** A mid-wave level: a gold double ring with a bright edge, a column of light, rising glints. */
-  private levelUp(W: World, V: Vfx, x: number, y: number): void {
-    const calm = !!W.settings.reduceMotion;
+  private levelUp(_W: World, V: Vfx, x: number, y: number): void {
     // (the feel layer adds its gold burst at your feet: this is the light around it — no ink chips)
     V.shock(x, y, 150, VT.gold, { flags: VF.double | VF.halo, debris: 6, fleck: FK.glint, life: 0.55, prio: 2 });
     V.bloom(x, y + 6, 120, VT.gold, 0.6, BK.column, 0.85, 2);
-    V.motes(x, y, 40, calm ? 4 : 8, VT.gold, 0.8);
+    V.motes(x, y, 40, 8, VT.gold, 0.8);
   }
 
   private drawEffects(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -418,10 +432,11 @@ export class Renderer {
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) continue;
       const k = PS.kind[i];
-      const id = PROJ_ATLAS[k];
-      const s = this.sprite(id);
+      const sl0 = PS.slot[i];
+      const peach = k === K_FLYSWORD && sl0 >= 0 && sl0 < 16 && (this.peachMask & (1 << sl0)) !== 0;
+      const s = peach ? (this.sprite('wpn:peach' as AtlasId) ?? this.sprite(PROJ_ATLAS[k])) : this.sprite(PROJ_ATLAS[k]);
       let ang = Math.atan2(PS.vy[i], PS.vx[i]);
-      let sz = TR_SZ[k];
+      let sz = peach ? PEACH_SZ : TR_SZ[k];
       let y = PS.y[i];
       if (PS.mode[i] === SMode.Lob) {
         const u = 1 - PS.life[i] / PS.life0[i];
@@ -436,7 +451,9 @@ export class Renderer {
         // (capped: a falling 七星 sword's r is its landing's reach, not its size)
         if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.5 * pa); }
       }
-      if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
+      // (the peachwood blade is anchored at its grip: set back so the blade, not the hilt, is on the shot)
+      if (s && peach) blitRot(ctx, cam, s, PS.x[i] - Math.cos(ang) * 14 * sz, y - Math.sin(ang) * 14 * sz, ang, sz, pa);
+      else if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
       else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
     }
   }
@@ -482,9 +499,14 @@ export class Renderer {
     if (W.skillPreview) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       const sx = (W.skillPreview.x - cam.x) * cam.scale + cam.w / 2, sy = (W.skillPreview.y - cam.y) * cam.scale + cam.h / 2;
-      ctx.strokeStyle = 'rgba(192,65,47,0.7)';
+      // your aim is gold (vermilion is the enemy's danger), with an ink hairline inside for definition
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = 'rgba(212,147,12,0.85)';
       ctx.lineWidth = 2 * cam.dpr;
       ctx.beginPath(); ctx.arc(sx, sy, 26 * cam.dpr, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = 'rgba(27,25,22,0.5)';
+      ctx.lineWidth = cam.dpr;
+      ctx.beginPath(); ctx.arc(sx, sy, 28 * cam.dpr, 0, TAU); ctx.stroke();
     }
   }
 
@@ -721,12 +743,18 @@ export class Renderer {
       if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 60, a, calm ? 0.3 : 0.7, 1, 3.5, VT.moon, passes, 0.75); }
       if (can) blitRot(ctx, cam, can, x, y, a + Math.PI / 2, 0.8); else circle(ctx, cam, x, y, 4, '#556');
     }
-    // idle swords
+    // idle swords (the 桃木剑's share of them rest as peachwood blades in their gamboge light)
+    let fly = 0, fpeach = 0;
+    if (W.idleSwords > 0) for (let j = 0; j < W.slots.length; j++) { const sl = W.slots[j]; if (sl.kind === 'launch' || (sl.kind === 'homing' && sl.flying)) { fly++; if (sl.id === 'peach') fpeach++; } }
+    const nPeach = fly > 0 ? Math.round((W.idleSwords * fpeach) / fly) : 0;
+    const peachS = nPeach > 0 ? this.sprite('wpn:peach' as AtlasId) : null;
     for (let k = 0; k < W.idleSwords && drawn < SWORDS_ON_SCREEN; k++, drawn++) {
       const a = W.t * TAU * 0.9 + (k / Math.max(1, W.idleSwords)) * TAU;
       const x = W.px + Math.cos(a) * 44, y = W.py + Math.sin(a) * 44;
-      if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 44, a, calm ? 0.3 : 0.75, 1, 3.2, VT.jade, passes, 0.7); }
-      if (sword) blitRot(ctx, cam, sword, x, y, a + Math.PI / 2, 0.8, 0.85); else circle(ctx, cam, x, y, 3, '#3f6f8f');
+      const pk = peachS !== null && k >= W.idleSwords - nPeach;
+      if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 44, a, calm ? 0.3 : 0.75, 1, 3.2, pk ? VT.gamboge : VT.jade, passes, 0.7); }
+      if (pk) { const ta = a + Math.PI / 2, sz = PEACH_SZ * 0.8; blitRot(ctx, cam, peachS, x - Math.cos(ta) * 14 * sz, y - Math.sin(ta) * 14 * sz, ta, sz, 0.85); }
+      else if (sword) blitRot(ctx, cam, sword, x, y, a + Math.PI / 2, 0.8, 0.85); else circle(ctx, cam, x, y, 3, '#3f6f8f');
     }
   }
 
@@ -740,8 +768,18 @@ export class Renderer {
     const calm = W.settings.reduceMotion;
     // i-frames: a 10 Hz blink, or (reduced motion) a steady half-tone with no flashing
     const inv = W.iframes > 0 || W.invulnT > 0;
-    const a = W.untargT > 0 ? 0.5 : inv ? (calm ? 0.55 : (Math.floor(W.t * 20) & 1) === 1 ? 0.45 : 1) : 1;
-    const lift = W.leapT > 0 ? Math.sin((1 - W.leapT / W.leapDur) * Math.PI) * 30 : 0;
+    // 广寒清辉: untargetable and not leaping, she rises — lifted off the ground (eased up, a slow sway,
+    // eased down to land) and drawn clear, not a pale ghost on pale paper
+    if (W.untargT > this.lastUntarg + 1e-4) this.riseDur = W.untargT;
+    this.lastUntarg = W.untargT;
+    let rise = 0;
+    if (W.untargT > 0 && W.leapT <= 0 && this.riseDur > 0) {
+      const up = Math.min(1, (this.riseDur - W.untargT) / 0.35), down = Math.min(1, W.untargT / 0.3);
+      const e = up * up * (3 - 2 * up) * down * down * (3 - 2 * down);
+      rise = e * (RISE_H + (calm ? 0 : 2.5 * Math.sin(W.t * 3)));
+    }
+    const a = W.untargT > 0 ? (rise > 0 ? 0.82 : 0.5) : inv ? (calm ? 0.55 : (Math.floor(W.t * 20) & 1) === 1 ? 0.45 : 1) : 1;
+    const lift = (W.leapT > 0 ? Math.sin((1 - W.leapT / W.leapDur) * Math.PI) * 30 : 0) + rise;
     const flip = Math.cos(W.face) < 0;
     const F = W.feel;
     // 流光: a dash or a leap draws a brush of light behind you, and your afterimages linger in it
@@ -869,7 +907,8 @@ export class Renderer {
       ctx.fillStyle = 'rgba(244,241,232,0.8)';
       const y = centre ? cam.h * 0.36 : cam.h * 0.14;
       ctx.fillText(text, cam.w / 2 + cam.dpr, y + cam.dpr);
-      ctx.fillStyle = centre ? '#1c1c1c' : '#c0412f';
+      // edge titles in dark gold ink (your synergies, 共鸣, 「举杯邀明月」: not the enemy's vermilion)
+      ctx.fillStyle = centre ? '#1c1c1c' : '#8a5d0c';
       ctx.fillText(text, cam.w / 2, y);
       ctx.globalAlpha = 1;
     }

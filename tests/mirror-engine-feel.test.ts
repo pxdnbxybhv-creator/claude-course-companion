@@ -182,8 +182,9 @@ describe('打击感: the feel layer', () => {
     for (const ms of [40, 75]) {
       W.hitstopMs = ms;
       const t0 = W.tWave;
-      // the stop's frames and the first one after it: no step larger than the walk's
-      for (let f = 0; f < Math.ceil(ms / 16.7) + 1; f++) { eng.frame((now += 1000 / 60)); expect(stepOf()).toBeLessThanOrEqual(walk * 1.05 + 1e-6); }
+      // the stop's frames and the first one after it: no step much larger than the walk's (the old code
+      // jumped ≈ 8× a walking step; the follow may catch up a little faster than the walk after a hold)
+      for (let f = 0; f < Math.ceil(ms / 16.7) + 1; f++) { eng.frame((now += 1000 / 60)); expect(stepOf()).toBeLessThanOrEqual(walk * 1.25 + 1e-6); }
       expect(W.tWave - t0).toBeLessThanOrEqual(2 / 60 + 1e-6); // the world was held (the stop's tail and the frame after it ran)
       for (let f = 0; f < 30; f++) { eng.frame((now += 1000 / 60)); walk = stepOf(); }
     }

@@ -48,7 +48,7 @@ describe('resolution: nothing is drawn larger than it was painted', () => {
   });
   it('the engine and the painter start from the same view scale', () => {
     expect(viewScale(390, 844)).toBeCloseTo(390 / 440, 5);
-    expect(viewScale(1920, 1080)).toBe(1.35);
+    expect(viewScale(1920, 1080)).toBe(1.5);
     expect(viewScale(200, 300)).toBe(0.7);
     expect(viewScale(0, 0)).toBe(1);
   });

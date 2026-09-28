@@ -99,6 +99,8 @@ for (let k = 0; k <= NLA; k++) {
   SPROF[k] = Math.pow(p, 0.8) * (p < 0.88 ? 1 : (1 - p) / 0.12);
   CPROF[k] = Math.pow(Math.sin(Math.PI * p), 0.75);
 }
+/** Reduced motion: a ring's radius starts here (× its reach) and only settles outward. */
+export const RING_CALM0 = 0.85;
 /** Scratch vertices (lightning). */
 const BX = new Float32Array(32), BY = new Float32Array(32);
 
@@ -194,9 +196,9 @@ export class Vfx {
     P.life[i] = o.life ?? (r > 150 ? 0.45 : 0.34);
     P.flags[i] = (o.flags ?? (VF.double | VF.halo)) | (ink ? VF.ink : 0);
     this.st.rings++;
-    // the pressure wind: flecks thrown outward (fewer on low; none under the frame guard's cut)
+    // the pressure wind: flecks thrown outward (half on low, under the frame guard and with reduced motion)
     let n = o.debris ?? Math.min(12, 4 + Math.round(r / 22));
-    if (this.q === 'low' || this.W.degrade) n >>= 1;
+    if (this.q === 'low' || this.W.degrade || this.calm) n >>= 1;
     if (n > 0) this.debris(x, y, r, o.debrisTint ?? tint, n, o.fleck ?? -1);
     // the ground mark stays local to the blow (a crack across the whole ring reads as a web)
     if ((o.stain ?? -1) >= 0) this.stain(x, y, Math.min(r * 0.55, o.stain === STAIN_CRACK ? 64 : 84), o.stain!, o.stainLife ?? 1.6);
@@ -235,6 +237,7 @@ export class Vfx {
   }
   /** Rising glints (level-up, the elixir, moonlight): n sparkles drifting up around (x, y) within r. */
   motes(x: number, y: number, r: number, n: number, tint: number, life = 0.7): void {
+    if (this.calm) n = Math.ceil(n / 2);
     for (let k = 0; k < n; k++) {
       const a = this.rnd() * TAU, d = r * Math.sqrt(this.rnd());
       this.fleck(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.6, (this.rnd() - 0.5) * 30, -60 - 80 * this.rnd(), FK.glint, tint, life * (0.7 + 0.5 * this.rnd()), 0.8 + 0.5 * this.rnd());
@@ -308,7 +311,8 @@ export class Vfx {
   }
 
   /** Is there an entry standing in for a legacy fx `name`, aged between a and b (0..1)? (QA harness.)
-   *  A shockwave is a full ring (not a thin pulse or ping); a pulse is a thin one. */
+   *  A shockwave is a full ring (not a thin pulse or ping, nor the 琴's music ring); a pulse is a thin
+   *  one or a music-green ring (the 琴's pulse is a full shockwave of sound). */
   probe(name: string, a = 0, b = 1): boolean {
     const ring = name === 'shockRing' || name === 'levelRing' || name === 'dustPuff' ? 1 : name === 'pulseRing' ? 2 : 0;
     const list = ring ? [this.rings]
@@ -317,8 +321,9 @@ export class Vfx {
     const t = this.W.t;
     for (const Q of list) for (let i = 0; i < Q.n; i++) {
       if (!Q.alive[i]) continue;
-      if (ring === 1 && (Q.flags[i] & VF.thin)) continue;
-      if (ring === 2 && !(Q.flags[i] & VF.thin)) continue;
+      const pulse = (Q.flags[i] & VF.thin) !== 0 || (ring !== 0 && Q.tint[i] === VT.green);
+      if (ring === 1 && pulse) continue;
+      if (ring === 2 && !pulse) continue;
       const u = (t - Q.t0[i]) / Q.life[i];
       if (u >= a && u <= b) return true;
     }
@@ -405,12 +410,13 @@ export class Vfx {
         const sz = (P.r[i] * (0.3 + 0.7 * e)) / (32 * RING_EDGE);
         rot(ctx, cam, s, P.x[i], P.y[i], 0, sz, sz, a0 * (1 - u));
       } else {
-        // the 镇 glyph slams down: big and faint, then its own size, hard (the zone holds it after)
+        // the 镇 glyph slams down onto the zone's own 镇: a short drop from a little above its size that
+        // lands registered and darkens it (a long, large bloom ghosts as a second, misregistered glyph)
         const s = spr('fx:zhenGlyph' as AtlasId);
         if (!s) continue;
-        const e = Math.min(1, u / 0.45);
-        const sz = (P.r[i] / 32) * (calm ? 1 : 1 + 0.7 * (1 - e) * (1 - e));
-        const al = a0 * (u < 0.45 ? 0.25 + 0.75 * e : 1 - (u - 0.45) / 0.55);
+        const e = Math.min(1, u / 0.18);
+        const sz = (P.r[i] / 32) * (calm ? 1 : 1 + 0.22 * (1 - e) * (1 - e));
+        const al = a0 * (u < 0.18 ? 0.5 + 0.5 * e : 1 - (u - 0.18) / 0.82);
         rot(ctx, cam, s, P.x[i], P.y[i], 0, sz, sz, al);
       }
     }
@@ -444,7 +450,10 @@ export class Vfx {
     const d = cam.dpr || 1;
     const ink = (fl & VF.ink) !== 0, thin = (fl & VF.thin) !== 0;
     const e = 1 - Math.pow(1 - u, 3);
-    const R = r * (0.12 + 0.88 * e);
+    // reduced motion: the ring stands near its reach and fades in place (no sweep across the screen),
+    // eased in and at 60% (no pop of light)
+    const R = r * (calm ? RING_CALM0 + (1 - RING_CALM0) * e : 0.12 + 0.88 * e);
+    if (calm) pa *= 0.6 * (u < 0.1 ? 0.4 + 6 * u : 1);
     if (!onScreen(cam, x, y, R + 20)) return;
     const fade = 1 - u;
     if ((fl & VF.halo) && this.halosLeft > 0) {
@@ -474,7 +483,8 @@ export class Vfx {
     if (fl & VF.double) {
       const u2 = (u - 0.16) / 0.84;
       if (u2 > 0) {
-        const R2 = r * (0.1 + 0.9 * (1 - Math.pow(1 - u2, 3))) * 0.8 * cam.scale;
+        const e2 = 1 - Math.pow(1 - u2, 3);
+        const R2 = r * (calm ? RING_CALM0 + (1 - RING_CALM0) * e2 : 0.1 + 0.9 * e2) * 0.8 * cam.scale;
         stroke(ctx, sx, sy, R2, edgeW * 1.1, ink ? VFX_EDGE : VFX_BODY[tint], pa * (1 - u2) * (ink ? 0.5 : 0.65));
         if (!ink && !calm) stroke(ctx, sx, sy, R2, edgeW * 0.4, VFX_CORE[tint], pa * (1 - u2) * 0.8);
       }
@@ -482,7 +492,7 @@ export class Vfx {
   }
 
   private drawSlashes(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, pa: number): void {
-    const P = this.slashes, t = this.W.t, q = this.q;
+    const P = this.slashes, t = this.W.t, q = this.q, calm = this.calm;
     if (!P.count) return;
     const d = cam.dpr || 1;
     const star = feel ? feel.get(SH.star, TN.white) : null;
@@ -496,11 +506,12 @@ export class Vfx {
       const deg = P.b[i];
       const span = (deg >= 300 ? TAU : (deg * Math.PI) / 180) * sg;
       const a0 = P.a[i] - span / 2;
-      const head = Math.min(1, u / 0.32);
-      const tail = Math.pow(Math.max(0, (u - 0.22) / 0.78), 1.2) * 0.98;
+      // reduced motion: the crescent opens at once and fades where it stands (no sweep round the screen)
+      const head = calm ? Math.min(1, u / 0.1) : Math.min(1, u / 0.32);
+      const tail = calm ? 0 : Math.pow(Math.max(0, (u - 0.22) / 0.78), 1.2) * 0.98;
       if (head - tail < 0.02) continue;
       const aH = a0 + span * head, aT = a0 + span * tail;
-      const fade = pa * (u < 0.4 ? 1 : 1 - (u - 0.4) / 0.6);
+      const fade = pa * (calm ? 0.75 : 1) * (u < 0.4 ? 1 : 1 - (u - 0.4) / 0.6);
       const sx = (P.x[i] - cam.x) * cam.scale + cam.w / 2, sy = (P.y[i] - cam.y) * cam.scale + cam.h / 2;
       const R = P.r[i] * 0.78 * cam.scale;
       const th = P.w[i] * cam.scale * (0.7 + 0.3 * head);
@@ -528,7 +539,7 @@ export class Vfx {
       // halo, a smear behind the head (the afterimage), the body, the white core
       crescent(ctx, sx, sy, R, aT, aH, th * 1.45 + 3 * d, 3 * d + th * 0.25);
       fill(ctx, VFX_HALO[tint], fade * 0.34);
-      if (q !== 'low') {
+      if (q !== 'low' && !calm) {
         const back = 0.22 * sg;
         crescent(ctx, sx, sy, R * 0.97, aT - back, aH - back, th * 0.8, 0);
         fill(ctx, VFX_BODY[tint], fade * 0.26);
@@ -542,7 +553,7 @@ export class Vfx {
       crescent(ctx, sx, sy, R - th * 0.08, aT, aH, th * 0.34, th * 0.04);
       fill(ctx, VFX_CORE[tint], fade);
       // a glint on the leading tip
-      if (star && !this.calm && u < 0.5) {
+      if (star && !calm && u < 0.5) {
         const hx = P.x[i] + Math.cos(aH) * P.r[i] * 0.74, hy = P.y[i] + Math.sin(aH) * P.r[i] * 0.74;
         rot(ctx, cam, star, hx, hy, aH, 0.42, 0.42, fade * (1 - u * 1.6));
       }

@@ -15,7 +15,8 @@ import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
 import { CONTENT } from '../src/views/mirror/engine/content';
 import { Renderer, drawOrder } from '../src/views/mirror/engine/render';
-import { BK, FK, STAIN, VFX_CAP, VF, VT, WPN_TINT, slashTint, vfxOf } from '../src/views/mirror/engine/vfx';
+import { BK, FK, RING_CALM0, STAIN, VFX_CAP, VF, VT, WPN_TINT, slashTint, vfxOf } from '../src/views/mirror/engine/vfx';
+import { PROJ_IDS } from '../src/views/mirror/engine/consts';
 import { TG, TSY, Trails } from '../src/views/mirror/engine/trails';
 import { NVT, VFX_BODY, VFX_CORE, VFX_HALO } from '../src/views/mirror/paint/vfx';
 
@@ -414,6 +415,140 @@ describe('流光: pass 3 (the ground, the columns, the cross)', () => {
       most = Math.max(most, n);
     }
     expect(most).toBe(2);
+    eng.dispose();
+  });
+});
+
+describe('流光: fix round (calm rings, answers on the press, the 琴 pulse, the peachwood blade, the cross)', () => {
+  /** A 2D context that records every arc's radius (the rest are no-ops). */
+  function arcCtx() {
+    const radii: number[] = [];
+    const st: Record<string, unknown> = { globalAlpha: 1 };
+    const noop = () => {};
+    const ctx = new Proxy(st, {
+      get: (t, k) => (k === 'arc' ? (_x: number, _y: number, r: number) => radii.push(r) : k in t ? t[k as string] : noop),
+      set: (t, k, v) => { t[k as string] = v; return true; },
+    });
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, radii };
+  }
+
+  it('reduced motion: a shockwave stands near its reach and fades in place (no sweep across the screen); debris and motes halve', () => {
+    for (const reduceMotion of [false, true]) {
+      const { run, setup } = setupFor(newRun(opts()));
+      const eng = make(run, { reduceMotion });
+      eng.start(run, setup);
+      const W = quiet(eng);
+      const V = vfxOf(W);
+      const cam = { x: 0, y: 0, scale: 1, w: 1280, h: 800, dpr: 1 };
+      V.frameStart();
+      const rec = arcCtx();
+      V.ringAt(rec.ctx, cam, 0, 0, 200, 0.1, VT.gold, VF.double | VF.halo, 1);
+      const R = Math.min(...rec.radii.filter((r) => r > 0));
+      if (reduceMotion) expect(R).toBeGreaterThanOrEqual(RING_CALM0 * 200 * 0.8 - 1);
+      const lead = Math.max(...rec.radii);
+      if (reduceMotion) expect(lead).toBeGreaterThanOrEqual(0.85 * 200);
+      else expect(lead).toBeLessThan(0.5 * 200);
+      V.clear();
+      V.shock(0, 0, 200, VT.gold, { debris: 8, fleck: FK.glint });
+      V.motes(0, 0, 40, 8, VT.gold);
+      expect(V.flecks.count).toBe(reduceMotion ? 4 + 4 : 8 + 8);
+      eng.dispose();
+    }
+  });
+
+  for (const [ch, skill] of [['change', 'qinghui'], ['rabbit', 'daoyao']] as const) {
+    it(`${skill} answers the press on its first frame`, () => {
+      const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 21, char: ch as CharId })), [['qingping', 2]]), wave: 6 });
+      const eng = make(run, {}, CONTENT);
+      eng.start(run, setup);
+      const W = quiet(eng);
+      crowd(W, 12, 90);
+      eng.stepN(20);
+      const V = vfxOf(W);
+      W.slots.length = 0;
+      const sum = () => V.st.rings + V.st.slashes + V.st.lances + V.st.bolts + V.st.blooms + V.st.flecks;
+      const before = sum();
+      W.skillCd = 0;
+      expect(W.castSkill(null, { x: 1, y: 0 })).toBe(true);
+      eng.stepN(1);
+      expect(sum()).toBeGreaterThan(before);
+      eng.dispose();
+    });
+  }
+
+  it('every 古琴 pulse is a shockwave with a body (not a hairline); the resonance beat is a big one with a halo', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3, char: 'musician' as CharId })), [['qin', 3]]), wave: 6 });
+    const eng = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    crowd(W, 16, 50);
+    const V = vfxOf(W);
+    let plain = 0, big = 0;
+    const seen = new Set<number>();
+    for (let k = 0; k < 60 * 8; k++) {
+      eng.stepN(1);
+      for (let i = 0; i < V.rings.n; i++) {
+        if (!V.rings.alive[i] || V.rings.tint[i] !== VT.green) continue;
+        const key = Math.round(V.rings.t0[i] * 1000) * 64 + i;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        expect(V.rings.flags[i] & VF.thin).toBe(0);
+        if (V.rings.flags[i] & VF.big) { big++; expect(V.rings.flags[i] & VF.halo).toBeTruthy(); } else plain++;
+      }
+    }
+    expect(plain).toBeGreaterThan(0);
+    expect(big).toBeGreaterThan(0);
+    eng.dispose();
+  });
+
+  it('a 桃木剑 shot flies as the peachwood blade (its own sprite), not the steel flying sword', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 4, char: 'taoist' as CharId })), [['peach', 3]]), wave: 6 });
+    const eng = make(run);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    crowd(W, 12, 160);
+    const K = PROJ_IDS.indexOf('flySword' as (typeof PROJ_IDS)[number]);
+    let shots = 0;
+    for (let k = 0; k < 240 && !shots; k++) { eng.stepN(1); for (let i = 0; i < W.PS.n; i++) if (W.PS.alive[i] && W.PS.kind[i] === K) shots++; }
+    expect(shots).toBeGreaterThan(0);
+    const P = createDebugPainter(run.map, 'high', 1);
+    const asked: string[] = [];
+    const orig = P.sprite.bind(P);
+    const blade = { img: {} as CanvasImageSource, sx: 0, sy: 0, sw: 44, sh: 12, w: 44, h: 12, ax: 0.23, ay: 0.5 };
+    P.sprite = ((id: string, v?: number) => { asked.push(id); return id === 'wpn:peach' ? blade : orig(id as never, v); }) as typeof P.sprite;
+    const r = new Renderer(P);
+    r.draw(W, nullCtx(), camOf(W));
+    // the held 桃木剑 asks once, every peach shot once more, the resting ones once; the steel sword only
+    // for the orbit pass
+    expect(asked.filter((id) => id === 'wpn:peach').length).toBe(1 + shots + (W.idleSwords > 0 ? 1 : 0));
+    expect(asked.filter((id) => id === 'proj:flySword').length).toBe(1);
+    eng.dispose();
+  });
+
+  it('一剑光寒\'s cross lands on what he cut, clear of his figure (never over his face)', () => {
+    const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 21, char: 'swordsman' as CharId })), [['qingping', 2], ['casket', 2]]), wave: 6 });
+    const eng = make(run, {}, CONTENT);
+    eng.start(run, setup);
+    const W = quiet(eng);
+    crowd(W, 12, 90);
+    eng.stepN(20);
+    const V = vfxOf(W);
+    W.skillCd = 0;
+    expect(W.castSkill(null, { x: 1, y: 0 })).toBe(true);
+    let nearest = Infinity, cuts = 0;
+    for (let k = 0; k < 60; k++) {
+      eng.stepN(1);
+      for (let i = 0; i < V.lances.n; i++) {
+        if (!V.lances.alive[i] || !(V.lances.flags[i] & VF.cut) || W.t - V.lances.t0[i] > 1 / 30) continue;
+        cuts++;
+        // the nearest point of the cut to the player
+        const x0 = V.lances.x[i], y0 = V.lances.y[i], c = Math.cos(V.lances.a[i]), s = Math.sin(V.lances.a[i]), L = V.lances.b[i];
+        const p = Math.max(0, Math.min(L, (W.px - x0) * c + (W.py - y0) * s));
+        nearest = Math.min(nearest, Math.hypot(x0 + c * p - W.px, y0 + s * p - W.py));
+      }
+    }
+    expect(cuts).toBeGreaterThanOrEqual(2);
+    expect(nearest).toBeGreaterThanOrEqual(40);
     eng.dispose();
   });
 });

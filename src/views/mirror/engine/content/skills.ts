@@ -227,8 +227,10 @@ const yijian: SkillImpl = {
       const V = vfxW(w);
       const nS = Math.max(1, Math.min(6, sw.n));
       for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; V.streak(sx - dy * o, sy + dx * o, ex - dy * o, ey + dx * o, k === (nS - 1) >> 1 ? 12 : 7, k & 1 ? VT.jade : VT.azure, 0.45, 2); }
-      const cx = ex + dx * 34, cy = ey + dy * 34;
-      // two whole cuts crossing (an X of light that thins away in place)
+      // two whole cuts crossing (an X of light that thins away in place) on what he cut: back along his
+      // path, clear of his figure (its nearest arm ≥ 46 u behind him), never over his face
+      const back = Math.max(84, Math.min(150, len * 0.5));
+      const cx = ex - dx * back, cy = ey - dy * back;
       V.lance(cx - Math.cos(ang + 0.8) * 46, cy - Math.sin(ang + 0.8) * 46, ang + 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
       V.lance(cx - Math.cos(ang - 0.8) * 46, cy - Math.sin(ang - 0.8) * 46, ang - 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
       V.bloom(cx, cy, 40, VT.gold, 0.3, BK.glow, 1, 2);
@@ -469,6 +471,11 @@ const daoyao: SkillImpl = {
   cast(w0, def) {
     const p = def.p;
     w0.root(p.root);
+    // the pestle goes up (the press answers at once; the first pound lands 0.3 s later): a jade lance of
+    // light raised over her, a thin jade ring where the pounds will land
+    const V0 = vfxW(w0);
+    V0.lance(w0.player.x, w0.player.y - 18, -Math.PI / 2, 64, 12, VT.jade, 0.3, VF.streak, 2);
+    V0.ring(w0.player.x, w0.player.y, p.r, VT.jade, 0.3, VF.thin);
     return coSkill(w0, function* (c) {
       const step = p.root / p.pounds;
       for (let k = 0; k < p.pounds; k++) {
@@ -586,9 +593,12 @@ const qinghui: SkillImpl = {
       let t = 0;
       while (t < p.rise) {
         const w = c.w;
-        // she rises in a column of moonlight, glints spiralling up with her
-        if (Math.floor(t * 4) !== Math.floor((t + w.dt) * 4)) {
+        // she rises in a column of moonlight, glints spiralling up with her (from the first frame: the
+        // press answers at once)
+        if (t === 0 || Math.floor(t * 4) !== Math.floor((t + w.dt) * 4)) {
           const V = vfxW(w);
+          // lift-off: a moon ring breaks from her feet
+          if (t === 0) V.ring(w.player.x, w.player.y, 60, VT.moon, 0.4, VF.thin | VF.double);
           V.bloom(w.player.x, w.player.y + 8, 130, VT.moon, 0.55, BK.column, 0.9, 1);
           V.bloom(w.player.x, w.player.y - 8, 58, VT.moon, 0.5, BK.halo, 0.75, 1);
           V.motes(w.player.x, w.player.y, 34, 4, VT.moon, 0.8);
@@ -602,7 +612,8 @@ const qinghui: SkillImpl = {
       // she lands in moonlight: a moon-white double ring with a halo, glints thrown out, the pool shimmers
       const V = vfxW(w);
       V.shock(x, y, p.r, VT.moon, { flags: VF.double | VF.halo | VF.big, debris: 10, fleck: FK.glint, life: 0.5, prio: 2 });
-      V.bloom(x, y, 60, VT.moon, 0.45, BK.glow, 0.9, 2);
+      // a ring of moonlight about her (a halo, clear in its heart: she is not washed out)
+      V.bloom(x, y - 6, 74, VT.moon, 0.5, BK.halo, 0.85, 2);
       shared(w).pools.push({ x, y, r: p.r, until: w.t + p.pool, dr: p.poolDr / 100 });
       w.zone({
         side: 'player', look: 'moonPool', x, y, r: p.r, life: p.pool, slow: p.poolSlow, tick: 0.25,

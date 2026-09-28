@@ -634,7 +634,7 @@ export type DropKind = (typeof DROP_REG)[number]['id'];
 /** Effects and marks: atlas `fx:<id>`. Player effects are washes at 55–70% opacity in class colours. */
 export const FX_REG = [
   { id: 'hitSpark', zh: '击', en: 'Hit', look: 'small ink flick at the impact point' },
-  { id: 'critSpark', zh: '暴', en: 'Crit', look: 'vermilion star-burst flick' },
+  { id: 'critSpark', zh: '暴', en: 'Crit', look: 'gold star-burst with a white heart' },
   { id: 'inkBurst', zh: '墨散', en: 'Ink Burst', look: 'death burst of ink wash (then stamped into the arena)' },
   { id: 'splat', zh: '墨渍', en: 'Stain', look: 'dry stain stamped into the arena layer; 3 variants' },
   { id: 'spawnBloom', zh: '晕墨', en: 'Ink Bloom', look: 'wet ink blooming in a circle where an enemy will appear' },

@@ -388,7 +388,9 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
         W.strike(i, d * big * (res ? ((p.resX as number) ?? 2) : 1), cp, cm, knock, px, py, s.i, SRCI.weapon, 0, s.proc);
         if (res && E.alive[i]) W.statusSlot(i, 'slow', (p.slowDur as number) ?? 1.5, (p.slow as number) ?? 30);
       }
-      vfxOf(W).shock(px, py, r, tintOf(s), { flags: VF.thin | VF.double | (res ? VF.halo : 0), debris: res ? 6 : 0, fleck: FK.glint, life: 0.38, prio: res ? 1 : 0 });
+      // the 琴's pulse is a shockwave of sound: every pulse a green body band with a bright edge and a few
+      // glints; the resonance beat a full, wide shockwave with a halo
+      vfxOf(W).shock(px, py, r, tintOf(s), { flags: VF.double | (res ? VF.halo | VF.big : 0), debris: res ? 8 : 3, fleck: FK.glint, life: 0.38, prio: res ? 1 : 0 });
       if (res) { if (t === 4) W.heal((p.healT4 as number) ?? 1); W.title({ zh: '共鸣', en: 'Resonance' }, 'edge'); }
       // the ring is the shot: its hits sound through the feel bus (pluck), so no cast sound or puff
       W.feel.fire(s.i, px, py, W.face, true);

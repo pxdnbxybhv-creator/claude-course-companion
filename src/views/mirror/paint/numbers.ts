@@ -5,7 +5,6 @@ import { fmtBig } from '../logic/formulas';
 import type { NumStyle } from '../types';
 import { canvas, ctx2d } from './atlas';
 import { BRUSH_FONT, TEXT_FONT } from './kit';
-import { DANGER } from './palette';
 
 /** The HUD's and the shop's abbreviation (logic fmtBig), so a number reads the same everywhere:
  *  1234 → '1234' · 15500 → '1.6万' / '15.5k' · 123456 → '12.3万' / '123k' · 2.5e6 → '250万' / '2.5m'. */
@@ -15,8 +14,8 @@ const GLYPHS = '0123456789.+-kmb万亿!';
 interface StyleDef { px: number; font: string; fill: string; edge: string; edgeW: number; /** An outer rim under the edge (crits: gold). */ rim?: string; rimW?: number }
 const STYLES: Record<NumStyle, StyleDef> = {
   hit: { px: 13, font: TEXT_FONT, fill: '#1b1916', edge: 'rgba(244,239,228,0.95)', edgeW: 3 },
-  // crits: vermilion brush numerals in a gold rim, with a 「!」 (打击感: they must read as a crit at a glance)
-  crit: { px: 21, font: BRUSH_FONT, fill: DANGER, edge: 'rgba(27,25,22,0.9)', edgeW: 2.2, rim: '#f0c24a', rimW: 4 },
+  // crits: white-hot brush numerals in an ink edge and a gold halo, with a 「!」 (vermilion stays the enemy's)
+  crit: { px: 21, font: BRUSH_FONT, fill: '#fff8e6', edge: 'rgba(27,25,22,0.92)', edgeW: 2.4, rim: '#f0c24a', rimW: 4.5 },
   heal: { px: 13, font: TEXT_FONT, fill: '#2f7a3e', edge: 'rgba(244,239,228,0.95)', edgeW: 3 },
   moon: { px: 12, font: TEXT_FONT, fill: '#f6f7fb', edge: 'rgba(40,52,70,0.9)', edgeW: 3 },
   coin: { px: 15, font: BRUSH_FONT, fill: '#e2b04a', edge: 'rgba(58,36,8,0.9)', edgeW: 3 },

@@ -321,7 +321,7 @@ export const FEEL_MIX: Record<FeelVoice, SfxMix> = {
   release: { gain: 0.2, send: 0.04, cap: 1, spam: true },
   zip: { gain: 0.26, send: 0.1, cap: 1 },
   heart: { gain: 0.55, send: 0.02, cap: 1 },
-  skillHit: { gain: 0.85, send: 0.2, cap: 1, duck: 0.5 },
+  skillHit: { gain: 0.85, send: 0.2, cap: 1, duck: 0.7 },
 };
 
 /** Render one voice (channels; mono or stereo). Deterministic for a given (name, sr). */
@@ -515,7 +515,7 @@ export const SFX_MIX: Record<SfxName, SfxMix> = {
   coinTen: { gain: 0.75, send: 0.25, cap: 1, duck: 0.6, pitched: true },
   levelUp: { gain: 0.7, send: 0.3, cap: 1, duck: 0.45, pitched: true },
   gong: { gain: 0.6, send: 0.3, cap: 1, duck: 0.5, pitched: true },
-  bell: { gain: 0.55, send: 0.25, cap: 1, duck: 0.4, pitched: true },
+  bell: { gain: 0.55, send: 0.25, cap: 1, duck: 0.75, pitched: true },
   merge: { gain: 0.55, send: 0.25, cap: 1, pitched: true },
   hurt: { gain: 0.7, send: 0.05, cap: 1 },
   dodge: { gain: 0.4, send: 0.1, cap: 1 },

@@ -1026,6 +1026,7 @@ export interface WorldApi {
   fx(name: FxName, x: number, y: number, o?: { r?: number; dir?: number; life?: number; tint?: string }): void;
   /** Brush title at the screen edge (synergies, ≤ 1/s) or centre (boss phases). */
   title(text: Bilingual, where?: 'edge' | 'centre'): void;
+  /** A boss's slam: min(2, px / 2) px, ≤ 1 per 0.5 s; off with 震屏 off and under reduced motion. The player's weapons, 镜技 and the elites never call it. */
   shake(px: number): void;
   hitstop(ms: number): void;
   sfx(name: SfxName): void;

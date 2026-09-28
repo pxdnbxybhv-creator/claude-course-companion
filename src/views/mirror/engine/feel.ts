@@ -957,11 +957,14 @@ export class Feel {
 
   /** A mid-wave level-up: a gold burst and a thump (the camera stays still). */
   level(x: number, y: number): void {
+    // reduced motion: one soft glow, no streaks flying out
+    if (!this.motion) { if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 1.2, 1.6, 0, 0, 0, PF.ease, 0.5); this.busLevel++; return; }
     for (let k = 0; k < 12 && this.room(2); k++) {
       const a = (k / 12) * Math.PI * 2 + this.rnd() * 0.3, v = 260 + 120 * this.rnd();
-      this.emit(k & 1 ? SH.glint : SH.streak, TN.gold, x, y, Math.cos(a) * v, Math.sin(a) * v, 0.4, 1, 0.4, a, 0, 4, k & 1 ? 0 : PF.stretch, 0.95);
+      // the streaks start clear of the figure so the level-up never covers him
+      this.emit(k & 1 ? SH.glint : SH.streak, TN.gold, x + Math.cos(a) * 14, y + Math.sin(a) * 14, Math.cos(a) * v, Math.sin(a) * v, 0.4, 1, 0.4, a, 0, 4, k & 1 ? 0 : PF.stretch, 0.95);
     }
-    if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 1.2, 3, 0, 0, 0, PF.ease, 0.8);
+    if (this.room(2)) this.emit(SH.flare, TN.gold, x, y, 0, 0, 0.18, 0.8, 2, 0, 0, 0, PF.ease, 0.8);
     this.busLevel++;
   }
   /** 月华 (or a coin) reached you: a glint. */

@@ -11,7 +11,7 @@ const W2S = (cam: Camera, x: number, y: number, out: { x: number; y: number }) =
   return out;
 };
 const P = { x: 0, y: 0 };
-const NUM_COLOUR: Record<NumStyle, string> = { hit: '#222', crit: '#c0412f', heal: '#3f7a4a', moon: '#6f8fb0', coin: '#b8862b', player: '#c0412f' };
+const NUM_COLOUR: Record<NumStyle, string> = { hit: '#222', crit: '#d4930c', heal: '#3f7a4a', moon: '#6f8fb0', coin: '#b8862b', player: '#c0412f' };
 
 export class DebugPainter implements Painter {
   readonly dpr: number;
