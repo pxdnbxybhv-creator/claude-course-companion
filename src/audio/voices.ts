@@ -1,5 +1,6 @@
 // One-shot sounds, scheduled on a Mixer at an absolute context time `when`.
-import type { QinNote } from './dsp';
+import { TAU, addNoiseBurst, fadeTail, highpass, lowpass, peakOf, scale, type QinNote } from './dsp';
+import { makeRng } from '../core/rng';
 import type { Job } from './jobs';
 import type { Mixer, VoiceOpts } from './graph';
 
@@ -107,4 +108,50 @@ export function playKnock(mix: Mixer, when: number, gain = 0.5) {
   const v = 1 + Math.floor(Math.random() * 3);
   mix.cached(`knock${v}`, { op: 'knock', seed: v }, (b) =>
     mix.play(b, when, { gain, send: 0.12, rate: 1 + (Math.random() - 0.5) * 0.02 }));
+}
+
+/**
+ * 滴 — a drop touching still water: a sine falling 1800 → 600 Hz (× pitch) in ≈ 40 ms, a 2 ms
+ * click, and a softer plink 90 ms later at 1.6× the pitch. Seeded, so equal arguments give the
+ * same sound (the opening PV's tap at 0.0 s and its echo at 67.5 s are the identical call).
+ */
+export function renderDrip(sr: number, pitch = 1): Float32Array {
+  const p = Math.max(0.25, Math.min(4, Number.isFinite(pitch) ? pitch : 1));
+  const out = new Float32Array(Math.ceil(0.42 * sr));
+  const nyq = sr * 0.45;
+  const drop = (at: number, k: number, amp: number, tau: number) => {
+    let ph = 0;
+    for (let i = Math.round(at * sr); i < out.length; i++) {
+      const t = i / sr - at;
+      ph += (TAU * Math.min(nyq, k * (600 + 1200 * Math.exp(-t / 0.013)))) / sr;
+      out[i] += amp * Math.sin(ph) * (1 - Math.exp(-t / 0.0007)) * Math.exp(-t / tau);
+    }
+  };
+  drop(0, p, 1, 0.075);
+  drop(0.09, 1.6 * p, 0.3, 0.05);
+  const rng = makeRng(0xd819);
+  addNoiseBurst(out, sr, rng, 0.35, 0.0003, [highpass(sr, 2500), lowpass(sr, 9000)]);
+  scale(out, 0.9 / (peakOf(out) || 1));
+  return fadeTail(out, sr, 0.08);
+}
+
+const drips = new WeakMap<Mixer, Map<string, AudioBuffer>>();
+
+/**
+ * The drip, rendered on the main thread (≈ 20 k samples, well under a millisecond) and kept per
+ * pitch: the PV's tap must sound within 50 ms of the click even while the synthesis worker is
+ * still starting.
+ */
+export function playDrip(mix: Mixer, when: number, pitch = 1, gain = 0.5) {
+  mix.play(dripBuffer(mix, pitch), when, { gain, send: 0.3 });
+}
+
+/** The drip's buffer for a pitch, made once per mixer (audio.prime() makes the tap's ahead of time). */
+export function dripBuffer(mix: Mixer, pitch = 1): AudioBuffer {
+  const key = pitch.toFixed(3);
+  let bank = drips.get(mix);
+  if (!bank) drips.set(mix, (bank = new Map()));
+  let b = bank.get(key);
+  if (!b) bank.set(key, (b = mix.buffer([renderDrip(mix.sampleRate, pitch)])));
+  return b;
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { route, go, tabOf, type Route } from './router';
 import { lang, state } from './store';
@@ -14,11 +14,12 @@ import { MailHost } from '../views/mail/MailHost';
 import { music } from '../audio/music';
 import { active } from '../views/focus/session';
 import { mirror } from './mirror';
+import { appTheme, introOn } from './intro';
+import { IntroHost } from '../views/intro/IntroHost';
 import { computed } from '@preact/signals';
 
 /** Is a run paused in the mirror? (a computed boolean, so the shell re-renders only when it flips) */
 const mirrorActive = computed(() => !!mirror.value.active);
-import type { MusicTheme } from '../views/walk/map';
 
 /** Load a page's code the first time it is opened (games and the 3D walk are large). */
 function lazyView(load: () => Promise<{ default: ComponentType }>) {
@@ -47,13 +48,6 @@ const QuestsView = lazyView(() => import('../views/quests/QuestsView'));
 const WalkView = lazyView(() => import('../views/walk/WalkView'));
 const MirrorView = lazyView(() => import('../views/mirror'));
 
-/** Background music by page; the 3D walk picks its own themes by region. */
-function themeFor(r: Route): MusicTheme | null | 'walk' {
-  if (r === 'walk' || r === 'mirror') return 'walk'; // the walk and the mirror drive their own themes
-  if (r === 'focus') return null; // the incense has its own ambience
-  if (r === 'games' || r === 'quests' || ['snake', 'tictactoe', 'gomoku', 'xiangqi', 'klotski', 'tangram', 'feihua'].includes(r)) return 'hall';
-  return 'garden';
-}
 import { ToastHost } from '../ui/kit';
 import { audio } from '../audio/engine';
 import './app.css';
@@ -73,6 +67,9 @@ export function App() {
   const { theme, sound, volume, music: musicOn, musicVolume } = state.value.settings;
   // a run waits in the mirror: the 镜 glyph carries one ink dot (no counts, no red badges)
   const mirrorPaused = mirrorActive.value && r !== 'mirror';
+  // the opening film: no route music under its reel, no games prefetch in its busiest seconds
+  const filmOn = introOn.value;
+  useLayoutEffect(() => { try { performance.mark('app:shell'); } catch { /* old browsers */ } }, []);
   useEffect(() => {
     audio.setEnabled(sound);
     audio.setVolume(volume);
@@ -84,14 +81,16 @@ export function App() {
   // while a stick burns with its own ambience (rain, a stream…), the music gives way to it
   const burning = active.value !== null && active.value.pausedAt === null && state.value.settings.ambient !== 'none';
   useEffect(() => {
-    const th = themeFor(r);
-    if (th !== 'walk') music.setTheme(burning ? null : th);
-  }, [r, burning]);
+    // Background music by page (the 3D walk picks its own themes by region; none while the film is on).
+    const th = appTheme(r, burning, filmOn);
+    if (th !== 'walk') music.setTheme(th);
+  }, [r, burning, filmOn]);
   useEffect(() => {
-    // Warm up the games' code while the visitor is looking at the garden.
+    // Warm up the games' code while the visitor is looking at the garden (not under the film).
+    if (filmOn) return;
     const t = setTimeout(() => { void GomokuView.prefetch(); void SnakeView.prefetch(); }, 6000);
     return () => clearTimeout(t);
-  }, []);
+  }, [filmOn]);
   useEffect(() => {
     // Browsers (iOS especially) only allow audio after a gesture: unlock on the first touches.
     const unlock = () => { if (state.value.settings.sound) void audio.unlock(); };
@@ -147,6 +146,7 @@ export function App() {
       <ToastHost />
       <MailHost />
       <Celebrate />
+      <IntroHost />
     </div>
   );
 }

@@ -491,7 +491,8 @@ function placeLabels(items: Placed[], growthOf: (key: string) => number, worldW:
   }
 }
 
-function vigorFor(freshness: number): number {
+/** A plant's ink vigour from its pond freshness (the opening film's beats use it too). */
+export function vigorFor(freshness: number): number {
   return Math.round((0.4 + 0.6 * clamp(freshness, 0, 1)) * 10) / 10;
 }
 
@@ -637,6 +638,12 @@ export class GardenScene {
   private ro: ResizeObserver | null = null;
   private io: IntersectionObserver | null = null;
   private mq: MediaQueryList | null = null;
+  /** Held under the opening film: after one complete frame the scene stops (see hold()). */
+  private held = false;
+  private holdWant = false;
+  private holdWaiters: (() => void)[] = [];
+  private measureDue = false;
+  private benchRec: { ms: number; mpx: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement, env: SceneEnv) {
     this.canvas = canvas;
@@ -669,6 +676,7 @@ export class GardenScene {
 
   destroy(): void {
     this.destroyed = true;
+    this.flushHold();
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     const c = this.canvas;
@@ -686,6 +694,74 @@ export class GardenScene {
   }
 
   // ------------------------------------------------------------------------------------ public API
+
+  /**
+   * The opening film holds the garden under it. on: finish the next COMPLETE frame (backdrop,
+   * every plant painted and faded in, pond), then stop; the promise resolves then. off: run again.
+   */
+  hold(on: boolean): Promise<void> {
+    if (!on) {
+      const was = this.held || this.holdWant;
+      this.held = false;
+      this.holdWant = false;
+      this.flushHold();
+      if (this.measureDue) {
+        this.measureDue = false;
+        this.measure();
+      }
+      if (was) {
+        this.last = 0;
+        this.kick();
+      }
+      return Promise.resolve();
+    }
+    if (this.held) return Promise.resolve();
+    this.holdWant = true;
+    const p = new Promise<void>((res) => this.holdWaiters.push(res));
+    this.kick();
+    return p;
+  }
+
+  private flushHold(): void {
+    const w = this.holdWaiters;
+    this.holdWaiters = [];
+    for (const f of w) f();
+  }
+
+  /** Every layer of the picture is painted and settled (no queued plants, no stroke in flight). */
+  private complete(): boolean {
+    if (!this.backdrop || !this.W || this.bdDue || this.queue.length) return false;
+    for (const s of this.slots.values()) if (!s.bmp || s.anim) return false;
+    return true;
+  }
+
+  /** The pond in viewport coordinates (null before the first backdrop). */
+  pondRect(): DOMRect | null {
+    if (!this.backdrop || !this.H) return null;
+    const r = this.canvas.getBoundingClientRect();
+    const k = r.height / this.H;
+    const top = this.pondTop * k;
+    return new DOMRect(r.left, r.top + top, r.width, Math.max(0, r.height - top));
+  }
+
+  /** The painted sun or moon disc in canvas css px, as it shows now (null when none). */
+  body(): { kind: 'sun' | 'moon'; x: number; y: number; r: number } | null {
+    const bd = this.backdrop;
+    if (!bd?.body || bd.body.r <= 0 || !this.bdH) return null;
+    const k = this.H / this.bdH;
+    const off = clamp(this.pan * PARALLAX, 0, Math.max(0, this.bdW * k - this.W));
+    return { kind: bd.body.kind, x: bd.body.x * k - off, y: bd.body.y * k, r: bd.body.r * k };
+  }
+
+  /** The env the scene paints (season, hour, moon…). */
+  currentEnv(): SceneEnv {
+    return this.env;
+  }
+
+  /** The first paintBackdrop this scene ran, timed (null when it came from the cache). */
+  bench(): { ms: number; mpx: number } | null {
+    return this.benchRec;
+  }
 
   setEnv(env: SceneEnv): void {
     this.env = env;
@@ -848,6 +924,10 @@ export class GardenScene {
   // ------------------------------------------------------------------------------------ layout sync
 
   private measure(): void {
+    if (this.held) {
+      this.measureDue = true; // resizing clears the canvas: the held picture stays until release
+      return;
+    }
     const r = this.canvas.getBoundingClientRect();
     const w = Math.round(r.width), h = Math.round(r.height);
     const dpr = Math.min(MAX_DPR, window.devicePixelRatio || 1);
@@ -989,7 +1069,7 @@ export class GardenScene {
   // ------------------------------------------------------------------------------------ loop
 
   private kick(): void {
-    if (this.destroyed || this.raf || this.hidden || !this.onScreen) return;
+    if (this.destroyed || this.raf || this.hidden || !this.onScreen || this.held) return;
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -1006,7 +1086,7 @@ export class GardenScene {
 
   private frame = (now: number): void => {
     this.raf = 0;
-    if (this.destroyed || this.hidden || !this.onScreen || !this.W) return;
+    if (this.destroyed || this.hidden || !this.onScreen || !this.W || this.held) return;
     const busy = this.isBusy(now);
     const idleMotion = !this.reduced;
     // Idle sway runs at ~30 fps; anything interactive at full rate.
@@ -1020,7 +1100,22 @@ export class GardenScene {
     this.t += dt;
     this.step(now, dt);
     this.draw(now);
-    if (busy || idleMotion) this.raf = requestAnimationFrame(this.frame);
+    if (this.holdWant && this.complete()) {
+      // settle every fade, so the held frame is the finished picture, then stop
+      let redraw = false;
+      for (const s of this.slots.values()) {
+        if (s.appear < 1 || s.fade < 1) redraw = true;
+        s.appear = 1;
+        s.fade = 1;
+        s.prev = null;
+      }
+      if (redraw) this.draw(now);
+      this.holdWant = false;
+      this.held = true;
+      this.flushHold();
+      return;
+    }
+    if (busy || idleMotion || this.holdWant) this.raf = requestAnimationFrame(this.frame);
   };
 
   private step(now: number, dt: number): void {
@@ -1034,7 +1129,9 @@ export class GardenScene {
       const ph = backdropPaintHeight(bw, this.H);
       if (backdropCache?.key === key) this.backdrop = backdropCache.bd;
       else {
+        const t0 = performance.now();
         this.backdrop = paintBackdrop(bw, ph, this.dpr, this.env);
+        if (!this.benchRec) this.benchRec = { ms: performance.now() - t0, mpx: (bw * ph * this.dpr * this.dpr) / 1e6 };
         backdropCache = { key, bd: this.backdrop, w: bw, h: this.H, ph };
         paintedBackdrop = true;
       }

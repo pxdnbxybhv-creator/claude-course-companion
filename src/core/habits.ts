@@ -19,7 +19,7 @@ export function countDone(days: readonly DateKey[], today: DateKey): number {
 
 /**
  * Growth 0..1 from the number of completions. A brand-new habit is a visible sprout (≈0.06);
- * ~7 days → 0.33, ~21 days → 0.65, ~66 days → 0.98.
+ * ~7 days → 0.33, ~21 days → 0.65, ~66 days → 0.959.
  */
 export function growthFor(completions: number): number {
   return 0.06 + 0.94 * (1 - Math.exp(-completions / 21));

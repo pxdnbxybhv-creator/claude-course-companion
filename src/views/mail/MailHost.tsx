@@ -43,10 +43,10 @@ export function MailHost() {
 /** The courier's toast while it shows: its id and the letters it brought. */
 let courier: { toast: number; ids: string[] } | null = null;
 
-/** Something the courier should not talk over: the walk still grinding its ink or changing scene. */
+/** Something the courier should not talk over: the walk still grinding its ink or changing scene, the opening film. */
 function screenBusy(): boolean {
   try {
-    return !!document.querySelector('.walk-loading:not(.walk-fail), .walk-curtain.is-on, .cel');
+    return !!document.querySelector('.walk-loading:not(.walk-fail), .walk-curtain.is-on, .cel, .intro-film');
   } catch {
     return false;
   }

@@ -26,6 +26,15 @@ answer was fresh water flowing in from the source, and habits work the same way.
 
 ## What's inside · 功能
 
+**开篇 The opening film.** The first time the page opens, a still night pond shows a broken moon and
+the words 「轻触水面」. Tap, and an 86-second film in Chinese, 《月亮看见的》, tells how 半亩 began: the
+moon finds itself in a square pond drawn in the margin of someone's reading notes, watches that person
+keep a small promise every night while the jade rabbit counts to sixty-six, drifts past a bronze
+mirror, a stick of incense and a go board, and sends the rabbit down with a letter. The film ends in
+your own garden, and the rabbit hops into the mailbox where 嫦娥's first letter is waiting. It is
+painted and scored live like everything else, can be skipped from the first frame, has a shorter
+version for reduced motion, and can be watched again from Settings.
+
 **园 Garden.** Each habit grows as a plant. A new habit starts as a sprout; around day 66, the
 average time it takes to form a habit, it reaches full bloom. Check in by tapping the ensō: the
 new strokes are brushed in, petals drift, and a line of classical poetry appears in the sky. You

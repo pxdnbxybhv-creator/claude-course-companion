@@ -2,12 +2,14 @@
 // in a Web Worker (render.worker.ts) so the main thread never stalls on DSP; the offline lab and
 // the no-worker fallback run them synchronously with the same code.
 import { renderBell, renderHarmonic, renderIR, renderKnock, renderNoise, renderQin, type NoiseColour, type QinNote } from './dsp';
+import { renderDrip } from './voices';
 
 export type Job =
   | { op: 'qin'; note: QinNote }
   | { op: 'harm'; freq: number; vel: number; decay: number; seed: number }
   | { op: 'bell' }
   | { op: 'knock'; seed: number }
+  | { op: 'drip'; pitch: number }
   | { op: 'noise'; colour: NoiseColour; secs: number; seed: number }
   | { op: 'ir' };
 
@@ -17,6 +19,7 @@ export function runJob(sr: number, j: Job): Float32Array[] {
     case 'harm': return [renderHarmonic(sr, j.freq, j.vel, j.decay, j.seed)];
     case 'bell': return renderBell(sr);
     case 'knock': return [renderKnock(sr, j.seed)];
+    case 'drip': return [renderDrip(sr, j.pitch)];
     case 'noise': return [renderNoise(j.colour, sr, j.secs, j.seed), renderNoise(j.colour, sr, j.secs, j.seed + 1)];
     case 'ir': return renderIR(sr);
   }

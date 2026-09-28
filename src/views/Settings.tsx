@@ -10,6 +10,7 @@ import { Segmented, Sheet, Toggle, toast } from '../ui/kit';
 import { audio } from '../audio/engine';
 import { music } from '../audio/music';
 import { redeemCode } from '../app/play';
+import { loadFilm, playIntro } from '../app/intro';
 import { makeSeal } from '../ink/seal';
 import { cleanName } from '../core/names';
 import { NameField, inComposition, useComposing } from './mail/NameField';
@@ -746,6 +747,7 @@ function AboutSection() {
       <p class="set-about-line set-privacy">
         {t('一切只存于此设备——无账号，无追踪。', 'Everything stays on this device — no accounts, no tracking.')}
       </p>
+      <ReplayRow />
       <div class="set-about-foot">
         <span class="muted num">{t('版本', 'Version')} {VERSION}</span>
         <button class="btn btn-small btn-ghost" onClick={() => go('garden')}>← {t('回到园圃', 'Back to the garden')}</button>
@@ -754,10 +756,30 @@ function AboutSection() {
   );
 }
 
+/** 「重看开篇」: the opening film again (its chunk is prefetched when Settings opens, for offline). */
+function ReplayRow() {
+  const t = useT();
+  const [miss, setMiss] = useState(false);
+  const open = () => {
+    loadFilm().then(() => { setMiss(false); playIntro('settings'); }, () => setMiss(true));
+  };
+  return (
+    <button type="button" class="row set-row set-replay" style={{ width: '100%', textAlign: 'start' }} onClick={open}>
+      <span class="row-main">
+        <span class="row-title" style={{ display: 'block' }}>{t('重看开篇', 'Watch the opening again')}</span>
+        <span class="row-sub" style={{ display: 'block' }}>{miss ? t('需联网载入一次', 'Needs a connection once to load') : t('月亮看见的 · 一分多钟', 'What the Moon Saw · about a minute')}</span>
+      </span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style={{ flex: 'none', opacity: 0.6 }}><path d="M9 5l7 7-7 7" /></svg>
+    </button>
+  );
+}
+
 // ------------------------------------------------------------------ view
 
 export function SettingsView() {
   const t = useT();
+  // the opening film's chunk, fetched now so a replay works offline later
+  useEffect(() => { loadFilm().catch(() => {}); }, []);
   return (
     <div class="settings-view">
       <header class="topbar">

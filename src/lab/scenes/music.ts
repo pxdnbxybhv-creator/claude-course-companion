@@ -1,6 +1,12 @@
 // /lab.html?scene=music[&theme=lake,village][&dur=40][&sr=32000][&day=2026-09-25][&visit=0]
 // /lab.html?scene=music&solo=1      — each instrument alone (timbre, articulation, spectrum)
 // /lab.html?scene=music&live=1      — realtime engine smoke / leak test (shared context, crossfade, duck, pause)
+// /lab.html?scene=music&reel=full|short[&sfx=0][&sr=48000]
+//                                    — the opening PV's authored reel (src/views/intro/score.ts) through the
+//                                      same bus, planned in PLAY_AHEAD windows by the reel's own planWindow; the
+//                                      second panel adds the sfx cues (drip, chimes, knock, stream) through the
+//                                      sound engine's mixer at the app's default volumes. window.__reel holds
+//                                      the mix (headless WAV export) and each panel's numbers.
 //
 // Renders each background-music theme through the real music bus (reverb, echo, compressor, soft
 // clip) in an OfflineAudioContext at full volume, then measures and draws it: waveform with its RMS
@@ -12,6 +18,13 @@ import { THEMES, type Inst, type ThemeId } from '../../audio/music-themes';
 import { STEP_NAMES, dayKey, daySeed, degreeToMidi, midiToFreq } from '../../audio/music-theory';
 import type { LineNote, MusicJob, PluckNote } from '../../audio/music-dsp';
 import { music, musicGain, musicStats } from '../../audio/music';
+import { Mixer } from '../../audio/graph';
+import { playChime, playDrip, playKnock } from '../../audio/voices';
+import { createBed } from '../../audio/ambient';
+import { buildScore, type ReelEvent } from '../../views/intro/score';
+import { PLAY_AHEAD, planWindow } from '../../views/intro/reel';
+import type { PlayedEvent } from '../../audio/music-player';
+import type { Phrase } from '../../audio/music-theory';
 
 const PAPER = '#f1e9d8', INK = '#1d1a16', RED = '#b93a2b', MUTED = 'rgba(29,26,22,.55)';
 
@@ -29,10 +42,12 @@ const ROLE_ZH = { qi: '起', cheng: '承', zhuan: '转', he: '合' } as const;
 
 /** Loudness window per theme (dBFS RMS at volume 1). */
 const WINDOW: Partial<Record<ThemeId, [number, number]>> = { quiet: [-40, -26], night: [-34, -22] };
-const windowOf = (t: ThemeId): [number, number] => WINDOW[t] ?? [-24, -18];
+/** The PV reel: a film score with a lapse and a hush in it — the whole 86 s sits a little under the themes. */
+const REEL_WINDOW: [number, number] = [-27, -18];
+const windowOf = (t: ThemeId | 'reel'): [number, number] => t === 'reel' ? REEL_WINDOW : WINDOW[t] ?? [-24, -18];
 
 interface Result {
-  name: string; theme: ThemeId; chs: Float32Array[]; sr: number; dur: number;
+  name: string; theme: ThemeId | 'reel'; chs: Float32Array[]; sr: number; dur: number;
   cond: Conductor[]; split?: number; ms: number; peakVoices: number; dropped: number;
   /** An instrument demo: no loudness window. */
   solo?: boolean;
@@ -105,6 +120,67 @@ async function renderTheme(theme: ThemeId, dur: number, sr: number, day: string,
   return {
     name: next ? `${theme} → ${next} (handover at ${at}s)` : theme, theme, chs: [buf.getChannelData(0), buf.getChannelData(1)], sr, dur, cond, split,
     ms: ms0, peakVoices: bus.peakVoices, dropped: bus.dropped,
+  };
+}
+
+
+// ---------------------------------------------------------------------------
+// the opening PV's reel
+
+/**
+ * The reel offline: the score's events planned window by window (PLAY_AHEAD, as the reel's tick
+ * does) onto the music bus at full music volume; with `sfx`, the cues through the sound engine's
+ * mixer at the app's default volumes (volume .7 → master .49; music .5 → the bus at musicGain(.5)).
+ */
+async function renderReel(cut: 'full' | 'short', sr: number, sfx: boolean): Promise<Result> {
+  const s = buildScore(cut);
+  const dur = s.end + 1.5;
+  const off = new OfflineAudioContext(2, Math.ceil(dur * sr), sr);
+  const bus = new MusicBus(off, { worker: null });
+  bus.volume.gain.value = musicGain(sfx ? 0.5 : 1);
+  const t0 = performance.now();
+  const dry = off.createGain(), wet = off.createGain(), echo = off.createGain();
+  dry.connect(bus.input); wet.connect(bus.verbIn); echo.connect(bus.echoIn);
+  const events: PlayedEvent[] = [];
+  let dropped = 0;
+  const base = 0.05;
+  for (let from = 0; from < s.end; from += PLAY_AHEAD) {
+    for (const p of planWindow(s.events, from, Math.min(s.end, from + PLAY_AHEAD))) {
+      const e = s.events[p.i] as ReelEvent;
+      const go = (b: AudioBuffer) => {
+        const src = bus.play(b, base + p.at, { gain: e.gain, pan: e.pan, send: e.send, echo: e.echo, rate: e.rate, offset: p.offset, dry, wet, echoDest: echo });
+        if (e.until !== undefined) bus.release(src, base + e.until, e.tau ?? 0.012);
+        events.push({ at: base + p.at, ev: e });
+      };
+      if (e.prio > 0 && bus.concurrent(base + p.at) >= MAX_VOICES - (e.prio === 2 ? 4 : 0)) { dropped++; continue; }
+      if (e.key) bus.cached(e.key, e.job, go);
+      else bus.render(e.job, (ch) => go(bus.buffer(ch)));
+    }
+  }
+  // reel.stop(1.5) at END − 0.7 (85.3 / 70.1)
+  for (const g of [dry, wet, echo]) { g.gain.setValueAtTime(1, base + s.end - 0.7); g.gain.linearRampToValueAtTime(0, base + s.end + 0.8); }
+  if (sfx) {
+    const mix = new Mixer(off, { worker: null });
+    mix.master.gain.value = 0.7 * 0.7;
+    let bed: ReturnType<typeof createBed> = null;
+    for (const c of s.sfx) {
+      const t = base + c.t;
+      if (c.kind === 'drip') playDrip(mix, t, c.pitch, c.gain);
+      else if (c.kind === 'chime') playChime(mix, t, c.streak);
+      else if (c.kind === 'knock') playKnock(mix, t);
+      else if (c.bed === 'stream') { bed = createBed('stream', mix, t, 1127); bed?.tick(t + 4); }
+      else { bed?.stop(t); bed = null; }
+    }
+  }
+  const ms = performance.now() - t0;
+  const buf = await off.startRendering();
+  const roles = ['qi', 'cheng', 'zhuan', 'he'] as const;
+  const phrases = s.acts.map((a, i) => ({ start: base + a, end: base + (s.acts[i + 1] ?? s.end), next: base + (s.acts[i + 1] ?? s.end), phrase: { role: roles[i], bpm: 60, mode: { tonic: 53, final: 0 } } as unknown as Phrase }));
+  const cond = { events, phrases, cutoff: Infinity, done: true } as unknown as Conductor;
+  return {
+    name: `开篇 reel · ${cut} cut (${s.end} s) · ${sfx ? 'mix with sfx at the app defaults (sound .7, music .5)' : 'music alone, full volume'}`,
+    theme: sfx ? 'reel' : 'reel', chs: [buf.getChannelData(0), buf.getChannelData(1)], sr, dur, cond: [cond], ms,
+    peakVoices: bus.peakVoices, dropped, solo: sfx,
   };
 }
 
@@ -380,8 +456,63 @@ async function liveTest(canvas: HTMLCanvasElement) {
   log(pass ? 'PASS — shared context, crossfade released, pause/resume, disable, silence: no leaked voices' : 'FAIL');
 }
 
+async function reelScene(canvas: HTMLCanvasElement, p: URLSearchParams) {
+  const cut = p.get('reel') === 'short' ? 'short' : 'full';
+  const sr = Number(p.get('sr') ?? 32000);
+  const results = [await renderReel(cut, sr, false)];
+  if (p.get('sfx') !== '0') results.push(await renderReel(cut, sr, true));
+  const W = window.innerWidth, header = 64, gap = 18;
+  const H = header + results.length * (PANEL_H + gap);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = PAPER; ctx.fillRect(0, 0, W, H);
+  const lines = results.map((r, i) => drawPanel(ctx, 16, header + i * (PANEL_H + gap), W - 32, r, dpr));
+  const allOk = lines.every((l) => l.ok);
+  ctx.fillStyle = allOk ? INK : RED;
+  ctx.font = '600 18px system-ui';
+  ctx.fillText(`半亩 开篇 《月亮看见的》 — the reel · ${cut} cut — ${allOk ? 'all checks pass' : 'CHECK FAILURES'}`, 16, 26);
+  ctx.font = '12px ui-monospace, monospace';
+  ctx.fillStyle = MUTED;
+  ctx.fillText(`checks: peak < 0.9 · |DC| < 2e-3 · no NaN · music RMS in ${REEL_WINDOW[0]}…${REEL_WINDOW[1]} dBFS · ≤ ${MAX_VOICES} voices · 起承转合 = the acts`, 16, 46);
+  (window as unknown as { __reel?: unknown }).__reel = { cut, sr, lines: lines.map((l) => l.line), mix: results[results.length - 1].chs, music: results[0].chs };
+  // listen: play the rendered mix (the second panel) in real time, with a playhead over the panels
+  const btn = document.createElement('button');
+  btn.textContent = '▶ listen';
+  btn.style.cssText = 'position:fixed;top:12px;right:16px;font:14px system-ui;padding:6px 14px;background:#f6efdd;border:1px solid #1d1a16;border-radius:4px;cursor:pointer';
+  const head = document.createElement('div');
+  head.style.cssText = `position:absolute;top:${header}px;left:16px;width:1px;height:${results.length * (PANEL_H + gap)}px;background:${RED};pointer-events:none;display:none`;
+  document.body.append(btn, head);
+  let live: { ac: AudioContext; t0: number; raf: number } | null = null;
+  const halt = () => { if (!live) return; void live.ac.close(); cancelAnimationFrame(live.raf); live = null; btn.textContent = '▶ listen'; head.style.display = 'none'; };
+  btn.onclick = () => {
+    if (live) return halt();
+    const chs = results[results.length - 1].chs;
+    const ac = new AudioContext();
+    const b = ac.createBuffer(2, chs[0].length, sr);
+    b.getChannelData(0).set(chs[0]); b.getChannelData(1).set(chs[1]);
+    const src = ac.createBufferSource();
+    src.buffer = b; src.connect(ac.destination); src.start();
+    const run = { ac, t0: ac.currentTime, raf: 0 };
+    const step = () => {
+      const t = ac.currentTime - run.t0, d = results[0].dur;
+      head.style.display = 'block';
+      head.style.left = `${16 + (Math.min(t, d) / d) * (W - 32)}px`;
+      btn.textContent = `■ ${t.toFixed(1)} s`;
+      run.raf = requestAnimationFrame(step);
+    };
+    step();
+    src.onended = () => { if (live === run) halt(); };
+    live = run;
+  };
+  console.log('[music-lab]', JSON.stringify({ allOk, results: lines.map((l) => l.line) }));
+}
+
 export default async function (canvas: HTMLCanvasElement, p: URLSearchParams) {
   if (p.get('live')) return liveTest(canvas);
+  if (p.get('reel')) return reelScene(canvas, p);
   const sr = Number(p.get('sr') ?? 32000);
   const dur = Number(p.get('dur') ?? 40);
   const day = p.get('day') ?? dayKey();

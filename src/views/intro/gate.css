@@ -1,0 +1,141 @@
+/* 开篇 · the title card, S1 and C1 (main bundle). Everything that moves before the takeover is an
+   HTML element animated by transform or opacity (WAAPI, set up in IntroHost.tsx), so it keeps
+   compositing through a phone's boot long tasks. The painting stays on paper in dark mode, framed
+   in dark silk. The caption classes here are shared with the film (captions.ts). */
+
+.intro-film {
+  --intro-paper: #f1e9d8;
+  --intro-ink: #1b1916;
+  --intro-pond: #2e3746;
+  --intro-lead: #f3eee2;
+  --intro-silk: 0px;
+  --cap-band: rgba(241, 233, 216, 0.85);
+  --cap-ink: #1b1916;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  color: var(--intro-ink);
+  font-family: var(--font-text);
+  view-transition-name: intro-film;
+  contain: strict;
+  outline: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .intro-film { --intro-silk: 12px; --cap-band: rgba(43, 37, 30, 0.9); --cap-ink: #ece4d2; }
+  :root:not([data-theme='light']) .intro-film.is-L { --intro-silk: 16px; }
+}
+:root[data-theme='dark'] .intro-film { --intro-silk: 12px; --cap-band: rgba(43, 37, 30, 0.9); --cap-ink: #ece4d2; }
+:root[data-theme='dark'] .intro-film.is-L { --intro-silk: 16px; }
+
+/* The route change behind a replay must not ink-bleed over the film: it keeps its own live layer. */
+::view-transition-group(intro-film) { animation: none; }
+::view-transition-old(intro-film) { display: none; }
+::view-transition-new(intro-film) { animation: none; }
+
+.intro-slot { position: absolute; inset: 0; z-index: 0; }
+.intro-bg {
+  position: absolute; inset: 0; z-index: 1;
+  background:
+    linear-gradient(to bottom, rgba(70, 82, 100, 0.16), rgba(70, 82, 100, 0) 20%),
+    radial-gradient(ellipse 80% 70% at 50% 50%, rgba(241, 233, 216, 0) 55%, rgba(120, 100, 70, 0.14) 100%),
+    var(--intro-paper);
+}
+.intro-tilt { position: absolute; left: 0; top: 0; width: 100%; height: 100%; z-index: 2; will-change: transform; pointer-events: none; }
+.intro-pondgrp, .intro-skygrp { position: absolute; left: 0; top: 0; width: 100%; height: 100%; will-change: opacity; }
+.intro-svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+.intro-sky {
+  position: absolute; left: 0; width: 100%;
+  background: linear-gradient(to bottom, #1a2230 0%, #243042 55%, #3a4659 80%, rgba(58, 70, 89, 0) 100%);
+}
+.intro-moon {
+  position: absolute; border-radius: 50%; will-change: transform, opacity;
+  background:
+    radial-gradient(ellipse 13% 17% at 40% 44%, rgba(120, 128, 142, 0.2), transparent 100%),
+    radial-gradient(ellipse 9% 20% at 34% 26%, rgba(120, 128, 142, 0.16), transparent 100%),
+    radial-gradient(ellipse 7% 17% at 45% 24%, rgba(120, 128, 142, 0.14), transparent 100%),
+    radial-gradient(ellipse 16% 11% at 58% 63%, rgba(120, 128, 142, 0.16), transparent 100%),
+    radial-gradient(circle at 42% 38%, #fbf8f0, #f3eee2 62%, #e6dfcf 100%);
+  box-shadow: 0 0 0 1px rgba(243, 238, 226, 0.25);
+}
+.intro-halo { position: absolute; inset: -110%; border-radius: 50%; background: radial-gradient(circle, rgba(243, 238, 226, 0.26) 22%, rgba(243, 238, 226, 0.08) 42%, transparent 70%); will-change: opacity; }
+.intro-veil { position: absolute; inset: 0; border-radius: 50%; background: #2e3746; opacity: 0; will-change: opacity; }
+
+.intro-bars { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.intro-bar { position: absolute; will-change: transform; }
+.intro-bar > i {
+  display: block; width: 100%; height: 100%; border-radius: 99px; background: var(--intro-lead);
+  animation: intro-sway 3.2s ease-in-out infinite alternate; will-change: transform;
+}
+@keyframes intro-sway { from { transform: translateX(-4px); } to { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .intro-bar > i { animation: none; } }
+
+.intro-rings { position: absolute; left: 0; top: 0; width: 0; height: 0; }
+.intro-ring {
+  position: absolute; left: 0; top: 0; border-radius: 50%;
+  border: 1.4px solid rgba(243, 238, 226, 0.9); opacity: 0;
+  transform: translate(-50%, -50%) scale(0.02); will-change: transform, opacity;
+}
+
+.intro-start {
+  position: absolute; z-index: 3; border-radius: 12px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.intro-start:focus { outline: none; }
+.intro-start:focus-visible { outline: none; }
+.intro-film.kbd .intro-start:focus-visible { outline: 1px dashed rgba(243, 238, 226, 0.34); outline-offset: -10px; }
+.intro-hint, .intro-sub {
+  position: absolute; left: 0; right: 0; z-index: 3; text-align: center; margin: 0;
+  pointer-events: none; opacity: 0; transform: translateY(-50%);
+}
+.intro-hint { font-family: 'Ma Shan Zheng', var(--font-brush); color: rgba(27, 25, 22, 0.86); letter-spacing: 0.24em; line-height: 1.2; }
+.intro-sub { color: rgba(27, 25, 22, 0.55); letter-spacing: 0.12em; line-height: 1.4; }
+
+.intro-late {
+  position: absolute; z-index: 4; left: 0; right: 0; text-align: center; margin: 0;
+  color: rgba(243, 238, 226, 0.82); font-size: 15px; letter-spacing: 0.3em; pointer-events: none;
+}
+
+.intro-chip {
+  position: absolute; z-index: 6; top: calc(env(safe-area-inset-top) + 12px);
+  min-width: 44px; height: 44px; padding: 0 12px; border-radius: 22px;
+  display: grid; place-items: center;
+  font-family: var(--font-text); font-size: 15px; letter-spacing: 0.12em; line-height: 1;
+  color: rgba(27, 25, 22, 0.8); background: rgba(241, 233, 216, 0.72);
+  transition: opacity 0.3s;
+}
+.intro-film.is-L .intro-chip { font-size: 16px; top: calc(env(safe-area-inset-top) + 16px); }
+.intro-skip { right: calc(env(safe-area-inset-right) + 12px); }
+.intro-mute { left: calc(env(safe-area-inset-left) + 12px); }
+.intro-film.is-L .intro-skip { right: calc(env(safe-area-inset-right) + 16px); }
+.intro-film.is-L .intro-mute { left: calc(env(safe-area-inset-left) + 16px); }
+.intro-mute[aria-pressed='true'] { color: rgba(27, 25, 22, 0.42); text-decoration: line-through; text-decoration-thickness: 1px; }
+.intro-chip:focus-visible { outline: 2px solid var(--cinnabar, #b93a2b); outline-offset: 2px; }
+
+/* The dark-mode mount: dark silk around the paper (drawn over the edges, so the geometry stays the viewport's). */
+.intro-silk { position: absolute; inset: 0; z-index: 5; pointer-events: none; box-shadow: inset 0 0 0 var(--intro-silk) #2b251e; }
+
+/* ---- captions (shared with the film) ------------------------------------------------------------ */
+.intro-capband {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; pointer-events: none;
+  height: calc(16% + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, var(--cap-band) 55%);
+  opacity: 0; will-change: opacity;
+}
+.intro-caps {
+  position: absolute; z-index: 4; left: 16px; right: 16px; pointer-events: none;
+  bottom: calc(7% + env(safe-area-inset-bottom));
+  text-align: center; color: var(--cap-ink); line-height: 1.55; letter-spacing: 0.06em;
+  font-family: var(--font-text); font-size: min(19px, calc((100vw - 32px) / 16));
+}
+.intro-film.is-L .intro-caps { bottom: calc(6% + env(safe-area-inset-bottom)); font-size: min(23px, 5.5vh); }
+.intro-film.is-shortL .intro-caps { font-size: 16px; }
+.intro-cap { margin: 0; }
+.intro-cap-line { display: block; opacity: 0; will-change: opacity, transform; }
+.intro-film.is-shortL .intro-cap-line { display: inline; }
+.intro-film.is-shortL .intro-cap-line + .intro-cap-line { margin-left: 0.6em; }
