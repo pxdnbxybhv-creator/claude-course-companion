@@ -5,12 +5,13 @@
 // wave just won, and nothing else; English carries no hanzi and no bare 「u」.
 import { afterEach, describe, expect, it } from 'vitest';
 import { COMPANIONS, SETS, WCLASSES, WEAPONS } from '../src/views/mirror/data';
-import { termOf } from '../src/views/mirror/data/glossary';
+import { CARD_HINT, termOf } from '../src/views/mirror/data/glossary';
+import { STAT_IDS } from '../src/views/mirror/data';
 import { armorReduction, computeStats, cooldown, maxHp, tierCd, weaponHit } from '../src/views/mirror/logic';
 import type { RunSave, StatId, Tier, WClass } from '../src/views/mirror/types';
 import type { WeaponId } from '../src/views/mirror/ids';
 import {
-  bodyDots, companionRun, companionView, levelPreview, makePanelBase, panelBase, panelView, rememberPanelBase, relevance, setStepText,
+  bodyDots, companionRun, companionView, itemFit, levelPreview, makePanelBase, panelBase, panelView, rememberPanelBase, relevance, setStepText, statFit,
   statValueText, weaponDps,
 } from '../src/views/mirror/ui/panelView';
 import { tFor } from '../src/views/mirror/ui/text';
@@ -91,6 +92,7 @@ describe('人物 panel · grouped rows', () => {
   });
   it('formats by the glossary: 暴击倍数 as +0.3, 射程 with no unit', () => {
     expect(statValueText('critDmg', 30)).toBe('+0.3');
+    expect(statValueText('critDmg', 0)).toBe('+0');
     expect(statValueText('range', 30)).toBe('+30');
     expect(statValueText('crit', 10)).toBe('+10%');
     expect(statValueText('dmg', -5)).toBe('−5%');
@@ -104,18 +106,47 @@ describe('人物 panel · grouped rows', () => {
 });
 
 describe('人物 panel · weapons', () => {
-  it('weaponDps is the old 属性 formula for every weapon at every tier', () => {
+  it('weaponDps is the old 属性 formula for every weapon that hits itself, at every tier', () => {
     const r = run('scholar', { stats: { crit: 12, aspd: 25, melee: 3, ranged: 4, elem: 2, spirit: 5, critDmg: 20, dmg: 10 } });
     const s = computeStats(r);
     for (const id of Object.keys(WEAPONS) as WeaponId[]) {
+      const def = WEAPONS[id];
+      if (def.kind === 'paint' || def.kind === 'turret') continue;
       for (const t of [1, 2, 3, 4] as Tier[]) {
-        const def = WEAPONS[id];
         const h = weaponHit(r, s, id, t);
-        const half = def.kind === 'paint' || def.kind === 'turret' || def.kind === 'mine';
+        const half = def.kind === 'mine';
         const old = (h.raw * h.mult * (1 + h.crit * (h.critM - 1))) / cooldown(tierCd(def, t), s.aspd, half);
         expect(weaponDps(r, s, { id, t }), `${id} ${t}`).toBeCloseTo(old, 9);
       }
     }
+  });
+  it('counts 神笔 and 砚台 by what they put out (the engine\'s spawnSummon): about min(life / cd, cap) out, each striking on its own clock', () => {
+    const r = run('scholar');
+    const s = computeStats(r);
+    for (const t of [1, 2, 3, 4] as Tier[]) {
+      const brush = WEAPONS.brush, h = weaponHit(r, s, 'brush', t);
+      const cd = cooldown(tierCd(brush, t), s.aspd, true);
+      const atk = cooldown((brush.p.atk as readonly number[])[t - 1], s.aspd, true);
+      const out = Math.min((brush.p.life as number) / cd, Math.floor(s.summonCap));
+      expect(weaponDps(r, s, { id: 'brush', t }), `brush ${t}`).toBeCloseTo((h.raw * h.mult * out) / atk, 9);
+      const ink = WEAPONS.inkstone, hi = weaponHit(r, s, 'inkstone', t);
+      const cdi = cooldown(tierCd(ink, t), s.aspd, true);
+      const atki = cooldown(ink.p.atk as number, s.aspd, true);
+      const blobs = (ink.p.blobs as readonly number[])[t - 1];
+      expect(weaponDps(r, s, { id: 'inkstone', t }), `inkstone ${t}`).toBeCloseTo((hi.raw * hi.mult * blobs * Math.min((ink.p.life as number) / cdi, Math.floor(s.summonCap))) / atki, 9);
+    }
+    // the owner's report: 神笔 I read 「2 每秒」, about a tenth of what its sparrows deal
+    expect(weaponDps(r, s, { id: 'brush', t: 1 })).toBeGreaterThan(15);
+    const v = panelView(run('scholar', { weapons: [{ id: 'brush', t: 1 }] }), null, zh);
+    expect(v.weapons[0].line).toMatch(/^每 [\d.]+ 秒画一只，每只 [\d.]+ 秒打一下 · 受造物加成$/);
+  });
+  it('an expanded weapon row says each scaling line once, and names the weapon\'s own crit rate as its own', () => {
+    const v = panelView(run('scholar', { weapons: [{ id: 'dart', t: 1 }] }), null, zh);
+    const d = v.weapons[0].detail;
+    expect(d.filter((x) => x.startsWith('每点远程')).length).toBe(1);
+    expect(d.some((x) => /每下多 /.test(x))).toBe(true);
+    expect(d.some((x) => x.startsWith('兵器自带暴击率'))).toBe(true);
+    expect(d.some((x) => x.startsWith('暴击率'))).toBe(false);
   });
   it('writes each weapon row plainly: interval, what it scales with, no bare u', () => {
     const v = panelView(run('scholar', { weapons: [{ id: 'qingfeng', t: 2 }, { id: 'qingping', t: 1 }] }), null, zh);
@@ -143,12 +174,12 @@ describe('人物 panel · sets', () => {
     const sword = v.sets.find((x) => x.cls === 'sword')!;
     expect(sword.count).toBe(2);
     expect(sword.tier).toBe(0);
-    // the step words are describe.setSteps' (TEXT); the panel adds 「再 k 件（凑满 m 件）：」
+    // the step words are describe.setSteps' (TEXT); the panel adds 「再 k 把（凑满 m 把）：」
     expect(sword.active).toMatch(/暴击率.*\+5%/);
-    expect(sword.next).toMatch(/^再 2 件（凑满 4 件）：.*暴击率.*\+10%/);
+    expect(sword.next).toMatch(/^再 2 把（凑满 4 把）：.*暴击率.*\+10%/);
     const heavy = v.sets.find((x) => x.cls === 'heavy')!;
     expect(heavy.active).toBeNull();
-    expect(heavy.next).toMatch(/^再 1 件（凑满 2 件）：/);
+    expect(heavy.next).toMatch(/^再 1 把（凑满 2 把）：/);
   });
 });
 
@@ -167,9 +198,10 @@ describe('人物 panel · level-card preview', () => {
     expect(levelPreview(run('scholar', { stats: { armor: -3 } }), 'armor', 4, zh).line).toBe(`多受 ${-armorReduction(-2)}% → 少受 ${armorReduction(2)}%`);
   });
   it('reads a percent card', () => {
-    expect(levelPreview(run('scholar'), 'crit', 5, zh).line).toBe('现在 0% → +5%');
-    expect(levelPreview(run('scholar'), 'crit', 5, en).line).toBe('Now 0% → +5%');
-    expect(levelPreview(run('scholar'), 'range', 15, zh).line).toBe('现在 0 → +15');
+    // one format on both sides: no '+' on the after-value (the 闪避 card reads 「0% → 3%」 too)
+    expect(levelPreview(run('scholar'), 'crit', 5, zh).line).toBe('现在 0% → 5%');
+    expect(levelPreview(run('scholar'), 'crit', 5, en).line).toBe('Now 0% → 5%');
+    expect(levelPreview(run('scholar'), 'range', 15, zh).line).toBe('现在 0 → 15');
   });
 });
 
@@ -252,6 +284,35 @@ describe('人物 panel · words', () => {
       // the panel's own words (a weapon's rules line and its extra detail are describe.ts's, tested there)
       const own = (v: typeof vZh) => JSON.stringify({ ...v, weapons: v.weapons.map((w) => ({ ...w, body: '', t4: '', detail: w.detail.slice(0, 1 + Object.keys(WEAPONS[w.id].scale).length) })) });
       expect(own(vZh) + own(vEn)).not.toMatch(/\d ?u\b|u\/s/);
+    }
+  });
+});
+
+describe('人物 panel · what a card does for your weapons (mirror3 fix round)', () => {
+  it('says whether a stat helps the weapons you hold, on the level card and the item card', () => {
+    const sword = run('scholar', { weapons: [{ id: 'qingfeng', t: 1 }] });
+    expect(statFit(sword, 'melee', zh)).toEqual({ text: '你的青锋剑受这项加成', on: true });
+    expect(statFit(sword, 'ranged', zh)).toEqual({ text: '你现在的兵器用不上', on: false });
+    expect(statFit(sword, 'crit', zh)).toBeNull();
+    expect(statFit(sword, 'hp', zh)).toBeNull();
+    const brush = run('scholar', { weapons: [{ id: 'brush', t: 1 }] });
+    expect(statFit(brush, 'spirit', zh)?.on).toBe(true);
+    expect(statFit(brush, 'crit', zh)).toEqual({ text: '你的兵器都不会暴击', on: false });
+    expect(statFit(brush, 'crit', en)?.text).toBe("your weapons can't crit");
+    expect(statFit({ ...brush, items: { dotting: 1 } }, 'crit', zh)).toBeNull();
+    const two = run('scholar', { weapons: [{ id: 'qingfeng', t: 1 }, { id: 'qingfeng', t: 1 }] });
+    expect(statFit(two, 'melee', zh)?.text).toBe('2 把兵器受这项加成');
+    expect(statFit(run('scholar', { weapons: [{ id: 'dart', t: 1 }] }), 'swords', zh)?.on).toBe(false);
+    // items: the first stat that helps, else why nothing does
+    expect(itemFit(sword, 'whetstone', zh)?.on).toBe(true);
+    expect(itemFit(brush, 'eagle', zh)?.text).toBe('你的兵器都不会暴击');
+  });
+  it('gives every stat a level-card hint of at most 10 characters, in both languages', () => {
+    for (const id of STAT_IDS) {
+      const h = CARD_HINT[id];
+      expect(h, id).toBeTruthy();
+      expect([...h.zh].length, id).toBeLessThanOrEqual(10);
+      expect(h.en).not.toMatch(/[\u3400-\u9fff]/);
     }
   });
 });

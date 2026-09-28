@@ -16,11 +16,13 @@ export type RunEvent =
   /** engine/tutor.ts: the tutorial scripts' cues and the tip watcher's 'elite'. */
   | { k: 'cue'; key: string; v?: number }
   /** A committed between-wave action (tutor/classify.ts over the run before and after). */
-  | { k: 'act'; a: RunAct; slot?: number }
+  | { k: 'act'; a: RunAct; slot?: number; id?: string }
   /** A click on a [data-tut] element (capture phase), with its ARIA state read on the next frame. */
   | { k: 'ui'; tut: string; selected?: boolean; pressed?: boolean; expanded?: boolean }
   | { k: 'pause'; open: boolean }
   | { k: 'who'; open: boolean };
 
 /** Events only the step machine sees: UI seconds while its line shows, and a hold's button. */
-export type MachineEvent = RunEvent | { k: 'tick'; dt: number } | { k: 'ok' };
+export type MachineEvent = RunEvent | { k: 'tick'; dt: number } | { k: 'ok' }
+  /** The coach saw that no merge can happen in the first shop any more (tutor/run.ts mergeLeft). */
+  | { k: 'noMerge' };

@@ -10,8 +10,10 @@ import { COMPANION_REG, SKILL_REG, type SkillId } from '../ids';
 import type { CharacterId, Engine, HudState } from '../types';
 import { termLine, termName } from '../data/glossary';
 import { Portrait } from './icons';
-import { armourWords } from './panelView';
 import { bossName, fmtClock, skillDrag, stickVector, STICK_R } from './text';
+
+/** The HUD's armour line names what is reduced: 「少受伤 6%」 (a bare 「少受 6%」 has no noun here). */
+const hudArmour = (r: number, t: (zh: string, en: string) => string) => (r >= 0 ? t(`少受伤 ${r}%`, `${r}% less damage`) : t(`多受伤 ${-r}%`, `${-r}% more damage`));
 
 export interface HudApi {
   push(s: HudState): void;
@@ -103,10 +105,10 @@ export function Hud(props: {
           const parts: string[] = [];
           const mark = (cls: string, label: string, line: string, body: string, style = '') =>
             `<span class="mj-mark${cls}" role="img" aria-label="${attr(`${label}：${line}`)}" title="${attr(line)}"${style}><span aria-hidden="true">${body}</span></span>`;
-          if (s.drunk !== null) parts.push(mark('', t(`醉意 ${Math.round(s.drunk)}`, `Drunk ${Math.round(s.drunk)}`), termLine('drunk', t), `醉 <b>${Math.round(s.drunk)}</b>`));
+          if (s.drunk !== null) parts.push(mark('', t(`醉意 ${Math.round(s.drunk)}`, `Drunk ${Math.round(s.drunk)}`), termLine('drunk', t), t(`醉 <b>${Math.round(s.drunk)}</b>`, `Drunk <b>${Math.round(s.drunk)}</b>`)));
           if (s.moonPhase !== null) parts.push(mark(' mj-moonphase', termName('moonPhase', t), termLine('moonPhase', t), `<i class="mj-phase" style="--k:${Math.abs(4 - Math.max(0, Math.min(7, s.moonPhase | 0))) / 4}"></i>`, ` style="--ph:${s.moonPhase}"`));
-          if (s.lives !== null) parts.push(mark('', t(`九命 ${s.lives}`, `Lives ${s.lives}`), termLine('lives', t), `命 <b>${s.lives}</b>`));
-          if (s.curse > 0) parts.push(mark(' mj-curse', t(`劫数 ${s.curse}`, `Curse ${s.curse}`), termLine('curse', t), `劫 <b>${s.curse}</b>`));
+          if (s.lives !== null) parts.push(mark('', t(`九命 ${s.lives}`, `Lives ${s.lives}`), termLine('lives', t), t(`命 <b>${s.lives}</b>`, `Lives <b>${s.lives}</b>`)));
+          if (s.curse > 0) parts.push(mark(' mj-curse', t(`劫数 ${s.curse}`, `Curse ${s.curse}`), termLine('curse', t), t(`劫 <b>${s.curse}</b>`, `Curse <b>${s.curse}</b>`)));
           marks.current.innerHTML = parts.join('');
         }
         root.current?.classList.toggle('is-low', s.lowHp);
@@ -153,7 +155,7 @@ export function Hud(props: {
             <b class="mj-hp-text num" ref={hpText} />
           </div>
           <div class="mj-hud-row">
-            <span class="mj-armor" title={termLine('armor', t)}>{armourWords(armorReduction(props.armor), t)}</span>
+            <span class="mj-armor" title={termLine('armor', t)}>{hudArmour(armorReduction(props.armor), t)}</span>
             <span class="mj-moon" data-tut="moon"><i class="mj-moon-dot" aria-hidden="true" /><b class="num" ref={moon} /><span class="visually-hidden">{termName('moon', t)}</span></span>
             <span class="mj-sleeve" data-tut="sleeve" ref={sleeve} hidden={!props.showSleeve} title={termLine('sleeve', t)}>
               <i class="coin-icon" style={{ width: '13px', height: '13px' }} aria-hidden="true" /><b class="num" ref={sleeveN}>0</b>

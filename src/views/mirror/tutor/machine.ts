@@ -42,7 +42,7 @@ export const STEPS: Readonly<Record<StepId, StepDef>> = {
   H2: D({ id: 'H2', line: 'H2', mode: 'bubble', target: ['slot:0'], skipAt: 60 }),
   H3a: D({ id: 'H3a', line: 'H3a', mode: 'bubble', target: ['tab:wpn'], skipAt: 30 }),
   H3: D({ id: 'H3', line: 'H3', mode: 'bubble', target: ['wslot:0', 'merge'], skipAt: 60 }),
-  H4: D({ id: 'H4', line: 'H4', mode: 'hold', target: ['wslot:0', 'sell'], btn: 'ok' }),
+  H4: D({ id: 'H4', line: 'H4', mode: 'hold', target: ['wslot:0'], btn: 'ok' }),
   H5: D({ id: 'H5', line: 'H5', mode: 'bubble', target: ['lock:2'], skipAt: 45 }),
   H6: D({ id: 'H6', line: 'H6', mode: 'bubble', target: ['reroll'], skipAt: 45 }),
   H7: D({ id: 'H7', line: 'H7', mode: 'bubble', target: ['who'], skipAt: 45 }),
@@ -68,6 +68,8 @@ export const PHASE_STEPS: Readonly<Partial<Record<Phase, readonly StepId[]>>> = 
 export const CUE_STEPS: Readonly<Record<string, StepId>> = {
   move: 'W1', moved: 'W2', kills3: 'W3', clock: 'W6', tele1: 'D1', dodged2: 'D2', crowd: 'D3', foe: 'B1',
 };
+/** The shop-1 steps that teach the merge: skipped together when no merge can happen any more. */
+export const MERGE_STEPS: readonly StepId[] = ['H2', 'H3a', 'H3', 'H4'];
 /** The steps a cue shows as a hold (the engine waits for the button). */
 const HOLD_CUES = new Set(['tele1', 'foe']);
 
@@ -100,6 +102,8 @@ export interface TutState {
   sinceB2: number;
   b3: boolean;
   skillReady: boolean;
+  /** P1 (how to pause) waits until the dodge lesson is over, so its ring on ‖ is seen. */
+  p1Due: boolean;
   /** The big one's health for the mini scroll (0..1), or null. */
   foeHp: number | null;
   ended: boolean;
@@ -107,14 +111,14 @@ export interface TutState {
 export function initTut(): TutState {
   return {
     phase: 'pre', waves: 0, shops: 0, cardsSeen: 0, cratesSeen: 0, step: null, t: 0, nudged: false, done: [], granted: false, locked: false,
-    leveled: false, lowHp: false, castSeen: false, foeUp: false, sinceB2: -1, b3: false, skillReady: false, foeHp: null, ended: false,
+    leveled: false, lowHp: false, castSeen: false, foeUp: false, sinceB2: -1, b3: false, skillReady: false, p1Due: false, foeHp: null, ended: false,
   };
 }
 
 export interface Out {
   state: TutState;
   whispers: Whisper[];
-  /** H2 wants the first slot affordable: the session tops the moonlight up (once). */
+  /** H2 wants the 青锋剑 affordable: the session tops the moonlight up (once, only when short). */
   grant: boolean;
   /** The engine should hold for this cue's line. */
   hold: boolean;
@@ -254,7 +258,11 @@ export function reduce(s0: TutState, ev: MachineEvent): Out {
       else if (s.step === 'D2' && key === 'lanterns') s = finish(s, 'D2');
       else if (s.step === 'D3' && key === 'cast') s = finish(s, 'D3');
       if (key === 'pickups3') whispers.push(W('W4', 7, 'moon', 'xp', 2.5));
-      else if (key === 'pause') whispers.push(W('P1', 4.5, 'pause'));
+      else if (key === 'pause') {
+        // said during the dodge lesson it would be gone before anyone looks up: it waits for dodged2
+        if (s.phase === 'w2' && !s.done.includes('D2') && s.step !== 'D2') s = { ...s, p1Due: true };
+        else whispers.push(W('P1', 4.5, 'pause'));
+      } else if (key === 'dodged2' && s.p1Due) { s = { ...s, p1Due: false }; whispers.push(W('P1', 4.5, 'pause')); }
       else if (key === 'teleDodged') whispers.push(W((ev.v ?? 1) >= 2 ? 'D1b' : 'D1a', 3));
       else if (key === 'teleHit') whispers.push(W('D1c', 4.5));
       else if (key === 'cast' && !s.castSeen) { s = { ...s, castSeen: true }; whispers.push(W('D3b', 4.5, 'skill'), W('D3c', 4.5, 'skill')); }
@@ -279,11 +287,14 @@ export function reduce(s0: TutState, ev: MachineEvent): Out {
       if (a === 'card' && s.step === 'C1') s = finish(s, 'C1');
       else if (a === 'crate' && s.step === 'K1') s = finish(s, 'K1');
       if (s.phase === 'shop1') {
-        if (a === 'buy' && ev.slot === 0) s = early(s, 'H2', whispers);
-        else if (a === 'buy' && s.step === 'H2') whispers.push(W('H2a', 4.5));
-        else if (a === 'merge') { const was = s.step === 'H3'; s = early(s, 'H3', whispers); if (!s.done.includes('H3a')) s = markDone(s, 'H3a'); if (was) whispers.push(W('H3done', 4.5, 'wslot:0')); }
+        if (a === 'buy' && ev.id === 'qingfeng') s = early(s, 'H2', whispers);
+        else if (a === 'buy' && !s.done.includes('H2')) {
+          if (s.step === 'H2') whispers.push(W('H2a', 4.5));
+          // the sword may be out of reach now: the session tops up exactly what is missing (once)
+          grant = true;
+        } else if (a === 'merge') { const was = s.step === 'H3'; s = early(s, 'H3', whispers); if (!s.done.includes('H3a')) s = markDone(s, 'H3a'); if (was) whispers.push(W('H3done', 4.5, 'wslot:0')); }
         else if (a === 'lock') { s = { ...s, locked: true }; s = early(s, 'H5', whispers); }
-        else if (a === 'reroll') { const was = s.step === 'H6'; s = early(s, 'H6', whispers); if (was && s.locked) whispers.push(W('H6done', 4.5)); }
+        else if (a === 'reroll') s = early(s, 'H6', whispers);
         if (s.step === 'H3a' && s.done.includes('H3')) s = finish(s, 'H3a');
       }
       break;
@@ -293,6 +304,14 @@ export function reduce(s0: TutState, ev: MachineEvent): Out {
       if (s.step === 'H3a' && (tut === 'tab:wpn' || tut.startsWith('wslot:'))) s = finish(s, 'H3a');
       else if (s.step === 'H7' && (tut === 'who' || tut === 'tab:who' || tut === 'cardWho')) s = finish(s, 'H7');
       else if (s.phase === 'shop1' && (tut === 'who' || tut === 'tab:who') && !s.done.includes('H7') && s.step !== 'H7') s = early(s, 'H7', whispers);
+      break;
+    }
+    case 'noMerge': {
+      // the second sword is gone (rerolled away, or never bought): skip the merge lesson, no whisper
+      if (s.phase !== 'shop1' || s.done.includes('H3')) break;
+      const cur = s.step;
+      for (const id of MERGE_STEPS) s = markDone(s, id);
+      if (cur && MERGE_STEPS.includes(cur)) s = setStep(s, nextIn(s));
       break;
     }
     case 'who': {

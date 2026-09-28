@@ -149,6 +149,8 @@ function fxGet(fx: readonly Effect[] | undefined, path: string): Val {
 export interface WeaponDesc {
   /** 「伤害 10 · 0.9 秒一剑」 (generated). */
   head: string;
+  /** The head's two halves, 「伤害 10」 and 「0.9 秒一剑」: a narrow card breaks only between them. */
+  headParts: [string, string];
   /** 「受近战加成」 / "scales with Melee" ('' if none). */
   scales: string;
   /** The rules line at THIS tier. */
@@ -196,13 +198,19 @@ export function scalesLine(sc: StatMods, t: T): string {
   return zh ? t(`受${zh}加成`, `scales with ${scaleNames(sc, 'en')}`) : '';
 }
 
+/** 「神品：」 on a 神品 card; 「合到神品：」 below it (the line is what merging up to 神品 will add). */
+export const tier4Lead = (tier: Tier, t: T): string =>
+  tier >= 4 ? `${termName('tier4', t)}${t('：', ': ')}` : t(`合到${termName('tier4', (z) => z)}：`, `At ${termName('tier4', (_z, e) => e)}: `);
+
 export function describeWeapon(id: WeaponId, tier: Tier, t: T): WeaponDesc {
   const w = WEAPONS[id], say = WEAPON_SAY[id];
   const cd = w.cd * F.tierCd[tier - 1];
   const dmg = w.dmg[tier - 1];
-  const head = t(`伤害 ${num(dmg)} · ${num(cd)} 秒${say.unit}`, `${num(dmg)} damage · every ${num(cd)} s`);
+  const headParts: [string, string] = [t(`伤害 ${num(dmg)}`, `${num(dmg)} damage`), t(`${num(cd)} 秒${say.unit}`, `every ${num(cd)} s`)];
+  const head = headParts.join(' · ');
   const body = fillW(say.say, id, tier, t);
-  const t4 = tier === 4 && say.num4 ? null : `${termName('tier4', t)}${t('：', ': ')}${fillW(say.say4, id, 4, t)}`;
+  // below 神品 the line is a promise, not something the weapon does yet
+  const t4 = tier === 4 && say.num4 ? null : `${tier4Lead(tier, t)}${fillW(say.say4, id, 4, t)}`;
   const detail: string[] = [];
   for (const [stat, k] of Object.entries(w.scale).sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0)) as [StatId, number][]) {
     if (k > 0) detail.push(t(`每点${GLOSSARY[stat].zh} +${num(k)} 伤害`, `+${num(k)} damage per ${GLOSSARY[stat].en}`));
@@ -214,8 +222,8 @@ export function describeWeapon(id: WeaponId, tier: Tier, t: T): WeaponDesc {
   else { const d = named('dotting')!; detail.push(t(`不会暴击（有「${d.zh}」时可以）`, `can't crit (unless you have ${d.en})`)); }
   if (w.knock > 0) detail.push(t(`击退 ${num(w.knock)}`, `knockback ${num(w.knock)}`));
   for (const m of say.more ?? []) detail.push(fillW(m, id, tier, t));
-  for (const m of say.more4 ?? []) detail.push(tier === 4 ? fillW(m, id, 4, t) : `${termName('tier4', t)}${t('：', ': ')}${fillW(m, id, 4, t)}`);
-  return { head, scales: scalesLine(w.scale, t), body, t4, detail, tierRow: weaponTierRows(id, t) };
+  for (const m of say.more4 ?? []) detail.push(tier === 4 ? fillW(m, id, 4, t) : `${tier4Lead(tier, t)}${fillW(m, id, 4, t)}`);
+  return { head, headParts, scales: scalesLine(w.scale, t), body, t4, detail, tierRow: weaponTierRows(id, t) };
 }
 
 /** 「伤害：凡品 10 · 灵品 16 · 仙品 26 · 神品 42」, then one row per `rows` slot. */
@@ -239,7 +247,9 @@ function statsLine(s: StatMods | undefined, sign: 1 | -1, t: T): string {
     if (!v || Math.sign(v) !== sign) continue;
     const f = STAT_FMT[id];
     const mag = f === 'pct' ? `${num(Math.abs(v))}%` : f === 'mult' ? num(Math.abs(v) / 100) : num(Math.abs(v));
-    parts.push(t(`${GLOSSARY[id].zh} ${v > 0 ? '+' : '−'}${mag}`, `${v > 0 ? '+' : '−'}${mag} ${GLOSSARY[id].en}`));
+    // 「+1 Extra sword」, not 「+1 Extra swords」
+    const en = id === 'swords' && Math.abs(v) === 1 ? GLOSSARY[id].en.replace(/s$/, '') : GLOSSARY[id].en;
+    parts.push(t(`${GLOSSARY[id].zh} ${v > 0 ? '+' : '−'}${mag}`, `${v > 0 ? '+' : '−'}${mag} ${en}`));
   }
   return parts.join(t('，', ', '));
 }
@@ -359,7 +369,8 @@ export function setSteps(cls: WClass, t: T): { n: 2 | 4 | 6; text: string }[] {
       const f = STAT_FMT[id];
       const mag = f === 'pct' ? `${num(v)}%` : f === 'mult' ? num(v / 100) : num(v);
       const had = (prevStats[id] ?? 0) !== 0 && prevStats[id] !== v;
-      parts.push(t(`${GLOSSARY[id].zh}${had ? '共' : ''} +${mag}`, `+${mag} ${GLOSSARY[id].en}${had ? ' in total' : ''}`));
+      const en = id === 'swords' && v === 1 ? GLOSSARY[id].en.replace(/s$/, '') : GLOSSARY[id].en;
+      parts.push(t(`${GLOSSARY[id].zh}${had ? '共' : ''} +${mag}`, `+${mag} ${en}${had ? ' in total' : ''}`));
     }
     const flags = tiers.slice(0, i + 1).flatMap((x) => x.flags ?? []);
     const area = flags.filter((f) => f.startsWith('musicArea')).pop();

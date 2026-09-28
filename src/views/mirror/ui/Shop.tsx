@@ -122,6 +122,7 @@ export function Shop(props: {
                 onClick={() => doBuy(i)}
                 disabled={!s.afford}
                 tut={`slot:${i}`}
+                run={run}
                 label={t(`买 ${nameOf(s.slot.id, t)}，${s.price} 月华`, `Buy ${nameOf(s.slot.id, t)} for ${s.price} moonlight`)}
               >
                 <div class="mj-price">
@@ -136,14 +137,14 @@ export function Shop(props: {
             {s.slot && (
               <button
                 type="button"
-                class="mj-lock"
+                class={'mj-lock' + (lng === 'en' ? ' is-en' : '')}
                 data-tut={`lock:${i}`}
                 aria-pressed={s.slot.locked}
                 disabled={!v.canLock}
                 onClick={() => doLock(i)}
                 title={termLine('lock', t)}
                 aria-label={s.slot.locked ? t('解锁', 'Unlock') : t('锁住（留到下一次商店）', 'Lock (keep it for the next shop)')}
-              >锁</button>
+              >{termName('lock', t)}</button>
             )}
           </div>
         ))}
@@ -187,7 +188,7 @@ export function Shop(props: {
         <div class="mj-shop-next">
           <span class="brush">{t(`第 ${w} 重`, `Wave ${w}`)}</span>
           <small>
-            {boss ? t(`首领 · ${boss.name}`, `Boss · ${boss.name}`) : plan.kind === 'elite' ? t(`有${termName('elite', (z) => z)}`, 'elite wave') : plan.kind === 'horde' ? termName('horde', t) : t(`${plan.len ?? 0} 秒`, `${plan.len ?? 0} s`)}
+            {boss ? t(`首领 · ${boss.name}`, `Boss · ${boss.name}`) : plan.kind === 'elite' ? t(`有${termName('elite', (z) => z)}`, 'elite wave') : plan.kind === 'horde' ? termName('horde', t) : t(`这一重 ${plan.len ?? 0} 秒`, `lasts ${plan.len ?? 0} s`)}
           </small>
         </div>
         <button type="button" class="btn btn-small btn-ghost" data-tut="leave" onClick={props.onLeave} title={termLine('leave', t)}>{termName('leave', t)}</button>
@@ -233,7 +234,7 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
       {w && sel !== null && d && (
         <div class="mj-wdetail" data-tut="wdetail">
           <b>{nameOf(w.id, t)} <span class="muted">{t(tierWord(w.t, t), `${TIER_ROMAN[w.t]} · ${tierWord(w.t, t)}`)}</span></b>
-          {d.head && <p class="mj-card-headline num">{d.head}</p>}
+          {d.head && <p class="mj-card-headline num"><span class="nw">{d.headParts[0]}</span> · <span class="nw">{d.headParts[1]}</span></p>}
           {d.scales && <p class="mj-card-scales"><span>{d.scales}</span></p>}
           <p class="mj-card-text">{d.body}</p>
           {d.t4 && <p class="mj-card-t4">{d.t4}</p>}
@@ -254,8 +255,8 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
           {sets.map((c) => (
             <div class={'mj-set' + (c.tier >= 0 ? ' is-on' : '')}>
               <span class="mj-set-name">{c.name}</span>
-              <span class="mj-pips" aria-label={t(`${c.count} 件`, `${c.count}`)}>{[2, 4, 6].map((n) => <i class={c.count >= n ? 'is-on' : ''} />)}</span>
-              <span class="num">{t(`${c.count} 件`, `${c.count}`)}</span>
+              <span class="mj-pips" aria-label={t(`${c.count} 把`, `${c.count}`)}>{[2, 4, 6].map((n) => <i class={c.count >= n ? 'is-on' : ''} />)}</span>
+              <span class="num">{t(`${c.count} 把`, `${c.count}`)}</span>
               <span class="mj-set-text">
                 {c.active && <span>{c.active}</span>}
                 {c.next && <span class="muted">{c.active ? ' · ' : ''}{c.next}</span>}

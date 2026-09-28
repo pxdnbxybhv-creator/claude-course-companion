@@ -19,7 +19,7 @@ import type { RunSave, TutorTipId, Unlocks } from '../types';
 import type { RunEvent, RunScreen } from '../tutor/events';
 import { BUTTONS, END, LINES, OFFER, SETTINGS, TIPS, fillSlots, lineSlots, resolveLine, type Line, type LineId, type Say, type SlotVal, type TipLineId } from '../tutor/lines';
 import { initTut, reduce, view, type TutState, type Whisper } from '../tutor/machine';
-import type { TutorSession } from '../tutor/session';
+import { mergeLeft, swordSlot, type TutorSession } from '../tutor/session';
 import { Seal } from './icons';
 import { calmNow } from './prefs';
 import { STICK_R } from './text';
@@ -69,6 +69,8 @@ function watchInput(): () => void {
   return () => { window.removeEventListener('pointerdown', pd, true); window.removeEventListener('keydown', kd, true); };
 }
 const L = () => (lang.value === 'en' ? 'en' : 'zh') as 'zh' | 'en';
+/** The shop's wide layout (Shop.tsx WIDE): 人物 is a column beside the shop, always open. */
+const wideNow = () => { try { return matchMedia('(min-width: 1100px)').matches; } catch { return false; } };
 const say = (x: Say) => x[L()];
 
 class Base {
@@ -87,8 +89,14 @@ class Base {
     this.queue.push(x);
     while (this.queue.length > max) this.queue.shift();
   }
+  /** Drop the whisper on screen and any queued (a new between-wave step starts clean). */
+  protected clearWhispers() {
+    this.queue = [];
+    if (this.whisper) { this.whisper = null; this.wT = 0; this.changed(); }
+  }
   protected tickWhisper(dt: number) {
-    if (!this.whisper) return;
+    // a hold's reader is busy with the hold: the whisper beside it waits too
+    if (!this.whisper || this.bubble?.mode === 'hold') return;
     this.wT += dt;
     if (this.wT >= this.whisper.dur) {
       this.whisper = this.queue.shift() ?? null;
@@ -107,6 +115,8 @@ export class TutorBrain extends Base implements CoachBrain {
   private slots(run: RunSave): Record<string, SlotVal> {
     const extra: Record<string, SlotVal> = {};
     if (run.pending.crates > 0) { try { extra.meltN = meltValue(run, crateItem(run, this.o.unlocks)); } catch { /* none */ } }
+    const sword = swordSlot(run);
+    if (sword >= 0) extra.n0 = sword + 1;
     const lock = this.lockSlot(run);
     if (lock >= 0) {
       const s = run.shop!.slots[lock]!;
@@ -131,10 +141,14 @@ export class TutorBrain extends Base implements CoachBrain {
       if (this.bubble) { this.bubble = null; this.lastKey = ''; this.changed(); }
       return;
     }
-    const key = `${v.id}|${v.line}`;
-    if (key !== this.lastKey) { this.text = this.line(v.line); this.lastKey = key; }
     let targets = v.target;
     if (v.id === 'H5') { const k = this.lockSlot(this.sess.run()); targets = k >= 0 ? [`lock:${k}`] : []; }
+    // H2 points at the 青锋剑 itself: a reroll may have moved it
+    else if (v.id === 'H2') { const k = swordSlot(this.sess.run()); targets = k >= 0 ? [`slot:${k}`] : []; }
+    // H7 on a wide screen: 人物 is already a column, the line says so
+    const lineId: LineId = v.id === 'H7' && !v.nudged && wideNow() ? 'H7w' : v.line;
+    const key = `${v.id}|${lineId}|${targets.join()}`;
+    if (key !== this.lastKey) { this.text = this.line(lineId); this.lastKey = key; }
     const inp = currentInput();
     const b: CoachBubble = {
       key: v.id, text: this.text, mode: v.mode, targets, tag: v.tag,
@@ -156,10 +170,23 @@ export class TutorBrain extends Base implements CoachBrain {
   }
   private apply(o: ReturnType<typeof reduce>, prevStep: string | null) {
     this.st = o.state;
-    for (const w of o.whispers) this.pushWhisper(this.toWhisper(w));
+    // between waves a new step starts clean: what was said for the last one is stale now
+    const wave = this.st.phase === 'w1' || this.st.phase === 'w2' || this.st.phase === 'w3';
+    if (!wave && this.st.step !== prevStep && this.st.step !== null) this.clearWhispers();
+    const keys = currentInput() === 'keys';
+    for (const w of o.whispers) {
+      if (w.line === 'D3c' && keys) continue; // the drag-to-aim line is for the touch button only
+      this.pushWhisper(this.toWhisper(w));
+    }
     if (o.grant) {
       const n = this.sess.grant();
       if (n > 0) { this.o.onRun(this.sess.run()); this.pushWhisper(this.toWhisper({ line: 'H2b', dur: 4.5 })); }
+    }
+    // the second sword was rerolled away or never bought: the merge lesson can't happen, skip it
+    if (this.st.phase === 'shop1' && !this.st.done.includes('H3') && !mergeLeft(this.sess.run(), this.st.done.includes('H2'))) {
+      const before = this.st.step;
+      this.st = reduce(this.st, { k: 'noMerge' }).state;
+      if (this.st.step !== before) this.clearWhispers();
     }
     if (prevStep === 'H7b' && this.st.step !== 'H7b') this.o.onCloseWho();
     const fh = this.st.foeHp;
@@ -374,7 +401,9 @@ export function Coach(props: { brain: CoachBrain; inWave: boolean; left: boolean
   useLayoutEffect(() => {
     let raf = 0;
     const place = () => {
-      raf = requestAnimationFrame(place);
+      // nothing to point at: hide once and stop (a real wave pays no per-frame cost); the effect runs
+      // again as soon as a bubble or a whisper appears
+      if (b || w) raf = requestAnimationFrame(place);
       const vw = window.innerWidth, vh = window.innerHeight;
       const tgs = b?.targets ?? [];
       const rs: (Rect | null)[] = [rectOf(tgs[0] ? findTarget(tgs[0]) : null), rectOf(tgs[1] ? findTarget(tgs[1]) : null)];
@@ -466,21 +495,21 @@ export function Coach(props: { brain: CoachBrain; inWave: boolean; left: boolean
       <span class="mj-tut-tag" ref={tagEl} aria-hidden="true">{say(BUTTONS.here)}</span>
       {b?.ghost === 'stick' && <GhostStick left={props.left} calm={calm} />}
       {b && foe && hold ? (
-        <div class="mj-tut-foe" role="dialog" aria-label={foe.name} data-step={b.key}>
+        <div class="mj-tut-foe" role="dialog" aria-label={foe.name} aria-describedby="mj-tut-foe-text" data-step={b.key}>
           <div class="mj-tut-foe-card">
             <Seal text={foe.seal} size={64} label={foe.name} />
             <h2 class="brush">{foe.name}</h2>
             <span class="mj-tut-foetag">{foe.tag}</span>
-            <p>{b.text}</p>
+            <p id="mj-tut-foe-text">{b.text}</p>
             <button type="button" class="btn btn-primary mj-big mj-tut-ok" ref={okBtn} onClick={props.onOk}>{b.btn}</button>
           </div>
         </div>
       ) : null}
       <div class="mj-tut-lane" ref={lane}>
         {b && !(foe && hold) && (
-          <div class={'mj-tut-bubble' + (hold ? ' is-hold' : '')} ref={bubbleEl} key={b.key} data-step={b.key} role={hold ? 'dialog' : 'note'} aria-live={hold ? undefined : 'polite'} aria-label={hold ? t('提示', 'Tip') : undefined}>
-            <p class="mj-tut-text">{b.text}</p>
-            {b.sub && <p class="mj-tut-sub">{b.sub}</p>}
+          <div class={'mj-tut-bubble' + (hold ? ' is-hold' : '')} ref={bubbleEl} key={b.key} data-step={b.key} role={hold ? 'dialog' : 'note'} aria-live={hold ? undefined : 'polite'} aria-label={hold ? t('提示', 'Tip') : undefined} aria-describedby={hold ? (b.sub ? 'mj-tut-text mj-tut-sub' : 'mj-tut-text') : undefined}>
+            <p class="mj-tut-text" id="mj-tut-text">{b.text}</p>
+            {b.sub && <p class="mj-tut-sub" id="mj-tut-sub">{b.sub}</p>}
             {b.ghost === 'keys' && <KeyCaps />}
             {hold && b.btn && <button type="button" class="btn btn-primary mj-tut-ok" ref={okBtn} onClick={props.onOk}>{b.btn}</button>}
           </div>

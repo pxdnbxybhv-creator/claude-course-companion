@@ -9,13 +9,13 @@ import { lang } from '../../../app/store';
 import { COMPANION_REG, MAP_REG, SKILL_REG, type ItemId, type WeaponId } from '../ids';
 import type { BossEvent, LevelCard, RunSave, Tier, Unlocks } from '../types';
 import { ITEMS, WEAPONS } from '../data';
-import { clsKey, termLine, termName, termOf } from '../data/glossary';
+import { CARD_HINT, clsKey, termLine, termName, termOf } from '../data/glossary';
 import {
   cardsView, crateItem, heartOffer, isBossWave, meltValue, pickCard, pickHeart, pickStart, rerollCards, resolveCrate, wavePlan,
 } from '../logic';
 import { Icon, Seal } from './icons';
 import { describeItem, describeWeapon } from './describe';
-import { levelPreview, statDeltaText, tierWord } from './panelView';
+import { itemFit, levelPreview, statDeltaText, statFit, tierWord } from './panelView';
 import { bossName, nameOf, screenKeyGate, statName, TIER_ROMAN, TIER_ZH, type T } from './text';
 
 const sheetOpen = () => typeof document !== 'undefined' && !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold');
@@ -44,6 +44,8 @@ const digit = (k: string, n: number) => (/^[1-9]$/.test(k) && Number(k) <= n ? N
 export function GearCard(props: {
   kind: 'weapon' | 'item'; id: WeaponId | ItemId; tier?: Tier; px?: number; t: T; children?: ComponentChildren; class?: string;
   onClick?: () => void; disabled?: boolean; label?: string; hotkey?: string; tut?: string;
+  /** The run the card is offered in: an item card then says whether it helps the weapons you hold. */
+  run?: RunSave;
 }) {
   const { t } = props;
   const isW = props.kind === 'weapon';
@@ -53,6 +55,7 @@ export function GearCard(props: {
   const idesc = isW ? null : describeItem(props.id as ItemId, t);
   const classes = isW ? WEAPONS[props.id as WeaponId].classes : [];
   const tags = isW ? [] : ITEMS[props.id as ItemId].tags;
+  const fit = !isW && props.run ? itemFit(props.run, props.id as ItemId, t) : null;
   const Tag = props.onClick ? 'button' : 'div';
   return (
     <Tag
@@ -70,15 +73,17 @@ export function GearCard(props: {
           <b class="mj-card-name">{name}{isW && lang.value === 'en' && <span class="mj-tierroman num"> {TIER_ROMAN[tier]}</span>}</b>
           <span class="mj-card-tier">
             <span class="visually-hidden">{tierWord(tier, t)} · </span>
-            {isW ? classes.map((c) => termName(clsKey(c), t)).join(' · ') : tags.length ? t('适合：', 'suits: ') + tags.map((c) => termName(clsKey(c), t)).join(' · ') : ''}
+            {isW ? classes.map((c) => termName(clsKey(c), t)).join(' · ') : tags.length ? t('相关：', 'related: ') + tags.map((c) => termName(clsKey(c), t)).join(' · ') : ''}
+            {!isW && lang.value === 'en' && <span class="mj-tierword"> · {tierWord(tier, t)}</span>}
           </span>
         </div>
         <span class={`mj-tierseal tier-${tier}`} aria-hidden="true" title={tierWord(tier, t)}>{TIER_ZH[tier]}</span>
       </div>
-      {wd?.head && <p class="mj-card-headline num">{wd.head}</p>}
+      {wd?.head && <p class="mj-card-headline num"><span class="nw">{wd.headParts[0]}</span> · <span class="nw">{wd.headParts[1]}</span></p>}
       {wd?.scales && <p class="mj-card-scales"><span>{wd.scales}</span></p>}
       <p class="mj-card-text">{wd ? wd.body : idesc!.body}</p>
       {wd?.t4 && <p class="mj-card-t4">{wd.t4}</p>}
+      {fit && <p class={'mj-card-fit' + (fit.on ? ' is-on' : ' is-off')}>{fit.text}</p>}
       {props.children}
     </Tag>
   );
@@ -105,7 +110,7 @@ export function StartPick(props: { run: RunSave; onRun: (r: RunSave) => void; on
   const opts = props.run.pending.start ?? [];
   useScreenKeys((k) => { const i = digit(k, opts.length); if (i < 0) return false; props.onRun(pickStart(props.run, opts[i])); return true; }, [props.run]);
   return (
-    <Panel title={t('择器', 'Choose a weapon')} sub={t('开打之前，先挑一把顺手的兵器。', 'Before the first wave, pick the weapon you like.')} onPause={props.onPause}>
+    <Panel title={t('挑兵器', 'Choose a weapon')} sub={t('开打之前，先挑一把顺手的兵器。', 'Before the first wave, pick the weapon you like.')} onPause={props.onPause}>
       <div class="mj-cards">
         {opts.map((id, i) => (
           <GearCard kind="weapon" id={id} tier={1} t={t} hotkey={String(i + 1)} onClick={() => props.onRun(pickStart(props.run, id))} px={52} tut={`startCard:${i}`} />
@@ -138,20 +143,24 @@ export function Cards(props: {
         {v.cards.map((c: LevelCard, i) => {
           const val = statDeltaText(c.stat, c.v);
           const pv = levelPreview(props.run, c.stat, c.v, t);
+          const hint = CARD_HINT[c.stat];
+          const fit = statFit(props.run, c.stat, t);
           return (
             <button
               type="button"
               class={`mj-card mj-lvcard tier-${c.tier}`}
               data-tut={`card:${i}`}
               onClick={() => pick(i)}
-              aria-label={`${i + 1}. ${statName(c.stat, t)} ${val} · ${pv.line} · ${tierWord(c.tier, t)}`}
+              aria-label={`${i + 1}. ${statName(c.stat, t)} ${val} · ${hint ? t(hint.zh, hint.en) + ' · ' : ''}${pv.line}${fit ? ' · ' + fit.text : ''} · ${tierWord(c.tier, t)}`}
               title={termLine(c.stat, t)}
             >
               <kbd class="mj-hotkey" aria-hidden="true">{i + 1}</kbd>
               <span class="mj-lvglyph brush" aria-hidden="true">{termOf(c.stat).icon ?? termOf('level').icon ?? '升'}</span>
               <b class="mj-lvval num" aria-hidden="true">{val}</b>
               <span class="mj-lvname" aria-hidden="true">{statName(c.stat, t)}</span>
+              {hint && <span class="mj-lvhint" aria-hidden="true">{t(hint.zh, hint.en)}</span>}
               <span class="mj-lvnow num" aria-hidden="true">{pv.line}</span>
+              {fit && <span class={'mj-lvfit' + (fit.on ? ' is-on' : ' is-off')} aria-hidden="true">{fit.text}</span>}
               <span class={`mj-tierseal tier-${c.tier}`} aria-hidden="true">{TIER_ZH[c.tier]}</span>
             </button>
           );
@@ -183,7 +192,7 @@ export function Crate(props: { run: RunSave; unlocks: Unlocks; onRun: (r: RunSav
   return (
     <Panel title={termName('crate', t)} sub={props.run.pending.crates > 1 ? t(`一共 ${props.run.pending.crates} 个`, `${props.run.pending.crates} to open`) : undefined} onPause={props.onPause}>
       <div class="mj-crate">
-        <GearCard kind="item" id={id} t={t} px={64} class="mj-crate-card" tut="crateCard" />
+        <GearCard kind="item" id={id} t={t} px={64} class="mj-crate-card" tut="crateCard" run={props.run} />
         <div class="mj-row-actions">
           <button type="button" class="btn btn-primary mj-big" data-tut="crateKeep" onClick={keep} title={termLine('keep', t)}>
             <span class="brush" aria-hidden="true">收</span> {termName('keep', t)} <kbd class="mj-hotkey-inline">1</kbd>
@@ -211,7 +220,7 @@ export function HeartPick(props: { run: RunSave; unlocks: Unlocks; onRun: (r: Ru
       onPause={props.onPause}
     >
       <div class="mj-cards">
-        {opts.map((id, i) => <GearCard kind="item" id={id} t={t} px={56} hotkey={String(i + 1)} onClick={() => pick(i)} tut={`heartCard:${i}`} />)}
+        {opts.map((id, i) => <GearCard kind="item" id={id} t={t} px={56} hotkey={String(i + 1)} onClick={() => pick(i)} tut={`heartCard:${i}`} run={props.run} />)}
       </div>
     </Panel>
   );
@@ -236,7 +245,7 @@ export function Ready(props: { run: RunSave; onGo: () => void; onPause: () => vo
       ) : plan.kind === 'elite' ? (
         <p class="mj-ready-kind">{t(`这一重有${termName('elite', (z) => z)}`, 'Elites this wave')}</p>
       ) : plan.kind === 'horde' ? (
-        <p class="mj-ready-kind">{t('群魔蜂拥', 'A horde')}</p>
+        <p class="mj-ready-kind">{termName('horde', t)}</p>
       ) : w === 1 ? (
         <p class="mj-ready-kind">{t(`${c.zh}入镜 · 镜技「${sk.zh}」`, `${c.en} steps in · skill “${sk.en}”`)}</p>
       ) : null}

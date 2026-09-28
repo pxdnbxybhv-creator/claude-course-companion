@@ -123,7 +123,7 @@ export function Lobby(props: {
               );
             })}
           </div>
-          <p class="mj-small muted mj-diff-line">{t(DIFF_REG[m.lobby.diff].zh, DIFF_REG[m.lobby.diff].en)}：{diffLine(m.lobby.diff, t)}</p>
+          <p class="mj-small muted mj-diff-line">{t(DIFF_REG[m.lobby.diff].zh, DIFF_REG[m.lobby.diff].en)}{t('：', ': ')}{diffLine(m.lobby.diff, t)}</p>
           <div class="mj-lobby-row">
             <button type="button" class="btn btn-small" onClick={() => setVows(true)}>{t(`镜誓 · ${termName('heat', t)} ${heat}`, `Vows · ${termName('heat', t)} ${heat}`)}</button>
             {m.heart.plain && <span class="chip" aria-label={t('素镜：心镜不生效', 'Plain mirror: Heart mirror off')}>{t('素镜', 'Plain')}</span>}
@@ -134,13 +134,13 @@ export function Lobby(props: {
 
       {props.ribbon && props.onTutorial && <TutorRibbon onGo={props.onTutorial} onClose={() => props.onRibbonClose?.()} />}
       <p class="mj-status">
-        <span>{t(`今日第 ${st.runs} 照`, `${st.runs} run${st.runs === 1 ? '' : 's'} today`)}</span>
-        <span>{t('下一照：', 'next: ')}{rateWord(st.nextRate, st.freeLeft, t)}</span>
-        <span>{t(`今日镜钱 ${st.paid}/${st.ceiling}`, `today ${st.paid}/${st.ceiling}`)}</span>
+        <span>{t(`今天已打 ${st.runs} 局`, `${st.runs} run${st.runs === 1 ? '' : 's'} today`)}</span>
+        <span>{t('下一局：', 'next run: ')}{rateWord(st.nextRate, st.freeLeft, t)}</span>
+        <span>{t(`今天结算 ${st.paid}/${st.ceiling} 文`, `paid today ${st.paid}/${st.ceiling}`)}</span>
         <span>{t(`铜钱 ${st.drops}/${st.dropCap}`, `coins ${st.drops}/${st.dropCap}`)}</span>
         <button type="button" class="mj-info" onClick={() => setRules(true)} aria-label={t('规则', 'How pay works')}>ⓘ</button>
       </p>
-      {st.rest && <p class="mj-rest">{t('镜已三照，且去园中走走。', 'Three looks today: take a walk in the garden.')}</p>}
+      {st.rest && <p class="mj-rest">{t('今天已经打了三局，去园子里走走吧。', 'Three runs today: take a walk in the garden.')}</p>}
 
       {!run && !newer && <DailyCard m={m} t={t} onOpen={() => setDaily(true)} canEnter={!q.paused && (q.free || q.unusedTicket || q.short === 0)} />}
 
@@ -161,7 +161,7 @@ export function Lobby(props: {
       <RulesSheet open={rules} onClose={() => setRules(false)} />
       {run && (
         <Confirm open={giveUp} title={t('弃镜', 'Give up the run')} yes={t('弃镜', 'Give it up')} danger onYes={() => { setGiveUp(false); props.onAbandon(); }} onNo={() => setGiveUp(false)}>
-          <p class="mj-confirm-big brush">{t(`弃镜即镜碎：结算已过 ${run.wave} 重，约 ${quoteNow(m, run, today)} 文`, `Giving up breaks the glass: settle ${run.wave} waves, about ${quoteNow(m, run, today)} coins`)}</p>
+          <p class="mj-confirm-big brush">{t(`放弃这一局就算倒下：按已过 ${run.wave} 重结算，约 ${quoteNow(m, run, today)} 文`, `Giving up counts as going down: you're paid for ${run.wave} waves, about ${quoteNow(m, run, today)} coins`)}</p>
         </Confirm>
       )}
       {daily && (
@@ -202,7 +202,7 @@ function EntryButton(props: { q: ReturnType<typeof entryQuote>; t: T; onEnter: (
     return (
       <div class={'mj-entry' + rung} ref={box}>
         <button type="button" class="btn btn-seal mj-enter" onClick={props.onEnter}><span class="brush">{t('续镜 · 已付', 'Enter · already paid')}</span></button>
-        <p class="mj-entry-note">{t('上次付了钱却没能入镜，这一照不再收钱。', 'Last time the fee was paid but the run never began: this one is on the house.')}</p>
+        <p class="mj-entry-note">{t('上次付了钱却没能入镜，这一局不再收钱。', 'Last time the fee was paid but the run never began: this one is on the house.')}</p>
       </div>
     );
   }
@@ -213,7 +213,7 @@ function EntryButton(props: { q: ReturnType<typeof entryQuote>; t: T; onEnter: (
           <span class="brush">{t('入镜', 'Enter')}</span>
           <Seal text="今日免费" size={46} class="mj-free-seal" color="#c0412f" label={t('今日免费', 'Free today')} />
         </button>
-        <p class="mj-entry-note">{t('返照减半 · 铜钱照常', 'half the reflected coins · coins as usual')}</p>
+        <p class="mj-entry-note">{t('免费这局：结算的钱减半，捡到的铜钱照拿', 'Free run: half the payout; coins you pick up are yours as usual')}</p>
       </div>
     );
   }
@@ -222,7 +222,7 @@ function EntryButton(props: { q: ReturnType<typeof entryQuote>; t: T; onEnter: (
       <button type="button" class="btn btn-seal mj-enter" onClick={props.onEnter} disabled={q.short > 0}>
         {q.short > 0 ? <span>{t(`还差 ${q.short} 文`, `${q.short} coins short`)}</span> : <><span class="brush">{t('入镜', 'Enter')}</span><CoinBadge value={q.fee} /></>}
       </button>
-      <p class="mj-entry-note">{t(`此照${rateWord(q.rate, false, t)}`, `this run: ${rateWord(q.rate, false, t)}`)}</p>
+      <p class="mj-entry-note">{t(`这一局：${rateWord(q.rate, false, t)}`, `this run: ${rateWord(q.rate, false, t)}`)}</p>
     </div>
   );
 }
@@ -242,11 +242,11 @@ function RunCard(props: { m: MirrorMeta; t: T; freeLeft: boolean; onResume: () =
         {run.daily && <> · {t('今日镜', 'Daily')}</>}
       </p>
       <p class="mj-runcard-wave brush">{t(`第 ${run.wave + 1} 重`, `Wave ${run.wave + 1}`)}</p>
-      <p class="mj-runcard-line">{t(`已过 ${run.wave} 重 · 此刻镜碎约得 ${X} 文 · 本照已拾 ${run.coins} 文`, `${run.wave} cleared · breaking now pays about ${X} · ${run.coins} coins picked up so far`)}</p>
+      <p class="mj-runcard-line">{t(`已过 ${run.wave} 重 · 现在倒下约得 ${X} 文 · 这局已捡 ${run.coins} 文`, `${run.wave} cleared · going down now pays about ${X} · ${run.coins} coins picked up this run`)}</p>
       {waited >= 7 && <p class="mj-runcard-wait">{t(`镜中人已候 ${waited} 日`, `Waiting in the mirror for ${waited} days`)}</p>}
       {run.interruptions > 0 && <p class="muted mj-small">{t(`中断 ${run.interruptions}/3`, `interrupted ${run.interruptions}/3`)}</p>}
       <button type="button" class="btn btn-seal mj-enter" onClick={props.onResume}><span class="brush">{t('续镜', 'Return')}</span></button>
-      {props.freeLeft && <p class="mj-free-kept"><Seal text="免费" size={20} /> {t('今日免费 · 留待下一照', 'Today’s free run waits for your next one')}</p>}
+      {props.freeLeft && <p class="mj-free-kept"><Seal text="免费" size={20} /> {t('今天的免费局 · 留给下一局', 'Today’s free run waits for your next one')}</p>}
       <button type="button" class="btn btn-small btn-ghost mj-danger" onClick={props.onGiveUp}>{t('弃镜', 'Give up the run')}</button>
     </div>
   );
@@ -315,7 +315,7 @@ function VowSheet(props: { open: boolean; onClose: () => void }) {
           );
         })}
       </div>
-      <button type="button" class="btn btn-ghost" onClick={() => setLobby({ vows: {} })} disabled={heat === 0}>{t('尽数解誓', 'Clear all vows')}</button>
+      <button type="button" class="btn btn-ghost" onClick={() => setLobby({ vows: {} })} disabled={heat === 0}>{t('全部取消', 'Clear all vows')}</button>
     </Sheet>
   );
 }
@@ -329,14 +329,14 @@ function RulesSheet(props: { open: boolean; onClose: () => void }) {
       <div class="mj-rules">
         <p class="mj-rules-lead brush">{t('过第十重，镜钱回本。', 'Clear wave 10 and the fee comes back.')}</p>
         <ul>
-          <li>{t(`入镜一次 ${PAY.FEE} 文，一照到底：直到镜碎。每天头一照免费（返照减半，铜钱照常）。`, `A run costs ${PAY.FEE} coins and lasts until the glass breaks. The first run each day is free (half the reflected coins, coins as usual).`)}</li>
-          <li>{t('暂离随时可以，续镜永远免费；中途离开，那一重回来重打。', 'Step away any time; coming back is always free. Leave mid-wave and that wave replays.')}</li>
-          <li>{t('镜碎时按已过的重数结算「返照钱」；一照至多 70 文。', 'When the glass breaks you are paid by the waves you cleared: at most 70 a run.')}</li>
-          <li>{t('同一天里：第一照 ×½，第二、三照全额，第四、五照 ×½，之后 ×¼。', 'In one day: the 1st run ×½, the 2nd and 3rd in full, the 4th and 5th ×½, then ×¼.')}</li>
-          <li>{t(`打怪时偶尔掉落真铜钱，破此重即入囊；一照至多 ${PAY.COIN_RUN} 文，一天至多 ${PAY.COIN_DAY} 文。`, `Real coins sometimes drop; they reach your purse when the wave is won: at most ${PAY.COIN_RUN} a run and ${PAY.COIN_DAY} a day.`)}</li>
-          <li>{t(`镜中一日所得至多 ${PAY.CEIL} 文（返照钱、铜钱、首次奖励合计）。过了上限，至多退回本钱。`, `The mirror pays at most ${PAY.CEIL} a day in all. Past that, a run can only hand its own fee back.`)}</li>
-          <li>{t('首次击败每位首领 +10，首次照破每张图的每个镜境 +20。', 'First kill of each boss +10; first clear of each map on each difficulty +20.')}</li>
-          <li>{t('月华、镜屑、心得都不换钱。福缘只让铜钱多掉一点。', 'Moonlight, dust and mastery never turn into money. Luck only nudges coin drops.')}</li>
+          <li>{t(`入镜一次 ${PAY.FEE} 文，一直打到倒下为止。每天第一局免费（返照钱减半，铜钱照常掉）。`, `A run costs ${PAY.FEE} coins and lasts until you go down. The first run each day is free (half the payout; coins drop as usual).`)}</li>
+          <li>{t('随时可以暂离，回来接着打不再收钱；打到一半离开，回来这一重要重打。', 'Step away any time; coming back is always free. Leave mid-wave and that wave replays.')}</li>
+          <li>{t(`倒下时按打过了几重结算「返照钱」，一局最多 ${PAY.RUN_CAP} 文。`, `When you go down you are paid by the waves you cleared: at most ${PAY.RUN_CAP} a run.`)}</li>
+          <li>{t('同一天里：第一局 ×½，第二、三局全额，第四、五局 ×½，之后 ×¼。', 'In one day: the 1st run ×½, the 2nd and 3rd in full, the 4th and 5th ×½, then ×¼.')}</li>
+          <li>{t(`打怪偶尔会掉真铜钱，打完这一重才进钱袋；一局最多 ${PAY.COIN_RUN} 文，一天最多 ${PAY.COIN_DAY} 文。`, `Real coins sometimes drop; they reach your purse when the wave is won: at most ${PAY.COIN_RUN} a run and ${PAY.COIN_DAY} a day.`)}</li>
+          <li>{t(`一天从镜中最多拿 ${PAY.CEIL} 文（返照钱、铜钱、首次奖励加起来）。超过以后，一局最多只退回本钱。`, `The mirror pays at most ${PAY.CEIL} a day in all. Past that, a run can only hand its own fee back.`)}</li>
+          <li>{t('第一次打倒每位首领 +10；每张图的每个难度第一次通关 +20。', 'First kill of each boss +10; first clear of each map on each difficulty +20.')}</li>
+          <li>{t('月华、镜屑、心得都不换钱。福缘只让铜钱多掉一点。', 'Moonlight, shards and mastery never turn into money. Luck only nudges coin drops.')}</li>
         </ul>
         <table class="mj-paytable">
           <caption>{t('照影 · 月湖 · 全额 · 无誓', 'Reflection · Moon Lake · full rate · no vows')}</caption>

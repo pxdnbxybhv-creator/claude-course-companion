@@ -54,20 +54,20 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   qingfeng: {
     unit: '一剑',
     say: b('向前直刺一剑，一剑最多刺中 {pierce+1} 个敌人。', 'Thrusts straight ahead, hitting up to {pierce+1} enemies in a line.'),
-    say4: b('暴击率再 +{critT4}%。', '+{critT4}% more crit chance.'),
+    say4: b('暴击率再 +{critT4}%。', '+{critT4}% crit chance.'),
     rows: [['pierce+1', b('一剑刺中', 'Enemies per thrust')]],
   },
   longquan: {
     unit: '一轮',
     say: b('双剑连砍 {hits} 下。每砍中一个敌人攻速 +{stack}%（最多 +{stackMax}%），{stackDur} 秒没砍中就清零。',
-      '{hits} quick slashes. Each enemy hit gives +{stack}% attack speed (max +{stackMax}%), lost after {stackDur} s without a hit.'),
-    say4: b('每第 {spinEvery} 轮转身砍一整圈。', 'Every {spinEvery:ord} round spins into a full-circle slash.'),
+      '{hits} quick slashes. Each enemy hit gives +{stack}% Attack speed (max +{stackMax}%), lost after {stackDur} s without a hit.'),
+    say4: b('每 {spinEvery} 轮有一轮转身砍一整圈。', 'Every {spinEvery:ord} round spins into a full-circle slash.'),
     more: [b('每下砍前方 {deg}°', 'each slash covers {deg}° in front')],
   },
   yanyue: {
     unit: '一刀',
     say: b('大刀横扫{deg:arc}，扫到的敌人都受伤，还会被远远推开。', 'Sweeps {deg:arc}, hitting everything it catches and knocking it far back.'),
-    say4: b('每第 {bigEvery} 刀伤害翻倍，还甩出一道刀气飞向{waveLen:reach}。', 'Every {bigEvery:ord} swing hits twice as hard and flings a blade wave that flies {waveLen:reach}.'),
+    say4: b('每砍 {bigEvery} 刀，最后一刀伤害翻倍，还甩出刀气飞向{waveLen:reach}。', 'Every {bigEvery:ord} swing hits twice as hard and flings a blade wave that flies {waveLen:reach}.'),
     more: [b('横扫 {deg}°', 'sweep {deg}°')],
     more4: [b('刀气飞 {waveLen}，穿过路上所有敌人', 'the blade wave flies {waveLen} through every enemy')],
   },
@@ -137,7 +137,7 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   },
   qingping: {
     unit: '一次',
-    say: b('放出飞剑，最多刺中 {pierce+1} 个敌人；领头那把会飞回来，回程再打一次（{ret%} 伤害）。', 'Launches flying swords that hit up to {pierce+1} enemies; the lead sword flies back and hits again ({ret%} damage).'),
+    say: b('放出一把飞剑，最多刺中 {pierce+1} 个敌人，还会飞回来再打一次（{ret%} 伤害）。', 'Launches a flying sword that hits up to {pierce+1} enemies, then flies back to hit again ({ret%} damage).'),
     say4: b('飞剑第一次暴击时，一把分成 {splitT4} 把。', 'A sword splits into {splitT4} on its first crit.'),
     rows: [['ret%', b('回程伤害', 'Return damage')]],
     more: [b('一次放 {=1} 把；飞剑数每 +{=1}，多放 {=1} 把（多出的打 {F.swordExtra%}，不飞回）', '{=1} sword a launch; each Extra sword adds {=1} more ({F.swordExtra%} damage, no return)')],
@@ -173,7 +173,7 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   fire: {
     unit: '一张',
     say: b('扔出火符，炸开{r:size}，让敌人燃烧 {burnDur} 秒（最多叠 {burnStacks} 层）。', 'Throws a fire charm that bursts over {r:size} and burns enemies for {burnDur} s (up to {burnStacks} stacks).'),
-    say4: b('烧死的敌人会把火传给旁边 {spreadT4} 个敌人。', 'Enemies that burn to death pass the fire to {spreadT4} nearby.'),
+    say4: b('烧死的敌人会把火传到旁边的敌人身上。', 'Enemies that burn to death set a neighbour alight.'),
     rows: [['burnStacks', b('燃烧最多叠', 'Burn stacks')]],
     more: [
       b('炸开半径 {r}', 'burst radius {r}'),
@@ -192,8 +192,8 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   },
   qin: {
     unit: '一圈',
-    say: b('琴音向四周震开{range:size}；每第 {every} 圈是「共鸣」：伤害{resX:times}，还让敌人慢 {slow}%。', 'Sends a ring of sound over {range:size}; every {every:ord} ring resonates: {resX:times} the damage and a {slow}% slow.'),
-    say4: b('每第 {every} 圈就共鸣，共鸣时给你回 {healT4} 点血。', 'Resonates every {every:ord} ring and heals you {healT4} HP.'),
+    say: b('琴音向四周震开{range:size}；每 {every} 圈有一圈「共鸣」：伤害{resX:times}，敌人慢 {slow}%。', 'Sends a ring of sound over {range:size}; every {every:ord} ring resonates: {resX:times} the damage and a {slow}% slow.'),
+    say4: b('每 {every} 圈就有一圈共鸣，共鸣时给你回 {healT4} 点血。', 'Resonates every {every:ord} ring and heals you {healT4} HP.'),
     rows: [['every', b('每几圈共鸣', 'Resonance every')]],
     more: [
       b('音波半径 {range}', 'ring radius {range}'),
@@ -203,8 +203,8 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   },
   flute: {
     unit: '一个音',
-    say: b('吹出会追人的音符；每第 {charmEvery} 个音迷惑一个小怪 {charmDur} 秒。', 'Plays homing notes; every {charmEvery:ord} note charms a small enemy for {charmDur} s.'),
-    say4: b('每第 {charmEvery} 个音就迷惑，一次迷惑 {charmDur} 秒。', 'Every {charmEvery:ord} note charms, for {charmDur} s.'),
+    say: b('吹出会追人的音符；每吹 {charmEvery} 个音，最后一个会迷惑小怪 {charmDur} 秒。', 'Plays homing notes; every {charmEvery:ord} note charms a small enemy for {charmDur} s.'),
+    say4: b('每 {charmEvery} 个音就迷惑一次，一次 {charmDur} 秒。', 'Every {charmEvery:ord} note charms, for {charmDur} s.'),
     num4: true,
     rows: [['charmEvery', b('每几个音迷惑', 'Charm every')], ['charmDur', b('迷惑秒数', 'Charm seconds')]],
   },
@@ -215,7 +215,7 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
       act: [b('啄', 'pecks'), b('冲撞', 'rams'), b('俯冲扑向', 'dives at'), b('扑咬', 'pounces on')],
     },
     say: b('画一只{beast}替你{act}敌人，能留 {life} 秒（占 {=1} 个墨宝名额）。', 'Paints an {beast} that {act} enemies for {life} s (uses {=1} ink summon slot).'),
-    say4: b('改画墨虎，每 {atk} 秒扑一次，还会把敌人引到身上。', 'Paints an ink tiger instead: it pounces every {atk} s and draws enemies to itself.'),
+    say4: b('墨虎每 {atk} 秒扑一次，还会把敌人引到自己身上。', 'The ink tiger pounces every {atk} s and draws enemies to itself.'),
     rows: [['atk', b('几秒出手一次', 'Seconds per attack')], ['r', b('出手范围', 'Attack radius')]],
     more: [b('{beast}每 {atk} 秒出手一次，范围 {r}', 'the {beast} attacks every {atk} s over radius {r}')],
     more4: [b('墨虎引怪 {taunt} 秒', 'the tiger taunts for {taunt} s')],
@@ -247,14 +247,14 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
   },
   moonwheel: {
     unit: '飞一次',
-    say: b('月轮飞出再飞回，穿过路上所有敌人；移速每 +{=1}%，伤害 +{=1}%（最多 +{speedDmg}%）。', 'A moon disc flies out and back through every enemy in its path; +{=1}% damage per {=1}% move speed (max +{speedDmg}%).'),
+    say: b('月轮飞出再飞回，穿过路上所有敌人；移速每 +{=1}%，伤害 +{=1}%（最多 +{speedDmg}%）。', 'A moon disc flies out and back through every enemy in its path; +{=1}% damage per {=1}% Move speed (max +{speedDmg}%).'),
     say4: b('一次扔出 {discs} 个，朝相反的方向飞。', 'Throws {discs} discs in opposite directions.'),
     rows: [['discs', b('一次扔几个', 'Discs')]],
   },
   moonmirror: {
     unit: '一道光',
     say: b('射出一道月光，瞬间穿过一条直线上的所有敌人；闪避后 {dodgeWin} 秒内每次多射一道。', 'Fires an instant moonbeam through every enemy in a line; for {dodgeWin} s after a dodge, each shot adds another beam.'),
-    say4: b('光束一分为 {fork}，左右各偏 {forkDeg}°。', 'The beam forks into {fork}, {forkDeg}° apart.'),
+    say4: b('一次射出 {fork} 道光，两边的各偏 {forkDeg}°。', 'Fires {fork} beams at once, the outer two {forkDeg}° apart.'),
     rows: [['fork', b('光束几道', 'Beams')]],
   },
 };
@@ -263,13 +263,13 @@ export const WEAPON_SAY: Readonly<Record<string, WeaponSay>> = {
 export interface ItemSay { readonly say?: Bi; readonly more?: readonly Bi[] }
 
 export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
-  drumroll: { say: b('每重开始后的前 {f0.when.below} 秒，攻速 +{f0.stats.aspd}%。', 'For the first {f0.when.below} s of every wave: +{f0.stats.aspd}% attack speed.') },
+  drumroll: { say: b('每重开始后的前 {f0.when.below} 秒，攻速 +{f0.stats.aspd}%。', 'For the first {f0.when.below} s of every wave: +{f0.stats.aspd}% Attack speed.') },
   gall: { say: b('每打完一重，气血上限 +{f0.v}。', '+{f0.v} max HP every time you clear a wave.') },
-  backwater: { say: b('气血低于 {f0.when.v%} 时：伤害 +{f0.stats.dmg}%，攻速 +{f0.stats.aspd}%。', 'Below {f0.when.v%} HP: +{f0.stats.dmg}% damage, +{f0.stats.aspd}% attack speed.') },
-  atease: { say: b('站着不动 {f0.when.s} 秒后：攻速 +{f0.stats.aspd}%，护甲 +{f0.stats.armor}。', 'After standing still for {f0.when.s} s: +{f0.stats.aspd}% attack speed, +{f0.stats.armor} armour.') },
-  versatile: { say: b('你的兵器每多一个类别，伤害 +{f0.k}%，攻速 +{f1.k}%。', 'For each different weapon class you carry: +{f0.k}% damage, +{f1.k}% attack speed.') },
-  chasewind: { say: b('移速每高 {f0.per}%，伤害 +{f0.k}%（最多 +{f0.max}%）。', '+{f0.k}% damage for every {f0.per}% move speed (max +{f0.max}%).') },
-  ironbone: { say: b('每 {f0.per} 点护甲，伤害 +{f0.k}%（最多 +{f0.max}%）。', '+{f0.k}% damage per {f0.per} armour (max +{f0.max}%).') },
+  backwater: { say: b('气血低于 {f0.when.v%} 时：伤害 +{f0.stats.dmg}%，攻速 +{f0.stats.aspd}%。', 'Below {f0.when.v%} HP: +{f0.stats.dmg}% damage, +{f0.stats.aspd}% Attack speed.') },
+  atease: { say: b('站着不动 {f0.when.s} 秒后：攻速 +{f0.stats.aspd}%，护甲 +{f0.stats.armor}。', 'After standing still for {f0.when.s} s: +{f0.stats.aspd}% Attack speed, +{f0.stats.armor} Armour.') },
+  versatile: { say: b('你的兵器里每有一种类别：伤害 +{f0.k}%，攻速 +{f1.k}%。', 'For each different weapon class you carry: +{f0.k}% damage, +{f1.k}% Attack speed.') },
+  chasewind: { say: b('移速每高 {f0.per}%，伤害 +{f0.k}%（最多 +{f0.max}%）。', '+{f0.k}% damage for every {f0.per}% Move speed (max +{f0.max}%).') },
+  ironbone: { say: b('每点护甲，伤害 +{f0.k}%（最多 +{f0.max}%）。', '+{f0.k}% damage per point of Armour (max +{f0.max}%).') },
   physician: { say: b('把回血的 {f0.k%} 加到近战、远程、法术、造物上（每样最多 +{f0.max}）。', 'Adds {f0.k%} of your HP Regen to Melee, Ranged, Elemental and Craft (max +{f0.max} each).') },
   lots: { say: b('每次商店多 {f0.n} 次免费刷新。', '+{f0.n} free {f0.n?reroll|rerolls} in every shop.') },
   pawn: { say: b('卖兵器能拿回现价的 {f0.frac%}（平常是 {F.sellFrac%}）。', 'Weapons sell for {f0.frac%} of their price (normally {F.sellFrac%}).') },
@@ -278,7 +278,7 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
   abacus: { say: b('每重结束，手里每剩 {f0.per} 点月华，再多给 {=1} 点（每个算盘最多 +{f0.max}）。', 'At wave end, +{=1} moonlight for every {f0.per} you haven\'t spent (max +{f0.max} per abacus).') },
   duanyan: { say: b('墨宝多留 {f0.pct}% 的时间。', 'Ink summons last {f0.pct}% longer.') },
   splash: {
-    say: b('墨宝消失时炸开一团墨：{f0.base} 点伤害（受{f0.scale:by}加成），炸到的敌人慢 {f0.slow}%，持续 {f0.dur} 秒。', 'When an ink summon ends it bursts: {f0.base} damage (scales with {f0.scale:by}) and a {f0.slow}% slow for {f0.dur} s.'),
+    say: b('墨宝消失时炸开：{f0.base} 点伤害（受{f0.scale:by}加成），敌人慢 {f0.slow}%，持续 {f0.dur} 秒。', 'When an ink summon ends it bursts: {f0.base} damage (scales with {f0.scale:by}) and a {f0.slow}% slow for {f0.dur} s.'),
     more: [b('炸开半径 {f0.r}', 'burst radius {f0.r}')],
   },
   inkbamboo: {
@@ -289,18 +289,18 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
     say: b('一只墨鹤一直陪着你，每 {f0.cd} 秒啄一下敌人（受{f0.scale:by}加成），还会把附近的月华叼回来。', 'An ink crane stays with you, pecking an enemy every {f0.cd} s (scales with {f0.scale:by}) and fetching nearby moonlight.'),
     more: [b('一啄 {f0.base} 点 + {f0.scale.spirit%} 造物；叼回 {f0.fetch} 以内的月华', 'pecks for {f0.base} + {f0.scale.spirit%} Craft; fetches moonlight within {f0.fetch}')],
   },
-  inkpool: { say: b('场上每有一只墨宝，护甲 +{f0.k}（最多 +{f0.max}）。', '+{f0.k} armour for each ink summon out (max +{f0.max}).') },
-  dotting: { say: b('墨宝也能暴击（用你的暴击率，暴击打 {f0.x} 倍），攻速 +{f0.aspd}%。', 'Ink summons can crit (with your crit chance, ×{f0.x}) and get +{f0.aspd}% attack speed.') },
-  tassel: { say: b('飞剑类兵器：攻速 +{f0.stats.aspd}%，射程 +{f0.stats.range}。', 'Flying-sword weapons: +{f0.stats.aspd}% attack speed, +{f0.stats.range} range.') },
+  inkpool: { say: b('场上每有一只墨宝，护甲 +{f0.k}（最多 +{f0.max}）。', '+{f0.k} Armour for each ink summon out (max +{f0.max}).') },
+  dotting: { say: b('墨宝也能暴击（用你的暴击率，暴击打 {f0.x} 倍），攻速 +{f0.aspd}%。', 'Ink summons can crit (with your crit chance, ×{f0.x}) and get +{f0.aspd}% Attack speed.') },
+  tassel: { say: b('飞剑类兵器：攻速 +{f0.stats.aspd}%，射程 +{f0.stats.range}。', 'Flying-sword weapons: +{f0.stats.aspd}% Attack speed, +{f0.stats.range} Range.') },
   swordqi: { say: b('飞剑多穿过 {f0.pierce} 个敌人，飞过的路上留下剑气（{f0.pct}% 伤害）。', 'Flying swords pierce {f0.pierce} more and leave a sword trail ({f0.pct}% damage).') },
   swordheart: { say: b('空中有 {f0.when.n} 把以上飞剑时：飞剑类兵器暴击率 +{f0.stats.crit}%，暴击倍数 +{f0.stats.critDmg/100}。', 'With {f0.when.n}+ swords in the air: flying-sword weapons get +{f0.stats.crit}% crit chance and +{f0.stats.critDmg/100} crit multiplier.') },
   washpool: { say: b('每把飞回来的剑给你回 {f0.v} 点血（每秒最多 {f0.capPerSec} 点）。', 'Each returning sword heals you {f0.v} HP (max {f0.capPerSec} a second).') },
   swordtomb: {
-    say: b('一重里飞剑每打倒 {f0.p.per} 个敌人，就多一把残剑绕着你转到重末（最多 {f0.p.max} 把）。', 'Every {f0.p.per} flying-sword kills in a wave adds a broken sword that circles you until the wave ends (max {f0.p.max}).'),
+    say: b('一重里飞剑每打倒 {f0.p.per} 个敌人，多一把残剑绕着你转，直到这一重结束（最多 {f0.p.max} 把）。', 'Every {f0.p.per} flying-sword kills in a wave adds a broken sword that circles you until the wave ends (max {f0.p.max}).'),
     more: [b('残剑 {f0.p.base} 点 + {f0.p.ranged%} 远程', 'broken swords deal {f0.p.base} + {f0.p.ranged%} Ranged')],
   },
   yellowpaper: { say: b('燃烧多叠 {f0.stacks} 层，多烧 {f0.dur} 秒。', 'Burns stack {f0.stacks} higher and last {f0.dur} s longer.') },
-  fivethunder: { say: b('雷多跳 {f0.chains} 个敌人；雷打倒敌人时会点着旁边的；每道雷有 {f0.stun%} 几率晕住 {f0.stunDur} 秒。', 'Lightning jumps to {f0.chains} more; lightning kills set nearby enemies alight; each strike has a {f0.stun%} chance to stun {f0.stunDur} s.') },
+  fivethunder: { say: b('雷多跳 {f0.chains} 个；雷打死的敌人会点着身边敌人；每道雷 {f0.stun%} 几率晕住 {f0.stunDur} 秒。', 'Lightning jumps to {f0.chains} more; lightning kills set nearby enemies alight; each strike has a {f0.stun%} chance to stun {f0.stunDur} s.') },
   lingering: { say: b('乐器每打中一次，{f0.delay} 秒后再响一次（{f0.pct}% 伤害）。', 'Music hits echo {f0.delay} s later for {f0.pct}% damage.') },
   boya: {
     say: b('迷惑几率变成 {f0.x} 倍；被迷惑的敌人伤害 +{f0.dmgPct}%，迷惑结束时炸开（受{f0.scale:by}加成）。', 'Charm chances ×{f0.x}; charmed enemies deal +{f0.dmgPct}% and burst when the charm ends (scales with {f0.scale:by}).'),
@@ -308,7 +308,7 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
   },
   dukang: { say: b('每次暴击醉意 +{f0.v}（出手快的兵器少一些）；不带酒类兵器也有醉意条。', 'Each crit adds {f0.v} Drunk (less for fast weapons); you get the Drunk meter even without a wine weapon.') },
   nightcup: { say: b('每次暴击回 {f0.v} 点血（每秒最多 {f0.capPerSec} 点）。', 'Each crit heals {f0.v} HP (max {f0.capPerSec} a second).') },
-  dragblade: { say: b('重器每第 {f0.n} 下伤害{f0.x:times}，击退 +{f0.knock}。', 'Every {f0.n:ord} Heavy swing hits {f0.x:times} as hard, with +{f0.knock} knockback.') },
+  dragblade: { say: b('重器每砍 {f0.n} 下，最后一下伤害{f0.x:times}，击退 +{f0.knock}。', 'Every {f0.n:ord} Heavy swing hits {f0.x:times} as hard, with +{f0.knock} knockback.') },
   thorns: {
     say: b('挨打时，反打对方 {f0.base} 点伤害（受{f0.scale:by}加成）。', 'When hit, deals {f0.base} damage back to the attacker (scales with {f0.scale:by}).'),
     more: [b('反伤 {f0.base} 点 + {f0.scale.armor%} 护甲', 'deals {f0.base} + {f0.scale.armor%} Armour back')],
@@ -319,35 +319,38 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
   },
   gomanual: { say: b('棋子炸开范围 +{f0.stats.area}%。', 'Stone blasts +{f0.stats.area}% area.') },
   capture: {
-    say: b('被 {f0.p.n} 颗棋子围住的敌人会被「吃掉」：受 {f0.p.x} 倍棋子伤害，无视护甲。', 'An enemy surrounded by {f0.p.n} stones is captured: {f0.p.x}× stone damage, ignoring armour.'),
+    say: b('被 {f0.p.n} 颗棋子围住的敌人会挨一记「提子」：{f0.p.x} 倍棋子伤害，无视护甲（首领不会）。', 'An enemy ringed by {f0.p.n} stones is captured: {f0.p.x}× stone damage, ignoring armour (not bosses).'),
     more: [b('围住：身边 {f0.p.r} 以内有 {f0.p.n} 颗以上棋子', 'surrounded: {f0.p.n}+ stones within {f0.p.r}')],
   },
   moonsoul: {
     say: b('每闪避一次，射出 {f0.n} 枚会追人的月魄（受{f0.scale:by}加成）。', 'Each dodge fires {f0.n} homing moon shards (scales with {f0.scale:by}).'),
     more: [b('每枚 {f0.base} 点 + {f0.scale.elem%} 法术', 'each deals {f0.base} + {f0.scale.elem%} Elemental')],
   },
-  osmanthus: { say: b('闪避上限 +{f0.v}；闪避后 {f1.dur} 秒内伤害 +{f1.stats.dmg}%。', 'Dodge cap +{f0.v}; +{f1.stats.dmg}% damage for {f1.dur} s after a dodge.') },
+  osmanthus: { say: b('闪避上限 +{f0.v}%；闪避后 {f1.dur} 秒内伤害 +{f1.stats.dmg}%。', 'Dodge cap +{f0.v}%; +{f1.stats.dmg}% damage for {f1.dur} s after a dodge.') },
   lingbo: {
     say: b('走动时留下脚印，每 {f0.p.tick} 秒伤到踩着的敌人；移速越高越痛。', 'Moving leaves footprints that hurt enemies on them every {f0.p.tick} s; the faster you move, the harder.'),
-    more: [b('{f0.p.base} 点；移速每 +{=10}%，再 +{f0.p.per10}', '{f0.p.base} damage, +{f0.p.per10} per {=10}% move speed')],
+    more: [b('{f0.p.base} 点；移速每 +{=10}%，再 +{f0.p.per10}', '{f0.p.base} damage, +{f0.p.per10} per {=10}% Move speed')],
   },
   cushion: { say: b('站着不动 {f0.when.s} 秒后，回血 +{f0.stats.regen}%（带几个就加几份）。', 'After standing still for {f0.when.s} s: +{f0.stats.regen}% HP Regen (each copy adds more).') },
   burnboats: { say: b('从此不能再刷新，也不能锁货。', 'No more rerolls or locks after this.') },
   yanwang: { say: b('每重一次：挨了致命一击不倒，剩 {=1} 点血。', 'Once a wave, a lethal hit leaves you at {=1} HP.') },
   delusion: { say: b('每重多来 {f0.budgetPct}% 的敌人；月华 +{f0.moonPct}%。', '{f0.budgetPct}% more enemies each wave; +{f0.moonPct}% moonlight.') },
-  innerdemon: { say: b('每重会冒出你的心魔（{f0.pct}% 的气血和伤害），打倒它掉一个镜奁。', 'Each wave your inner demon appears ({f0.pct}% of your HP and damage); beating it drops a casket.') },
+  innerdemon: { say: b('每重来个心魔（你 {f0.pct}% 的血和伤害），打倒掉一个镜奁。', 'Each wave your inner demon appears ({f0.pct}% of your HP and damage); beating it drops a casket.') },
   crackedmirror: { say: b('商店多 {f0.n} 个货位；仙品几率 +{f1.t3}%，神品几率 +{f1.t4}%。', '+{f0.n} shop {f0.n?slot|slots}; Immortal odds +{f1.t3}%, Divine odds +{f1.t4}%.') },
-  wanjian: { say: b('有 {f0.p.min} 把以上飞剑时，每 {f0.p.every} 秒全部扑向敌人最多处，各砍 {f0.p.strikes} 下（{f0.p.pct}% 伤害）。', 'With {f0.p.min}+ swords, every {f0.p.every} s all swords dive at the thickest crowd, striking {f0.p.strikes} times each at {f0.p.pct}%.') },
+  wanjian: { say: b('有 {f0.p.min} 把以上飞剑时，每 {f0.p.every} 秒全部扑进怪堆一次（{f0.p.pct}% 伤害）。', 'With {f0.p.min}+ swords, every {f0.p.every} s they all dive through the thickest crowd ({f0.p.pct}% damage).') },
   inkdragon: {
     say: b('总有一只墨宝变成墨龙：伤害 {f0.p.x} 倍，会飞，能穿过敌人。墨龙没了，{f0.p.every} 秒后再变一只。', 'One ink summon is always an ink dragon: {f0.p.x}× damage, flies and passes through enemies. If it\'s gone, another turns in {f0.p.every} s.'),
     more: [b('墨龙一口咬半径 {f0.p.r}', 'the dragon bites radius {f0.p.r}')],
   },
-  dugu: { say: b('只带 {=1} 把兵器时：它算作同类 {f0.p.count} 把，伤害变成 {f0.p.x} 倍，攻速 +{f0.p.aspd}%。', 'With exactly {=1} weapon: it counts as {f0.p.count} of its class, deals {f0.p.x}× damage and gets +{f0.p.aspd}% attack speed.') },
-  samadhi: { say: b('你身边 {f0.p.r} 以内的燃烧永远不灭；燃烧层数上限{f0.p.stackX:times}。', 'Burns within {f0.p.r} of you never go out; the burn stack limit is {f0.p.stackX:times} as high.') },
+  dugu: { say: b('只带 {=1} 把兵器时：套装按 {f0.p.count} 把算，伤害变成 {f0.p.x} 倍，攻速 +{f0.p.aspd}%。', 'With exactly {=1} weapon: its set counts as {f0.p.count}, it deals {f0.p.x}× damage and gets +{f0.p.aspd}% Attack speed.') },
+  samadhi: {
+    say: b('你身边{f0.p.r:size}里，燃烧永远不灭；燃烧层数上限{f0.p.stackX:times}。', 'Burns in {f0.p.r:size} around you never go out; the burn stack limit is {f0.p.stackX:times} as high.'),
+    more: [b('范围半径 {f0.p.r}', 'radius {f0.p.r}')],
+  },
   treasurebowl: { say: b('每重结束，手里的月华多给 {f0.pct}% 利息（最多 {f0.max}）；每次商店多 {f1.n} 次免费刷新。', 'At wave end, +{f0.pct}% interest on moonlight held (max {f0.max}); +{f1.n} free {f1.n?reroll|rerolls} every shop.') },
-  penglai: { say: b('一局一次：倒下时带着 {f0.hpPct%} 气血站起来，并清掉敌人的子弹。', 'Once a run, when you go down you get back up with {f0.hpPct%} HP and every enemy shot is cleared.') },
-  ambush: { say: b('乐器或符箓每打第 {f0.p.every} 下，你其他的乐器和符箓一起出手（{f0.p.pct}% 伤害）。', 'Every {f0.p.every:ord} Music or Talisman attack fires all your other Music and Talisman weapons at {f0.p.pct}%.') },
-  needle: { say: b('不会被击退；每点护甲伤害 +{f1.k}%（和{@ironbone}加起来最多 +{f1.max}%）。', 'Immune to knockback; +{f1.k}% damage per armour (with {@ironbone}, max +{f1.max}%).') },
+  penglai: { say: b('一局一次：倒下时带着 {f0.hpPct%} 气血站起来，清掉敌人子弹。', 'Once a run, when you go down you get back up with {f0.hpPct%} HP and every enemy shot is cleared.') },
+  ambush: { say: b('乐器或符箓每出手 {f0.p.every} 次，你其他的乐器和符箓就一起出手一次（{f0.p.pct}% 伤害）。', 'Every {f0.p.every:ord} Music or Talisman attack fires all your other Music and Talisman weapons at {f0.p.pct}%.') },
+  needle: { say: b('不会被击退；每点护甲伤害 +{f1.k}%（和{@ironbone}加起来最多 +{f1.max}%）。', 'Immune to knockback; +{f1.k}% damage per point of Armour (with {@ironbone}, max +{f1.max}%).') },
   jiangjinjiu: { say: b('醉意上限变成 {f0.p.cap}；醉意到 {f0.p.autoCrit} 以上每下都暴击；醉意消得{f0.p.drain:faster}。', 'Drunk cap becomes {f0.p.cap}; at {f0.p.autoCrit}+ Drunk every hit crits; Drunk drains {f0.p.drain:times} as fast.') },
   watermoon: { say: b('每件兵器出手时，还会朝身后打出一次镜像（{f0.p.pct}% 伤害）。', 'Every weapon also attacks behind you as a mirror image ({f0.p.pct}% damage).') },
 };
@@ -358,8 +361,8 @@ export interface SkillSay { readonly gist: Bi; readonly say: Bi; readonly more?:
 export const SKILL_SAY: Readonly<Record<string, SkillSay>> = {
   yizi: {
     gist: b('在敌人最多的地方写个大「镇」字，砸伤一片；字留 {zone} 秒，让里面的敌人变慢、多受伤。', 'Brushes a giant glyph where enemies crowd: it hits them all, then for {zone} s slows them and makes them take more damage.'),
-    say: b('在敌人最多的地方写下一个大「镇」字，砸出 {base} 点伤害（受你最高的那项伤害加成）。字在地上留 {zone} 秒，里面的敌人慢 {slow}%，多受 {amp}% 伤害。',
-      'Writes a giant \'Hold\' glyph where enemies crowd: {base} damage (scales with your highest damage stat). It stays {zone} s: enemies inside are {slow}% slower and take {amp}% more damage.'),
+    say: b('在敌人最多的地方写个大「镇」字，砸出 {base} 点伤害（按你兵器加成里最高的一项算）。字在地上留 {zone} 秒，里面的敌人慢 {slow}%，多受 {amp}% 伤害。',
+      'Writes a giant \'Hold\' glyph where enemies crowd: {base} damage (scales with your highest of Melee, Ranged, Elemental and Craft). It stays {zone} s: enemies inside are {slow}% slower and take {amp}% more damage.'),
     more: [b('半径 {r}；施放距离 {reach}', 'radius {r}; cast range {reach}'), b('加成：近战、远程、法术、造物里最高那项的 {k%}', 'bonus: {k%} of your highest of Melee, Ranged, Elemental and Craft')],
   },
   manyuan: {
@@ -375,8 +378,8 @@ export const SKILL_SAY: Readonly<Record<string, SkillSay>> = {
     more: [b('网半径 {r}；吸月华范围 {attract}', 'net radius {r}; pulls moonlight within {attract}'), b('首领不会被拖、被定，但也会多受伤', 'bosses aren\'t dragged or held, but still take more damage')],
   },
   guangling: {
-    gist: b('弹 {dur} 秒琴：每一拍震伤、拖慢身边的敌人，小怪还可能倒戈帮你。', 'Plays for {dur} s: every beat hurts and slows enemies around you, and small ones may switch sides.'),
-    say: b('弹琴 {dur} 秒：每 {beat} 秒一拍，震伤身边的敌人（受法术加成）并让它们慢 {slow}%；小怪每秒有 {charm%} 几率倒戈 {charmDur} 秒（福缘越高越容易）。',
+    gist: b('弹 {dur} 秒琴：每一拍震伤、拖慢身边的敌人，小怪还可能被迷惑，帮你打。', 'Plays for {dur} s: every beat hurts and slows enemies around you, and small ones may switch sides.'),
+    say: b('弹琴 {dur} 秒：每 {beat} 秒一拍，震伤身边的敌人（受法术加成）并让它们慢 {slow}%；小怪每秒有 {charm%} 几率被迷惑 {charmDur} 秒（福缘越高越容易）。',
       'Plays for {dur} s: every {beat} s a beat hits enemies around you (scales with Elemental) and slows them {slow}%; each second small enemies have a {charm%} chance to switch sides for {charmDur} s (more with Luck).'),
     more: [b('半径 {r}；每拍 {base} 点 + {k%} 法术', 'radius {r}; each beat {base} + {k%} Elemental'), b('弹琴时移速是平常的 {move%}；首领只慢 {slowBoss}%', 'you move at {move%} speed while playing; bosses are slowed only {slowBoss}%')],
   },
@@ -419,7 +422,7 @@ export const SKILL_SAY: Readonly<Record<string, SkillSay>> = {
   yaoyue: {
     gist: b('一口喝到大醉：{dur} 秒里暴击更高，每次暴击射出追人的诗字；之后晕乎 {hang} 秒，走得慢。', 'Drinks deep: for {dur} s you crit more and each crit fires a seeking verse; then {hang} s of hangover, moving slower.'),
     say: b('一口喝到醉意 {drunk}：{dur} 秒里暴击率 +{crit}%，每次暴击射出一个追人的诗字（受远程加成，再跳 {chain} 个敌人）；之后宿醉 {hang} 秒，移速 −{hangSlow}%。',
-      'Drinks to {drunk} Drunk: for {dur} s +{crit}% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to {chain} more; then {hang} s of hangover at −{hangSlow}% move speed.'),
+      'Drinks to {drunk} Drunk: for {dur} s +{crit}% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to {chain} more; then {hang} s of hangover at −{hangSlow}% Move speed.'),
     more: [b('诗字 {base} 点 + {k%} 远程', 'verse glyphs deal {base} + {k%} Ranged')],
   },
   tuodao: {
@@ -486,11 +489,11 @@ export const SKILL_SAY: Readonly<Record<string, SkillSay>> = {
   },
   doujiu: {
     gist: b('猛喝一口：更醉、出手更快，暴击迸出诗字。', 'A deep drink: more Drunk, faster attacks, and crits burst into verse.'),
-    say: b('醉意 +{drunk}，{dur} 秒里攻速 +{aspd}%；每次暴击迸出诗字，打附近 {n} 个敌人（暴击伤害的 {pct}%）。', '+{drunk} Drunk and +{aspd}% attack speed for {dur} s; each crit bursts into verse that hits {n} nearby enemies for {pct}% of the crit.'),
+    say: b('醉意 +{drunk}，{dur} 秒里攻速 +{aspd}%；每次暴击迸出诗字，打附近 {n} 个敌人（暴击伤害的 {pct}%）。', '+{drunk} Drunk and +{aspd}% Attack speed for {dur} s; each crit bursts into verse that hits {n} nearby enemies for {pct}% of the crit.'),
   },
   chitu: {
     gist: b('骑上赤兔马冲进怪堆，谁挡路谁受伤。', 'Ride Red Hare through the crowd, hurting whatever is in the way.'),
-    say: b('骑上赤兔马 {dur} 秒：移速 +{speed}%，不怕减速、定住和击退；撞到的敌人每 {tick} 秒受一次伤（受近战、护甲加成）。', 'Ride Red Hare for {dur} s: +{speed}% move speed, immune to slow, root and knockback; enemies you run through take damage every {tick} s (scales with Melee and Armour).'),
+    say: b('骑上赤兔马 {dur} 秒：移速 +{speed}%，不怕减速、定住和击退；撞到的敌人每 {tick} 秒受一次伤（受近战、护甲加成）。', 'Ride Red Hare for {dur} s: +{speed}% Move speed, immune to slow, root and knockback; enemies you run through take damage every {tick} s (scales with Melee and Armour).'),
     more: [b('{base} 点 + {k%} 近战 + {kArmor} × 护甲', '{base} + {k%} Melee + {kArmor} × Armour')],
   },
   benyue: {
@@ -512,7 +515,7 @@ export const PASSIVE_SAY: Readonly<Record<string, PassiveSay>> = {
   chunzhong: {
     gist: b('收成更多，而且每重涨得更快。', 'More Harvest, and it grows faster every wave.'),
     say: b('收成 +{s.harvest}，而且收成每重涨 {grow:up}（别人是 {F.harvestGrow:up}）。', '+{s.harvest} Harvest, and Harvest grows {grow:up} a wave (others {F.harvestGrow:up}).'),
-    cost: b('攻速 {s.aspd}%', '{s.aspd}% attack speed'),
+    cost: b('攻速 {s.aspd}%', '{s.aspd}% Attack speed'),
   },
   yuanzhe: {
     gist: b('运气好、捡得远，打倒的敌人偶尔变成金鲤。', 'Lucky, picks up from afar, and some kills turn into golden carp.'),
@@ -522,27 +525,27 @@ export const PASSIVE_SAY: Readonly<Record<string, PassiveSay>> = {
   zhiyin: {
     gist: b('乐器踩着拍子打，更痛、范围更大。', 'Music weapons play on the beat, harder and wider.'),
     say: b('乐器跟着拍子出手（最多等 {wait} 秒），伤害 +{dmg}%，范围 +{area}%。', 'Music weapons fire on the beat (waiting at most {wait} s): +{dmg}% damage, +{area}% area.'),
-    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {w.melee}%'),
+    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {-w.melee}% less damage'),
   },
   jianyi: {
     gist: b('飞剑多一把，飞剑更容易暴击。', 'One more flying sword, and flying swords crit more.'),
     say: b('飞剑数 +{s.swords}；飞剑类兵器暴击率 +{f0.stats.crit}%。', '+{s.swords} Extra {s.swords?sword|swords}; flying-sword weapons +{f0.stats.crit}% crit chance.'),
-    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {w.melee}%'),
+    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {-w.melee}% less damage'),
   },
   tongzi: {
     gist: b('个子小不容易被打中；减速、燃烧这类效果更持久。', 'Small and hard to hit; slows, burns and the like last longer.'),
     say: b('你给敌人的减速、燃烧这类效果多持续 {statusDur}%；个子更小（身体半径 {hitbox}，别人 {c0.hitbox}），更难被打中。', 'Slows, burns and other effects you inflict last {statusDur}% longer; your body is smaller (radius {hitbox}, others {c0.hitbox}), so you\'re harder to hit.'),
-    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {w.melee}%'),
+    cost: b('主要受近战加成的兵器，伤害 {w.melee}%', 'Weapons that mainly scale with Melee deal {-w.melee}% less damage'),
   },
   chengzhu: {
     gist: b('墨宝更多、留得更久、打得更痛。', 'More ink summons, lasting longer and hitting harder.'),
     say: b('墨宝上限 +{s.summonCap}；墨宝多留 {f0.pct}% 的时间，伤害 +{dmg}%。', '+{s.summonCap} ink summon limit; ink summons last {f0.pct}% longer and deal +{dmg}%.'),
-    cost: b('墨宝以外的兵器，伤害 {w.notInk}%', 'Non-ink weapons deal {w.notInk}%'),
+    cost: b('墨宝以外的兵器，伤害 {w.notInk}%', 'Non-ink weapons deal {-w.notInk}% less damage'),
   },
   luozi: {
     gist: b('棋子更多、整重都在；商店多一次免费刷新，还能先看下一重。', 'More stones that last the wave; a free reroll and a peek at the next wave.'),
     say: b('棋子上限 +{s.stones}，棋子一直留到这一重结束；每次商店多 {f0.n} 次免费刷新；商店里能先看到下一重的精英和险地。', '+{s.stones} stone limit, and stones last until the wave ends; +{f0.n} free reroll every shop; the shop shows the next wave\'s elites and hazards.'),
-    cost: b('攻速 {s.aspd}%', '{s.aspd}% attack speed'),
+    cost: b('攻速 {s.aspd}%', '{s.aspd}% Attack speed'),
   },
   jiuming: {
     gist: b('一局有 {lives} 次挨了致命一击也不倒。', 'Shrugs off a lethal hit {lives} times a run.'),
@@ -551,7 +554,7 @@ export const PASSIVE_SAY: Readonly<Record<string, PassiveSay>> = {
   },
   yaoxiang: {
     gist: b('回满血后多出来的部分变成护盾。', 'Healing past full HP becomes a shield.'),
-    say: b('回血回满后，多出来的部分变成护盾（最多到气血上限的 {shield%}，每秒少 {decay%}）；治疗效果 +{s.heal}%。', 'Healing past full HP becomes a shield (up to {shield%} of max HP, fading {decay%} a second); +{s.heal}% healing.'),
+    say: b('血回满以后，再回的血变成护盾（最多到气血上限的 {shield%}，每秒少 {decay%}）；治疗效果 +{s.heal}%。', 'Healing past full HP becomes a shield (up to {shield%} of max HP, fading {decay%} a second); +{s.heal}% healing.'),
     cost: b('射程 {rangePct}%', '{rangePct}% range'),
   },
   baipian: {
@@ -561,7 +564,7 @@ export const PASSIVE_SAY: Readonly<Record<string, PassiveSay>> = {
   },
   yibo: {
     gist: b('一下最多掉 {hitCap%} 气血，身边敌人伤害变低，近战越打越强。', 'No hit takes more than {hitCap%} of your HP, nearby enemies hit softer, and Melee grows as you go.'),
-    say: b('一下最多掉气血上限的 {hitCap%}；每打完 {per} 重近战 +{=1}（最多 +{meleeMax}）；身边 {auraR} 以内的敌人伤害 −{aura}%。', 'No hit takes more than {hitCap%} of max HP; +{=1} Melee every {per} waves cleared (max +{meleeMax}); enemies within {auraR} deal {aura}% less.'),
+    say: b('一下最多掉气血上限的 {hitCap%}；每打完 {per} 重近战 +{=1}（最多 +{meleeMax}）；身边{auraR:size}里的敌人伤害 −{aura}%。', 'No hit takes more than {hitCap%} of max HP; +{=1} Melee every {per} waves cleared (max +{meleeMax}); enemies in {auraR:size} around you deal {aura}% less.'),
     cost: b('只有 {c.slots} 个兵器位；商店不卖{bans}', 'Only {c.slots} weapon slots; no {bans} weapons in his shop'),
   },
   yinqing: {
@@ -603,7 +606,7 @@ export const FLAG_SAY: Readonly<Record<string, Bi>> = {
   charmX2: b('迷惑几率翻倍', 'charm chances doubled'),
   ink6: b('墨宝个头和伤害 +{=20}%', 'ink summons {=20}% bigger and stronger'),
   goArea25: b('棋子炸开范围 +{=25}%', 'stone blasts +{=25}% area'),
-  dodgeCap5: b('闪避上限 +{=5}', 'dodge cap +{=5}'),
+  dodgeCap5: b('闪避上限 +{=5}%', 'dodge cap +{=5}%'),
 };
 
 // ───────────────────────────────────────────── 流派 (14)
@@ -654,14 +657,14 @@ export const MUTATOR_SAY: Readonly<Record<string, Bi>> = {
   jiying: b('敌人移速 +{v}%', 'enemies +{v}% move speed'),
   huiguang: b('敌人掉到一半气血时回 {v}% 的血（一次）', 'enemies heal {v}% once at half HP'),
   suijing: b('敌人死后裂成 {n} 个小的（各 {v}% 气血）', 'enemies split into {n} on death ({v}% HP each)'),
-  anyue: b('只看得见身边 {v} 以内', 'you can only see {v} around you'),
+  anyue: b('四周变暗，看不清远处', "darkness: you can't see far"),
   fanzhao: b('会射击的敌人多射 {v} 发', 'shooters fire {v} more {v?shot|shots}'),
   houjia: b('所有敌人护甲 +{v}', 'every enemy +{v} armour'),
 };
 
 export const AFFIX_SAY: Readonly<Record<string, Bi>> = {
-  aegis: b('护甲 +{armor}', '+{armor} armour'),
-  swift: b('移速 +{speed}%', '+{speed}% move speed'),
+  aegis: b('护甲 +{armor}', '+{armor} Armour'),
+  swift: b('移速 +{speed}%', '+{speed}% Move speed'),
   splitting: b('死后分成 {n} 个（各 {hp%} 气血）', 'splits into {n} on death ({hp%} HP each)'),
   devour: b('打中你时给自己回血', 'heals itself when it hits you'),
   mirrored: b('挨了重击后，会短暂把子弹弹回去', 'reflects shots for a moment after a big hit'),
@@ -687,9 +690,9 @@ export const DEED_SAY: Readonly<Record<string, Bi>> = {
   painterClear: b('用画师照破，或同时带 {alt} 把墨宝类兵器', 'clear as the Painter, or hold {alt} Ink weapons'),
   stoneChain: b('一次连着引爆 {goal} 颗棋子', 'set off a chain of {goal} stones'),
   poetClear: b('用诗仙照破', 'clear as the Poet'),
-  armorTwenty: b('护甲到 {goal}', 'reach {goal} armour'),
+  armorTwenty: b('护甲到 {goal}', 'reach {goal} Armour'),
   guanClear: b('用关公照破', 'clear as Lord Guan'),
-  speedSixty: b('移速到 +{goal}%', 'reach +{goal}% move speed'),
+  speedSixty: b('移速到 +{goal}%', 'reach +{goal}% Move speed'),
   dodgeFifty: b('闪避到 {goal}%', 'reach {goal}% dodge'),
   regenTwenty: b('回血到 {goal}', 'reach {goal} HP Regen'),
   healRun: b('一局里累计回 {goal} 点血', 'heal {goal} HP in one run'),

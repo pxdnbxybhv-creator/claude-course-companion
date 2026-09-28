@@ -365,6 +365,7 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-lock::before { content: ''; position: absolute; inset: -6px; }
 .mj-lock[aria-pressed='true'] { background: var(--indigo); color: #fbf5ea; border-color: var(--indigo); }
 .mj-lock[disabled] { opacity: 0.35; }
+.mj-lock.is-en { width: auto; min-width: 32px; padding: 0 8px; font-family: var(--font-latin); font-size: 13px; }
 .mj-shop-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 12px 0; }
 .mj-keys-hint { font-size: 12px; }
 .mj-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-top: 8px; overflow-x: auto; }
@@ -554,6 +555,9 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-cp { display: flex; flex-direction: column; gap: 14px; max-width: 640px; color: var(--ink); font-size: 15px; }
 /* lining figures in the panel: an old-style 0 reads as the letter o at a glance */
 .mj-cp .num, .mj-cp b.num, .mj-cp-delta, .mj-tile-value, .mj-cp-dps, .mj-lvbadge, .mj-hp-text, .mj-lvval, .mj-lvnow { font-variant-numeric: lining-nums tabular-nums; }
+/* every number in the mirror uses lining figures: old-style 1 and 0 read as I and O (「IO」, 「5I」, 「第 I 重」) */
+.mirror .num, .mirror .brush, .mirror .mj-timer, .mirror .mj-wave, .mirror .mj-ready-title, .mirror .mj-shop-next,
+.mirror .mj-price, .mirror .mj-moon-cost, .mirror .mj-have b { font-variant-numeric: lining-nums tabular-nums; }
 .mj-cp button { font: inherit; color: inherit; }
 .mj-cp-who { display: flex; align-items: center; gap: 12px; }
 .mj-cp-who .mj-portrait { box-shadow: 0 0 0 2px var(--line-strong); }
@@ -711,6 +715,14 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-select-weapon .mj-card-scales { margin-left: 6px; }
 .mj-card-tier { color: var(--mj-muted); }
 .mj-lvnow { font-size: 13px; color: var(--mj-muted); }
+/* the head line breaks only at its 「·」, never inside 「0.6 秒一轮」 */
+.mj-card-headline .nw { white-space: nowrap; }
+/* what a stat does (level cards), and whether it helps the weapons you hold (level and item cards) */
+.mj-lvhint { font-size: 12px; line-height: 1.35; color: var(--ink-2); }
+.mj-lvfit, .mj-card-fit { font-size: 12px; line-height: 1.35; }
+.mj-card-fit { margin: 0; }
+.mj-lvfit.is-on, .mj-card-fit.is-on { color: var(--mj-tag); }
+.mj-lvfit.is-off, .mj-card-fit.is-off { color: var(--mj-muted); }
 .mj-cardwho { margin-left: auto; }
 .mj-cardwho .brush { color: var(--cinnabar); }
 

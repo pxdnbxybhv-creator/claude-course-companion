@@ -11,18 +11,35 @@ export interface TutorSession extends RunSession {
   /** The practice run as it is now (null after it ended). */
   run(): RunSave;
   /**
-   * H2's safety net: if the first slot (the second 青锋剑) can't be afforded, add exactly the moonlight
-   * that is missing (in memory), once. Returns what was added (0 when nothing was needed).
+   * H2's safety net: if the second 青锋剑 (wherever it sits in the shop) can't be afforded, add exactly
+   * the moonlight that is missing (in memory), once. Returns what was added (0 when nothing was needed).
    */
   grant(): number;
 }
 
-/** What H2 is short of: the first slot's price minus the moonlight held (0 when affordable or gone). */
+/** The shop slot holding the 青锋剑 H2 asks for (−1 when it is gone). */
+export function swordSlot(run: RunSave): number {
+  return (run.shop?.slots ?? []).findIndex((x) => !!x && x.kind === 'weapon' && x.id === 'qingfeng');
+}
+/** What H2 is short of: the sword's price minus the moonlight held (0 when affordable or gone). */
 export function shortfall(run: RunSave): number {
-  const s = run.shop?.slots[0];
-  if (!s || s.kind !== 'weapon' || s.id !== 'qingfeng') return 0;
-  const price = shopView(run).slots[0]?.price ?? 0;
+  const i = swordSlot(run);
+  if (i < 0) return 0;
+  const price = shopView(run).slots[i]?.price ?? 0;
   return Math.max(0, Math.ceil(price - run.moon));
+}
+/**
+ * Can the first shop still teach the merge? Yes while two identical weapons are held, or (before the
+ * sword is bought) while a 青锋剑 matching one in hand is still for sale.
+ */
+export function mergeLeft(run: RunSave, bought: boolean): boolean {
+  const ws = run.weapons;
+  for (let i = 0; i < ws.length; i++) for (let j = i + 1; j < ws.length; j++) if (ws[i].id === ws[j].id && ws[i].t === ws[j].t && ws[i].t < 4) return true;
+  if (bought) return false;
+  const k = swordSlot(run);
+  if (k < 0) return false;
+  const x = run.shop!.slots[k]!;
+  return x.kind === 'weapon' && ws.some((w) => w.id === x.id && w.t === x.t);
 }
 
 export function createTutorSession(first: RunSave = tutorRun()): TutorSession {

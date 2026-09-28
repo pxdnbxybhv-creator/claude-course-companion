@@ -12,7 +12,7 @@ import {
 } from '../src/views/mirror/logic';
 import { TUTOR_SEED, TUTOR_SHOP1, tutorPlan, tutorRun, tutorScript, tutorSetup, tutorShop1, tutorUnlocks } from '../src/views/mirror/tutor/run';
 import { classify } from '../src/views/mirror/tutor/classify';
-import { createTutorSession, shortfall } from '../src/views/mirror/tutor/session';
+import { createTutorSession, mergeLeft, shortfall, swordSlot } from '../src/views/mirror/tutor/session';
 import {
   BUTTONS, END, LABEL_SLOTS, LINES, LINE_CAPS, OFFER, SETTINGS, TIPS, backWave, fillSlots, lineSlots, resolveLine, type Line,
 } from '../src/views/mirror/tutor/lines';
@@ -88,12 +88,12 @@ describe('classify', () => {
   it('recognises each action from the real logic calls', () => {
     const r = base();
     const b = buy(r, 0)!;
-    expect(classify(r, b)).toEqual({ a: 'buy', slot: 0 });
+    expect(classify(r, b)).toEqual({ a: 'buy', slot: 0, id: 'qingfeng' });
     const m = merge(b, 0, 1)!;
     expect(classify(b, m)).toEqual({ a: 'merge' });
     const two = buy(r, 0)!;
     expect(classify(two, sell(two, 1))).toEqual({ a: 'sell' });
-    expect(classify(r, toggleLock(r, 2))).toEqual({ a: 'lock', slot: 2 });
+    expect(classify(r, toggleLock(r, 2))).toEqual({ a: 'lock', slot: 2, id: 'sandals' });
     const rr = reroll(r, tutorUnlocks())!;
     expect(classify(r, rr)).toEqual({ a: 'reroll' });
     expect(classify(r, pickCard(r, 0))).toEqual({ a: 'card' });
@@ -126,7 +126,7 @@ const CANON: MachineEvent[] = [
   scr('ritual'), scr('bake'), scr('ready'), scr('wave'),
   cue('move'), cue('moved'), cue('kills3'), cue('pickups3'), { k: 'levelUp', level: 2 }, cue('clock'),
   scr('cards'), { k: 'act', a: 'card' },
-  scr('shop'), { k: 'ok' }, { k: 'act', a: 'buy', slot: 0 }, { k: 'ui', tut: 'tab:wpn', selected: true }, { k: 'ui', tut: 'wslot:0', pressed: true },
+  scr('shop'), { k: 'ok' }, { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' }, { k: 'ui', tut: 'tab:wpn', selected: true }, { k: 'ui', tut: 'wslot:0', pressed: true },
   { k: 'act', a: 'merge' }, { k: 'ok' }, { k: 'act', a: 'lock', slot: 2 }, { k: 'act', a: 'reroll' }, { k: 'ui', tut: 'who' }, { k: 'who', open: true }, { k: 'ok' },
   scr('wave'), cue('pause'), cue('tele1'), { k: 'ok' }, cue('teleDodged', 1), cue('teleDodged', 2), cue('dodged2'), cue('lanterns'), cue('crowd'), cue('cast'),
   scr('shop'), { k: 'ok' },
@@ -142,12 +142,15 @@ describe('the step machine', () => {
     expect(r.shown).toEqual(['R1', 'W1', 'W2', 'W3', 'W6', 'C1', 'H1', 'H2', 'H3a', 'H3', 'H4', 'H5', 'H6', 'H7', 'H7b', 'H8', 'D1', 'D2', 'D3', 'H9', 'B1', 'B2', 'K1']);
     expect(r.holds).toEqual(['tele1', 'foe', 'tele']);
     expect(r.grants).toBe(1);
-    expect(r.whispers).toEqual(expect.arrayContaining(['W4', 'W5', 'H3done', 'H6done', 'P1', 'D1a', 'D1b', 'D3b', 'B5']));
+    expect(r.whispers).toEqual(expect.arrayContaining(['W4', 'W5', 'H3done', 'P1', 'D1a', 'D1b', 'D3b', 'B5']));
+    expect(r.whispers).not.toContain('H6done');
+    // P1 waits for the dodge lesson: it comes with dodged2, after D1's whispers
+    expect(r.whispers.indexOf('P1')).toBeGreaterThan(r.whispers.indexOf('D1b'));
   });
   it('advances only on the right actions', () => {
     let st = run([scr('ready'), scr('wave'), cue('move')]).st;
     expect(view(st)?.id).toBe('W1');
-    for (const ev of [cue('teleHit'), cue('lanterns'), { k: 'act', a: 'buy', slot: 0 } as MachineEvent, { k: 'ok' } as MachineEvent, { k: 'ui', tut: 'who' } as MachineEvent]) st = reduce(st, ev).state;
+    for (const ev of [cue('teleHit'), cue('lanterns'), { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' } as MachineEvent, { k: 'ok' } as MachineEvent, { k: 'ui', tut: 'who' } as MachineEvent]) st = reduce(st, ev).state;
     expect(view(st)?.id).toBe('W1');
     st = reduce(st, cue('moved')).state;
     expect(view(st)?.id).toBe('W2');
@@ -159,7 +162,7 @@ describe('the step machine', () => {
     expect(o.whispers.map((w) => w.line)).toEqual(['H2a']);
     sh = reduce(o.state, { k: 'act', a: 'sell' }).state;
     expect(view(sh)?.id).toBe('H2');
-    sh = reduce(sh, { k: 'act', a: 'buy', slot: 0 }).state;
+    sh = reduce(sh, { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' }).state;
     expect(view(sh)?.id).toBe('H3a');
     // a hold ignores everything but its button
     let h = run([scr('ready'), scr('wave'), scr('shop')]).st;
@@ -171,7 +174,7 @@ describe('the step machine', () => {
     const r = run([
       scr('ready'), scr('wave'), scr('shop'),
       { k: 'act', a: 'lock', slot: 2 }, { k: 'act', a: 'reroll' }, { k: 'act', a: 'merge' },
-      { k: 'ok' }, { k: 'act', a: 'buy', slot: 0 }, { k: 'ok' }, { k: 'ui', tut: 'who' }, { k: 'ok' },
+      { k: 'ok' }, { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' }, { k: 'ok' }, { k: 'ui', tut: 'who' }, { k: 'ok' },
     ]);
     expect(r.shown).toEqual(['R1', 'H1', 'H2', 'H4', 'H7', 'H7b', 'H8']);
     expect(r.whispers.filter((w) => w === 'nice').length).toBe(3);
@@ -209,7 +212,7 @@ describe('the step machine', () => {
     let seed = 12345;
     const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 2 ** 32; };
     const noise: MachineEvent[] = [
-      { k: 'ok' }, { k: 'tick', dt: 3 }, { k: 'tick', dt: 30 }, { k: 'act', a: 'buy', slot: 0 }, { k: 'act', a: 'buy', slot: 2 }, { k: 'act', a: 'merge' },
+      { k: 'ok' }, { k: 'tick', dt: 3 }, { k: 'tick', dt: 30 }, { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' }, { k: 'act', a: 'buy', slot: 2 }, { k: 'act', a: 'merge' },
       { k: 'act', a: 'lock', slot: 1 }, { k: 'act', a: 'reroll' }, { k: 'act', a: 'sell' }, { k: 'act', a: 'card' }, { k: 'act', a: 'crate' },
       { k: 'ui', tut: 'who' }, { k: 'ui', tut: 'tab:wpn' }, { k: 'who', open: true }, { k: 'levelUp', level: 3 },
       ...['move', 'moved', 'kills3', 'pickups3', 'clock', 'pause', 'tele1', 'teleHit', 'teleDodged', 'dodged2', 'lanterns', 'crowd', 'cast', 'foe', 'tele', 'foeHp', 'foeDown', 'saved', 'elite'].map((k) => cue(k, 1)),
@@ -253,6 +256,65 @@ const FLAT: [string, { zh: string; en: string }][] = [
   ['end.title', END.title], ['end.sub', END.sub], ['end.enter', END.enter], ['end.back', END.back], ['end.foot', END.foot],
   ...END.lines.map((x, i) => [`end.${i}`, x] as [string, { zh: string; en: string }]),
 ];
+
+describe('the first shop when the newcomer goes off script (mirror3 fix round)', () => {
+  const shop1 = (moon = 48): RunSave => tutorShop1(endWave({ ...tutorRun(DAY), inWave: 1 }, won(1, { moon, xp: 0 })));
+  const atH2 = () => run([scr('ready'), scr('wave'), scr('shop'), { k: 'ok' }]).st;
+  it('H2 finishes on buying the 青锋剑 wherever it sits, never on buying whatever is in slot 0', () => {
+    let st = atH2();
+    expect(view(st)?.id).toBe('H2');
+    st = reduce(st, { k: 'act', a: 'buy', slot: 0, id: 'dao' }).state;
+    expect(view(st)?.id).toBe('H2');
+    st = reduce(st, { k: 'act', a: 'buy', slot: 3, id: 'qingfeng' }).state;
+    expect(view(st)?.id).toBe('H3a');
+  });
+  it('a buy before the sword asks the session for the shortfall, which it grants once, only when short', () => {
+    const o = reduce(atH2(), { k: 'act', a: 'buy', slot: 1, id: 'songzi' });
+    expect(o.grant).toBe(true);
+    const s = createTutorSession(shop1());
+    let r = s.run();
+    const price = shopView(r).slots[swordSlot(r)].price;
+    // spend first: 松子, 草鞋, 铜铃
+    for (const i of [1, 2, 3]) { const b = buy(r, i); if (b) { r = b; } }
+    s.commit(r);
+    const short = shortfall(s.run());
+    expect(short).toBe(Math.max(0, Math.ceil(price - r.moon)));
+    expect(s.grant()).toBe(short);
+    expect(s.run().moon).toBeGreaterThanOrEqual(price);
+    expect(s.grant()).toBe(0);
+  });
+  it('finds the sword after a reroll moved it, and knows when no merge is left', () => {
+    const r = shop1();
+    expect(swordSlot(r)).toBe(0);
+    const moved: RunSave = { ...r, shop: { ...r.shop!, slots: [r.shop!.slots[1], r.shop!.slots[2], r.shop!.slots[3], r.shop!.slots[0]] } };
+    expect(swordSlot(moved)).toBe(3);
+    expect(mergeLeft(moved, false)).toBe(true);
+    const gone: RunSave = { ...r, shop: { ...r.shop!, slots: r.shop!.slots.map((x) => (x?.id === 'qingfeng' ? null : x)) } };
+    expect(mergeLeft(gone, false)).toBe(false);
+    expect(mergeLeft(r, true)).toBe(false);
+    const two = buy(r, 0)!;
+    expect(mergeLeft(two, true)).toBe(true);
+  });
+  it('noMerge skips H2–H4 without a whisper and goes on to H5', () => {
+    const o = reduce(atH2(), { k: 'noMerge' });
+    expect(view(o.state)?.id).toBe('H5');
+    expect(o.whispers).toEqual([]);
+    for (const id of ['H2', 'H3a', 'H3', 'H4'] as StepId[]) expect(o.state.done).toContain(id);
+    // after the merge it does nothing
+    const merged = run([scr('ready'), scr('wave'), scr('shop'), { k: 'ok' }, { k: 'act', a: 'buy', slot: 0, id: 'qingfeng' }, { k: 'act', a: 'merge' }]).st;
+    expect(view(merged)?.id).toBe('H4');
+    expect(view(reduce(merged, { k: 'noMerge' }).state)?.id).toBe('H4');
+  });
+  it('P1 waits for the dodge lesson (dodged2), and is said at once if the pause cue comes after it', () => {
+    let st = run([scr('ready'), scr('wave'), scr('shop'), scr('wave')]).st;
+    let o = reduce(st, cue('pause'));
+    expect(o.whispers).toEqual([]);
+    st = reduce(reduce(o.state, cue('tele1')).state, { k: 'ok' }).state;
+    o = reduce(st, cue('dodged2'));
+    expect(o.whispers.map((w) => w.line)).toContain('P1');
+    expect(reduce(o.state, cue('pause')).whispers.map((w) => w.line)).toEqual(['P1']);
+  });
+});
 
 describe('the lines', () => {
   const slots = lineSlots({ meltN: 9 });
@@ -315,7 +377,7 @@ describe('the lines', () => {
     for (const [slot, id] of Object.entries(LABEL_SLOTS)) expect((s[slot] as { zh: string }).zh, slot).toBe(termOf(id).zh);
     expect(resolveLine(LINES.H6, { lang: 'zh', input: 'touch', left: false, slots: s })).toContain(`「${termOf('reroll').zh}」`);
     expect(resolveLine(LINES.H7, { lang: 'zh', input: 'touch', left: false, slots: s })).toContain(`「${termOf('panel').zh}」`);
-    expect(resolveLine(LINES.K1, { lang: 'zh', input: 'touch', left: false, slots: lineSlots({ meltN: 7 }) })).toContain(`「${termOf('melt').zh}」就换成 7`);
+    expect(resolveLine(LINES.K1, { lang: 'zh', input: 'touch', left: false, slots: lineSlots({ meltN: 7 }) })).toContain(`「${termOf('melt').zh}」能换 7`);
   });
   it('speaks of the side the controls are on', () => {
     const s = lineSlots();

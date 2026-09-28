@@ -115,7 +115,7 @@ export function CompanionSheet(props: {
           <div class="mj-select-block">
             <p class="mj-select-kicker">{t('开局兵器', 'Starting weapon')}</p>
             {c.start === 'choice' ? (
-              <p class="mj-select-line">{t(`开局自己挑一把：从已解锁的兵器里随出 ${PASSIVES.bolan.p.choices} 把，挑一把带上。`, `He picks his own: ${PASSIVES.bolan.p.choices} unlocked weapons are offered and he takes one.`)}</p>
+              <p class="mj-select-line">{t(`开局自己挑一把：从已解锁的兵器里随机给出 ${PASSIVES.bolan.p.choices} 把，挑一把带上。`, `He picks his own: ${PASSIVES.bolan.p.choices} unlocked weapons are offered and he takes one.`)}</p>
             ) : (
               <div class="mj-select-weapon">
                 <Icon id={`wpn:${c.start}`} px={28} />

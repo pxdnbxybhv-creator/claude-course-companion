@@ -3,7 +3,7 @@
 import type { RunSave } from '../types';
 import type { RunAct } from './events';
 
-export function classify(prev: RunSave, next: RunSave): { a: RunAct; slot?: number } | null {
+export function classify(prev: RunSave, next: RunSave): { a: RunAct; slot?: number; id?: string } | null {
   if (prev === next) return null;
   const p = prev.pending, n = next.pending;
   if (p.start && p.start.length && !(n.start && n.start.length)) return { a: 'start' };
@@ -15,8 +15,8 @@ export function classify(prev: RunSave, next: RunSave): { a: RunAct; slot?: numb
     if (ns.k !== ps.k || ns.free !== ps.free) return { a: 'reroll' };
     for (let i = 0; i < Math.max(ps.slots.length, ns.slots.length); i++) {
       const a = ps.slots[i] ?? null, b = ns.slots[i] ?? null;
-      if (a && !b) return { a: 'buy', slot: i };
-      if (a && b && a.locked !== b.locked) return { a: 'lock', slot: i };
+      if (a && !b) return { a: 'buy', slot: i, id: a.id };
+      if (a && b && a.locked !== b.locked) return { a: 'lock', slot: i, id: a.id };
     }
   }
   if (next.weapons.length === prev.weapons.length - 1) {

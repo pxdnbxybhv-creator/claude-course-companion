@@ -10,6 +10,7 @@ import { clsKey, STAT_FMT, STAT_GROUPS, termLine as termLineOf, termName, type S
 import {
   armorReduction, classCounts, computeStats, cooldown, dodgeCapOf, mainScale, maxHp, regenPerSec, setTiers, tierCd, weaponHit, weaponSlotsOf,
 } from '../logic';
+import { perTier, summonCapOf } from '../logic/formulas';
 import { describeWeapon, FLAG_TEXT, setSteps } from './describe';
 import type { T } from './text';
 
@@ -37,7 +38,8 @@ const COUNT_STATS: ReadonlySet<StatId> = new Set<StatId>(['stones', 'summonCap']
 export function statValueText(id: StatId, v: number): string {
   const f = STAT_FMT[id];
   if (COUNT_STATS.has(id)) return num(v);
-  if (f === 'mult') return signed(v / 100);
+  // 暴击倍数 is an added multiplier: 「+0」, never a bare 「0」 that reads as 「crits deal ×0」
+  if (f === 'mult') { const x = signed(v / 100); return x === '0' ? '+0' : x; }
   return signed(v) + (f === 'pct' ? '%' : '');
 }
 /** A change in a stat, in its own unit: 「+5%」 「−2」 「+0.1」. */
@@ -48,17 +50,34 @@ export function statDeltaText(id: StatId, d: number): string {
 }
 
 // ───────────────────────────────────────────── weapons
-/** A weapon's rough damage per second: one hit with crits averaged in, over its cooldown (the maths the
- *  old 属性 tab used; paint, turret and mine get half the 攻速). */
+/** A weapon's rough damage per second: one hit with crits averaged in, over its cooldown (paint, turret
+ *  and mine get half the 攻速). 神笔 and 砚台 don't hit themselves: what they paint or set down does, every
+ *  `every` seconds (half 攻速, as the engine's spawnSummon), and about min(life / cd, 墨宝上限) are out. */
 export function weaponDps(run: RunSave, s: Stats, x: Pick<OwnedWeapon, 'id' | 't'>): number {
   return weaponNumbers(run, s, x).dps;
 }
-export function weaponNumbers(run: RunSave, s: Stats, x: Pick<OwnedWeapon, 'id' | 't'>): { dps: number; cd: number; hit: number; crit: number; critM: number } {
+export function weaponNumbers(run: RunSave, s: Stats, x: Pick<OwnedWeapon, 'id' | 't'>): { dps: number; cd: number; hit: number; crit: number; critM: number; every: number | null } {
   const def = WEAPONS[x.id];
   const h = weaponHit(run, s, x.id, x.t);
   const half = def.kind === 'paint' || def.kind === 'turret' || def.kind === 'mine';
   const cd = cooldown(tierCd(def, x.t), s.aspd, half);
-  return { dps: (h.raw * h.mult * (1 + h.crit * (h.critM - 1))) / cd, cd, hit: h.raw * h.mult, crit: h.crit, critM: h.critM };
+  const hit = h.raw * h.mult * (1 + h.crit * (h.critM - 1));
+  let perSec = 1 / cd, every: number | null = null;
+  if (def.kind === 'paint' || def.kind === 'turret') {
+    const turret = def.kind === 'turret';
+    every = cooldown(turret ? perTier(def.p.atk as number | undefined, x.t, 0.8) : perTier(def.p.atk as never, x.t, 0.7), s.aspd, true);
+    const life = perTier(def.p.life as number | undefined, x.t, turret ? 8 : 10);
+    const out = Math.min(life / cd, summonCapOf(s));
+    const blobs = turret ? perTier(def.p.blobs as never, x.t, 1) : 1;
+    perSec = (out * blobs) / every;
+  }
+  return { dps: hit * perSec, cd, hit: h.raw * h.mult, crit: h.crit, critM: h.critM, every };
+}
+/** 「每 0.86 秒一下」, or for 神笔 / 砚台 what they put out and how often that strikes. */
+export function cadenceText(kind: string, cd: number, every: number | null, t: T): string {
+  if (every !== null && kind === 'paint') return t(`每 ${num(cd)} 秒画一只，每只 ${num(every)} 秒打一下`, `paints one every ${num(cd)} s; each strikes every ${num(every)} s`);
+  if (every !== null && kind === 'turret') return t(`每 ${num(cd)} 秒放一方，每 ${num(every)} 秒吐一次墨`, `sets one down every ${num(cd)} s; it spits ink every ${num(every)} s`);
+  return t(`每 ${num(cd)} 秒一下`, `every ${num(cd)} s`);
 }
 
 // ───────────────────────────────────────────── level-card preview
@@ -78,7 +97,8 @@ export function levelPreview(run: RunSave, stat: StatId, v: number, t: T = tZh):
     if (stat === 'hp') return String(maxHp(s));
     if (stat === 'dodge') return `${num(Math.max(0, Math.min(s.dodge, dodgeCapOf(run))))}%`;
     if (stat === 'speed') return speedValue(s.speed, t).value;
-    return statValueText(stat, s[stat]);
+    // no sign on either side: 「现在 0% → 3%」, never 「0% → +3%」 beside a 闪避 card's 「0% → 3%」
+    return statValueText(stat, s[stat]).replace(/^\+/, '');
   };
   const before = shown(a), after = shown(b);
   return { before, after, line: t(`现在 ${before} → ${after}`, `Now ${before} → ${after}`) };
@@ -166,7 +186,7 @@ export interface WeaponRowView {
 export interface SetRowView {
   cls: WClass; name: string; count: number; tier: -1 | 0 | 1 | 2;
   active: string | null;
-  /** 「再 2 件（凑满 4 件）：暴击率 +10%」, or null at 6. */
+  /** 「再 2 把（凑满 4 把）：暴击率 +10%」, or null at 6. */
   next: string | null;
   dugu: boolean;
 }
@@ -215,6 +235,42 @@ export function relevance(run: Pick<RunSave, 'weapons'>, s: Stats, id: StatId): 
   if (id === 'stones') return defs.some((d) => d.classes.includes('go'));
   if (id === 'summonCap') return defs.some((d) => d.classes.includes('ink'));
   return false;
+}
+
+/**
+ * Does this stat help what you hold? Said on the level-up card and the item card, where the choice is
+ * made (the 人物 rows say it too): 「你的神笔受这项加成」, 「你现在的兵器用不上」, 「你的兵器都不会暴击」. `on`:
+ * helps; false: it does nothing for your weapons yet. null: nothing worth saying.
+ */
+export function statFit(run: Pick<RunSave, 'weapons' | 'items'>, stat: StatId, t: T, named = false): { text: string; on: boolean } | null {
+  if (!run.weapons.length) return null;
+  if (stat === 'crit' || stat === 'critDmg') {
+    const canCrit = run.weapons.some((x) => WEAPONS[x.id].critX > 0) || (run.items.dotting ?? 0) > 0;
+    return canCrit ? null : { text: t('你的兵器都不会暴击', "your weapons can't crit"), on: false };
+  }
+  const users = run.weapons.filter((x) => (WEAPONS[x.id].scale[stat] ?? 0) !== 0);
+  const what = named ? t(`受${statLabel(stat, t)}加成`, `scales with ${statLabel(stat, t)}`) : t('受这项加成', 'scales with this');
+  if (users.length) {
+    const uniq = [...new Set(users.map((x) => x.id))];
+    return uniq.length === 1 && users.length === 1
+      ? { text: t(`你的${nameOf(uniq[0], t)}${what}`, `your ${nameOf(uniq[0], t)} ${what}`), on: true }
+      : { text: t(`${users.length} 把兵器${what}`, `${users.length} of your weapons ${named ? `scale with ${statLabel(stat, t)}` : 'scale with this'}`), on: true };
+  }
+  const cls: WClass | null = stat === 'swords' ? 'flying' : stat === 'stones' ? 'go' : stat === 'summonCap' ? 'ink' : null;
+  const typed = stat === 'melee' || stat === 'ranged' || stat === 'elem' || stat === 'spirit';
+  if (typed || (cls && !run.weapons.some((x) => WEAPONS[x.id].classes.includes(cls)))) {
+    return { text: named ? t(`你现在的兵器用不上${statLabel(stat, t)}`, `none of your weapons use ${statLabel(stat, t)} yet`) : t('你现在的兵器用不上', 'none of your weapons use this yet'), on: false };
+  }
+  return null;
+}
+/** The same for an item card: the first stat it gives that helps; else, when nothing it gives helps, why. */
+export function itemFit(run: Pick<RunSave, 'weapons' | 'items'>, id: ItemId, t: T): { text: string; on: boolean } | null {
+  const st = ITEMS[id]?.stats ?? {};
+  const ids = (Object.keys(st) as StatId[]).filter((k) => (st[k] ?? 0) > 0);
+  const fits = ids.map((k) => statFit(run, k, t, true)).filter((f): f is { text: string; on: boolean } => !!f);
+  const on = fits.find((f) => f.on);
+  if (on) return on;
+  return fits.length && fits.length === ids.length ? fits[0] : null;
 }
 
 /** The words of one set step: describe.setSteps (generated from SETS + FLAG_TEXT), with a SETS fallback. */
@@ -304,15 +360,27 @@ export function panelView(run: RunSave, base?: PanelBase | null, t: T = tZh): Pa
     const scales = desc.scales || (ms ? t(`受${statLabel(ms, t)}加成`, `scales with ${statLabel(ms, t)}`) : '');
     const detail: string[] = [];
     detail.push(n.critM > 1
-      ? t(`一下约 ${Math.round(n.hit)} 点伤害，暴击时打 ${num(n.critM)} 倍（暴击率 ${Math.round(n.crit * 100)}%）`, `about ${Math.round(n.hit)} a hit; crits hit ×${num(n.critM)} (${Math.round(n.crit * 100)}% chance)`)
+      ? t(`一下约 ${Math.round(n.hit)} 点伤害，暴击时打 ${num(n.critM)} 倍（算上你的加成，暴击率 ${Math.round(n.crit * 100)}%）`, `about ${Math.round(n.hit)} a hit; crits hit ×${num(n.critM)} (${Math.round(n.crit * 100)}% chance with your bonuses)`)
       : t(`一下约 ${Math.round(n.hit)} 点伤害，不会暴击`, `about ${Math.round(n.hit)} a hit; cannot crit`));
+    const perPoint: string[] = [];
     for (const k of Object.keys(def.scale) as StatId[]) {
       const c = def.scale[k] ?? 0;
       if (!c) continue;
       const add = c * s[k];
-      detail.push(t(`每点${statLabel(k, t)} +${num(c)} 伤害；你现在 ${num(s[k])} 点，每下 ${signed(add)}`, `+${num(c)} damage per point of ${statLabel(k, t)}; you have ${num(s[k])}, so ${signed(add)} a hit`));
+      perPoint.push(t(`每点${statLabel(k, t)} +${num(c)} 伤害`, `+${num(c)} damage per ${statLabel(k, t)}`));
+      detail.push(add >= 0
+        ? t(`每点${statLabel(k, t)} +${num(c)} 伤害；你现在 ${num(s[k])} 点，每下多 ${num(add)}`, `+${num(c)} damage per point of ${statLabel(k, t)}; you have ${num(s[k])}, adding ${num(add)} a hit`)
+        : t(`每点${statLabel(k, t)} +${num(c)} 伤害；你现在 ${num(s[k])} 点，每下少 ${num(-add)}`, `+${num(c)} damage per point of ${statLabel(k, t)}; you have ${num(s[k])}, taking ${num(-add)} off a hit`));
     }
-    for (const line of desc.detail) detail.push(line);
+    // describe's own lines, minus the per-point ones already said above with your numbers
+    for (const line of desc.detail) {
+      if (perPoint.includes(line)) continue;
+      if (def.critX > 0 && line === t(`暴击率 ${num(def.crit)}%，暴击打 ${num(def.critX)} 倍`, `${num(def.crit)}% crit chance, crits deal ×${num(def.critX)}`)) {
+        detail.push(t(`兵器自带暴击率 ${num(def.crit)}%，暴击打 ${num(def.critX)} 倍`, `base crit ${num(def.crit)}%, crits deal ×${num(def.critX)}`));
+        continue;
+      }
+      detail.push(line);
+    }
     let delta: DeltaChip | null = null;
     if (b) {
       const j = b.weapons.findIndex((y) => y.id === x.id && y.t === x.t);
@@ -325,7 +393,7 @@ export function panelView(run: RunSave, base?: PanelBase | null, t: T = tZh): Pa
       i, id: x.id, t: x.t, name: nameOf(x.id, t), roman: ROMAN[x.t], tierWord: termName(TIER_TERM[x.t], t),
       classes: def.classes.map((c) => termName(clsKey(c), t)).join(' · '),
       dps: n.dps, cd: n.cd, hit: n.hit, critM: n.critM, crit: n.crit,
-      line: [t(`每 ${num(n.cd)} 秒一下`, `every ${num(n.cd)} s`), scales].filter(Boolean).join(' · '),
+      line: [cadenceText(def.kind, n.cd, n.every, t), scales].filter(Boolean).join(' · '),
       body: desc.body, t4: desc.t4, detail, delta,
     };
   });
@@ -342,7 +410,7 @@ export function panelView(run: RunSave, base?: PanelBase | null, t: T = tZh): Pa
       return {
         cls: c, name: termName(clsKey(c), t), count, tier,
         active: tier >= 0 ? setStepText(c, tier as 0 | 1 | 2, t) : null,
-        next: tier >= 2 ? null : t(`再 ${need - count} 件（凑满 ${need} 件）：${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`, `${need - count} more (for ${need}): ${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`),
+        next: tier >= 2 ? null : t(`再 ${need - count} 把（凑满 ${need} 把）：${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`, `${need - count} more (for ${need}): ${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`),
         dugu,
       };
     })
@@ -410,7 +478,7 @@ export function deltaStrip(run: RunSave, s: Stats, cap: number, b: PanelBase, t:
   const tiers = setTiers(run);
   for (const c of WCLASSES) {
     const now = tiers[c] ?? -1, was = b.sets[c] ?? -1;
-    if (now > was) push(t(`${termName(clsKey(c), t)} 凑满 ${[2, 4, 6][now]} 件`, `${termName(clsKey(c), t)} set of ${[2, 4, 6][now]}`), 1);
+    if (now > was) push(t(`${termName(clsKey(c), t)} 凑满 ${[2, 4, 6][now]} 把`, `${termName(clsKey(c), t)} set of ${[2, 4, 6][now]}`), 1);
   }
   // new items
   for (const id of Object.keys(run.items) as ItemId[]) {

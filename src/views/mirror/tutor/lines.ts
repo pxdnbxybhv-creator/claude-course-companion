@@ -24,7 +24,7 @@ export const LINE_CAPS: Readonly<Record<LineWhere, { zh: number; en: number }>> 
 
 // ───────────────────────────────────────────── the coach
 export const LINES = {
-  ritual: L('between', s('头一回来吧？老朽陪你走一遭，不收钱。', "First time here? I'll walk you through. No charge.")),
+  ritual: L('between', s('头一回来吧？我陪你走一遍，不收钱。', "First time here? I'll walk you through. No charge.")),
   // before wave 1
   R1: L('between', s('这一局是练习：不花钱，不记成绩，也不会倒下。准备好了，点「{go}」。', "This run is practice: it's free, nothing is recorded, and you can't go down. Tap {go} when you're ready."), {
     keys: s('这一局是练习：不花钱，不记成绩，也不会倒下。准备好了，按 Enter 或点「{go}」。', "This run is practice: it's free, nothing is recorded, and you can't go down. Press Enter or click {go} when you're ready."),
@@ -49,14 +49,18 @@ export const LINES = {
   // shop 1
   H1: L('between', s('这是{shop}。每打完一重都会来这里，用{moon}买兵器和道具。', 'This is the shop. You come here after every wave to spend moonlight on weapons and items.')),
   H2: L('between', s('这把{w0}跟你手里那把一模一样。买下它。', 'This {w0} is just like the one in your hand. Buy it.'), {
-    keys: s('这把{w0}跟你手里那把一模一样。点它或按 1，买下它。', 'This {w0} is just like the one in your hand. Click it or press 1 to buy it.'),
+    keys: s('这把{w0}跟你手里那把一模一样。点它或按 {n0}，买下它。', 'This {w0} is just like the one in your hand. Click it or press {n0} to buy it.'),
   }),
   H2a: L('between', s('也行。再把{w0}买下来。', 'Fine. Now buy the {w0} too.')),
   H2b: L('between', s('{moon}差一点，这回算我的。', "A little short on moonlight. This one's on me.")),
   H3a: L('between', s('点「兵器」，看看你手里的兵器。', "Tap Weapons to see what you're holding.")),
-  H3: L('between', s('两把同名、同品阶的兵器，能合铸成更强的一把。先点一把剑，再点「{merge}」。', 'Two identical weapons of the same tier merge into a stronger one. Tap one of the swords, then {merge}.')),
-  H3done: L('between', s('合好了：伤害从 {d1} 变成 {d2}。', 'Merged: damage went from {d1} to {d2}.')),
-  H4: L('between', s('点一下兵器，能看它的本事。不要的兵器可以「{sell}」掉，换回现价的{sellFrac}。这把先留着。', "Tap a weapon to read what it does. One you don't need can be sold for {sellFrac} of its price now. Keep this one.")),
+  H3: L('between', s('两把同名、同品阶的兵器，能合铸成更强的一把。先点一把剑，再点「{merge}」。', 'Two identical weapons of the same tier merge into a stronger one. Tap one of the swords, then {merge}.'), {
+    keys: s('两把同名、同品阶的兵器，能合铸成更强的一把。先点一把剑，再点「{merge}」。', 'Two identical weapons of the same tier merge into a stronger one. Click one of the swords, then {merge}.'),
+  }),
+  H3done: L('between', s('合好了：{t1}变成{t2}，伤害从 {d1} 变成 {d2}。', 'Merged: {t1} became {t2}, and damage went from {d1} to {d2}.')),
+  H4: L('between', s('不要的兵器，点它再点「{sell}」，能换回现价的{sellFrac}。这把先留着。', "Don't need a weapon? Tap it, then {sell}, for {sellFrac} of its price now. Keep this one."), {
+    keys: s('不要的兵器，点它再点「{sell}」，能换回现价的{sellFrac}。这把先留着。', "Don't need a weapon? Click it, then {sell}, for {sellFrac} of its price now. Keep this one."),
+  }),
   H5: L('between', s('看中了但钱不够？点「{lock}」，这件货会留到下一次商店。锁住{i2}试试。', "Like something you can't afford yet? {lock} it and it waits for the next shop. Try locking the {i2}."), {
     keys: s('看中了但钱不够？点「{lock}」，或先按 L 再按 {n2}，这件货会留到下一次商店。锁住{i2}试试。', "Like something you can't afford yet? {lock} it (or press L, then {n2}) and it waits for the next shop. Try the {i2}."),
   }),
@@ -64,8 +68,16 @@ export const LINES = {
     keys: s('不喜欢这些货，就点「{reroll}」或按 R 换一批。书生每次进商店，都送一次免费的。', "Don't like the goods? {reroll} (or press R) for a new batch. The Scholar gets one free in every shop."),
   }),
   H6done: L('between', s('锁住的{i2}还在原处。', 'The locked {i2} stayed put.')),
-  H7: L('between', s('点这个头像，打开「{panel}」：{hp}、{armor}，还有每把兵器每秒打多少，都在这里。', 'Tap your portrait to open {panel}: HP, armour, and how much each weapon deals per second.')),
-  H7b: L('between', s('上面四格是保命的数。哪一格、哪一行看不懂，点一下就有一句解释。', "These four tiles keep you alive. Tap any tile or row you're unsure of for a one-line explanation.")),
+  H7: L('between', s('点这个头像，打开「{panel}」：{hp}、{armor}，还有每把兵器每秒打多少，都在这里。', 'Tap your portrait to open {panel}: HP, armour, and how much each weapon deals per second.'), {
+    keys: s('点这个头像（或按 C），打开「{panel}」：{hp}、{armor}，还有每把兵器每秒打多少，都在这里。', 'Click your portrait (or press C) to open {panel}: HP, armour, and how much each weapon deals per second.'),
+  }),
+  /** H7 on a wide screen, where 人物 is a column that is always open. */
+  H7w: L('between', s('「{panel}」这一栏一直开着：{hp}、{armor}，还有每把兵器每秒打多少。点头像就能跳过去。', '{panel} has its own column, always open: HP, armour, and how much each weapon deals per second. Tap your portrait to jump to it.'), {
+    keys: s('「{panel}」这一栏一直开着：{hp}、{armor}，还有每把兵器每秒打多少。点头像或按 C 就能跳过去。', '{panel} has its own column, always open: HP, armour, and how much each weapon deals per second. Click your portrait or press C to jump to it.'),
+  }),
+  H7b: L('between', s('上面四格是保命的数。哪一格、哪一行看不懂，点一下就有一句解释。', "These four tiles keep you alive. Tap any tile or row you're unsure of for a one-line explanation."), {
+    keys: s('上面四格是保命的数。哪一格、哪一行看不懂，点一下就有一句解释。', "These four tiles keep you alive. Click any tile or row you're unsure of for a one-line explanation."),
+  }),
   H8: L('between', s('商店就这些。点「{next}」接着打。', "That's the shop. Tap {next} to carry on."), {
     keys: s('商店就这些。按 Enter 或点「{next}」接着打。', "That's the shop. Press Enter or click {next} to carry on."),
   }),
@@ -84,7 +96,9 @@ export const LINES = {
   D3b: L('wave', s('放完之后，外圈要转满才能再放：{cd} 秒。', 'After a cast, the ring has to fill before the next one: {cd} seconds.')),
   D3c: L('wave', s('按住圆钮拖动，还能自己挑落点。', 'Hold the button and drag to pick where it lands.')),
   // shop 2
-  H9: L('between', s('这回你自己挑。买不买都行，好了就点「{next}」。', "Your call this time. Buy or don't, and tap {next} when you're done.")),
+  H9: L('between', s('这回你自己挑。买不买都行，好了就点「{next}」。', "Your call this time. Buy or don't, and tap {next} when you're done."), {
+    keys: s('这回你自己挑。买不买都行，好了就按 Enter 或点「{next}」。', "Your call this time. Buy or don't, and press Enter or click {next} when you're done."),
+  }),
   // wave 3 · the big one
   B1: L('wave', s('来了个大个的：{foe}。它比小怪硬得多，打倒它，这一重就过了。', "A big one: the {foe}. It's much tougher than the small ones. Beat it and the wave is won.")),
   B2: L('wave', s('地上的红色长条，就是它要打的地方。站到没有红的地方去。', "The red strips on the ground are where it's about to strike. Stand somewhere with no red.")),
@@ -95,8 +109,8 @@ export const LINES = {
   B4b: L('wave', s('这一下本来会倒下。练习里不要紧，真入镜可要当心。', 'That hit would have put you down. Fine in practice; in a real run, be careful.')),
   B5: L('wave', s('打倒了！它掉了一个{crate}，这一重打完就能打开。', "Got it! It dropped a casket; you'll open it when the wave ends.")),
   // the casket
-  K1: L('between', s('{crate}里是一件道具。点「{keep}」留着它，点「{melt}」就换成 {meltN} {moon}。拿不准就收下。', 'A casket holds one item. {keep} it, or {melt} it into {meltN} moonlight. Not sure? Keep it.'), {
-    keys: s('{crate}里是一件道具。按 1「{keep}」留着它，按 2「{melt}」换成 {meltN} {moon}。拿不准就收下。', 'A casket holds one item. Press 1 to keep it, or 2 to melt it into {meltN} moonlight. Not sure? Keep it.'),
+  K1: L('between', s('{crate}里是一件道具。点「{keep}」留着它，点「{melt}」能换 {meltN} {moon}。拿不准就收下。', 'A casket holds one item. {keep} it, or {melt} it for {meltN} moonlight. Not sure? Keep it.'), {
+    keys: s('{crate}里是一件道具。按 1「{keep}」留着它，按 2「{melt}」能换 {meltN} {moon}。拿不准就收下。', 'A casket holds one item. Press 1 to keep it, or 2 to melt it for {meltN} moonlight. Not sure? Keep it.'),
   }),
   nice: L('wave', s('好。', 'Nice.')),
   // the pause sheet's error
@@ -170,7 +184,7 @@ export type Slots = Readonly<Record<string, SlotVal>>;
 export const LABEL_SLOTS = {
   reroll: 'reroll', panel: 'panel', lock: 'lock', merge: 'merge', sell: 'sell', next: 'next', go: 'go', keep: 'keep', melt: 'melt',
   leave: 'leave', tutorial: 'tutorial', moon: 'moon', hp: 'hp', armor: 'armor', card: 'card', crate: 'crate', elite: 'elite',
-  shop: 'shop', curse: 'curse', boss: 'boss', skillWord: 'skill',
+  shop: 'shop', curse: 'curse', boss: 'boss', skillWord: 'skill', t1: 'tier1', t2: 'tier2',
 } as const satisfies Record<string, GlossId>;
 
 const named = (id: string): Say => {
@@ -200,7 +214,7 @@ export function lineSlots(extra: Record<string, SlotVal> = {}): Slots {
     back: backWave(),
     e: pctOf(F.curseEnemy), d: F.curseDmg, m: pctOf(F.curseMoon),
     glyph: s(sk.glyph, sk.glyph), skill: s(sk.zh, sk.en),
-    w0: named('qingfeng'), i2: named('sandals'), n2: 3,
+    w0: named('qingfeng'), i2: named('sandals'), n0: 1, n2: 3,
     blot: named('blot'), lantern: named('lantern'), foe: named('whitesnake'),
   };
   for (const [k, id] of Object.entries(LABEL_SLOTS)) { const x = termOf(id); out[k] = s(x.zh, x.en); }

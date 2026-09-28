@@ -21,7 +21,7 @@ import { Icon, Portrait } from './icons';
 import { calmNow } from './prefs';
 import { companionView, panelBase, panelView, type DeltaChip, type PanelBase, type PanelView, type TileView } from './panelView';
 import type { CharacterId } from '../types';
-import type { T } from './text';
+import { nameOf, type T } from './text';
 
 export type Density = 'full' | 'compact' | 'card';
 
@@ -203,7 +203,7 @@ function Weapons(props: { v: PanelView; t: T; compact: boolean; id: string }) {
           <InfoToggle open={info} onToggle={() => setInfo(!info)} controls={`${props.id}-dps`} label={t('每秒伤害是怎么算的', 'How damage per second is worked out')} />
         </span>
       </div>
-      <p id={`${props.id}-dps`} class="mj-cp-gloss" hidden={!info}>{termLine('dps', t)}{t('连击、穿透、弹射、燃烧都没算，拿来比较自己的兵器就好。', ' Combos, pierce, bounces and burns are left out: use it to compare your own weapons.')}</p>
+      <p id={`${props.id}-dps`} class="mj-cp-gloss" hidden={!info}>{termLine('dps', t)}{t('神笔、砚台按它们画出、放下的东西出手的次数算。连击、穿透、弹射、燃烧都没算，拿来比较自己的兵器就好。', ' The brush and the inkstone count what they paint or set down. Combos, pierce, bounces and burns are left out: use it to compare your own weapons.')}</p>
       {!v.weapons.length && <p class="mj-cp-empty">{t('还没有兵器。', 'No weapons yet.')}</p>}
       <ul class="mj-cp-wlist">
         {v.weapons.map((w) => {
@@ -270,13 +270,13 @@ function Sets(props: { v: PanelView; t: T; id: string; compact: boolean }) {
               <span class="mj-cp-pips" aria-hidden="true">
                 {[0, 1, 2].map((g) => <span class="mj-cp-pipgroup">{[0, 1].map((k) => <i class={s.count > g * 2 + k ? 'is-on' : ''} />)}</span>)}
               </span>
-              <span class="num">{t(`${s.count} 件`, `${s.count}`)}</span>
+              <span class="num">{t(`${s.count} 把`, `${s.count}`)}</span>
               {s.tier >= 0 && <span class="mj-cp-on">{t('生效中', 'active')}</span>}
             </p>
             {s.active && <p class="mj-cp-setline">{s.active}</p>}
             {!props.compact && s.next && <p class="mj-cp-setnext">{s.next}</p>}
             {!props.compact && s.tier >= 2 && <p class="mj-cp-setnext">{t('已凑满', 'complete')}</p>}
-            {s.dugu && <p class="mj-cp-setnext">{t('独孤九剑：只带这一把，算 6 把', 'Lone Sword: carrying only this one counts as 6')}</p>}
+            {s.dugu && <p class="mj-cp-setnext">{t(`${nameOf('dugu', t)}：只带这一把，套装按 6 把算`, `${nameOf('dugu', t)}: carrying only this one, its set counts as 6`)}</p>}
           </li>
         ))}
       </ul>

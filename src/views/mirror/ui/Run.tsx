@@ -470,8 +470,11 @@ export function RunView(props: {
   useEffect(() => {
     if (stage !== 'between') return;
     const down = (e: KeyboardEvent) => {
-      if (sheetOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Esc pauses even over a coach hold (its tip comes back after 继续); a real sheet owns its own Esc
+      if (k === 'escape' && !document.querySelector('.sheet-backdrop')) { e.preventDefault(); pause(); return; }
+      if (sheetOpen()) return;
       if (k === 'escape' || k === 'p') { e.preventDefault(); pause(); }
       else if (k === 'c') { e.preventDefault(); setWhoOpen(true); }
     };
@@ -486,14 +489,16 @@ export function RunView(props: {
     const MOVE = new Set(['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright']);
     const push = () => { const v = keysVector(held); engine.current?.input.move(v.x, v.y); };
     const down = (e: KeyboardEvent) => {
-      if (sheetOpen() || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (k === 'escape' && !document.querySelector('.sheet-backdrop')) { e.preventDefault(); pause(); return; }
+      if (sheetOpen()) return;
       if (MOVE.has(k)) { e.preventDefault(); if (!held.has(k)) { held.add(k); push(); } return; }
       if (k === 'q' || k === ' ') {
         e.preventDefault();
         if (e.repeat) return;
         const c = cursor.current;
-        engine.current?.skill(mirror.value.settings.aim === 'manual' && c ? { kind: 'screen', sx: c.x, sy: c.y } : { kind: 'auto' });
+        engine.current?.skill(!practice && mirror.value.settings.aim === 'manual' && c ? { kind: 'screen', sx: c.x, sy: c.y } : { kind: 'auto' });
         return;
       }
       if (k === 'escape' || k === 'p' || k === 'c') { e.preventDefault(); pause(); }

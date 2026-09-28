@@ -76,7 +76,7 @@ export function nameOf(id: string, t: T): string {
 // ───────────────────────────────────────────── economy words
 /** The rate of the next run in words: 免费 · 全额 · 半额 · 四分之一. */
 export function rateWord(rate: number, free: boolean, t: T): string {
-  if (free) return t('免费（返照减半）', 'free (half pay)');
+  if (free) return t('免费（结算减半）', 'free (half payout)');
   if (rate >= 1) return t('全额', 'full pay');
   if (rate >= 0.5) return t('半额', 'half pay');
   return t('四分之一', 'quarter pay');
@@ -286,8 +286,8 @@ export const TERM_TEXT: Record<string, readonly [string, string]> = {
   shuangjiang: ['暴击率 +10%；治疗效果 −20%', '+10% crit chance; −20% healing'],
   lidong: ['每重结束，手里的月华多给 5% 利息（最多 25）', 'at wave end, +5% interest on moonlight held (max 25)'],
   xiaoxue: ['敌人子弹慢 20%；敌人气血 +10%', 'enemy shots 20% slower; enemies +10% HP'],
-  daxue: ['只看得见身边 520 以内；掉落 +25%', 'you can only see 520 around you; drops +25%'],
-  dongzhi: ['月类兵器伤害 +25%；双数重是暗月', 'Moon weapons +25% damage; even waves are dark'],
+  daxue: ['大雪遮眼，看不清远处；掉落 +25%', 'snow blinds you at range; drops +25%'],
+  dongzhi: ['月类兵器伤害 +25%；双数重四周变暗，看不清远处', 'Moon weapons +25% damage; on even waves it goes dark and you can\'t see far'],
   xiaohan: ['敌人护甲 +2；火伤害 +25%', 'enemies +2 armour; fire +25%'],
   dahan: ['首领气血 −15%；首领身边的小怪 +50%', 'bosses −15% HP; their adds +50%'],
 };
@@ -295,7 +295,7 @@ export const TERM_TEXT: Record<string, readonly [string, string]> = {
 /** 心镜 faces in words (GDD §17.2), by HeartFaceId. Numbers are HEART's (mirror-text.test checks). */
 export const HEART_TEXT: Record<string, readonly [string, string]> = {
   heartHp: ['每阶 +2 气血', '+2 HP a rank'], heartRegen: ['每阶 +1 回血', '+1 HP Regen a rank'],
-  heartMoon: ['每阶开局多 10 月华', 'start with +10 moonlight a rank'], heartReroll: ['每阶刷新便宜 4%', 'rerolls 4% cheaper a rank'],
+  heartMoon: ['每阶开局多 10 点月华', 'start with +10 moonlight a rank'], heartReroll: ['每阶刷新便宜 4%', 'rerolls 4% cheaper a rank'],
   heartArmor: ['每阶 +1 护甲', '+1 armour a rank'], heartDodge: ['每阶 +2% 闪避', '+2% dodge a rank'],
   heartPickup: ['每阶拾取范围 +10%', '+10% pickup range a rank'], heartHarvest: ['每阶 +2 收成', '+2 Harvest a rank'],
   heartRevive: ['每局一次：倒下后带着 30% 气血站起来', 'once a run, get back up with 30% HP'], heartWard: ['每局第一次挨了致命一击，只剩 1 点血，不倒', 'the first lethal hit of a run leaves you at 1 HP'],

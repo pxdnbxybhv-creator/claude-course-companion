@@ -151,7 +151,7 @@ const STATS: Record<StatId, Term> = {
     '子弹和刺击打中一个后，还能再穿过几个敌人。',
     'Shots and thrusts go through this many more enemies.', '穿'),
   heal: g('stat', '治疗效果', 'Healing',
-    '你所有的回血，都按这个百分比加减。',
+    '回血、吸血和各种治疗，都按这个百分比加减。',
     'All your healing goes up or down by this percentage.', '疗'),
 };
 
@@ -414,6 +414,39 @@ export const STAT_FMT: Readonly<Record<StatId, StatFmt>> = {
   hp: 'flat', regen: 'flat', steal: 'pct', dmg: 'pct', melee: 'flat', ranged: 'flat', elem: 'flat', spirit: 'flat', aspd: 'pct',
   crit: 'pct', critDmg: 'mult', range: 'flat', armor: 'flat', dodge: 'pct', speed: 'pct', luck: 'flat', harvest: 'flat', curse: 'flat',
   pickup: 'pct', summonCap: 'flat', swords: 'flat', stones: 'flat', knock: 'flat', area: 'pct', pierce: 'flat', heal: 'pct',
+};
+
+/**
+ * The level-up card's hint under the stat name (≤ 10 zh chars; a phone has no hover title): what the
+ * stat does, in a few words. The armour card also keeps its live 「少受 x% → y%」 line.
+ */
+export const CARD_HINT: Readonly<Record<StatId, { readonly zh: string; readonly en: string }>> = {
+  hp: { zh: '能多挨几下', en: 'take more hits' },
+  armor: { zh: '每下挨打都轻些', en: 'every hit hurts less' },
+  dodge: { zh: '更常躲开攻击', en: 'dodge more hits' },
+  speed: { zh: '走得更快', en: 'move faster' },
+  regen: { zh: '每秒慢慢回血', en: 'slow healing over time' },
+  steal: { zh: '打中时可能回血', en: 'hits may heal you' },
+  heal: { zh: '所有回血更多', en: 'all healing up' },
+  dmg: { zh: '所有伤害都更高', en: 'all your damage up' },
+  melee: { zh: '贴身的兵器更痛', en: 'close-in weapons hit harder' },
+  ranged: { zh: '弓、镖、飞剑更痛', en: 'bows, darts, flying swords' },
+  elem: { zh: '符、琴笛、镜子更痛', en: 'charms, music, mirrors' },
+  spirit: { zh: '墨宝、棋子更痛', en: 'ink and stones hit harder' },
+  aspd: { zh: '出手更快', en: 'attack more often' },
+  crit: { zh: '更常打出暴击', en: 'crit more often' },
+  critDmg: { zh: '暴击打得更狠', en: 'crits hit harder' },
+  range: { zh: '打得更远', en: 'reach farther' },
+  area: { zh: '爆炸、横扫更大', en: 'bigger blasts and sweeps' },
+  pierce: { zh: '多穿过几个敌人', en: 'shots pass through more' },
+  knock: { zh: '把敌人推得更远', en: 'push enemies farther' },
+  swords: { zh: '飞剑多放几把', en: 'more flying swords' },
+  stones: { zh: '地上多留棋子', en: 'more stones on the board' },
+  summonCap: { zh: '墨宝能多几只', en: 'more ink summons out' },
+  luck: { zh: '掉落和好货更多', en: 'more drops, better goods' },
+  harvest: { zh: '每重白拿月华', en: 'free moonlight each wave' },
+  pickup: { zh: '月华从更远处飞来', en: 'grab moonlight from afar' },
+  curse: { zh: '敌人和你都变强', en: 'enemies and you grow stronger' },
 };
 
 /** The 人物 panel's grouping: four body tiles, then five groups of rows (d-panel §3.2–3.3). */

@@ -51,13 +51,14 @@ function lines(): Line[] {
   for (const w of WEAPON_REG) for (const t of TIERS) {
     both(`${w.id} ${t} head`, (x) => D.describeWeapon(w.id, t, x).head, 17, 34);
     both(`${w.id} ${t} body`, (x) => D.describeWeapon(w.id, t, x).body, 42, 120);
-    both(`${w.id} ${t} t4`, (x) => D.describeWeapon(w.id, t, x).t4, 30, 90);
+    // below 神品 the line leads with 「合到神品：」 (+2), so a 凡品 card never reads it as a power it has now
+    both(`${w.id} ${t} t4`, (x) => D.describeWeapon(w.id, t, x).t4, t < 4 ? 32 : 30, 90);
     both(`${w.id} ${t} scales`, (x) => D.describeWeapon(w.id, t, x).scales, 12, 40);
     for (let i = 0; i < D.describeWeapon(w.id, t, zh).detail.length; i++) both(`${w.id} ${t} detail${i}`, (x) => D.describeWeapon(w.id, t, x).detail[i], 40, 100);
     for (let i = 0; i < D.describeWeapon(w.id, t, zh).tierRow.length; i++) both(`${w.id} row${i}`, (x) => D.describeWeapon(w.id, t, x).tierRow[i], 40, 80);
   }
   for (const it of ITEM_REG) {
-    both(`${it.id} body`, (x) => D.describeItem(it.id, x).body, 48, 150);
+    both(`${it.id} body`, (x) => D.describeItem(it.id, x).body, 42, 150);
     for (let i = 0; i < D.describeItem(it.id, zh).detail.length; i++) both(`${it.id} detail${i}`, (x) => D.describeItem(it.id, x).detail[i], 60, 140);
   }
   for (const s of [...SKILL_REG, ...ALT_SKILL_REG]) {
@@ -215,7 +216,7 @@ describe('mirror descriptions · numbers match the data', () => {
     expect(body('hoe', 3)).toContain('20% 几率');
     expect(body('coindart', 2)).toContain('最多 +15');
     expect(D.describeWeapon('claw', 4, zh).t4).toBeNull(); // IV only raises numbers the body shows
-    expect(D.describeWeapon('claw', 1, zh).t4).toBe('神品：流血最多叠 15 层。');
+    expect(D.describeWeapon('claw', 1, zh).t4).toBe('合到神品：流血最多叠 15 层。');
     expect(D.describeWeapon('qingfeng', 1, zh).tierRow[1]).toBe('一剑刺中：凡 2 · 灵 2 · 仙 2 · 神 4');
     expect(D.describeWeapon('qingfeng', 1, en).head).toBe('10 damage · every 0.9 s');
     expect(D.describeWeapon('yanyue', 1, zh).scales).toBe('受近战、护甲加成');
@@ -268,7 +269,7 @@ describe('mirror descriptions · numbers match the data', () => {
   it('set steps are generated from SETS: totals at each step, flags added', () => {
     expect(D.setSteps('sword', zh).map((x) => x.text)).toEqual(['暴击率 +5%', '暴击率共 +10%', '暴击率共 +15%，剑类刺击多刺中 1 个敌人']);
     expect(D.setSteps('music', zh)[2].text).toBe('乐器范围 +30%，迷惑几率翻倍');
-    expect(D.setSteps('flying', en)[1].text).toBe('+5% Crit chance, +1 Extra swords');
+    expect(D.setSteps('flying', en)[1].text).toBe('+5% Crit chance, +1 Extra sword');
   });
 });
 
@@ -324,5 +325,12 @@ describe('mirror descriptions · a readable snapshot', () => {
       for (const p of PASSIVE_REG) { const d = D.describePassive(p.id, t); out.push(`${p.id} | ${d.body} | ${d.cost ?? '-'}`); }
     }
     await expect(out.join('\n') + '\n').toMatchFileSnapshot('./__snapshots__/mirror-text.snap.txt');
+  });
+});
+
+describe('mirror descriptions · words that stand for a number (mirror3 fix round)', () => {
+  it('「每点护甲」 is only true while 铁骨 converts per 1 armour', () => {
+    const fx = (ITEMS.ironbone.fx ?? [])[0] as { per?: number };
+    expect(fx.per).toBe(1);
   });
 });
