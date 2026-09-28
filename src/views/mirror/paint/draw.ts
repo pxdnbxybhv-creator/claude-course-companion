@@ -26,3 +26,16 @@ export function blitRot(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
   if (a !== 1) ctx.globalAlpha = 1;
 }
+
+/** The largest view scale (a big screen): 1.5 keeps figures ≈ 45 px tall at 1280×800 and still shows
+ *  more of the arena than a phone does (853 × 533 u against 440 × 950); × a canvas dpr of 2 it stays
+ *  within every quality's bake cap (paint/index.ts K_MAX). */
+export const VIEW_MAX = 1.5;
+/** CSS px per world u for a viewport of cssW × cssH: the shorter side shows ≈ 440 u (a phone sees
+ *  ~440 × 950 u, a desktop ~850 × 530 u), within 0.7–VIEW_MAX. The engine's camera (× the canvas dpr) and
+ *  the painter's bake scale (paint/index.ts bakeScale) both start here, so sprites are painted at the
+ *  size they are drawn. */
+export function viewScale(cssW: number, cssH: number): number {
+  const m = Math.min(cssW, cssH);
+  return Math.max(0.7, Math.min(VIEW_MAX, (Number.isFinite(m) && m > 0 ? m : 440) / 440));
+}

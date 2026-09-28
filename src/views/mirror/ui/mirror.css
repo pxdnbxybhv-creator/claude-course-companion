@@ -219,8 +219,8 @@
 .mj-stick-knob { position: absolute; left: 34px; top: 34px; width: 44px; height: 44px; border-radius: 50%; background: rgba(27, 25, 22, 0.35); }
 .mj-run.is-inverted .mj-stick { border-color: rgba(243, 236, 221, 0.35); background: rgba(20, 18, 14, 0.25); }
 .mj-run.is-inverted .mj-stick-knob { background: rgba(243, 236, 221, 0.4); }
-.mj-aimstick { border-color: rgba(192, 65, 47, 0.35); }
-.mj-aimstick .mj-stick-knob { background: rgba(192, 65, 47, 0.4); }
+.mj-aimstick { border-color: rgba(212, 147, 12, 0.35); }
+.mj-aimstick .mj-stick-knob { background: rgba(212, 147, 12, 0.4); }
 .mj-skill {
   position: absolute; right: calc(env(safe-area-inset-right) + 22px); bottom: calc(env(safe-area-inset-bottom) + 26px);
   width: 72px; height: 72px; border-radius: 50%; border: 0; background: rgba(27, 25, 22, 0.82); color: #fbf5ea; font-size: 32px; touch-action: none; z-index: 4;
@@ -236,7 +236,7 @@
 .mj-skill.is-off { opacity: 0.4; filter: grayscale(1); }
 .mj-skill.is-active, .mj-run.is-inverted .mj-skill.is-active { box-shadow: 0 0 0 4px rgba(192, 65, 47, 0.5); }
 .mj-skill.is-held { transform: scale(0.95); }
-.mj-skill-aim { position: absolute; left: 50%; top: 50%; width: 120px; height: 3px; margin-top: -1.5px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(192, 65, 47, 0.8), rgba(192, 65, 47, 0)); opacity: 0; pointer-events: none; }
+.mj-skill-aim { position: absolute; left: 50%; top: 50%; width: 120px; height: 3px; margin-top: -1.5px; transform-origin: 0 50%; background: linear-gradient(90deg, rgba(212, 147, 12, 0.8), rgba(212, 147, 12, 0)); opacity: 0; pointer-events: none; }
 
 /* ritual and 研墨 */
 .mj-ritual { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; border: 0; background: var(--paper); color: var(--ink); cursor: pointer; }

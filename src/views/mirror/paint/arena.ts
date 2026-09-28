@@ -1,12 +1,12 @@
 // The arena: paper, the map's ground, décor, the obstacles and the bronze mirror rim, painted once
-// offscreen (GDD §12, §21). Death stains are stamped into a second, half-resolution layer so the
+// offscreen (GDD §12, §21). Death stains are stamped into a second, lower-resolution layer so the
 // painting keeps building; each wave end washes that layer 8% paler. 倒影 (endless) inverts the
 // lightness of everything while keeping its hues: white ink on black paper.
 //
-// Memory: the base layer is sized to a pixel budget by quality (≈ 2× a phone screen), whatever the
-// arena's size in u; the stain layer is a quarter of that. The obstacles (they block movement and
-// shots, so they must read crisply) are painted as their own sprites at sprite resolution on mid and
-// high quality, and drawn over the base when in view.
+// Memory: the base layer is sized to a pixel budget by quality (BUDGET), whatever the arena's size in
+// u; the stain layer is 0.6–0.75× its resolution. The obstacles (they block movement and shots, so
+// they must read crisply) are painted as their own sprites near sprite resolution at every quality,
+// and drawn over the base when in view.
 //
 // 倒影 inverts only the arena and its rim; beyond the rim the surround stays dark (a void), and the
 // camera's fill past the layer matches it, so there is no seam. Turning an already painted arena
@@ -20,23 +20,60 @@ import { canvas, ctx2d, invertLightness, renderSpec } from './atlas';
 import { B, blob, ell, arcW, h01, rot, rotW, star, type Pt, type Spec } from './kit';
 import { CINNABAR, GOLD, INK, MAP_PAL, MOON, rgba, type MapPalette } from './palette';
 
-const BUDGET: Record<Quality, number> = { low: 1.5e6, mid: 2.4e6, high: 3.6e6 };
+/** The base layer's pixel budget by quality (≈ 8 / 14 / 18 MB). The washes it holds are soft, so a
+ *  base drawn 1.2–2.5× enlarged still reads; what must be crisp (obstacles, the paper's grain) is not
+ *  in it: obstacles are sprites, and the grain is laid over at screen resolution (paint/ambient.ts). */
+const BUDGET: Record<Quality, number> = { low: 2.0e6, mid: 3.6e6, high: 4.5e6 };
+/** The stain layer's resolution relative to the base. */
+const STAIN_K: Record<Quality, number> = { low: 0.5, mid: 0.6, high: 0.6 };
 const MARGIN = 150;
+/** The soft pass's resolution relative to the base, by quality (see paint: low paints one pass). */
+const SOFT_K: Record<Quality, number> = { low: 1, mid: 0.6, high: 0.6 };
+/** A brush this wide (u) or wider is a broad soft band (the lake's deep rim, the bronze band under
+ *  its crisp dark edges): painted with the washes. */
+const SOFT_W = 20;
+/** The index just past the washes that open ops[from…] (an obstacle's shadow comes first). */
+function leadingWashes(ops: B['ops'], from: number): number {
+  let i = from;
+  while (i < ops.length) { const op = ops[i]; if (op.k !== 'stroke' || op.s.kind !== 'wash') break; i++; }
+  return i;
+}
+/** Whether an arena mark is soft: washes and broad bands (their edges are blurred anyway). */
+export function isSoft(op: B['ops'][number]): boolean {
+  if (op.k !== 'stroke') return false;
+  const st = op.s;
+  if (st.kind === 'wash') return true;
+  if (st.kind !== 'brush') return false;
+  let w = 0;
+  for (const p of st.pts) w = Math.max(w, p.w);
+  return w >= SOFT_W;
+}
 /** The bronze rim's width (u), outside the arena's shape. */
 const RIM_W = 34;
-/** Obstacle sprites: px per u (× the capped dpr) by quality; low paints them into the base. */
-const OBST_K: Record<Quality, number> = { low: 0, mid: 0.9, high: 1.1 };
+/** Obstacle sprites are painted at the camera's own scale (they never rotate, and the zoom punches
+ *  that the sprites' headroom is for are a 2% flick now), within this cap: a DPR-3 phone's 2.66–2.93
+ *  px per u and a DPR-2 desktop's 2.7 are drawn 1:1. Memory: the forest's 14 clumps are ≈ 0.42 M u² of
+ *  sprite, ≈ 12 MB at 2.66 px per u (a DPR-2 phone ≈ 6 MB, a DPR-1 desktop ≈ 3 MB). */
+const OBST_K_MAX = 3;
+/** The painter's bake scale over the camera's, by quality (paint/index.ts HEADROOM). */
+const SPRITE_HEADROOM: Record<Quality, number> = { low: 1, mid: 1.1, high: 1.1 };
 /** 倒影's surround: the map's outside darkened toward the void. */
 const VOID = '#08090c';
 const VOID_A = 0.55;
 
 interface ObstSprite { img: HTMLCanvasElement; x0: number; y0: number; w: number; h: number }
 
+/** The obstacles' px per u for a sprite bake scale `sk` (the camera's scale × the painter's headroom). */
+export function obstacleScale(sk: number, q: Quality): number {
+  return Math.min(OBST_K_MAX, Math.max(1, sk / SPRITE_HEADROOM[q]));
+}
+
 export class ArenaLayer {
   inverted = false;
-  private base: HTMLCanvasElement | null = null;
-  private stains: HTMLCanvasElement | null = null;
-  private sg: CanvasRenderingContext2D | null = null;
+  /** The base and the stain layer, each cut into tiles: a frame only touches the tiles in view, so the
+   *  textures a frame needs stay a few MB however large the arena is painted. */
+  private base: Tiles | null = null;
+  private stains: Tiles | null = null;
   /** px per u of the base layer; the stain layer is half. */
   private k = 1;
   private x0 = 0;
@@ -50,17 +87,27 @@ export class ArenaLayer {
   /** ms the last paint took (lab). */
   lastMs = 0;
 
-  constructor(readonly map: MapId, readonly quality: Quality, readonly dpr: number) {
+  /** `sk`: the sprite scale (px per u the painter bakes figures at: the camera's scale). */
+  constructor(readonly map: MapId, readonly quality: Quality, readonly dpr: number, readonly sk = dpr) {
     this.pal = MAP_PAL[map];
   }
+
+  /** Bytes held by the layers (base, stains, obstacle sprites). */
+  bytes(): number {
+    let n = 0;
+    for (const c of this.obst) n += c.img.width * c.img.height * 4;
+    return n + (this.base?.bytes() ?? 0) + (this.stains?.bytes() ?? 0);
+  }
+  /** The stain layer's px per u. */
+  private get kS(): number { return this.k * STAIN_K[this.quality]; }
 
   paint(geom: ArenaGeom, seed: number, inverted: boolean): void {
     const t0 = performance.now();
     if (inverted && !this.inverted && this.base && this.geom === geom && this.seed === seed) {
       // the endless stage: invert what is painted (base, stains, obstacles) — no repaint
       this.inverted = true;
-      invertLayer(this.base, geom, this.k, this.x0, this.y0, this.pal);
-      if (this.stains) invertLightness(this.stains);
+      this.base.each((c, tx, ty) => invertLayer(c, geom, this.k, this.x0 + (tx - TB) / this.k, this.y0 + (ty - TB) / this.k, this.pal));
+      this.stains?.each((c) => invertLightness(c));
       for (const o of this.obst) invertLightness(o.img);
       this.bakeStamps(true);
       this.lastMs = performance.now() - t0;
@@ -71,45 +118,83 @@ export class ArenaLayer {
     this.inverted = inverted;
     const x0 = geom.minX - MARGIN, y0 = geom.minY - MARGIN, x1 = geom.maxX + MARGIN, y1 = geom.maxY + MARGIN;
     const W = x1 - x0, H = y1 - y0;
-    this.k = Math.min(this.dpr, Math.sqrt(BUDGET[this.quality] / (W * H)));
+    this.k = Math.min(Math.max(1, this.sk), Math.sqrt(BUDGET[this.quality] / (W * H)));
     this.x0 = x0; this.y0 = y0;
     const k = this.k;
     const pw = Math.ceil(W * k), ph = Math.ceil(H * k);
-    if (!this.base || this.base.width !== pw || this.base.height !== ph) this.base = canvas(pw, ph);
-    const g = ctx2d(this.base);
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'source-over';
-    g.fillStyle = this.pal.outside;
-    g.fillRect(0, 0, pw, ph);
+    // painted whole, then cut into tiles (the whole canvas is freed)
+    const big = canvas(pw, ph);
+    const g = ctx2d(big);
     const P = this.pal;
-    // world → layer px
-    const toL = () => g.setTransform(k, 0, 0, k, -x0 * k, -y0 * k);
-    const strokes = (b: B) => { for (const op of b.ops) { toL(); if (op.k === 'stroke') paintStroke(g, op.s); else { g.save(); try { op.f(g); } finally { g.restore(); } } } };
+    // Two passes. The soft pass (the paper, washes, broad bands: everything whose edge is blurred
+    // anyway) is painted opaque at SOFT_K of the layer's resolution — a fraction of the pixels, and
+    // they are most of the arena's paint time — then laid in smoothed; the crisp pass (lines, dots,
+    // fills, the rim's edges and motifs) is painted over it at full resolution. The paper's crisp tooth
+    // comes from the screen-resolution grain overlay (paint/ambient.ts) on mid and high; low paints
+    // one pass at full resolution. (Washes must be painted onto the opaque paper, not a clear layer:
+    // at their low alphas a clear layer's 8-bit premultiplied colour bleaches them.)
+    const sk = SOFT_K[this.quality];
+    const two = sk < 1;
+    const soft = two ? canvas(Math.ceil(pw * sk) + 2, Math.ceil(ph * sk) + 2) : big;
+    const kk = two ? k * sk : k;
+    const sg = ctx2d(soft);
+    sg.setTransform(1, 0, 0, 1, 0, 0);
+    sg.globalCompositeOperation = 'source-over';
+    sg.fillStyle = P.outside;
+    sg.fillRect(0, 0, soft.width, soft.height);
+    const pass = (gg: CanvasRenderingContext2D, kp: number, ops: B['ops']) => {
+      for (const op of ops) {
+        gg.setTransform(kp, 0, 0, kp, -x0 * kp, -y0 * kp);
+        if (op.k === 'stroke') paintStroke(gg, op.s); else { gg.save(); try { op.f(gg); } finally { gg.restore(); } }
+      }
+    };
+    const clipTo = (gg: CanvasRenderingContext2D, kp: number, band: boolean) => {
+      gg.save();
+      gg.setTransform(kp, 0, 0, kp, -x0 * kp, -y0 * kp);
+      if (band) { shapePath(gg, geom, RIM_W + 1); shapePath(gg, geom, -1, true); gg.clip('evenodd'); } else { shapePath(gg, geom, 0); gg.clip(); }
+    };
+    /** Paint a B: its soft marks on the soft pass now, its crisp marks later on the crisp pass (in the
+     *  same clip). */
+    const crispLater: { ops: B['ops']; clip: 0 | 1 | 2 }[] = [];
+    const strokes = (b: B, clip: 0 | 1 | 2 = 0) => {
+      const softOps = two ? b.ops.filter(isSoft) : b.ops;
+      if (softOps.length) {
+        if (clip) clipTo(sg, kk, clip === 2);
+        pass(sg, kk, softOps);
+        if (clip) sg.restore();
+      }
+      if (two) { const crisp = b.ops.filter((op) => !isSoft(op)); if (crisp.length) crispLater.push({ ops: crisp, clip }); }
+    };
 
     // the void / surround
     const out = new B(seed ^ 0x51);
     surround(out, this.map, geom, P, seed);
     strokes(out);
     // paper inside the shape
-    g.save();
-    toL(); shapePath(g, geom, 0); g.clip();
-    g.setTransform(k, 0, 0, k, 0, 0);
-    fillPaper(g, W, H, 11 + (seed % 7));
-    g.restore();
-    g.save();
-    toL(); shapePath(g, geom, 0); g.clip();
+    clipTo(sg, kk, false);
+    sg.setTransform(kk, 0, 0, kk, 0, 0);
+    fillPaper(sg, W, H, 11 + (seed % 7));
+    sg.restore();
     const bg = new B(seed);
     ground(bg, this.map, geom, P, seed);
-    strokes(bg);
+    strokes(bg, 1);
     this.obst = [];
-    const ks = OBST_K[this.quality] * Math.min(2, this.dpr);
-    if (ks > k * 1.15) {
-      // crisp obstacles: each its own sprite (a shadow wash under it stays in the base)
+    const ks = obstacleScale(this.sk, this.quality);
+    if (ks > k * 1.02) {
+      // crisp obstacles: each its own sprite; the soft shadow wash under it (its leading washes) is
+      // painted into the base with the ground's soft marks instead
+      const shade = new B(seed ^ 0x7b);
+      for (const o of geom.obstacles) {
+        const from = shade.ops.length;
+        obstacle(shade, o, P, seed);
+        shade.ops.length = leadingWashes(shade.ops, from);
+      }
+      strokes(shade, 1);
       for (const o of geom.obstacles) {
         const R = o.r * 1.35 + 12;
-        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => obstacle(b, o, P, seed) };
+        const spec: Spec = { box: [o.x - R, o.y - R, o.x + R, o.y + R], halo: 'none', paint: (b) => { const from = b.ops.length; obstacle(b, o, P, seed); b.ops.splice(from, leadingWashes(b.ops, from) - from); } };
         try {
-          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0 });
+          const p = renderSpec(spec, 0, { k: ks, seed: seed ^ 0x77, halo: 0, flash: false });
           if (inverted) invertLightness(p.img);
           // the spec's anchor (0, 0) is the world origin: the canvas's corner sits at −anchor × size
           this.obst.push({ img: p.img, x0: -p.ax * p.w, y0: -p.ay * p.h, w: p.w, h: p.h });
@@ -119,38 +204,47 @@ export class ArenaLayer {
     if (!this.obst.length) {
       const ob = new B(seed ^ 0x77);
       for (const o of geom.obstacles) obstacle(ob, o, P, seed);
-      strokes(ob);
+      strokes(ob, 1);
     }
-    g.restore();
     const rim = new B(seed ^ 0x99), deco = new B(seed ^ 0x9b);
     rimOf(rim, deco, this.map, geom, P);
-    if (geom.shape.kind === 'circle') strokes(rim);
-    else {
-      // a polygon's rim: one stroke per edge, clipped to the band so the corners are mitred (the
-      // brush's ends would otherwise stick out past each corner)
-      g.save();
-      toL(); shapePath(g, geom, RIM_W + 1); shapePath(g, geom, -1, true); g.clip('evenodd');
-      strokes(rim);
-      g.restore();
-    }
+    // a polygon's rim: one stroke per edge, clipped to the band so the corners are mitred (the brush's
+    // ends would otherwise stick out past each corner)
+    strokes(rim, geom.shape.kind === 'circle' ? 0 : 2);
     strokes(deco);
+    if (two) {
+      // the soft pass laid in, then the crisp marks over it
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(soft, 0, 0, soft.width / sk, soft.height / sk);
+      for (const c of crispLater) {
+        if (c.clip) clipTo(g, k, c.clip === 2);
+        pass(g, k, c.ops);
+        if (c.clip) g.restore();
+      }
+      soft.width = soft.height = 1;
+    }
     g.setTransform(1, 0, 0, 1, 0, 0);
-    if (inverted) invertLayer(this.base, geom, k, x0, y0, P);
+    if (inverted) invertLayer(big, geom, k, x0, y0, P);
     feather(g, pw, ph, k, inverted ? voidOf(P) : P.outside);
+    this.base?.dispose();
+    this.base = Tiles.from(big);
+    big.width = big.height = 1;
     // the stain layer
-    const sw = Math.ceil(pw / 2), sh = Math.ceil(ph / 2);
-    if (!this.stains || this.stains.width !== sw || this.stains.height !== sh) { this.stains = canvas(sw, sh); this.sg = ctx2d(this.stains); }
-    else this.sg!.clearRect(0, 0, sw, sh);
+    const sw = Math.ceil(W * this.kS), sh = Math.ceil(H * this.kS);
+    this.stains?.dispose();
+    this.stains = new Tiles(sw, sh);
     this.bakeStamps(inverted);
     this.lastMs = performance.now() - t0;
   }
 
   private bakeStamps(inverted: boolean) {
     this.stampImgs.clear();
-    const k = Math.max(0.6, this.k / 2) * 1.5;
+    const k = Math.max(0.6, this.kS) * 1.5;
     this.stampK = k;
     const mk = (spec: Spec, n: number) => Array.from({ length: n }, (_, v) => {
-      const p = renderSpec(spec, v, { k, seed: 101 + v * 31, halo: 0 });
+      const p = renderSpec(spec, v, { k, seed: 101 + v * 31, halo: 0, flash: false });
       if (inverted) invertLightness(p.img);
       return p.img;
     });
@@ -169,12 +263,13 @@ export class ArenaLayer {
     const wx0 = cam.x - cam.w / 2 / s, wy0 = cam.y - cam.h / 2 / s;
     const wx1 = cam.x + cam.w / 2 / s, wy1 = cam.y + cam.h / 2 / s;
     const lx0 = Math.max(this.x0, wx0), ly0 = Math.max(this.y0, wy0);
-    const lx1 = Math.min(this.x0 + base.width / k, wx1), ly1 = Math.min(this.y0 + base.height / k, wy1);
+    const lx1 = Math.min(this.x0 + base.w / k, wx1), ly1 = Math.min(this.y0 + base.h / k, wy1);
     if (lx1 <= lx0 || ly1 <= ly0) return;
-    const dx = (lx0 - wx0) * s, dy = (ly0 - wy0) * s, dw = (lx1 - lx0) * s, dh = (ly1 - ly0) * s;
-    ctx.drawImage(base, (lx0 - this.x0) * k, (ly0 - this.y0) * k, (lx1 - lx0) * k, (ly1 - ly0) * k, dx, dy, dw, dh);
+    // world → screen: sx = (wx − wx0) · s; a layer's px p ↔ world x0 + p / k
+    base.draw(ctx, (lx0 - this.x0) * k, (ly0 - this.y0) * k, (lx1 - this.x0) * k, (ly1 - this.y0) * k, s / k, (this.x0 - wx0) * s, (this.y0 - wy0) * s);
     const st = this.stains;
-    if (st) ctx.drawImage(st, (lx0 - this.x0) * k / 2, (ly0 - this.y0) * k / 2, (lx1 - lx0) * k / 2, (ly1 - ly0) * k / 2, dx, dy, dw, dh);
+    const ks = this.kS;
+    if (st) st.draw(ctx, (lx0 - this.x0) * ks, (ly0 - this.y0) * ks, (lx1 - this.x0) * ks, (ly1 - this.y0) * ks, s / ks, (this.x0 - wx0) * s, (this.y0 - wy0) * s);
     for (const o of this.obst) {
       if (o.x0 > wx1 || o.y0 > wy1 || o.x0 + o.w < wx0 || o.y0 + o.h < wy0) continue;
       ctx.drawImage(o.img, (o.x0 - wx0) * s, (o.y0 - wy0) * s, o.w * s, o.h * s);
@@ -182,29 +277,38 @@ export class ArenaLayer {
   }
 
   stamp(kind: StampKind, x: number, y: number, r: number, seed: number, _tint?: string): void {
-    const g = this.sg, imgs = this.stampImgs.get(kind);
-    if (!g || !imgs || !imgs.length) return;
+    const st = this.stains, imgs = this.stampImgs.get(kind);
+    if (!st || !imgs || !imgs.length) return;
     const img = imgs[(seed >>> 0) % imgs.length];
-    const k = this.k / 2;
+    const k = this.kS;
     const a = ((seed >>> 3) % 628) / 100;
     // the stamp spec is a ±20 u disc painted at stampK px per u: scale so that its radius is r
     const scale = (r * k) / (20 * this.stampK);
     const c = Math.cos(a) * scale, n = Math.sin(a) * scale;
-    g.setTransform(c, n, -n, c, (x - this.x0) * k, (y - this.y0) * k);
-    g.globalAlpha = kind === 'coinRing' ? 0.9 : 0.75;
-    g.drawImage(img, -img.width / 2, -img.height / 2);
-    g.globalAlpha = 1;
-    g.setTransform(1, 0, 0, 1, 0, 0);
+    const px = (x - this.x0) * k, py = (y - this.y0) * k, R = (Math.max(img.width, img.height) / 2) * scale * 1.42;
+    st.over(px - R, py - R, px + R, py + R, (g, ox, oy) => {
+      g.setTransform(c, n, -n, c, px - ox, py - oy);
+      // a stain is a memory of the fight, not a new floor: light enough that dark monsters keep their
+      // contrast over a long wave's fight path (the feel layer also washes the layer as you fight)
+      g.globalAlpha = kind === 'coinRing' ? 0.9 : 0.5;
+      g.drawImage(img, -img.width / 2, -img.height / 2);
+      g.globalAlpha = 1;
+      g.setTransform(1, 0, 0, 1, 0, 0);
+    });
   }
 
   wash(f: number): void {
-    const g = this.sg, st = this.stains;
-    if (!g || !st) return;
-    g.setTransform(1, 0, 0, 1, 0, 0);
-    g.globalCompositeOperation = 'destination-out';
-    g.fillStyle = `rgba(0,0,0,${Math.max(0, Math.min(1, f))})`;
-    g.fillRect(0, 0, st.width, st.height);
-    g.globalCompositeOperation = 'source-over';
+    const st = this.stains;
+    if (!st) return;
+    const fill = `rgba(0,0,0,${Math.max(0, Math.min(1, f))})`;
+    st.each((c) => {
+      const g = ctx2d(c);
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.globalCompositeOperation = 'destination-out';
+      g.fillStyle = fill;
+      g.fillRect(0, 0, c.width, c.height);
+      g.globalCompositeOperation = 'source-over';
+    });
   }
 
   /** The arena's current ink (base + stains), cropped to the arena and scaled into w × h. */
@@ -219,8 +323,9 @@ export class ArenaLayer {
     const fit = Math.max(w / sw, h / sh);
     const cw = w / fit, ch = h / fit;
     const cx = sx + (sw - cw) / 2, cy = sy + (sh - ch) / 2;
-    g.drawImage(base, cx, cy, cw, ch, 0, 0, w, h);
-    if (this.stains) g.drawImage(this.stains, cx / 2, cy / 2, cw / 2, ch / 2, 0, 0, w, h);
+    base.draw(g, Math.max(0, cx), Math.max(0, cy), Math.min(base.w, cx + cw), Math.min(base.h, cy + ch), w / cw, -cx * (w / cw), -cy * (h / ch));
+    const f0 = STAIN_K[this.quality];
+    if (this.stains) this.stains.draw(g, Math.max(0, cx * f0), Math.max(0, cy * f0), Math.min(this.stains.w, (cx + cw) * f0), Math.min(this.stains.h, (cy + ch) * f0), w / (cw * f0), -cx * (w / cw), -cy * (h / ch));
     // obstacles: layer px → out px
     const f = w / cw;
     for (const o of this.obst) g.drawImage(o.img, ((o.x0 - this.x0) * k - cx) * f, ((o.y0 - this.y0) * k - cy) * f, o.w * k * f, o.h * k * f);
@@ -228,11 +333,79 @@ export class ArenaLayer {
   }
 
   dispose(): void {
-    for (const c of [this.base, this.stains, ...this.obst.map((o) => o.img)]) if (c) { c.width = 1; c.height = 1; }
+    for (const o of this.obst) { o.img.width = 1; o.img.height = 1; }
+    this.base?.dispose();
+    this.stains?.dispose();
     this.obst = [];
     this.base = this.stains = null;
-    this.sg = null;
     this.stampImgs.clear();
+  }
+}
+
+/** Tile size (px) of the arena's layers, and the border each tile repeats from its neighbours (so
+ *  bilinear sampling at a tile's edge sees the real neighbouring pixels: no seams). */
+const TILE = 256;
+const TB = 2;
+
+/** A large canvas cut into TILE² tiles (each with a TB border). */
+class Tiles {
+  readonly cols: number;
+  readonly rows: number;
+  readonly tiles: HTMLCanvasElement[] = [];
+  constructor(readonly w: number, readonly h: number) {
+    this.cols = Math.max(1, Math.ceil(w / TILE));
+    this.rows = Math.max(1, Math.ceil(h / TILE));
+    for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) {
+      const tw = Math.min(TILE, w - i * TILE), th = Math.min(TILE, h - j * TILE);
+      this.tiles.push(canvas(tw + TB * 2, th + TB * 2));
+    }
+  }
+  /** Cut a painted canvas into tiles. */
+  static from(src: HTMLCanvasElement): Tiles {
+    const t = new Tiles(src.width, src.height);
+    t.each((c, tx, ty) => ctx2d(c).drawImage(src, -(tx - TB), -(ty - TB)));
+    return t;
+  }
+  /** Each tile with its layer-px origin (tx, ty) of its interior (the canvas's (TB, TB)). */
+  each(f: (c: HTMLCanvasElement, tx: number, ty: number) => void): void {
+    for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) f(this.tiles[j * this.cols + i], i * TILE, j * TILE);
+  }
+  /** Each tile whose canvas (border included) meets the layer-px rect; g draws in layer px − (ox, oy). */
+  over(x0: number, y0: number, x1: number, y1: number, f: (g: CanvasRenderingContext2D, ox: number, oy: number) => void): void {
+    const i0 = Math.max(0, Math.floor((x0 - TB) / TILE)), i1 = Math.min(this.cols - 1, Math.floor((x1 + TB) / TILE));
+    const j0 = Math.max(0, Math.floor((y0 - TB) / TILE)), j1 = Math.min(this.rows - 1, Math.floor((y1 + TB) / TILE));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) f(ctx2d(this.tiles[j * this.cols + i]), i * TILE - TB, j * TILE - TB);
+  }
+  /**
+   * Draw the layer-px rect [x0, x1) × [y0, y1) at screen = ox + p · f (the same f on both axes): only
+   * the tiles it meets, each clipped to it. Tile edges land on whole screen pixels (the source is
+   * adjusted to match), so neighbouring tiles meet without a seam.
+   */
+  draw(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number, f: number, ox: number, oy: number): void {
+    const i0 = Math.max(0, Math.floor(x0 / TILE)), i1 = Math.min(this.cols - 1, Math.floor((x1 - 1e-6) / TILE));
+    const j0 = Math.max(0, Math.floor(y0 / TILE)), j1 = Math.min(this.rows - 1, Math.floor((y1 - 1e-6) / TILE));
+    for (let j = j0; j <= j1; j++) {
+      const ty = j * TILE;
+      const dy0 = Math.round(oy + Math.max(y0, ty) * f), dy1 = Math.round(oy + Math.min(y1, ty + TILE, this.h) * f);
+      if (dy1 <= dy0) continue;
+      for (let i = i0; i <= i1; i++) {
+        const tx = i * TILE;
+        const dx0 = Math.round(ox + Math.max(x0, tx) * f), dx1 = Math.round(ox + Math.min(x1, tx + TILE, this.w) * f);
+        if (dx1 <= dx0) continue;
+        // the source rect that maps onto the whole-pixel destination rect (tile canvas px)
+        const sx = (dx0 - ox) / f - tx + TB, sy = (dy0 - oy) / f - ty + TB;
+        ctx.drawImage(this.tiles[j * this.cols + i], sx, sy, (dx1 - dx0) / f, (dy1 - dy0) / f, dx0, dy0, dx1 - dx0, dy1 - dy0);
+      }
+    }
+  }
+  bytes(): number {
+    let n = 0;
+    for (const c of this.tiles) n += c.width * c.height * 4;
+    return n;
+  }
+  dispose(): void {
+    for (const c of this.tiles) { c.width = 1; c.height = 1; }
+    this.tiles.length = 0;
   }
 }
 
@@ -273,7 +446,7 @@ function ground(b: B, map: MapId, geom: ArenaGeom, P: MapPalette, seed: number) 
   // broad washes of the ground colour
   for (let i = 0; i < 9; i++) {
     const x = minX + rnd(i) * W, y = minY + rnd(i + 50) * H;
-    b.wash(P.ground, blob(x, y, 160 + rnd(i + 90) * 200, 110 + rnd(i + 130) * 150, seed + i, 0.22, 16), map === 'palace' ? 0.07 : 0.1, 30);
+    b.wash(P.ground, blob(x, y, 160 + rnd(i + 90) * 200, 110 + rnd(i + 130) * 150, seed + i, 0.22, 16), map === 'palace' ? 0.07 : map === 'lake' ? 0.08 : 0.1, 30);
   }
   if (map === 'lake') {
     // the water's skin: one pale indigo wash over everything, deeper toward the rim
@@ -321,10 +494,16 @@ function ground(b: B, map: MapId, geom: ArenaGeom, P: MapPalette, seed: number) 
       b.brush(arcW(x, y, 22, 16, Math.PI * 0.2, Math.PI * 1.8, 1, 3, 10), 0.18, P.ground);
       b.brush(arcW(x + 30, y + 4, 14, 10, Math.PI * 1.2, Math.PI * 2.8, 2, 0.6, 8), 0.16, P.ground);
     }
-    // fallen osmanthus
+    // fallen osmanthus: tiny four-petal florets, pale and open — never round gold dots of a coin's size
+    // (round and golden is money's look on this floor)
     for (let i = 0; i < 40; i++) {
       const a = rnd(i + 1000) * Math.PI * 2, r = 110 + rnd(i + 1100) * 260;
-      b.dot(Math.cos(a) * r, Math.sin(a) * r, 3 + rnd(i) * 3, 0.55, GOLD);
+      const x = Math.cos(a) * r, y = Math.sin(a) * r, s = 0.8 + rnd(i) * 0.5, t = rnd(i + 1200) * Math.PI;
+      for (let k = 0; k < 4; k++) {
+        const pa = t + (k * Math.PI) / 2, cx = x + Math.cos(pa) * 1.5 * s, cy = y + Math.sin(pa) * 1.5 * s;
+        b.fill(k % 2 ? '#efd48a' : '#e6c26a', rot(ell(cx, cy, 1.5 * s, 0.9 * s, 0, Math.PI * 2, 8), pa, cx, cy), 0.6, 0.2);
+      }
+      b.dot(x, y, 0.9 * s, 0.7, '#c98a3a');
     }
   }
 }
@@ -376,9 +555,22 @@ function obstacle(b: B, o: ArenaGeom['obstacles'][number], P: MapPalette, seed: 
       const a = h01(s, i + 5) * Math.PI * 2, d = Math.sqrt(h01(s, i + 25)) * r * 0.85;
       b.dot(x + Math.cos(a) * d, y + Math.sin(a) * d, r * (0.35 + h01(s, i + 45) * 0.25), 0.75, i % 2 ? '#1f3a2a' : '#2f4a36');
     }
-    for (let i = 0; i < 60; i++) {
-      const a = h01(s, i + 105) * Math.PI * 2, d = Math.sqrt(h01(s, i + 205)) * r;
-      b.disc(x + Math.cos(a) * d, y + Math.sin(a) * d, 2 + h01(s, i + 305) * 1.6, i % 4 ? GOLD : '#f0d060');
+    // in bloom: tiny pale four-petal florets held inside the canopy — never round gold discs (on this
+    // floor round and golden is money's look, and loose ones on bare paper read as dropped coins)
+    for (let i = 0; i < 48; i++) {
+      const a = h01(s, i + 105) * Math.PI * 2, d = Math.sqrt(h01(s, i + 205)) * r * 0.75;
+      const fx = x + Math.cos(a) * d, fy = y + Math.sin(a) * d, fs = 0.7 + h01(s, i + 305) * 0.5, t = h01(s, i + 405) * Math.PI;
+      const col = i % 4 ? '#e8d9a8' : '#f4ead0';
+      b.flat((g) => {
+        g.fillStyle = col; g.globalAlpha = 0.9;
+        for (let q = 0; q < 4; q++) {
+          const pa = t + (q * Math.PI) / 2;
+          g.beginPath(); g.ellipse(fx + Math.cos(pa) * 1.3 * fs, fy + Math.sin(pa) * 1.3 * fs, 1.3 * fs, 0.75 * fs, pa, 0, Math.PI * 2); g.fill();
+        }
+        g.globalAlpha = 0.85; g.fillStyle = '#c98a3a';
+        g.beginPath(); g.arc(fx, fy, 0.45 * fs, 0, Math.PI * 2); g.fill();
+        g.globalAlpha = 1;
+      }, [fx - 3 * fs, fy - 3 * fs, fx + 3 * fs, fy + 3 * fs]);
     }
     b.dot(x, y, 22, 0.9, '#4a3526');
   }

@@ -640,7 +640,7 @@ describe('engine-content: the nine bosses', () => {
     }
     console.log('[content perf] ms per step, worst phase:', JSON.stringify(worst));
     for (const v of Object.values(worst)) expect(v).toBeLessThan(4);
-  });
+  }, 30_000); // several seconds on a CI runner
 });
 
 // ═════════════════════════════════════════════ 镜蚀 and 节气

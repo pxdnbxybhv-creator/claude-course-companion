@@ -132,6 +132,11 @@ export interface QinNote {
   /** Extra brightness 0..1. */
   bright?: number;
   seed?: number;
+  /**
+   * The instrument body: 'qin' (default) is the paulownia box of the 古琴; 'none' leaves the bare
+   * string and bridge (a DC block only) so the 琵琶 and 古筝 can put their own bodies on it.
+   */
+  body?: 'qin' | 'none';
 }
 
 /** Natural T60 of the fundamental: ~9 s for the low C2 string, ~3.5 s at C5. */
@@ -299,11 +304,13 @@ export function renderQin(sr: number, n: QinNote): Float32Array {
   // Body: DC block, paulownia air cavity and plate resonances, a little silk presence,
   // a gentle top roll-off for warmth.
   filter(out, highpass(sr, 32, 0.7));
-  filter(out, peaking(sr, 108, 1.4, 3.5));
-  filter(out, peaking(sr, 265, 2.2, 2.5));
-  filter(out, peaking(sr, 640, 1.2, -2));
-  filter(out, peaking(sr, 1350, 2, 1.5));
-  filter(out, lowpass(sr, 5200, 0.6));
+  if (n.body !== 'none') {
+    filter(out, peaking(sr, 108, 1.4, 3.5));
+    filter(out, peaking(sr, 265, 2.2, 2.5));
+    filter(out, peaking(sr, 640, 1.2, -2));
+    filter(out, peaking(sr, 1350, 2, 1.5));
+    filter(out, lowpass(sr, 5200, 0.6));
+  }
 
   // Level: set by the sustained tone (RMS 50–400 ms), not by the transient peak, so every pitch
   // and brightness sounds equally loud; the peak is only limited.

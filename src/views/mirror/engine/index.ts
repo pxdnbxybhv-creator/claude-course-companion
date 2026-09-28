@@ -10,10 +10,21 @@ import { World } from './world';
 import { Renderer } from './render';
 import { createDebugPainter } from './debugPainter';
 import { installDev } from './dev';
+import { viewScale } from '../paint/draw';
 
 const STEP = 1 / 60;
 const MAX_STEPS = 4;
 const DT_CLAMP = 0.05;
+/** Dynamic resolution: the canvas dpr steps down these notches under load before the guard cuts any
+ *  effect, and back up after long fast stretches (sprites are baked for the top notch, so a step only
+ *  ever draws them smaller). */
+export const RES_STEPS = [3, 2.5, 2, 1.5, 1.25, 1] as const;
+/** The lowest notch by quality (low may fall to 1; mid and high keep 1.5 and cut effects instead). */
+const RES_FLOOR = { low: 1, mid: 1.5, high: 1.5 } as const;
+/** Fast seconds before a step back up, and how many step-ups a run allows (hysteresis: a device that
+ *  slows again at the higher notch settles one below it). */
+const RES_UP_AFTER = 20;
+const RES_UPS = 3;
 
 class MirrorEngine implements Engine {
   readonly world: World;
@@ -114,18 +125,49 @@ class MirrorEngine implements Engine {
     let w = 0, h = 0;
     try { const r = c.getBoundingClientRect(); w = r.width; h = r.height; } catch { /* not in a document */ }
     if (!w || !h) { w = c.clientWidth || c.width || 1; h = c.clientHeight || c.height || 1; }
-    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
-    const dpr = Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2));
+    const dpr = this.dprNow();
     this.cssW = w; this.cssH = h;
     const pw = Math.max(1, Math.round(w * dpr)), ph = Math.max(1, Math.round(h * dpr));
     if (c.width !== pw || c.height !== ph) { c.width = pw; c.height = ph; }
     this.cam.w = pw; this.cam.h = ph; this.cam.dpr = dpr;
-    // the shorter side shows ≈ 440 u (a phone sees ~420 × 900 u, a desktop ~950 × 590 u)
-    this.baseScale = Math.max(0.7, Math.min(1.35, Math.min(w, h) / 440)) * dpr;
+    // the shorter side shows ≈ 440 u (a phone sees ~440 × 950 u, a desktop ~950 × 590 u); the painter
+    // bakes its sprites from the same viewScale (paint/index.ts bakeScale), so they are drawn ≤ 1:1
+    this.baseScale = viewScale(w, h) * dpr;
     this.cam.scale = this.baseScale;
     if (this._paused || this.world.phase !== 'wave') this.drawFrame();
   }
   private baseScale = 1;
+  /** The dynamic-resolution ceiling on the canvas dpr (Infinity: the settings' cap alone). */
+  private resCap = Infinity;
+  private resUps = RES_UPS;
+  /** The canvas dpr now: the device's, within the settings' cap and the dynamic notch. */
+  private dprNow(): number {
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    return Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2, this.resCap));
+  }
+  /** The canvas dpr the engine is drawing at (dev, perf probe). */
+  get resolution(): number { return this.cam.dpr; }
+  /**
+   * One notch of dynamic resolution: dir −1 steps the canvas dpr down (false when already at the
+   * quality's floor), +1 back up toward the cap. One resize: a canvas reallocation (≈ 1–3 ms).
+   */
+  private stepRes(dir: -1 | 1): boolean {
+    const cur = this.cam.dpr;
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const top = Math.max(1, Math.min(dprRaw, this.deps.settings.dprCap || 2));
+    if (dir < 0) {
+      const floor = Math.min(top, RES_FLOOR[this.deps.settings.quality] ?? 1.5);
+      const next = RES_STEPS.find((d) => d < cur - 0.01 && d >= floor - 0.001);
+      if (next === undefined) return false;
+      this.resCap = next;
+    } else {
+      if (this.resCap === Infinity || cur >= top - 0.01) { this.resCap = Infinity; return false; }
+      const up = [...RES_STEPS].reverse().find((d) => d > cur + 0.01);
+      this.resCap = up === undefined || up >= top - 0.01 ? Infinity : up;
+    }
+    this.resize();
+    return true;
+  }
 
   skill(t?: SkillTarget): void {
     const w = this.world;
@@ -179,7 +221,9 @@ class MirrorEngine implements Engine {
       this.frame(now);
       const ph = this.world.phase;
       if (!this._paused && !this.fatal && (ph === 'wave' || ph === 'ending')) this.raf = raf(tick);
-      else this.drawFrame();
+      // the last picture under a pause, the boss card or the wave's end: the camera stays put (a dt = 0
+      // redraw would close its follow lag in one jump as the card comes up)
+      else this.drawFrame(0, true);
     };
     this.raf = raf(tick);
   }
@@ -216,7 +260,8 @@ class MirrorEngine implements Engine {
     if (this.acc > STEP * MAX_STEPS) this.acc = 0;
     const t1 = performanceNow();
     try { w.feel.frame(real, frozen); } catch { /* cosmetic */ }
-    this.drawFrame(dt);
+    // a hitstop holds the camera with the world (dt = 0 there must not snap its follow lag shut)
+    this.drawFrame(dt, frozen > 0);
     w.perf.canvasMs = w.perf.canvasMs * 0.95 + (performanceNow() - t1) * 0.05;
     // perf: EMA of simulation ms per step; the draw figure is the whole frame interval (the raster
     // work happens after our canvas calls return, so timing them alone says nothing on a slow phone)
@@ -229,9 +274,12 @@ class MirrorEngine implements Engine {
 
   /**
    * The frame-time guard (GDD §24.3): when frames arrive more than 20 ms apart (under ~50 fps) for
-   * 2 s, drop particles and fade player effects; recover after 8 s of fast frames. It is based on
-   * the real interval between animation frames, so a device limited by rasterising trips it too.
-   * Intervals over 250 ms (a tab switch, a GC pause, a breakpoint) are ignored.
+   * 2 s, give something up, cheapest to lose first: the paper's full-screen overlays (grain,
+   * vignette), then a notch of resolution at a time, then particles and player effects (degrade).
+   * Recovery runs the other way: effects after 8 s of fast frames, then a notch of resolution (or the
+   * overlays, last) after each long fast stretch, a few times a run. It is based on the real interval
+   * between animation frames, so a device limited by rasterising trips it too. Intervals over 250 ms
+   * (a tab switch, a GC pause, a breakpoint) are ignored.
    */
   private guard(ms: number): void {
     const w = this.world;
@@ -241,8 +289,31 @@ class MirrorEngine implements Engine {
     this.frameMs = this.frameMs * 0.9 + ms * 0.1;
     const s = ms / 1000;
     if (this.frameMs > 20) { this.slowFor += s; this.fastFor = 0; } else { this.fastFor += s; if (this.fastFor > 3) this.slowFor = 0; }
-    if (this.slowFor > 2 && !w.degrade) w.degrade = 1;
+    // slow: first the overlays, then a notch of resolution (every 2 s while still slow), then effects
+    if (this.slowFor > 2) {
+      if (!w.degrade && this.shedOverlays(true)) this.slowFor = 0;
+      else if (!w.degrade && this.stepRes(-1)) this.slowFor = 0;
+      else if (!w.degrade) w.degrade = 1;
+    }
+    // fast again: effects come back first; resolution, then the overlays, only after a long fast stretch
     if (w.degrade && this.fastFor > 8) w.degrade = 0;
+    else if (!w.degrade && this.resUps > 0 && this.fastFor > RES_UP_AFTER && (this.resCap !== Infinity || this.overlaysShed())) {
+      if (this.resCap !== Infinity ? this.stepRes(1) : this.shedOverlays(false)) this.resUps--;
+      this.fastFor = 0;
+    }
+  }
+  /** The painter's ambience overlays (paint/ambient.ts), when it has them. */
+  private ambience(): { shed: boolean } | null {
+    const a = (this.painter as Painter & { ambience?: { shed: boolean } }).ambience;
+    return a && typeof a === 'object' && 'shed' in a ? a : null;
+  }
+  private overlaysShed(): boolean { return !!this.ambience()?.shed; }
+  /** Shed (true) or restore (false) the full-screen overlays; false when there was nothing to change. */
+  private shedOverlays(on: boolean): boolean {
+    const a = this.ambience();
+    if (!a || a.shed === on || (on && this.deps.settings.quality === 'low')) return false;
+    a.shed = on;
+    return true;
   }
   private frameMs = 16.7;
 
@@ -272,26 +343,39 @@ class MirrorEngine implements Engine {
 
   // ─────────────────────────────────────────────── camera and drawing
 
-  private drawFrame(dt = 0): void {
-    const ctx = this.ctx;
+  /**
+   * The camera follows you: a 60 px lead in the direction you move, the boss fit, the arena's edge
+   * kept from drifting far into view. dt = 0 snaps (a resize, a paused redraw); `held` (a hitstop)
+   * keeps it exactly where it is — the world is frozen, so closing the follow lag in that one frame
+   * would jerk the whole picture 15–50 px.
+   */
+  private follow(dt: number, held: boolean): void {
     const w = this.world;
-    if (!ctx || !w.run) return;
+    if (!w.run) return;
     const c = this.cam;
-    // lead 60 px in the direction you move; fit the boss arena during bosses
     const lead = 60 * c.dpr / c.scale;
     const tx = w.px + w.pvx / Math.max(1, w.moveSpd) * lead, ty = w.py + w.pvy / Math.max(1, w.moveSpd) * lead;
-    const k = dt > 0 ? Math.min(1, dt * 6) : 1;
+    const k = held ? 0 : dt > 0 ? Math.min(1, dt * 6) : 1;
     c.x += (tx - c.x) * k; c.y += (ty - c.y) * k;
     const zoom = w.bossH.length && w.phase === 'wave' ? 0.84 : 1;
     const target = this.baseScale * zoom;
-    c.scale += (target - c.scale) * (dt > 0 ? Math.min(1, dt * 2) : 1);
-    // keep the arena's edge from drifting far into view
+    c.scale += (target - c.scale) * (held ? 0 : dt > 0 ? Math.min(1, dt * 2) : 1);
     const A = w.arena;
     if (A) {
       const hw = c.w / 2 / c.scale, hh = c.h / 2 / c.scale;
       const mx = Math.max(0, (A.maxX - A.minX) / 2 + 120 - hw), my = Math.max(0, (A.maxY - A.minY) / 2 + 120 - hh);
       c.x = Math.max(-mx, Math.min(mx, c.x)); c.y = Math.max(-my, Math.min(my, c.y));
     }
+  }
+  /** The camera as it follows (tests, the dev probe): a copy, so nobody moves it by accident. */
+  get camera(): Readonly<Camera> { return { ...this.cam }; }
+
+  private drawFrame(dt = 0, held = false): void {
+    this.follow(dt, held);
+    const ctx = this.ctx;
+    const w = this.world;
+    if (!ctx || !w.run) return;
+    const c = this.cam;
     // 打击感: trauma shake and directional kicks (CSS px → world), a zoom punch on big impacts;
     // the feel layer zeroes them under reduced motion (and shake / kicks with the shake setting off)
     const F = w.feel;

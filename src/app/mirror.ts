@@ -90,7 +90,7 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
     const settings: MirrorSettings = {
       aim: st.aim === 'manual' ? 'manual' : 'auto',
       nums: st.nums === 0 || st.nums === 2 ? st.nums : 1,
-      shake: st.shake !== false, // on unless turned off (capped at 6 px; reduced motion still removes it)
+      shake: st.shake !== false, // on unless turned off: big moments only (a hard blow you take, boss slams and phases; ≤ 3 px); reduced motion removes it
       left: st.left === true,
       quality: st.quality === 'low' || st.quality === 'mid' || st.quality === 'high' ? st.quality : 'auto',
     };

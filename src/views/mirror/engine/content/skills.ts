@@ -8,8 +8,9 @@ import type { SkillId, WeaponId } from '../../ids';
 import type { GameEvent, HitPacket, SkillImpl, SkillRun, StatId, StatMods, Vec, WorldApi } from '../../types';
 import { WEAPONS } from '../../data';
 import { charMult, luckMult, rawDamage } from '../../logic/formulas';
-import { costOf, fxLine, fxSprite, restoreHp, setMoon } from './bridge';
+import { costOf, fxSprite, restoreHp, setMoon } from './bridge';
 import { CoRun, DEG, TAU, angDiff, shared, type Co } from './util';
+import { BK, FK, STAIN, VF, VT, vfxW } from '../vfx';
 
 /** A skill as a coroutine: `body` yields seconds; `on` sees combat events while it runs. */
 function coSkill(w0: WorldApi, body: (c: { w: WorldApi }) => Co, o: { on?: (w: WorldApi, ev: GameEvent) => void; end?: (w: WorldApi) => void } = {}): SkillRun {
@@ -63,11 +64,16 @@ const yizi: SkillImpl = {
       const zone = c.w.zone({ side: 'player', look: 'zhenGlyph', x: at.x, y: at.y, r: p.r, life: p.draw + p.zone });
       void zone;
       c.w.fx('inkBurst', at.x, at.y, { r: p.r * 0.5, life: p.draw });
+      // 流光: a thin indigo ring opens where the glyph will fall
+      vfxW(c.w).ring(at.x, at.y, p.r * 1.15, VT.indigo, p.draw, VF.thin);
       yield p.draw;
       const w = c.w;
       const n = w.hitArea(at.x, at.y, p.r, hit(p.base, { [bestStat(w)]: p.k }, { knock: 30 }));
-      w.fx('shockRing', at.x, at.y, { r: p.r, life: 0.4 });
-      w.shake(5);
+      // 镇 slams down: the glyph drops in hard, a gold-white shockwave with an ink crown, the paper cracks
+      const V = vfxW(w);
+      V.bloom(at.x, at.y, p.r, VT.ink, 0.55, BK.glyph, 1, 2);
+      V.shock(at.x, at.y, p.r * 1.1, VT.gold, { flags: VF.double | VF.halo | VF.big, debris: 12, stain: STAIN.crack, stainLife: 2.4, life: 0.5, prio: 2 });
+      V.shock(at.x, at.y, p.r * 0.7, VT.ink, { flags: VF.double, debris: 10, life: 0.4, prio: 2 });
       if (!n) w.sfx('bossDrum');
       // the lingering 镇: slow 40%, and +20% damage taken from every source
       w.zone({
@@ -100,12 +106,18 @@ const manyuan: SkillImpl = {
           w.hit(h, hit(p.base, { spirit: p.kSpirit, regen: p.kRegen }, { proc: 0.6 }));
           w.fx('petalBurst', ex, ey, { r: 28, life: 0.35 });
         }
+        // the bed breathes a soft jade ring each tick
+        vfxW(w).ring(x, y, p.r * 0.92, VT.jade, 0.5, VF.thin);
         // you regenerate inside
         if ((w.player.x - x) ** 2 + (w.player.y - y) ** 2 <= p.r * p.r) w.heal(p.hps * p.tick);
       },
     });
     if (id >= 0) sh.beds.push(id);
     w0.fx('petalBurst', x, y, { r: 60, life: 0.5 });
+    // spring spirals out from your feet: green light rings out, petals of light rise
+    const V = vfxW(w0);
+    V.shock(x, y, p.r, VT.green, { flags: VF.double | VF.halo, debris: 10, fleck: FK.glint, life: 0.5, prio: 2 });
+    V.motes(x, y, p.r * 0.6, 10, VT.green, 0.9);
     w0.sfx('summon');
     return { tick: () => false };
   },
@@ -130,7 +142,11 @@ const yiwang: SkillImpl = {
       if (e.kind === 'mon') sh.nets.set(h, { until: w.t + p.ampDur, cost: costOf(w, h) * (p.moonX - 1) });
     }
     w.attract(at.x, at.y, p.attract);
-    w.fx('shockRing', at.x, at.y, { r: p.r, life: 0.35 });
+    // the net is thrown (a line of light out to it) and lands on the water: a moon-blue double ring, droplets
+    const V = vfxW(w);
+    V.streak(w.player.x, w.player.y, at.x, at.y, 7, VT.azure, 0.3, 2);
+    V.shock(at.x, at.y, p.r, VT.azure, { flags: VF.double | VF.halo, debris: 12, fleck: FK.drop, life: 0.42, prio: 2 });
+    V.ring(at.x, at.y, p.r * 0.55, VT.moon, 0.36, VF.thin);
     w.sfx('reroll');
     return { tick: () => false };
   },
@@ -143,6 +159,11 @@ const guangling: SkillImpl = {
     const p = def.p;
     w0.buff('guangling', {}, p.dur, p.move);
     w0.sfx('bell');
+    {
+      // seven strings of light radiate from you
+      const V = vfxW(w0), x = w0.player.x, y = w0.player.y;
+      for (let k = 0; k < 7; k++) { const a = (k / 7) * TAU - Math.PI / 2; V.lance(x + Math.cos(a) * 16, y + Math.sin(a) * 16, a, p.r * 0.85, 4, VT.green, 0.4, 0, 2); }
+    }
     return coSkill(w0, function* (c) {
       let t = 0, charmT = 0;
       while (t < p.dur) {
@@ -150,7 +171,8 @@ const guangling: SkillImpl = {
         if (w.beat) {
           const x = w.player.x, y = w.player.y;
           w.hitArea(x, y, p.r, hit(p.base, { elem: p.k }, { status: { kind: 'slow', dur: 0.6, v: p.slow }, proc: 0.6 }));
-          w.fx('pulseRing', x, y, { r: p.r, life: 0.45 });
+          // each beat: a jade double ring, notes of light flung out
+          vfxW(w).shock(x, y, p.r, VT.jade, { flags: VF.double | VF.thin | VF.halo, debris: 6, fleck: FK.glint, life: 0.45, prio: 1 });
         }
         charmT += w.dt;
         if (charmT >= 1) {
@@ -201,18 +223,28 @@ const yijian: SkillImpl = {
       const ex = w.player.x, ey = w.player.y, len = Math.hypot(ex - sx, ey - sy), ang = Math.atan2(ey - sy, ex - sx);
       const pk = sw.n > 0 ? hit(sw.sum * p.streak, undefined, { knock: 20 }) : hit(10 * p.streak, { ranged: p.streak }, { knock: 20 });
       if (!w.hitLine(sx, sy, ang, Math.max(40, len), 56, pk)) w.sfx('hitShot');
+      // every sword streaks along the cut in light; a cross of gold-white light where you stop (never vermilion)
+      const V = vfxW(w);
       const nS = Math.max(1, Math.min(6, sw.n));
-      for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; fxLine(w, 'swordStreak', sx - dy * o, sy + dx * o, ang, Math.max(40, len), 0.45, 1.8); }
-      w.fx('critSpark', ex, ey, { r: 40, life: 0.3 });
+      for (let k = 0; k < nS; k++) { const o = (k - (nS - 1) / 2) * 9; V.streak(sx - dy * o, sy + dx * o, ex - dy * o, ey + dx * o, k === (nS - 1) >> 1 ? 12 : 7, k & 1 ? VT.jade : VT.azure, 0.45, 2); }
+      // two whole cuts crossing (an X of light that thins away in place) on what he cut: back along his
+      // path, clear of his figure (its nearest arm ≥ 46 u behind him), never over his face
+      const back = Math.max(84, Math.min(150, len * 0.5));
+      const cx = ex - dx * back, cy = ey - dy * back;
+      V.lance(cx - Math.cos(ang + 0.8) * 46, cy - Math.sin(ang + 0.8) * 46, ang + 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
+      V.lance(cx - Math.cos(ang - 0.8) * 46, cy - Math.sin(ang - 0.8) * 46, ang - 0.8, 92, 10, VT.gold, 0.3, VF.cut, 2);
+      V.bloom(cx, cy, 40, VT.gold, 0.3, BK.glow, 1, 2);
+      V.shock(ex, ey, 90, VT.azure, { flags: VF.double, debris: 6, fleck: FK.glint, life: 0.3, prio: 2 });
       // then the orbiting swords spin fast for 3 s, 40% on contact
       if (sw.n > 0) {
         const per = (sw.sum / sw.n) * p.spin;
+        // the spin: azure sword-light sweeping round you (no wash; the music-green ring was the 琴's)
         w.zone({
-          side: 'player', look: 'pulseRing', x: ex, y: ey, r: 110, life: p.spinDur, follow: 'player', tick: 0.5,
+          side: 'player', look: '' as never, x: ex, y: ey, r: 110, life: p.spinDur, follow: 'player', tick: 0.5,
           onTick: (ww) => {
             ww.hitArea(ww.player.x, ww.player.y, 110, hit(per, undefined, { proc: 0.3 }));
             const a0 = ww.t * 9;
-            for (let k = 0; k < 3; k++) fxLine(ww, 'swordStreak', ww.player.x + Math.cos(a0 + k * 2.1) * 95, ww.player.y + Math.sin(a0 + k * 2.1) * 95, a0 + k * 2.1 + Math.PI / 2, 40, 0.25, 1);
+            vfxW(ww).slash(ww.player.x, ww.player.y, a0, 110, 360, VT.azure, VF.big, 0.45, 1);
           },
         });
       }
@@ -230,6 +262,8 @@ const jiji: SkillImpl = {
   cast(w0, def, at0) {
     const p = def.p, at = within(w0, at0, def.reach ?? 420);
     w0.zone({ side: 'player', look: 'vortex', x: at.x, y: at.y, r: p.r, life: p.dur });
+    // the talisman's seal opens: a gamboge ring, sparks spiralling in
+    vfxW(w0).shock(at.x, at.y, p.r, VT.gamboge, { flags: VF.double | VF.thin | VF.halo, debris: 8, fleck: FK.ember, life: 0.45, prio: 2 });
     return coSkill(w0, function* (c) {
       let t = 0, tick = 0, first = true;
       while (t < p.dur) {
@@ -252,7 +286,11 @@ const jiji: SkillImpl = {
             const e = w.enemy(h);
             const ex = e.x, ey = e.y;
             w.hit(h, hit(p.base, { elem: p.k }, { status: { kind: 'burn', dur: 3, v: 3 + 0.5 * Math.max(0, w.stats.elem) }, proc: 0.6 }));
-            w.fx('lightningStrike', ex, ey, { r: 30, life: 0.3 });
+            // lightning from the sky, crisp and jagged, scorching where it lands
+            const V = vfxW(w);
+            V.bolt(ex + (w.rng() - 0.5) * 40, ey - 190, ex, ey, VT.gold, 0.22, 1.2, 1);
+            V.bloom(ex, ey, 26, VT.gold, 0.22, BK.glow, 1, 0);
+            V.stain(ex, ey, 18, STAIN.burn, 1.2);
           }
           // the first volley's strikes sound through the feel layer; an empty vortex still crackles
           if (first && !hs.length) w.sfx('hitTalisman');
@@ -307,16 +345,20 @@ const dianhua: SkillImpl = {
     // the nearest non-elites in the arc turn to ink allies for 10 s
     const mons = handles(w, x, y, p.r, 'normal').filter((h) => !decoy(w, h) && inArc(h));
     mons.sort((a, c) => { const ea = w.enemy(a), da = (ea.x - x) ** 2 + (ea.y - y) ** 2; const ec = w.enemy(c); return da - ((ec.x - x) ** 2 + (ec.y - y) ** 2); });
+    const V = vfxW(w);
     for (const h of mons.slice(0, p.n)) {
       const e = w.enemy(h);
       w.fx('inkBurst', e.x, e.y, { r: 20, life: 0.35 });
+      // turned: an indigo ring of wet ink round each new ally
+      V.ring(e.x, e.y, Math.max(22, e.r * 1.6), VT.indigo, 0.45, VF.thin | VF.double);
       w.convert(h, p.dur);
     }
     // elites and bosses in the arc take 60 + 200% 造化 instead
     w.hitCone(x, y, dir, p.r, p.deg, hit(p.eliteBase, { spirit: p.eliteK }, { knock: 20 }), 'eliteOrBoss');
-    w.fx('slashArc', x + Math.cos(dir) * 60, y + Math.sin(dir) * 60, { r: p.r * 0.7, dir, life: 0.4 });
-    fxLine(w, 'swordStreak', x, y, dir - half * 0.7, p.r, 0.35, 1);
-    fxLine(w, 'swordStreak', x, y, dir + half * 0.7, p.r, 0.35, 1);
+    // one giant stroke of the brush: a wet ink crescent across the arc, its two edges drawn in indigo
+    V.slash(x, y, dir, p.r, p.deg, VT.ink, VF.big, 0.42, 2);
+    V.lance(x, y, dir - half * 0.7, p.r, 7, VT.indigo, 0.35, 0, 2);
+    V.lance(x, y, dir + half * 0.7, p.r, 7, VT.indigo, 0.35, 0, 2);
     w.sfx('summon');
     return { tick: () => false };
   },
@@ -369,11 +411,16 @@ const wei: SkillImpl = {
         w.hit(h, hit(dmg, undefined, { noArmor: true, crit: false }));
         if (w.alive(h)) w.status(h, 'stun', p.stun);
       }
-      w.fx('shockRing', cx, cy, { r: p.r * 0.6, life: 0.4 });
+      // 提: the board's lines flash across the ring, an ink double ring, chips and a scorch
+      const V = vfxW(w), R0 = p.r * 0.55;
+      for (let k = -1; k <= 1; k += 2) {
+        V.lance(cx - R0, cy + k * R0 * 0.35, 0, R0 * 2, 3, VT.moon, 0.3, VF.streak, 2);
+        V.lance(cx + k * R0 * 0.35, cy - R0, Math.PI / 2, R0 * 2, 3, VT.moon, 0.3, VF.streak, 2);
+      }
+      V.shock(cx, cy, p.r * 0.6, VT.ink, { flags: VF.double | VF.halo | VF.big, debris: 12, stain: STAIN.scorch, life: 0.45, prio: 2 });
       if (n >= 6) w.title({ zh: '提子', en: 'Captured' }, 'edge');
       // captures pop through the feel layer; an empty 围 only clacks its stones
       if (!n) w.sfx('merge');
-      w.shake(3);
     });
   },
 };
@@ -393,6 +440,7 @@ const pudie: SkillImpl = {
     const snap = w0.strongest(to.x, to.y, 90);
     if (snap >= 0) { const e = w0.enemy(snap); to = vec(e.x, e.y); }
     else if (Math.hypot(to.x - w0.player.x, to.y - w0.player.y) < 30) to = vec(w0.player.x + dir.x * 200, w0.player.y + dir.y * 200);
+    const sx0 = w0.player.x, sy0 = w0.player.y;
     w0.leap(to, p.air, true);
     w0.sfx('dodge');
     let killed = false, landed = false;
@@ -401,9 +449,12 @@ const pudie: SkillImpl = {
       const w = c.w, x = w.player.x, y = w.player.y;
       landed = true;
       const n = w.hitArea(x, y, p.r, hit(p.base, { melee: p.k }, { status: { kind: 'stun', dur: p.stun }, knock: 40 }));
-      w.fx('shockRing', x, y, { r: p.r, life: 0.3 });
+      // the pounce lands: a gold shockwave, the paper cracks, three claw rakes across the prey
+      const V = vfxW(w);
+      V.shock(x, y, p.r, VT.gold, { flags: VF.double | VF.halo, debris: 10, stain: STAIN.crack, life: 0.34, prio: 2 });
+      const fa = Math.atan2(y - sy0, x - sx0);
+      V.slash(x - Math.cos(fa) * 30, y - Math.sin(fa) * 30, fa, 56, 110, VT.ink, VF.rake, 0.24, 2);
       w.fx('dustPuff', x, y, { r: 30, life: 0.3 });
-      w.shake(3);
       if (!n) w.sfx('hitMelee');
     }, {
       // only the landing's own kills count (weapons firing through the leap don't chain it)
@@ -420,14 +471,21 @@ const daoyao: SkillImpl = {
   cast(w0, def) {
     const p = def.p;
     w0.root(p.root);
+    // the pestle goes up (the press answers at once; the first pound lands 0.3 s later): a jade lance of
+    // light raised over her, a thin jade ring where the pounds will land
+    const V0 = vfxW(w0);
+    V0.lance(w0.player.x, w0.player.y - 18, -Math.PI / 2, 64, 12, VT.jade, 0.3, VF.streak, 2);
+    V0.ring(w0.player.x, w0.player.y, p.r, VT.jade, 0.3, VF.thin);
     return coSkill(w0, function* (c) {
       const step = p.root / p.pounds;
       for (let k = 0; k < p.pounds; k++) {
         yield step * 0.75;
         const w = c.w, x = w.player.x, y = w.player.y;
         const n = w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock }));
-        w.fx('shockRing', x, y, { r: p.r, life: 0.35 });
-        w.shake(2);
+        // the jade pestle comes down: a jade double ring, moon dust thrown up
+        const V = vfxW(w);
+        V.lance(x, y - 70, Math.PI / 2, 64, 12, VT.jade, 0.16, VF.streak, 2);
+        V.shock(x, y, p.r, VT.jade, { flags: VF.double | VF.halo, debris: 8, fleck: FK.glint, life: 0.36, prio: 2 });
         if (!n) w.sfx('bossDrum');
         yield step * 0.25;
       }
@@ -436,6 +494,9 @@ const daoyao: SkillImpl = {
       w.heal(w.player.hpMax * p.heal);
       w.buff('daoyao', { dmg: p.buff }, p.buffDur);
       w.fx('shieldBubble', w.player.x, w.player.y, { r: 30, life: 0.6 });
+      // the elixir: jade light rises round you
+      vfxW(w).bloom(w.player.x, w.player.y + 6, 90, VT.jade, 0.6, BK.column, 0.85, 2);
+      vfxW(w).motes(w.player.x, w.player.y, 30, 10, VT.jade, 0.9);
       w.sfx('levelUp');
     }, {
       // rooted, you take half damage
@@ -452,6 +513,9 @@ const yaoyue: SkillImpl = {
     w0.addDrunk(p.drunk);
     w0.buff('yaoyue', { crit: p.crit }, p.dur);
     w0.title({ zh: '举杯邀明月', en: 'A cup to the moon' }, 'edge');
+    // wine drops swirl up to the moon
+    vfxW(w0).motes(w0.player.x, w0.player.y, 46, 10, VT.wine, 0.9);
+    vfxW(w0).ring(w0.player.x, w0.player.y, 70, VT.moon, 0.5, VF.thin | VF.double);
     w0.sfx('bell');
     let glyphs = 0, winT = 0;
     const verse = (w: WorldApi, h0: number) => {
@@ -462,7 +526,8 @@ const yaoyue: SkillImpl = {
       for (let k = 0; k <= p.chain && h >= 0; k++) {
         const e = w.enemy(h);
         const ex = e.x, ey = e.y;
-        fxLine(w, 'boltChain', px, py, Math.atan2(ey - py, ex - px), Math.hypot(ex - px, ey - py), 0.25, 0.7);
+        // the verse flies as a ribbon of wine-dark ink (not the talisman's lightning)
+        vfxW(w).streak(px, py, ex, ey, 6, VT.wine, 0.3, 0);
         fxSprite(w, 'proj:verseGlyph', ex, ey - 10, 22, 0.35);
         w.hit(h, hit(p.base, { ranged: p.k }, { crit: false, proc: 0.3 }));
         seen.push(h);
@@ -504,9 +569,11 @@ const tuodao: SkillImpl = {
       yield 0.22;
       const w = c.w, x = w.player.x, y = w.player.y;
       const n = w.hitArea(x, y, p.r, hit(p.kWeapon * best, { melee: p.kMelee }, { knock: p.knock, status: { kind: 'stun', dur: p.stun } }));
-      for (let k = 0; k < 4; k++) w.fx('slashArc', x + Math.cos(k * TAU / 4) * 120, y + Math.sin(k * TAU / 4) * 120, { r: 110, dir: k * TAU / 4 + Math.PI / 2, life: 0.35 });
-      w.fx('shockRing', x, y, { r: p.r, life: 0.4 });
-      w.shake(6);
+      // the turn and the sweep: one golden crescent round the whole circle, a bright leading edge, a
+      // gold shockwave behind it, dust flung, the paper cracked (never vermilion: 关公's red is his own)
+      const V = vfxW(w), fa = Math.atan2(dy / d, dx / d) + Math.PI;
+      V.slash(x, y, fa, p.r * 0.95, 360, VT.gold, VF.edge | VF.big, 0.4, 2);
+      V.shock(x, y, p.r, VT.gold, { flags: VF.double | VF.halo | VF.big, debris: 12, stain: STAIN.crack, stainLife: 2.2, life: 0.48, prio: 2 });
       if (!n) w.sfx('bossDrum');
     });
   },
@@ -526,21 +593,33 @@ const qinghui: SkillImpl = {
       let t = 0;
       while (t < p.rise) {
         const w = c.w;
-        if (Math.floor(t * 4) !== Math.floor((t + w.dt) * 4)) w.fx('moonCircle', w.player.x, w.player.y, { r: 26, life: 0.4 });
+        // she rises in a column of moonlight, glints spiralling up with her (from the first frame: the
+        // press answers at once)
+        if (t === 0 || Math.floor(t * 4) !== Math.floor((t + w.dt) * 4)) {
+          const V = vfxW(w);
+          // lift-off: a moon ring breaks from her feet
+          if (t === 0) V.ring(w.player.x, w.player.y, 60, VT.moon, 0.4, VF.thin | VF.double);
+          V.bloom(w.player.x, w.player.y + 8, 130, VT.moon, 0.55, BK.column, 0.9, 1);
+          V.bloom(w.player.x, w.player.y - 8, 58, VT.moon, 0.5, BK.halo, 0.75, 1);
+          V.motes(w.player.x, w.player.y, 34, 4, VT.moon, 0.8);
+        }
         t += w.dt;
         yield 0;
       }
       // she lands in a moonlight pool: impact, then −30% damage and 20% slower for foes inside, +5 回气 for her
       const w = c.w, x = w.player.x, y = w.player.y;
       const landed = w.hitArea(x, y, p.r, hit(p.base, { elem: p.k }, { knock: 30 }));
-      w.fx('shockRing', x, y, { r: p.r, life: 0.4 });
+      // she lands in moonlight: a moon-white double ring with a halo, glints thrown out, the pool shimmers
+      const V = vfxW(w);
+      V.shock(x, y, p.r, VT.moon, { flags: VF.double | VF.halo | VF.big, debris: 10, fleck: FK.glint, life: 0.5, prio: 2 });
+      // a ring of moonlight about her (a halo, clear in its heart: she is not washed out)
+      V.bloom(x, y - 6, 74, VT.moon, 0.5, BK.halo, 0.85, 2);
       shared(w).pools.push({ x, y, r: p.r, until: w.t + p.pool, dr: p.poolDr / 100 });
       w.zone({
         side: 'player', look: 'moonPool', x, y, r: p.r, life: p.pool, slow: p.poolSlow, tick: 0.25,
         onTick: (ww) => { if ((ww.player.x - x) ** 2 + (ww.player.y - y) ** 2 <= p.r * p.r) ww.buff('moonpool', { regen: p.poolRegen }, 0.3); },
       });
       setMoon(w, 0);
-      w.shake(3);
       if (!landed) w.sfx('bell'); // a landing on foes gets the feel layer's boom instead
     });
   },

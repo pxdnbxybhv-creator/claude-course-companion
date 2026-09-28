@@ -2,6 +2,8 @@
 // core already scales an elite's HP, damage and speed, gives it the elite knockback resist and pays
 // its 12 月华, 镜奁 and planned 铜钱 on death; content moves it and makes it attack. Every attack is
 // announced in wet vermilion ink first. Damage is the elite's own scaled contact damage × a factor.
+// Elites are ordinary combat: their slams ring and thud but never shake the camera (that is kept for
+// the hard blows you take and for bosses).
 import { AFFIX_REG, ELITE_REG, type AffixId, type EliteId, type TreasureId } from '../../ids';
 import type { ActorImpl, AffixImpl, TeleShape, WorldApi } from '../../types';
 import { AFFIXES, ELITES, TREASURES } from '../../data';
@@ -129,7 +131,7 @@ const turtle = coActor(function* (c) {
         const e = w.enemy(h);
         const k = Math.min(1, along / Math.max(1, L));
         e.x = a.x + (z.x - a.x) * k; e.y = a.y + (z.y - a.y) * k; e.vx = 0; e.vy = 0;
-        if (k >= 1) { seg++; along = 0; w.fx('shockRing', e.x, e.y, { r: 50, life: 0.25 }); w.sfx('hitMelee'); w.shake(2); }
+        if (k >= 1) { seg++; along = 0; w.fx('shockRing', e.x, e.y, { r: 50, life: 0.25 }); w.sfx('hitMelee'); }
       }
       t += w.dt;
       yield 0;
@@ -207,7 +209,7 @@ const tiger = coActor(function* (c) {
     }
     {
       const w = c.w, e = w.enemy(h);
-      w.sfx('bossDrum'); w.shake(3);
+      w.sfx('bossDrum');
       if (dist(e.x, e.y, w.player.x, w.player.y) <= p.roarR) { slowPlayer(w, p.slow, 1.8); w.fx('slowMark', w.player.x, w.player.y + 10, { r: 40, life: 1.2 }); }
     }
     // three leaps
@@ -221,7 +223,7 @@ const tiger = coActor(function* (c) {
       const R = 80;
       strikeTele(w, h, { kind: 'circle', x: to.x, y: to.y, r: R }, p.tell, (ww) => {
         if (playerIn(ww, { kind: 'circle', x: to.x, y: to.y, r: R })) eliteHit(ww, h, 1.3, 'tiger');
-        ww.fx('shockRing', to.x, to.y, { r: R, life: 0.3 }); ww.fx('dustPuff', to.x, to.y, { r: 40, life: 0.3 }); ww.shake(3); ww.sfx('hitMelee');
+        ww.fx('shockRing', to.x, to.y, { r: R, life: 0.3 }); ww.fx('dustPuff', to.x, to.y, { r: 40, life: 0.3 }); ww.sfx('hitMelee');
       });
       setAir(w, h, true);
       const T = teleT(w, p.tell);
@@ -265,7 +267,7 @@ const painted = coActor(function* (c) {
       w.fx('petalBurst', e.x, e.y, { r: 60, life: 0.5 });
       // its true name (and its 镜印) only now
       if (!announce(w, c.h)) w.title(b('画皮', 'Painted Skin'), 'edge');
-      w.sfx('shatter'); w.shake(3);
+      w.sfx('shatter');
     }
     const fast = (p.fast / ELITES.painted.speed);
     while (true) {

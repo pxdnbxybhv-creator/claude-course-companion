@@ -94,7 +94,7 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
       {seg(t('瞄准', 'Aim'), s.aim, [['auto', t('自动', 'Auto')], ['manual', t('手瞄', 'Manual')]], (v) => set({ aim: v }))}
       {seg(t('伤害数字', 'Damage numbers'), s.nums, [[0, t('关', 'Off')], [1, t('暴击', 'Crits')], [2, t('全部', 'All')]], (v) => set({ nums: v }))}
       <div class="row">
-        <div class="row-main"><div class="row-title">{t('震屏', 'Screen shake')}</div><div class="row-sub">{t('减少动态时总是关闭', 'Always off with reduced motion')}</div></div>
+        <div class="row-main"><div class="row-title">{t('震屏', 'Screen shake')}</div><div class="row-sub">{t('只在重创与首领出招时轻震；减少动态时关闭', 'A small shake only for hard hits and boss blows; off with reduced motion')}</div></div>
         <Switch checked={s.shake && !calm} disabled={calm} onChange={(v) => set({ shake: v })} label={t('震屏', 'Screen shake')} />
       </div>
       <div class="row">

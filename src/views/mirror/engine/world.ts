@@ -266,7 +266,6 @@ export class World implements WorldApi {
   lastCrit = false;
   /** Crits dealt so far (a weapon checks whether any hit of one attack crit). */
   critN = 0;
-  private eliteStopT = -1;
 
   constructor(o: WorldOpts) {
     this.settings = o.settings;
@@ -307,7 +306,6 @@ export class World implements WorldApi {
     this.setup = setup;
     this.plan = setup.plan;
     this.lastResult = null;
-    this.eliteStopT = -1;
     this.wave = setup.wave;
     this.map = MAPS[run.map];
     this.diff = DIFFS[run.diff];
@@ -883,8 +881,8 @@ export class World implements WorldApi {
     if (ph) this.title({ zh: ph.zh, en: ph.en }, 'centre');
     this.clearShots('enemy');
     this.sfx('phaseBreak');
+    // a beat of stillness, then a small, short shake (feel.phase): big moments only
     this.feel.stopHard(120);
-    this.shake(6);
     this.feel.phase(E.x[i], E.y[i]);
   }
   private bossHudId(id: string): BossId | 'twins' | 'mirrorself' {
@@ -1210,15 +1208,10 @@ export class World implements WorldApi {
         E.kx[i] = (dx * dist) / F.knockDur; E.ky[i] = (dy * dist) / F.knockDur; E.kT[i] = F.knockDur;
       }
     }
-    // 30 ms on elite hits (§4.2), rate-limited: at most one per 0.5 s, and only for a crit or a hit
-    // worth 3% of its HP — unlimited, fast builds froze the game every 80 ms (61–78% speed); now
-    // the worst case costs about 6% of game speed while an elite is under fire
-    if (E.kind[i] === EKind.Elite && !(flags & HF.dot) && this.t - this.eliteStopT >= 0.5 && (crit || d >= E.hpMax[i] * 0.03)) {
-      this.eliteStopT = this.t;
-      this.hitstop(30);
-    }
+    // (an elite struck no longer stops the world: the elite itself freezes and staggers — feel.hit)
     const srcName = SRC[src];
-    // 打击感: flash, squash, spatter by weapon class, the impact bus, crit stops (quiet DoT ticks: none)
+    // 打击感: the body reacts (flash, squash, recoil, a local freeze), marks and spatter by weapon
+    // class, the impact bus (quiet DoT ticks: none); the camera stays still
     if (!(flags & HF.quiet) || !(flags & HF.dot)) this.feel.hit(i, fx, fy, d, crit, this.fcOf(slot, src, flags), (flags & HF.dot) !== 0, src, slot);
     // on-hit: lifesteal (weapons only), items, content
     if (!(flags & HF.noProc)) {
@@ -1428,7 +1421,9 @@ export class World implements WorldApi {
     const h = E.handle(i);
     const k = E.kind[i], id = E.id[i], x = E.x[i], y = E.y[i];
     // everything read after release is taken now: a splitter's first child reuses slot i
-    const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], role = E.role[i], r = E.r[i], burning = E.burnN[i] > 0, hitA = E.hitA[i];
+    const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], r = E.r[i], burning = E.burnN[i] > 0, hitA = E.hitA[i];
+    // 打击感: the look its death burst breaks apart (the slot may be reused before feel.kill)
+    const look = E.atlas[i], lookFace = E.face[i], lookK = E.r[i] / Math.max(1, E.r0[i]);
     E.hp[i] = Math.min(E.hp[i], 0);
     this.flushNumber(i);
     // content death hooks run while the body still exists
@@ -1466,12 +1461,13 @@ export class World implements WorldApi {
     if (!ally) onWeaponKill(this, lastSlot, x, y, crit, burning);
     if (k === EKind.Demon && drops) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
     onEnemyDeath(this, i, k, id, x, y, crit);
-    // 60 ms of hitstop on crit kills of tanks (§4.2)
-    if (crit && k === EKind.Mon && role === ROLE.tank) this.hitstop(60);
     this.emit('kill', h, 0, crit, SRC[lastSrc] ?? 'weapon', x, y, lastSlot);
-    // ink: a burst, a wet crown and flung drops (打击感), then a stain stamped into the paper
-    this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
-    if (!ally) this.feel.kill(x, y, r, k, crit, hitA, this.fcOf(lastSlot, lastSrc, 0));
+    // ink (打击感): the body breaks into its pieces over a splash on the ground, a wet crown and flung
+    // drops, then a stain stamped into the paper. The dark ink burst (drawn in the effects layer, over
+    // the pieces) only when nothing breaks: an ally, a degraded frame, a crowd's fifth death in a step.
+    let broke = false;
+    if (!ally) { this.feel.corpse(look, lookFace, lookK); broke = this.feel.kill(x, y, r, k, crit, hitA, this.fcOf(lastSlot, lastSrc, 0)); }
+    if (!broke) this.fx('inkBurst', x, y, { r: r * 1.6, life: 0.35 });
     try { this.painter?.stamp('splat', x, y, r * 1.2, (h * 2654435761) >>> 0); } catch { /* painter optional */ }
   }
 
@@ -1524,7 +1520,6 @@ export class World implements WorldApi {
     if (this.wave > 30) this.addStat('endlessBosses', 1);
     this.hooks.boss({ kind: 'dead', id: this.bossHudId(id) });
     this.feel.stopHard(160);
-    this.shake(6);
     this.feel.bossDown(x, y);
     this.sfx('shatter');
     // the wave's boss reward waits for the last body of the fight
@@ -1597,11 +1592,12 @@ export class World implements WorldApi {
     if (!dot) {
       this.iframes = F.iframes;
       this.addStat('hitsTaken', 1);
-      // 打击感: a dark edge pulse, a kick away from the blow, the heartbeat drum and a grunt, a stop,
-      // an 8 ms haptic tick, and your figure knocked back a few px — drawn only: the simulation never
-      // shoves you (GDD §20.1: no drift), so a blow can't push you into a telegraph
+      // 打击感: a dark edge pulse, the heartbeat drum and a grunt, an 8 ms haptic tick, and your figure
+      // knocked back a few px — drawn only: the simulation never shoves you (GDD §20.1: no drift), so a
+      // blow can't push you into a telegraph; a hard blow (≥ 15% of your HP, a boss's) also nudges the
+      // camera a little and stops a beat
       const sx = attacker >= 0 ? this.E.x[attacker] : this.hurtSrcX, sy = attacker >= 0 ? this.E.y[attacker] : this.hurtSrcY;
-      this.feel.hurt(sx, sy, attacker >= 0 && this.E.kind[attacker] === EKind.Boss);
+      this.feel.hurt(sx, sy, attacker >= 0 && this.E.kind[attacker] === EKind.Boss, this.hpMax > 0 ? d / this.hpMax : 0);
       this.emit('hurt', attacker >= 0 ? this.E.handle(attacker) : -1, d, false, 'enemy', this.px, this.py, -1);
       if (attacker >= 0) this.thorns(attacker, n, melee);
     }
@@ -1775,7 +1771,9 @@ export class World implements WorldApi {
     this.titles.push({ text, where, t: where === 'centre' ? 1.4 : 0.6 });
     if (this.titles.length > 4) this.titles.shift();
   }
-  /** Screen shake as trauma (the feel layer: amplitude ∝ trauma², decays in real time). */
+  /** A boss's slam shakes the screen a little (the feel layer: ≤ 2 px, at most one per 0.5 s, off with
+   *  the shake setting). The player's own weapons, 镜技 and the elites never call it: their blows show on
+   *  the bodies. */
   shake(px: number): void {
     this.feel.shake(px);
   }

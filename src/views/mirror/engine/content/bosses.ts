@@ -16,6 +16,7 @@ import {
   teleFill, teleShape, dropMoon, dropGold, setHp, setBossBeat, ownBeat, beatNow,
 } from './bridge';
 import { shotSpeedX } from './field';
+import { BK, FK, STAIN, VF, VT, vfxW } from '../vfx';
 import {
   CoRun, DEG, TAU, b, clamp, dist, homeOf, hurtPlayer, inGap, openPoint, playerIn, rayToWall, reflect, rimR,
   FOREVER, shared, swarmOf, teleT, toPlayer, type Co,
@@ -1269,6 +1270,7 @@ const RUNNER: ActorImpl<BossState> = {
   },
   death(w, h, st) {
     st.dead = true;
+    { const e = w.enemy(h); bossDownFx(w, e.x, e.y, e.r); }
     endAll(w, st);
     clearPhantoms(w, st);
     for (const t of st.trees) if (w.alive(t)) { shared(w).phantoms.delete(t); expire(w, t, 'petalBurst'); }
@@ -1287,6 +1289,18 @@ const RUNNER: ActorImpl<BossState> = {
     shared(w).bosses.delete(h);
   },
 };
+/**
+ * 流光: a boss breaks — a great gold double ring with a bright leading edge, a second one in moonlight,
+ * a column of light where it stood, glints flung up and the ground cracked (player-side light: never
+ * vermilion). Visual only.
+ */
+function bossDownFx(w: WorldApi, x: number, y: number, r: number): void {
+  const V = vfxW(w);
+  V.shock(x, y, Math.max(220, r * 5), VT.gold, { flags: VF.double | VF.halo | VF.big, debris: 14, fleck: FK.glint, stain: STAIN.crack, stainLife: 3, life: 0.75, prio: 2 });
+  V.shock(x, y, Math.max(140, r * 3.2), VT.moon, { flags: VF.double | VF.halo, debris: 0, life: 0.55, prio: 2 });
+  V.bloom(x, y + 10, Math.max(220, r * 4.5), VT.gold, 0.85, BK.column, 0.9, 2);
+  V.motes(x, y, Math.max(40, r * 1.5), 12, VT.gold, 1.1);
+}
 export const BOSS_IMPLS: Partial<Record<BossId, ActorImpl>> = {};
 for (const id of Object.keys(BOSSES) as BossId[]) BOSS_IMPLS[id] = RUNNER as ActorImpl;
 

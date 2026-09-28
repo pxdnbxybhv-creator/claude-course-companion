@@ -1,5 +1,5 @@
 // 水月幻镜 · engine-core regressions from the engine QA round: 提子's capture rate, pierce-all hit
-// sets, 醉拳 IV's crit reset, held movement across pause, the frame-time guard, elite hitstop, re-entrant
+// sets, 醉拳 IV's crit reset, held movement across pause, the frame-time guard, no elite hitstop, re-entrant
 // scratch buffers, guarded UI hooks, coins with a full drop pool, 重墨 overflow targets, kill events of
 // splitters, wilting weeds, 纸伞妖 vs 墨宝, the 竹鼠 surfacing pause.
 import { describe, expect, it } from 'vitest';
@@ -220,7 +220,7 @@ describe('engine-core fixes: the world', () => {
     eng.dispose();
   });
 
-  it('elite hitstop is rate-limited: a fast build keeps ≥ 93% game speed against an elite', () => {
+  it('striking an elite never stops the world: the elite itself flashes, freezes and staggers (打击感)', () => {
     const ws: [WeaponId, 1 | 2 | 3 | 4][] = [['casket', 4], ['claw', 4], ['dart', 4], ['repeater', 4], ['longquan', 4], ['thunder', 4]];
     const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3, char: 'scholar' })), ws), wave: 11, stats: { aspd: 120, crit: 60 } });
     const { eng } = make(run);
@@ -229,10 +229,14 @@ describe('engine-core fixes: the world', () => {
     const h = W.spawn('turtle', W.px + 60, W.py, { bloom: false });
     const i = W.E.slotOf(h); W.E.hp[i] = W.E.hpMax[i] = 1e12; W.E.speed[i] = 0; W.E.dmg[i] = 0;
     const t0 = W.tWave;
+    const F = W.feel, st0 = { ...F.st };
     let now = 1000;
     for (let f = 0; f < 600; f++) { now += 1000 / 60; eng.frame(now); }
-    expect(W.tWave - t0).toBeGreaterThan(9.3);
-    expect(W.tWave - t0).toBeLessThan(9.95); // it still plays (crits land)
+    expect(W.tWave - t0).toBeGreaterThanOrEqual(9.95); // full game speed (it used to stop 30 ms twice a second)
+    expect(F.st.stopMs - st0.stopMs).toBe(0);
+    expect(F.st.pulses - st0.pulses).toBeGreaterThan(100); // … the elite shows every hit instead
+    expect(F.st.freezes - st0.freezes).toBeGreaterThan(5);
+    expect(F.st.staggers - st0.staggers).toBe(0); // (immortal: 1e12 HP never reaches a stagger's 8%)
     eng.dispose();
   });
 
