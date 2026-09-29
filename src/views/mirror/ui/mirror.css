@@ -771,6 +771,7 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-revive-card h2 { margin: 0 0 8px; font-size: 34px; font-weight: 400; letter-spacing: 0.08em; }
 .mj-revive-line { margin: 0 0 12px; font-size: 15px; line-height: 1.6; color: var(--ink-2); text-align: left; }
 .mj-revive-purse { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 0 14px; font-size: 15px; color: var(--ink); }
+.mj-revive-purse .coin-icon { width: 16px; height: 16px; }
 .mj-revive-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
 .mj-revive-go { width: 100%; background: #3e9a63; border-color: #3e9a63; color: #fbf5ea; font-size: 16px; }
 .mj-revive-go:hover { background: color-mix(in srgb, #3e9a63 86%, black); }

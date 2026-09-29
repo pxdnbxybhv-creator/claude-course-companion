@@ -153,10 +153,7 @@ export const STICK_DEAD = 8;
 /** Thumb travel (px) that already gives full speed; the knob still draws out to STICK_R. The old ramp
  *  (full only at the 56 px rim, 2% of speed a px) made speed follow how far the thumb happened to
  *  travel, so a few px of touch offset split up from down (「往往向上走慢，向下快」). */
-export const STICK_FULL = 24;
-/** The first ms after touchdown in which the base moves with a thumb still inside the dead zone (the
- *  pad settling toward the palm is not a push). */
-export const STICK_SETTLE_MS = 100;
+export const STICK_FULL = 20;
 /** The floating stick: drag (dx, dy) px from the anchor → a move vector of length ≤ 1 (dead zone 8,
  *  full speed from STICK_FULL). The manual-aim stick uses its direction only. */
 export function stickVector(dx: number, dy: number, R = STICK_R, dead = STICK_DEAD, full = STICK_FULL): { x: number; y: number; knobX: number; knobY: number } {
@@ -167,18 +164,14 @@ export function stickVector(dx: number, dy: number, R = STICK_R, dead = STICK_DE
   return { x: dx * k, y: dy * k, knobX: dx * kk, knobY: dy * kk };
 }
 /** The base follows a thumb that runs past its rim (a thumb far out never needs a long trip home to
- *  turn round); mutates and returns the anchor. */
+ *  turn round); mutates and returns the anchor. There is no settle re-anchor near touchdown: one that
+ *  moved the base with a thumb still inside the dead zone chased any push slower than 8 px an event
+ *  and ate it (you stood still, and up and down differed). A few px of pad settle fit under the 20 px
+ *  full-speed travel instead. */
 export function stickFollow<A extends { x: number; y: number }>(a: A, px: number, py: number, R = STICK_R): A {
   const dx = px - a.x, dy = py - a.y, d = Math.hypot(dx, dy);
   if (d > R && Number.isFinite(d)) { const k = 1 - R / d; a.x += dx * k; a.y += dy * k; }
   return a;
-}
-/** Within STICK_SETTLE_MS of touchdown (`t0`, `t`: the events' timeStamps, ms) a thumb still inside the
- *  dead zone re-anchors the base; then the base follows past the rim (stickFollow). Mutates and
- *  returns the anchor. */
-export function stickSettle<A extends { x: number; y: number; t0: number }>(a: A, px: number, py: number, t: number, R = STICK_R, dead = STICK_DEAD): A {
-  if (t - a.t0 < STICK_SETTLE_MS && Math.hypot(px - a.x, py - a.y) < dead) { a.x = px; a.y = py; }
-  return stickFollow(a, px, py, R);
 }
 /** Keys held → a move vector (WASD / arrows), normalised. */
 export function keysVector(held: ReadonlySet<string>): { x: number; y: number } {

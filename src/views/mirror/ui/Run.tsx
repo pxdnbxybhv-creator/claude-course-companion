@@ -16,7 +16,7 @@ import { coinToast } from '../../../ui/coins';
 import { coins } from '../../../app/play';
 import { todayKey } from '../../../core/date';
 import { bakeScale, createPainter, viewOf } from '../paint';
-import { arenaGeom, computeStats, nextScreen, openShop, REVIVE, unlocksOf } from '../logic';
+import { arenaGeom, computeStats, nextScreen, openShop, unlocksOf } from '../logic';
 import { realSession, type RunSession } from '../logic/session';
 import { COMPANIONS } from '../data';
 import type {
@@ -395,7 +395,8 @@ export function RunView(props: {
       return;
     }
     setRun({ ...runRef.current, revived: true });
-    toast(t(`已花 ${REVIVE.price} 文。本局不能再复活。`, `${REVIVE.price} coins spent. No more revives this run.`), 3200);
+    // no toast here: the centre title 破镜重圆 says you rose, the dialog said it was the run's one revive,
+    // and a toast at the top would sit over the HP bar, the wave and the pause button just when you need them
     P.current.audio.music(fightMusic.current, runRef.current.map);
     wrap.current?.focus({ preventScroll: true });
   };

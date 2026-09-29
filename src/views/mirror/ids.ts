@@ -223,7 +223,7 @@ export const PASSIVE_REG = [
   { id: 'yaoxiang', char: 'rabbit', zh: '月宫药香', en: 'Moon-Palace Herbs', look: 'overheal becomes a moon shield, healing +15%; −15% 射程' },
   { id: 'baipian', char: 'poet', zh: '斗酒百篇', en: 'A Hundred Poems a Jug', look: 'the 醉 meter without wine, twice as fast; his aim sways' },
   { id: 'yibo', char: 'guan', zh: '义薄云天', en: 'Righteous as the Clouds', look: 'no hit takes over 20% of max HP, grows 近战; five weapon slots, no hidden weapons' },
-  { id: 'yinqing', char: 'change', zh: '阴晴圆缺', en: 'Waxing and Waning', look: 'a 16 s moon cycle from full-moon damage to new-moon dodge; floats over hazards' },
+  { id: 'yinqing', char: 'change', zh: '阴晴圆缺', en: 'Waxing and Waning', look: 'a 16 s moon cycle from full-moon damage to new-moon dodge; ground hazards hurt her half and never slow her' },
 ] as const satisfies readonly CharNamed[];
 export type PassiveId = (typeof PASSIVE_REG)[number]['id'];
 

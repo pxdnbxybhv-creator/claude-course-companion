@@ -2238,11 +2238,13 @@ export class World implements WorldApi {
       if (Z.side[i] === 0) {
         // enemy zones act on the player (webs, clouds, puddles): undodgeable DoT, slows
         const dx = this.px - x, dy = this.py - y;
-        // 嫦娥 floats over the core's ground zones (webs, spore clouds); content zones decide for themselves
+        // 嫦娥 floats over the core's ground zones (webs, spore clouds): never slowed, half the burn (round 5:
+        // with the late HP wall gone these zones are what ends endless runs, and full immunity took her to
+        // the cap every time); content zones decide for themselves
         const floats = this.run.char === 'change' && Z.code[i] !== 0;
-        if (!floats && dx * dx + dy * dy <= (r + this.pr * 0.5) * (r + this.pr * 0.5)) {
-          if (Z.slow[i] > 0) this.slowPlayer(Z.slow[i] > 1 ? Z.slow[i] / 100 : Z.slow[i], 0.15);
-          if (Z.dps[i] > 0) this.dotPlayer(Z.dps[i], 0.2);
+        if (dx * dx + dy * dy <= (r + this.pr * 0.5) * (r + this.pr * 0.5)) {
+          if (!floats && Z.slow[i] > 0) this.slowPlayer(Z.slow[i] > 1 ? Z.slow[i] / 100 : Z.slow[i], 0.15);
+          if (Z.dps[i] > 0) this.dotPlayer(Z.dps[i] * (floats ? 0.5 : 1), 0.2);
         }
       } else if (Z.slow[i] > 0 || Z.dps[i] > 0 || Z.code[i] > 0) {
         this.zoneOnEnemies(i, x, y, r, dt);

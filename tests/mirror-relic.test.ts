@@ -167,15 +167,18 @@ describe('同流派: the shop draws your schools', () => {
 });
 
 describe('round-5 buffs', () => {
-  it('every companion is sturdier: +10 气血 (关公 +12), +2 护甲 (关公 +3), the nine ranged +1 护甲 more', () => {
+  it('every companion is sturdier: +10 气血 (关公 +12), +2 护甲 (关公 +3), the nine ranged +1 护甲 more; QA: 侠客 +8 气血 +2 护甲, 诗仙 +6 气血 on top', () => {
     const before: Record<string, [number, number]> = {
       scholar: [24, 1], gardener: [26, 2], fisher: [24, 1], musician: [18, 0], swordsman: [18, 0], taoist: [16, 0], painter: [24, 1],
       player: [20, 2], cat: [16, 0], rabbit: [18, 1], poet: [22, 0], guan: [28, 3], change: [19, 0],
     };
+    // the QA fix round: the two who trailed the other ranged companions (skilled median 28–30 against 31–45)
+    const qa: Record<string, [number, number]> = { swordsman: [8, 2], poet: [6, 0] };
     for (const [id, [hp, ar]] of Object.entries(before)) {
       const c = COMPANIONS[id as keyof typeof COMPANIONS];
-      expect(c.hp).toBe(hp + (id === 'guan' ? 12 : 10));
-      expect(c.armor).toBe(ar + (id === 'guan' ? 3 : 2) + (c.style === 'ranged' ? 1 : 0));
+      const [qh, qr] = qa[id] ?? [0, 0];
+      expect(c.hp).toBe(hp + (id === 'guan' ? 12 : 10) + qh);
+      expect(c.armor).toBe(ar + (id === 'guan' ? 3 : 2) + (c.style === 'ranged' ? 1 : 0) + qr);
     }
   });
   it('melee weapons hit harder and reach further', () => {

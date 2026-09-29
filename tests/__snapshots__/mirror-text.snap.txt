@@ -222,7 +222,7 @@ jiuming | 一局有 8 次（每重最多一次）：挨了致命一击不倒，�
 yaoxiang | 血回满以后，再回的血变成护盾（最多到气血上限的 25%，每秒少 2%）；治疗效果 +15%。 | 射程 −15%
 baipian | 不带酒类兵器也有醉意条，醉意涨得快一倍。 | 自动瞄准会左右晃 10°
 yibo | 一下最多掉气血上限的 20%；每打完 3 重近战 +1（最多 +10）；身边一圈里的敌人伤害 −10%。 | 只有 5 个兵器位；商店不卖暗器
-yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；能飘过地上的险地。 | 加的护甲只算 75%
+yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；地上的险地只伤她一半，也拖不慢她。 | 加的护甲只算 75%
 ## en
 qingfeng 1 | 14 damage · every 0.8 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
 qingfeng 2 | 22 damage · every 0.76 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
@@ -447,4 +447,4 @@ jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP a
 yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing. | −15% range
 baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. | Auto-aim sways 10°
 yibo | No hit takes more than 20% of max HP; +1 Melee every 3 waves cleared (max +10); enemies in a medium area around you deal 10% less. | Only 5 weapon slots; no Hidden weapons in his shop
-yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Floats over ground hazards. | Armour gains count 75%
+yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Ground hazards hurt her half as much and never slow her. | Armour gains count 75%

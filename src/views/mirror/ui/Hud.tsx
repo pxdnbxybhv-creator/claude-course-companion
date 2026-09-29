@@ -10,7 +10,7 @@ import { COMPANION_REG, SKILL_REG, type SkillId } from '../ids';
 import type { CharacterId, Engine, HudState } from '../types';
 import { termLine, termName } from '../data/glossary';
 import { Portrait } from './icons';
-import { bossName, fmtClock, skillDrag, stickSettle, stickVector, STICK_R } from './text';
+import { bossName, fmtClock, skillDrag, stickFollow, stickVector, STICK_R } from './text';
 
 /** The HUD's armour line names what is reduced: 「少受伤 6%」 (a bare 「少受 6%」 has no noun here). */
 const hudArmour = (r: number, t: (zh: string, en: string) => string) => (r >= 0 ? t(`少受伤 ${r}%`, `${r}% less damage`) : t(`多受伤 ${-r}%`, `${-r}% more damage`));
@@ -197,7 +197,7 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
 
   useEffect(() => {
     const el = layer.current!;
-    let stick: { id: number; x: number; y: number; t0: number } | null = null;
+    let stick: { id: number; x: number; y: number } | null = null;
     let aim: { id: number; x: number; y: number } | null = null;
     const show = (b: HTMLDivElement | null, k: HTMLDivElement | null, x: number, y: number, kx: number, ky: number, on: boolean) => {
       if (!b || !k) return;
@@ -215,7 +215,7 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       const p = local(e);
       const inStick = opts.current.left ? p.x > p.w * 0.4 : p.x < p.w * 0.6;
       if (inStick && !stick) {
-        stick = { id: e.pointerId, x: p.x, y: p.y, t0: e.timeStamp };
+        stick = { id: e.pointerId, x: p.x, y: p.y };
         try { el.setPointerCapture(e.pointerId); } catch { /* old browsers */ }
         show(base.current, knob.current, p.x, p.y, 0, 0, true);
         e.preventDefault();
@@ -232,7 +232,7 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       if (e.pointerType === 'mouse') eng?.input.cursor(p.x, p.y);
       if (stick && e.pointerId === stick.id) {
         // the pad's settle in the first 100 ms moves the base; a thumb past the rim drags it along
-        stickSettle(stick, p.x, p.y, e.timeStamp);
+        stickFollow(stick, p.x, p.y); // the base follows a thumb past the rim; no settle re-anchor (it chased thumbs moving < 8 px an event)
         const v = stickVector(p.x - stick.x, p.y - stick.y);
         eng?.input.move(v.x, v.y);
         show(base.current, knob.current, stick.x, stick.y, v.knobX, v.knobY, true);

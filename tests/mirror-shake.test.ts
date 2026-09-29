@@ -174,6 +174,46 @@ describe('屏幕抖动: the fixed-step loop is drawn smoothly', () => {
   });
 });
 
+describe('屏幕抖动: a packed crowd is drawn still', () => {
+  it('60 墨团 packed round you shiver ≤ 5 times a body a second on a 120 Hz screen (was 15), and a body on the move is drawn where it is', () => {
+    const { eng, W, also } = make({ content: CONTENT });
+    for (let k = 0; k < 60; k++) {
+      const a = k * 2.399, d = 150 + (k % 9) * 40;
+      const i = W.E.slotOf(W.spawn('blot', W.px + Math.cos(a) * d, W.py + Math.sin(a) * d, { bloom: false }));
+      if (i >= 0) { W.E.hp[i] = W.E.hpMax[i] = 1e12; W.E.dmg[i] = 0; }
+    }
+    const px = new Float32Array(1024), py = new Float32Array(1024), dx0 = new Float32Array(1024), dy0 = new Float32Array(1024);
+    let flips = 0, rec = false, first = true;
+    also((Wd) => {
+      if (!rec) return;
+      for (let i = 0; i < Wd.E.n; i++) {
+        if (!Wd.E.alive[i]) continue;
+        const dx = Wd.E.x[i] - px[i], dy = Wd.E.y[i] - py[i], m = Math.hypot(dx, dy), m0 = Math.hypot(dx0[i], dy0[i]);
+        if (!first && m > 0.15 && m0 > 0.15 && (dx * dx0[i] + dy * dy0[i]) / (m * m0) < -0.5) flips++;
+        dx0[i] = first ? 0 : dx; dy0[i] = first ? 0 : dy; px[i] = Wd.E.x[i]; py[i] = Wd.E.y[i];
+      }
+      first = false;
+    });
+    let t = 1000;
+    for (let f = 0; f < 120 * 3; f++) eng.frame((t += 1000 / 120));
+    rec = true;
+    for (let f = 0; f < 120 * 5; f++) eng.frame((t += 1000 / 120));
+    expect(flips / W.E.count / 5).toBeLessThan(5);
+    eng.dispose();
+    // a body that charges at 600 u/s is drawn, from 0.2 s into the charge, within one step's travel + 4 u
+    // of where it is (a plain 30 ms low-pass would trail it by 18 u)
+    const r = make({ content: CONTENT });
+    const b = r.W.E.slotOf(r.W.spawn('blot', r.W.px - 400, r.W.py + 300, { bloom: false }));
+    r.W.E.hp[b] = r.W.E.hpMax[b] = 1e12; r.W.E.dmg[b] = 0;
+    r.track(b);
+    const s0 = r.W.step.bind(r.W); r.W.step = (dt: number) => { s0(dt); r.W.E.x[b] += 600 * dt - r.W.E.vx[b] * dt; };
+    let worst = 0;
+    for (let f = 0; f < 60; f++) { r.eng.frame((t += 1000 / 120)); if (f >= 24) worst = Math.max(worst, Math.abs(r.drawn[r.drawn.length - 1].ex - r.W.E.x[b])); }
+    expect(worst).toBeLessThan(600 / 60 + 4);
+    r.eng.dispose();
+  });
+});
+
 describe('屏幕抖动: the camera moves only because you do', () => {
   it('when you let go of the stick the view does not swing back against your last heading', () => {
     for (const [w, h] of [[390, 844], [1280, 800]] as const) {

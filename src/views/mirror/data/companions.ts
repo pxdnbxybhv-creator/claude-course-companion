@@ -29,7 +29,7 @@ export const COMPANIONS: Readonly<Record<CharacterId, CompanionDef>> = {
     quip: b('知音难觅。', 'A kindred ear is hard to find.'), verse: b('此曲只应天上有', 'Such music belongs in heaven'),
   },
   swordsman: {
-    id: 'swordsman', hp: 28, armor: 3, speed: 15, dodge: 10, extra: {}, start: 'qingping', style: 'ranged', alt: 'casket', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'swordsman', hp: 36, armor: 5, speed: 15, dodge: 10, extra: {}, start: 'qingping', style: 'ranged', alt: 'casket', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: MELEE_PEN, bans: [], skill: 'yijian', passive: 'jianyi', altSkill: 'qinggong', leans: ['xianjian', 'jifeng'],
     quip: b('十步杀一人。', 'One foe every ten paces.'), verse: b('事了拂衣去，深藏身与名', 'The deed done, he shakes his sleeves and goes'),
   },
@@ -59,7 +59,7 @@ export const COMPANIONS: Readonly<Record<CharacterId, CompanionDef>> = {
     quip: b('捣药去也。', 'Off to pound the elixir.'), verse: b('白兔捣药秋复春', 'The white rabbit pounds, autumn into spring'),
   },
   poet: {
-    id: 'poet', hp: 32, armor: 3, speed: 5, dodge: 0, extra: { crit: 15 }, start: 'gourd', style: 'ranged', alt: 'qingping', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'poet', hp: 38, armor: 3, speed: 5, dodge: 0, extra: { crit: 15 }, start: 'gourd', style: 'ranged', alt: 'qingping', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'yaoyue', passive: 'baipian', altSkill: 'doujiu', leans: ['zuixian', 'xianjian'],
     quip: b('天子呼来不上船。', 'Even the emperor\'s call won\'t get me on the boat.'), verse: b('举杯邀明月，对影成三人', 'I raise my cup to the moon; with my shadow we make three'),
   },

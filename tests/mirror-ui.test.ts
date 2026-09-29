@@ -92,16 +92,16 @@ describe('mirror ui · the pay lines of the scroll', () => {
 });
 
 describe('mirror ui · input maths', () => {
-  it('the stick has an 8 px dead zone, full speed from 24 px, and its knob draws out to the 56 px radius', () => {
+  it('the stick has an 8 px dead zone, full speed from 20 px, and its knob draws out to the 56 px radius', () => {
     expect(stickVector(5, 5)).toMatchObject({ x: 0, y: 0 });
     const full = stickVector(200, 0);
     expect(full.x).toBeCloseTo(1);
     expect(full.knobX).toBeCloseTo(STICK_R);
-    const half = stickVector(0, 16);
+    const half = stickVector(0, 14);
     expect(half.y).toBeGreaterThan(0.4);
     expect(half.y).toBeLessThan(0.6);
-    expect(stickVector(0, 24).y).toBeCloseTo(1);
-    expect(stickVector(0, 24).knobY).toBeCloseTo(24); // the knob follows the thumb to the rim
+    expect(stickVector(0, 20).y).toBeCloseTo(1);
+    expect(stickVector(0, 20).knobY).toBeCloseTo(20); // the knob follows the thumb to the rim
     expect(Math.hypot(stickVector(40, 40).x, stickVector(40, 40).y)).toBeLessThanOrEqual(1);
     expect(stickVector(NaN, 1)).toMatchObject({ x: 0, y: 0 });
   });

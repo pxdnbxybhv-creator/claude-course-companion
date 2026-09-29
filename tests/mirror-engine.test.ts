@@ -375,3 +375,28 @@ describe('engine-core: errors and cost', () => {
     eng.dispose();
   });
 });
+
+describe('engine-core: 嫦娥 over ground hazards (round 5)', () => {
+  it('a core ground zone never slows her and burns her for half; anyone else is slowed and burnt in full', () => {
+    const lost = (char: NewRunOpts['char']) => {
+      const { run, setup } = setupFor(newRun(opts({ char })));
+      const { eng } = make(run);
+      eng.start(run, { ...setup, plan: { ...setup.plan, groups: [], elites: [], treasures: [] } });
+      const W = eng.world;
+      W.len = 1e9;
+      const hp0 = W.hp;
+      W.coreZone(0, 'spore' as never, W.px, W.py, 80, 5, 1, 0, 0.5, 2);
+      let slowed = 0;
+      for (let s = 0; s < 60; s++) { eng.stepN(1); if (W.pslowT > 0) slowed++; }
+      const out = { hp: hp0 - W.hp, slowed };
+      eng.dispose();
+      return out;
+    };
+    const her = lost('change'), him = lost('scholar');
+    expect(her.slowed).toBe(0);
+    expect(him.slowed).toBeGreaterThan(50);
+    expect(him.hp).toBeGreaterThan(5);
+    expect(her.hp / him.hp).toBeGreaterThan(0.4);
+    expect(her.hp / him.hp).toBeLessThan(0.6);
+  });
+});

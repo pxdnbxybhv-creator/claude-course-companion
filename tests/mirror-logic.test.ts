@@ -90,10 +90,10 @@ describe('formulas', () => {
       expect(hpMul(w) / hpMul(w - 1), `hp ${w}`).toBeLessThanOrEqual(1.38);
       if (w >= 32) expect(hpMul(w) / hpMul(w - 1), `hp ${w}`).toBeLessThanOrEqual(1.0551);
     }
-    // late danger is damage, not HP: wave 20 unchanged, ×1.09 a wave to 30, ×1.06 a wave in endless
+    // late danger is damage, not HP: wave 20 unchanged, ×1.09 a wave to 30, ×1.10 a wave in endless
     expect(dmgMul(30) / dmgMul(20)).toBeCloseTo(((1 + 0.15 * 29) / (1 + 0.15 * 19)) * Math.pow(1.09, 10));
     expect(dmgMul(31)).toBeCloseTo(dmgMul(30));
-    expect(dmgMul(32) / dmgMul(31)).toBeCloseTo(1.06);
+    expect(dmgMul(32) / dmgMul(31)).toBeCloseTo(1.08);
     const lake = newRun(opts()), palace = newRun(opts({ map: 'palace' }));
     expect(Math.round(bossHp(10, lake))).toBe(4810);
     expect(Math.round(bossHp(10, palace))).toBe(5051);

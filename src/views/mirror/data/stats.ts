@@ -86,14 +86,16 @@ export const F = {
   // ⚖3 (the real-engine harness, sim/realbal.ts): 1.08 → 1.06. Played for real, mid-run hits landed
   // far more often than the reference sim assumed, and waves 14–27 killed in 4–7 hits (~25% of max HP a
   // hit); ~−16% at wave 20, −30% at 30 (bosses scale to their home wave, so their own hits are unchanged)
-  // ⚖5 (m6): late danger comes from damage, not HP — waves 21–30 grow 1.09 a wave (×1.33 at 30), endless 1.06.
+  // ⚖5 (m6): late danger comes from damage, not HP — waves 21–30 grow 1.09 a wave (×1.33 at 30), endless 1.08.
   dmg: { slope: 0.15, grow: 1.06, from: 11, lateGrow: 1.09 },
   spd: { slope: 0.005, cap: 30 },
   bossK: { 10: 1300, 20: 1200, 30: 700 } as Readonly<Record<10 | 20 | 30, number>>,
   /** ⚖ 镜境 multipliers above ×1 ramp in over waves 1–20. */
   diffRamp: 20,
-  // §5.3 endless (⚖5: HP 1.08 → 1.055 a wave, no cliff at 31; damage 1.05 → 1.06)
-  endless: { hp: 1.055, dmg: 1.06, spd: 0.01, spdMax: 0.3, harvestDecay: 0.9, mutatorEvery: 5, twinsX: 0.7, mirrorX: 0.8, coinX: 0.5 },
+  // §5.3 endless (⚖5: HP 1.08 → 1.055 a wave, no cliff at 31; damage 1.05 → 1.10: with the HP wall gone a bot that
+  // steps out of ground clouds reached the wave-70 cap in 54% of runs at 1.06; at 1.10, 12%, median wave 54.5; the owner
+  // asked that late waves stay winnable, so 1.08 sits between: endless still tightens, a good build is not one-shot at 50)
+  endless: { hp: 1.055, dmg: 1.08, spd: 0.01, spdMax: 0.3, harvestDecay: 0.9, mutatorEvery: 5, twinsX: 0.7, mirrorX: 0.8, coinX: 0.5 },
   // §6
   startMoon: 30,
   eliteMoon: 12,

@@ -34,6 +34,8 @@ export interface RealOpts {
   beginner?: boolean;
   /** Godmode for waves below this (to study later waves on their own). */
   godTo?: number;
+  /** The bot also steps out of enemy ground zones (clouds, webs, puddles), the way a person would. */
+  zones?: boolean;
   content?: ContentRegistry;
 }
 export interface RealRun {
@@ -63,7 +65,7 @@ const DAY = '2026-09-27';
 // The world's internals are read directly (struct-of-arrays pools): this is a dev harness, not content.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Raw = any;
-export interface BotState { wander: number; last: [number, number]; n: number }
+export interface BotState { wander: number; last: [number, number]; n: number; zones?: boolean }
 
 /** One bot decision (called every third step). Exported for the probes. */
 export function botStep(W: Raw, eng: Raw, level: BotLevel, st: BotState): void {
@@ -129,6 +131,15 @@ export function botStep(W: Raw, eng: Raw, level: BotLevel, st: BotState): void {
       fx += (dx / d) * pull * 1.5 + (-dy / d) * 0.6; fy += (dy / d) * pull * 1.5 + (dx / d) * 0.6;
     }
   }
+  // (zones) step out of enemy ground zones, the way a person would
+  if (st.zones) {
+    const Z = W.Z;
+    for (let i = 0; i < Z.n; i++) {
+      if (!Z.alive[i] || Z.side[i] !== 0 || !(Z.dps[i] > 0 || Z.slow[i] > 0)) continue;
+      const dx = px - Z.x[i], dy = py - Z.y[i], dd = Math.hypot(dx, dy) || 1;
+      if (dd < Z.r[i] + 45) { fx += (dx / dd) * 7; fy += (dy / dd) * 7; }
+    }
+  }
   const A = W.arena, m = 160;
   if (px < A.minX + m) fx += ((A.minX + m - px) / m) * 2.5;
   if (px > A.maxX - m) fx -= ((px - (A.maxX - m)) / m) * 2.5;
@@ -192,7 +203,7 @@ export function playReal(o: RealOpts): RealRun {
     }
     return d;
   };
-  const st: BotState = { wander: 0, last: [0, 0], n: 0 };
+  const st: BotState = { wander: 0, last: [0, 0], n: 0, zones: !!o.zones };
   const trace: string[] = [];
   let dead = false, deadAtBoss = false, timeout = false, ms = 0, steps = 0;
   for (let w = 1; w <= maxWave; w++) {

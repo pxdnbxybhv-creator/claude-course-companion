@@ -48,6 +48,14 @@ export function snapStep(dt: number, period = dt): number {
  * (a blink, a teleport) is drawn where it is. No allocation per step or frame.
  */
 const LERP_JUMP = 48;
+/**
+ * A packed crowd shivers: separation pushes a body back and forth by 1–3 u a step (about 15 reversals
+ * a body a second in a 墨团 pack). Enemies (pool 0) are drawn through a speed-adaptive low-pass (a
+ * "one-euro" filter): at rest its time constant is CROWD_TAU (30 ms), so the shiver averages out; the
+ * cutoff rises with the body's smoothed speed (CROWD_BETA Hz per u/s), so a body on the move (a charge,
+ * a chase) is drawn with almost no lag. Drawing only: hits, contact and aim use the simulation's values.
+ */
+const CROWD_TAU = 0.03, CROWD_BETA = 0.03, CROWD_DTAU = 0.2;
 interface LerpPool { x: Float32Array; y: Float32Array; alive: Uint8Array; n: number; gen?: Uint32Array }
 interface LerpSrc {
   p: LerpPool;
@@ -67,6 +75,9 @@ class LerpSet {
   /** A snapshot exists (false after start() and revive(): no "before" to draw from). */
   ok = false;
   private ppx = 0; private ppy = 0; private spx = 0; private spy = 0; private applied = false;
+  /** The crowd filter's state for pool 0: drawn position, smoothed velocity, generation, valid. */
+  private qx = new Float32Array(0); private qy = new Float32Array(0); private qvx = new Float32Array(0); private qvy = new Float32Array(0);
+  private qg = new Uint32Array(0); private qv = new Uint8Array(0);
   constructor(private list: () => LerpSrc[]) {}
   /** Build the before/saved arrays once (the world's pools are made with it and never replaced). */
   private ensure(): void {
@@ -79,11 +90,15 @@ class LerpSet {
     this.bc = L.map((s) => (s.clock ? new Float64Array(s.clock.length) : null));
     this.sx = L.map((s) => F(s.p.x.length)); this.sy = L.map((s) => F(s.p.x.length)); this.sr = L.map((s) => (s.r ? F(s.r.length) : null));
     this.sn = new Int32Array(L.length); this.bn = new Int32Array(L.length);
+    const n0 = L[0].p.x.length;
+    this.qx = F(n0); this.qy = F(n0); this.qvx = F(n0); this.qvy = F(n0); this.qg = new Uint32Array(n0); this.qv = new Uint8Array(n0);
     this.ok = false;
   }
   /** Before a step: remember where everything is. */
   snap(w: World): void {
     this.ensure();
+    // the first snapshot after start() / revive(): the crowd filter starts again from where bodies are
+    if (!this.ok) this.qv.fill(0);
     const S = this.srcs;
     for (let k = 0; k < S.length; k++) {
       const s = S[k], p = s.p, n = p.n, X = p.x, Y = p.y, A = p.alive, G = p.gen, R = s.r, C = s.clock;
@@ -101,8 +116,9 @@ class LerpSet {
     this.ppx = w.px; this.ppy = w.py;
     this.ok = true;
   }
-  /** Draw-time: write lerp(before, now, a) in place (restore() puts the simulation's values back). */
-  apply(w: World, a: number): void {
+  /** Draw-time: write lerp(before, now, a) in place (restore() puts the simulation's values back);
+   *  enemies then go through the crowd filter over the frame's `dt` (s; 0 holds it). */
+  apply(w: World, a: number, dt = 0): void {
     this.applied = false;
     if (!this.ok) return;
     const S = this.srcs, J2 = LERP_JUMP * LERP_JUMP;
@@ -124,12 +140,33 @@ class LerpSet {
         X[i] = bx[i] + dx * a; Y[i] = by[i] + dy * a;
         if (br && R) { const dr = R[i] - br[i]; if (Math.abs(dr) <= LERP_JUMP) R[i] = br[i] + dr * a; }
       }
+      if (k === 0) this.crowd(n, X, Y, A, G, dt);
     }
     this.spx = w.px; this.spy = w.py;
     const dx = w.px - this.ppx, dy = w.py - this.ppy;
     if (dx * dx + dy * dy <= 4 * J2) { w.px = this.ppx + dx * a; w.py = this.ppy + dy * a; }
     w.tDraw = w.t - (1 - a) * STEP;
     this.applied = true;
+  }
+  /** The crowd filter (see CROWD_TAU) over pool 0's drawn positions, in place. */
+  private crowd(n: number, X: Float32Array, Y: Float32Array, A: Uint8Array, G: Uint32Array | undefined, dt: number): void {
+    const qx = this.qx, qy = this.qy, qvx = this.qvx, qvy = this.qvy, qg = this.qg, qv = this.qv, J2 = LERP_JUMP * LERP_JUMP;
+    const ad = dt > 0 ? 1 - Math.exp(-dt / CROWD_DTAU) : 0;
+    for (let i = 0; i < n; i++) {
+      if (!A[i]) { qv[i] = 0; continue; }
+      const ex = X[i] - qx[i], ey = Y[i] - qy[i];
+      if (!qv[i] || (G && qg[i] !== G[i]) || ex * ex + ey * ey > J2) {
+        qx[i] = X[i]; qy[i] = Y[i]; qvx[i] = qvy[i] = 0; qg[i] = G ? G[i] : 0; qv[i] = 1;
+        continue;
+      }
+      if (dt > 0) {
+        qvx[i] += (ex / dt - qvx[i]) * ad; qvy[i] += (ey / dt - qvy[i]) * ad;
+        const cut = 1 / (2 * Math.PI * CROWD_TAU) + CROWD_BETA * Math.hypot(qvx[i], qvy[i]);
+        const al = 1 - Math.exp(-dt * 2 * Math.PI * cut);
+        qx[i] += ex * al; qy[i] += ey * al;
+      }
+      X[i] = qx[i]; Y[i] = qy[i];
+    }
   }
   restore(w: World): void {
     if (!this.applied) return;
@@ -737,7 +774,7 @@ class MirrorEngine implements Engine {
     const w = this.world;
     w.tDraw = w.t;
     const lerp = this.ctx !== null && !!w.run && (w.phase === 'wave' || w.phase === 'ending' || w.phase === 'down');
-    if (lerp) this.lerp.apply(w, this.alpha);
+    if (lerp) this.lerp.apply(w, this.alpha, held ? 0 : dt);
     try { this.drawNow(dt, held); } finally { if (lerp) this.lerp.restore(w); }
   }
   private drawNow(dt: number, held: boolean): void {

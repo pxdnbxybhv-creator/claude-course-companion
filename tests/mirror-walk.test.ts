@@ -11,7 +11,7 @@ import { wavePlan } from '../src/views/mirror/logic/spawn';
 import { computeStats } from '../src/views/mirror/logic/formulas';
 import { createEngine, type MirrorEngine } from '../src/views/mirror/engine';
 import { createDebugPainter } from '../src/views/mirror/engine/debugPainter';
-import { keysVector, stickFollow, stickSettle, stickVector, STICK_R } from '../src/views/mirror/ui/text';
+import { keysVector, stickFollow, stickVector, STICK_R } from '../src/views/mirror/ui/text';
 
 const SILENT: MirrorAudio = { prime: async () => {}, sfx: () => {}, pickup: () => {}, music: () => {}, dispose: () => {} };
 const EMPTY = { skills: {}, passives: {}, hazards: {}, elites: {}, treasures: {}, bosses: {}, patterns: {}, affixes: {}, mutators: {}, terms: {} };
@@ -44,8 +44,8 @@ const DIRS: [number, number][] = [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1
 const mag = (v: { x: number; y: number }) => Math.hypot(v.x, v.y);
 
 describe('walking · the stick', () => {
-  it('reaches full speed by 24 px of thumb travel, in every direction', () => {
-    for (const d of [24, 30, 40, 56, 90]) for (const [x, y] of DIRS) {
+  it('reaches full speed by 20 px of thumb travel, in every direction', () => {
+    for (const d of [20, 24, 30, 40, 56, 90]) for (const [x, y] of DIRS) {
       const n = Math.hypot(x, y);
       expect(mag(stickVector((x / n) * d, (y / n) * d))).toBeGreaterThan(0.999);
     }
@@ -57,22 +57,22 @@ describe('walking · the stick', () => {
       expect(up / down).toBeGreaterThan(0.98);
     }
   });
-  it('the pad settling in the first 100 ms moves the base, not you; later a small push still counts', () => {
-    // touch down at (100, 300); the reported point settles 5 px toward the palm by 60 ms; then the same
-    // 20 px push up and down reads the same
-    const push = (dy: number) => {
-      const a = { x: 100, y: 300, t0: 1000 };
-      stickSettle(a, 100, 302, 1030); stickSettle(a, 100, 305, 1060);
-      const p = { x: 100, y: 305 + dy };
-      stickSettle(a, p.x, p.y, 1180);
-      return mag(stickVector(p.x - a.x, p.y - a.y));
-    };
-    expect(push(-20) / push(20)).toBeGreaterThan(0.98); // without the re-anchor: 0.44 against 1.00
-    expect(push(-20)).toBeGreaterThan(0.7);
-    // after 100 ms the base holds: a deliberate 6 px nudge is not swallowed as a settle
-    const b = { x: 100, y: 300, t0: 1000 };
-    stickSettle(b, 100, 306, 1150);
-    expect(b.y).toBe(300);
+  it('a push that starts at touchdown is never eaten', () => {
+    // touch events at 60 / 120 Hz; an ease-out push of d px at v px/s from the first event; the pad
+    // settles b px toward the palm over 40 ms. A settle re-anchor near touchdown (round 5's first try)
+    // chased any thumb moving < 8 px an event: 20% of these pushes stood still, and up ÷ down fell to 0.
+    for (const hz of [60, 120]) for (const v of [150, 300, 500, 900]) for (const d of [30, 40, 56]) for (const b of [0, 3, 6, 10]) for (const uy of [-1, 1]) {
+      const a = { x: 100, y: 600 };
+      let m = 0;
+      const Tp = (2 * d) / v * 1000;
+      for (let k = 1; k < 400; k++) {
+        const t = k * 1000 / hz, u = Math.min(1, t / Tp), s = d * (1 - (1 - u) ** 2), py = 600 + uy * s + b * Math.min(1, t / 40);
+        stickFollow(a, 100, py);
+        m = mag(stickVector(0, py - a.y));
+        if (u >= 1 && t > 250) break;
+      }
+      expect(m).toBeGreaterThan(0.98);
+    }
   });
   it('the base follows a thumb that runs past its rim, so turning round is one short move', () => {
     const a = { x: 100, y: 300 };
