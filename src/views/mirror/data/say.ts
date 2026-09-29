@@ -353,6 +353,9 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
   needle: { say: b('不会被击退；每点护甲伤害 +{f1.k}%（和{@ironbone}加起来最多 +{f1.max}%）。', 'Immune to knockback; +{f1.k}% Damage per point of Armour (with {@ironbone}, max +{f1.max}%).') },
   jiangjinjiu: { say: b('醉意上限变成 {f0.p.cap}；醉意到 {f0.p.autoCrit} 以上每下都暴击；醉意消得{f0.p.drain:faster}。', 'Drunk cap becomes {f0.p.cap}; at {f0.p.autoCrit}+ Drunk every hit crits; Drunk drains {f0.p.drain:times} as fast.') },
   watermoon: { say: b('每件兵器出手时，还会朝身后打出一次镜像（{f0.p.pct}% 伤害）。', 'Every weapon also attacks behind you as a mirror image ({f0.p.pct}% damage).') },
+  // 9.9 镜宝 (the stats line is generated; the relic's own rules)
+  wangchen: { more: [b('墨宝也能暴击，暴击打 {inkCrit} 倍。', 'Ink summons can crit too, at ×{inkCrit}.')] },
+  longyuan: { say: b('所有兵器攻击距离 +{reachPct}%。', '+{reachPct}% reach on every weapon.') },
 };
 
 // ───────────────────────────────────────────── 镜技 (13) and ☆ 别传 (13)
@@ -568,8 +571,8 @@ export const PASSIVE_SAY: Readonly<Record<string, PassiveSay>> = {
     cost: b('只有 {c.slots} 个兵器位；商店不卖{bans}', 'Only {c.slots} weapon slots; no {bans} weapons in his shop'),
   },
   yinqing: {
-    gist: b('月相 {cycle} 秒转一圈：满月伤害高，新月更会躲；能飘过险地。', 'A {cycle} s moon cycle: strong at full moon, evasive at new moon; floats over hazards.'),
-    say: b('月相 {cycle} 秒转一圈：满月时伤害 +{full}%，新月时伤害 {newDmg}%、闪避 +{newDodge}%；能飘过地上的险地。', 'A {cycle} s moon cycle: full moon +{full}% Damage; new moon {newDmg}% Damage and +{newDodge}% Dodge. Floats over ground hazards.'),
+    gist: b('月相 {cycle} 秒转一圈：满月伤害高，新月更会躲；险地只伤她一半。', 'A {cycle} s moon cycle: strong at full moon, evasive at new moon; ground hazards hurt her only half as much.'),
+    say: b('月相 {cycle} 秒转一圈：满月时伤害 +{full}%，新月时伤害 {newDmg}%、闪避 +{newDodge}%；地上的险地只伤她一半，也拖不慢她。', 'A {cycle} s moon cycle: full moon +{full}% Damage; new moon {newDmg}% Damage and +{newDodge}% Dodge. Ground hazards hurt her half as much and never slow her.'),
     cost: b('加的护甲只算 {armorGain%}', 'Armour gains count {armorGain%}'),
   },
 };
@@ -588,7 +591,7 @@ export const COMPANION_SAY: Readonly<Record<string, Bi>> = {
   rabbit: b('会回血，回满后多出来的变成护盾。射程短一些。', 'Regenerates, and healing past full becomes a shield. Shorter range.'),
   poet: b('不喝酒也会醉，越醉暴击越高。自动瞄准会晃。', 'Gets drunk without wine, and the drunker, the more crits. Auto-aim sways.'),
   guan: b('最耐打：一下最多掉 {hitCap%} 气血，身边敌人打得轻，近战越来越强。只有 {c.slots} 个兵器位，不卖{bans}。', 'The toughest: no hit takes over {hitCap%} of your HP, nearby enemies hit softer, and Melee grows. Only {c.slots} weapon slots; no {bans} weapons in his shop.'),
-  change: b('会闪避，能飘过地上的险地；月相 {cycle} 秒转一圈，满月伤害高，新月更会躲。护甲加得少。', 'Dodgy and floats over ground hazards; a {cycle} s moon cycle, strong at full moon, evasive at new moon. Gains less armour.'),
+  change: b('会闪避，险地只伤她一半，也拖不慢她；月相 {cycle} 秒转一圈，满月伤害高，新月更会躲。护甲加得少。', 'Dodgy; ground hazards hurt her half as much and never slow her. A {cycle} s moon cycle, strong at full moon, evasive at new moon. Gains less armour.'),
 };
 
 // ───────────────────────────────────────────── set rule flags (SETS … flags)

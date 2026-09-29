@@ -25,6 +25,8 @@ export const F = {
   dodgeHard: 75,
   regenPerPoint: 0.1,
   stealPerSec: 10,
+  /** Innate 吸血 % of melee weapon hits (thrust, combo, sweep, smash, slam, punch), on top of the stat. */
+  meleeSteal: 3,
   baseSpeed: 280,
   /** Pickup radius (u) before 拾取: 135, 150% of the old 90 (the owner: 「拾取掉落物的范围初始扩大至当前的150%」). */
   pickupBase: 135,
@@ -40,7 +42,8 @@ export const F = {
   /** Knockback resist by body. */
   resist: { normal: 0, tank: 0.5, elite: 0.7, boss: 1 },
   knockDur: 0.12,
-  iframes: 0.35,
+  /** i-frames after a hit (round 5: 0.35 → 0.5, every companion). */
+  iframes: 0.5,
   contactCd: 0.35,
   /** ⚖ 劫数: enemies +1% HP and damage per point, you +2% 伤害, 月华 +3%. */
   curseEnemy: 0.01,
@@ -75,19 +78,24 @@ export const F = {
   spawnMinDist: 260,
   alive: { low: 90, mid: 140, high: 200 },
   enemyShots: 300,
-  heavyInk: { hpFrac: 0.8, grow: 0.08, max: 1.6 },
-  // §5.2 ⚖
-  hp: { slope: 0.3, grow: 1.28, from: 11 },
+  /** 重墨: a spawn over the alive cap feeds a living body (80% of its HP); ⚖5 hpCap: never past 2.5× the body's own HP (the rest only moves 月华). */
+  heavyInk: { hpFrac: 0.8, grow: 0.08, max: 1.6, hpCap: 2.5 },
+  // §5.2 ⚖5 (m6): HP grows by band instead of 1.28^(w−11) — the owner: 「25波以后小怪的血量厚到无法杀死」.
+  // [lastWave, growth per wave]; waves 1–20 are exactly the old curve (×188 at 25, ×410 at 30; was ×260 / ×1,056).
+  hp: { slope: 0.3, bands: [[11, 1], [20, 1.28], [25, 1.20], [30, 1.13]] as readonly (readonly [number, number])[] },
   // ⚖3 (the real-engine harness, sim/realbal.ts): 1.08 → 1.06. Played for real, mid-run hits landed
   // far more often than the reference sim assumed, and waves 14–27 killed in 4–7 hits (~25% of max HP a
   // hit); ~−16% at wave 20, −30% at 30 (bosses scale to their home wave, so their own hits are unchanged)
-  dmg: { slope: 0.15, grow: 1.06, from: 11 },
+  // ⚖5 (m6): late danger comes from damage, not HP — waves 21–30 grow 1.09 a wave (×1.33 at 30), endless 1.08.
+  dmg: { slope: 0.15, grow: 1.06, from: 11, lateGrow: 1.09 },
   spd: { slope: 0.005, cap: 30 },
   bossK: { 10: 1300, 20: 1200, 30: 700 } as Readonly<Record<10 | 20 | 30, number>>,
   /** ⚖ 镜境 multipliers above ×1 ramp in over waves 1–20. */
   diffRamp: 20,
-  // §5.3 endless
-  endless: { hp: 1.08, dmg: 1.05, spd: 0.01, spdMax: 0.3, harvestDecay: 0.9, mutatorEvery: 5, twinsX: 0.7, mirrorX: 0.8, coinX: 0.5 },
+  // §5.3 endless (⚖5: HP 1.08 → 1.055 a wave, no cliff at 31; damage 1.05 → 1.10: with the HP wall gone a bot that
+  // steps out of ground clouds reached the wave-70 cap in 54% of runs at 1.06; at 1.10, 12%, median wave 54.5; the owner
+  // asked that late waves stay winnable, so 1.08 sits between: endless still tightens, a good build is not one-shot at 50)
+  endless: { hp: 1.055, dmg: 1.08, spd: 0.01, spdMax: 0.3, harvestDecay: 0.9, mutatorEvery: 5, twinsX: 0.7, mirrorX: 0.8, coinX: 0.5 },
   // §6
   startMoon: 30,
   eliteMoon: 12,
@@ -102,12 +110,21 @@ export const F = {
   // §7 shop
   shopSlots: 4,
   shopSlotsMax: 6,
-  weaponRoll: 0.35,
-  fullWeaponRoll: 0.1,
-  classLean: 0.25,
-  copyLean: 0.3,
-  /** [fromWave, 凡, 灵, 仙, 神] */
+  /** A slot rolls a weapon 45% of the time (20% once the weapon slots are full: then always a copy for 合铸). */
+  weaponRoll: 0.45,
+  fullWeaponRoll: 0.2,
+  /** Item slots lean to your weapons' class tags 40% of the time, from the first piece (was 25%, from 2). */
+  classLean: 0.4,
+  classLeanFrom: 1,
+  /** A weapon roll is a copy (same id and tier) of a held weapon 25% of the time, weighted like the school draw. */
+  copyLean: 0.25,
+  /** 同流派 draw: a weapon's weight is 1 + schoolK · min(schoolCap, pieces of its classes you hold or have locked). */
+  schoolK: 4,
+  schoolCap: 4,
+  /** [fromWave, 凡, 灵, 仙, 神]: weapon tiers in the shop and the item in a 镜奁. */
   shopOdds: [[1, 90, 10, 0, 0], [4, 70, 25, 5, 0], [8, 55, 32, 11, 2], [13, 42, 36, 18, 4], [20, 30, 38, 25, 7], [30, 22, 38, 30, 10]] as const,
+  /** [fromWave, 凡, 灵, 仙, 神]: item (道具) tiers in the shop — ⚖5: more 仙 and 神 (the owner: 「紫，红品质道具降价且多刷」). */
+  itemOdds: [[1, 90, 10, 0, 0], [4, 62, 28, 10, 0], [8, 44, 34, 18, 4], [13, 30, 36, 26, 8], [20, 20, 34, 34, 12], [30, 14, 32, 38, 16]] as const,
   /** ⚖ price = round(base × tierMult × (1 + 0.18(w−1))). */
   priceSlope: 0.18,
   tierMult: [1, 2, 3.8, 6.5] as PerTier,

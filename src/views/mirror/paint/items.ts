@@ -107,6 +107,9 @@ const DEF: Record<ItemId, (b: B) => void> = {
   needle: (b) => { P.ripples(b, 0, 12); b.fill('#3a3a36', [[-3, -14], [3, -14], [3, 12], [-3, 12]], 0.97, 0.2); for (const y of [-12, 9]) b.brush([[-4, y, 2.4], [4, y, 2.4]], 0.95, GOLD); },
   jiangjinjiu: (b) => { b.fill('#8a6a4a', rot([[-9, -6], [-11, 4], [-8, 13], [8, 13], [11, 4], [9, -6]], 0.9, 0, 0).map(([x, y]) => [x - 4, y - 4] as Pt), 0.92, 0.4); b.wash(IND, [[2, -2], [14, 4], [15, 14], [4, 12]], 0.5); b.brush([[2, -2, 3], [10, 6, 4], [14, 14, 3]], 0.5, '#8e2b3a'); },
   watermoon: (b) => { P.mirror(b, '#b0875a', '#1d2430'); b.disc(-2, -3, 3.6, '#f6f7fb'); b.fill('#f6f7fb', ell(-2, 5, 3.6, 1.2), 0.6, 0.2); P.ripples(b, -2, 5, '#9ab0c6'); },
+  // 9.9 镜宝: a clean bronze mirror with its dust lifting off; a sword rising out of dark water
+  wangchen: (b) => { P.mirror(b, '#9a7a4a', '#f3f1e6'); b.brush([[-9, 7, 0.6], [-3, 3, 1.6], [4, 1, 1.2], [11, -4, 0.4]], 0.45, '#b9ad94'); for (const [x, y] of [[8, -8], [11, -11], [5, -12]] as Pt[]) b.dot(x, y, 1.6, 0.7, '#b9ad94'); },
+  longyuan: (b) => { P.ripples(b, 0, 10, IND); P.sword(b, -Math.PI / 2 + 0.25, 28, STEEL); b.brush([[-7, 8, 1.6], [-3, 3, 2.2], [1, 6, 1.6], [5, 1, 1.2]], 0.55, JADE); },
 };
 
 export const ITEM_SPECS = {} as Record<ItemId, Spec>;
@@ -116,6 +119,7 @@ for (const row of ITEM_REG) {
     paint(b);
     if (row.group === 'curse') P.ring(b, CURSE, 1.8);
     if (row.group === 'legend') { P.ring(b, GOLD, 2); b.ring(0, 0, 13.2, 0.5, '#fff1b8', 0.8); }
+    if (row.group === 'relic') { P.ring(b, JADE, 2.2); b.ring(0, 0, 13, 0.6, '#e8f3ec', 0.85); }
   });
 }
 void star; void SILVER;

@@ -69,6 +69,8 @@ export default function MirrorView() {
     try { if (WENKAI_MIRROR_SAMPLE) void document.fonts?.load(`16px 'LXGW WenKai'`, WENKAI_MIRROR_SAMPLE).catch(() => {}); } catch { /* no font loading API */ }
     if (scene.kind === 'results' && scene.report.cause === 'migrate') toast(t('此局存档已旧，按镜碎结算。', 'That run was saved by an older version and has been settled.'), 4000);
     if (scene.kind === 'results' && scene.report.cause === 'interrupt') toast(t('第三次中断，本照以镜碎结算。', 'A third interruption: the run has been settled.'), 4000);
+    // only resumeCheck's 「left while down」 path opens the view on a death's results
+    if (scene.kind === 'results' && scene.report.cause === 'death') toast(t('上次倒下后没有复活就离开了，这一局按镜碎结算。', 'You left while down last time, so the run has ended.'), 4000);
     return () => {
       audio.current?.dispose();
       audio.current = null;

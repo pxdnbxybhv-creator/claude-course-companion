@@ -12,12 +12,12 @@
 //     sparks flung out of the far side, spatter and a ground splash (marks, sparks);
 //   · a death burst: the body's own sprite breaks into pieces flung along the killing blow (frags),
 //     a pop of light, a ring, a wet crown, droplets and a stain stamped into the paper;
-//   · the camera stays still for your own hits, crits, kills and weapons. It moves only a little, and
-//     rarely: a hard blow you take (≥ 15% of your HP, or a boss's), a boss's slam, phase change or
-//     death (≤ 3 px, short), and a gentle zoom on the 镜技's landing. The shake setting means "big
-//     moments only"; off removes those too; reduced motion removes every camera motion and stop;
-//   · global hitstop only for rare heavy moments (a heavy weapon's crit, elite kills, the 镜技, a hard
-//     blow you take), spent from a small token bucket;
+//   · the camera never moves for a hit (屏幕抖动, round 5): not for your own hits, crits, kills or
+//     weapons, not for a blow you take, a boss's slam, phase change or death, not for the 镜技. The big
+//     moments answer with a brief edge pulse (an overlay, the picture stays still), rings, sound and
+//     haptics instead; trauma, kicks and zoom punches are no-ops (offX / offY / zoom stay 0);
+//   · no global hitstop in ordinary play: only a boss's phase change (120 ms) and death (160 ms) stop
+//     the world (stopHard); stop() is a no-op;
 //   · a sound bus: the step's hits become ≤ 4 voices (class colour, kill pop, crit crack, thump),
 //     started on the step the hit lands so the sound meets the flash on the same frame;
 //   · navigator.vibrate ticks (an 8 ms tick when you are hurt; elite kills and the 镜技 at most once a
@@ -227,10 +227,12 @@ const STAMPS_STEP = 1;
 const MAX_SHAKE = 6;
 /** The camera's whole offset (shake + kick) never exceeds this (CSS px): big moments only, and small. */
 const MAX_OFFSET = 3;
-/** Kicks (a hard blow you take) stay within this (CSS px). */
-const KICK_MAX = 2;
 /** Trauma decays this much per real second (short tails). */
 const TRAUMA_DECAY = 2.6;
+/** The big moments' edge pulse: its peak alpha and length (s). It darkens the screen's rim a moment;
+ *  nothing on the screen moves. */
+export const PULSE_A = 0.25;
+export const PULSE_S = 0.3;
 /** Ranged weapons whose single blows are heavy by nature (the 射日弓, the flying swords, 雷符): their
  *  class weight counts 0.25 more (a bigger reaction on the body; never the camera). */
 const WEIGHTY: ReadonlySet<string> = new Set(['sunbow', 'qingping', 'casket', 'thunder']);
@@ -244,7 +246,9 @@ const HEAVY_CRIT_GAP = 0.45;
 const SQUASH = [0.12, 0.18, 0.28] as const;
 const RECOIL = [4, 7, 11] as const;
 const FREEZE = [0, 0.045, 0.075] as const;
-const JITTER = [0, 1.5, 2.6] as const;
+/** The struck body's square-wave shiver (was 1.5 / 2.6 u at 25 Hz: a melee sweep made a whole pack
+ *  shiver, 屏幕抖动 RC7): off; squash, recoil and the local freeze carry the blow. */
+const JITTER = [0, 0, 0] as const;
 const FLASH = [0.05, 0.066, 0.1] as const;
 /** A body re-pulses on a blow ≥ this share of its live reaction, or after PULSE_GAP s (≤ 12 Hz). */
 const PULSE_SHARE = 0.6;
@@ -335,6 +339,10 @@ export class Feel {
   hurtK = 0;
   /** The direction the last blow pushed you (a sprite offset only: the simulation never drifts). */
   hurtUx = 0; hurtUy = 0;
+  /** The big moments' edge pulse (a boss's phase or death, a hard blow): seconds (real) since, and its
+   *  strength (render.ts draws ≤ PULSE_A × it over PULSE_S s; the picture itself never moves). */
+  pulseAge = 9;
+  pulseK = 0;
   beat = 0;
   private beatN = 0;
   // sound bus (per step)
@@ -403,7 +411,7 @@ export class Feel {
     this.fr.id.fill(null);
     this.rGen.fill(0xffffffff);
     this.trauma = 0; this.kickX = this.kickY = 0; this.zoom = 0; this.offX = this.offY = 0;
-    this.bank = STOP_CAP; this.hurtAge = 9; this.hurtK = 0;
+    this.bank = STOP_CAP; this.hurtAge = 9; this.hurtK = 0; this.pulseAge = 9; this.pulseK = 0;
     this.slotT.fill(9);
     this.cId = null;
     // the world clock restarts at 0 every wave, so every rate gate starts fresh too
@@ -585,9 +593,9 @@ export class Feel {
       let frz: number = crit && tier === 2 ? 0.06 : FREEZE[tier];
       let J: number = JITTER[tier];
       let jt = 0;
-      if (boss) { S *= 0.35; R = Math.min(3, R * 0.35); frz = 0; J = 1.5; jt = tier >= 1 ? 0.06 : 0; }
+      if (boss) { S *= 0.35; R = Math.min(3, R * 0.35); frz = 0; J = 0; jt = 0; }
       else if (big) { S *= 0.7; R *= 0.7; frz = Math.min(0.055, frz); J = Math.min(2, J); }
-      if (thunder) { J = Math.max(J, 1.5); jt = Math.max(jt, 0.09); }
+      if (thunder) { J = 0; jt = Math.max(jt, 0.09); }
       if (calm) { S = 0.06; R = Math.min(2, R); frz = 0; J = 0; jt = 0; }
       if (frz > 0) {
         // the bank: a fast weapon can't pin a body in place
@@ -903,8 +911,6 @@ export class Feel {
     // must not stutter the world): at most once per 1.2 s
     if (W.t - this.lastSkillStop >= 1.2 || W.t < this.lastSkillStop) {
       this.lastSkillStop = W.t;
-      this.stop(40);
-      this.punch(0.02);
     }
     this.vib(14, 1);
     if (this.markRoom(2)) this.mark(MK.ring, SH.halo, TN.gold, -1, x, y, 0, 0.32, 0.5 * 1.1, 2.6 * 1.1, 0.95);
@@ -913,23 +919,21 @@ export class Feel {
     this.busSkill++;
   }
 
-  /** A boss changed phase (the core's 120 ms stop already runs): a short, small shake. */
+  /** A boss changed phase (the core's 120 ms stop already runs): an edge pulse, rings, a haptic. */
   phase(x: number, y: number): void {
-    this.addTrauma(0.5);
-    this.punch(0.03);
+    this.edgePulse(1);
     this.vib(40, 0);
     for (let k = 0; k < 2; k++) if (this.room(2)) this.emit(SH.ring, TN.ink, x, y, 0, 0, 0.4 + k * 0.15, 0.6, 3.5 + k, this.rnd() * 6.28, 0, 0, PF.ease, 0.9);
   }
-  /** A boss died (the core stops 160 ms). */
+  /** A boss died (the core stops 160 ms): an edge pulse, the crown, a haptic. */
   bossDown(x: number, y: number): void {
-    this.addTrauma(0.6);
-    this.punch(0.04);
+    this.edgePulse(1);
     this.vib(80, 0);
     if (this.room(2)) this.emit(SH.crown, TN.ink, x, y, 0, 0, 0.6, 1, 4, 0, 0, 0, PF.ease, 0.9);
   }
 
-  /** You were hurt from (fx, fy) (NaN: unknown); frac is the blow's share of your max HP. Only a hard
-   *  blow (≥ 15%, or a boss's) moves the camera, a little, at most once per 0.6 s. */
+  /** You were hurt from (fx, fy) (NaN: unknown); frac is the blow's share of your max HP. A hard blow
+   *  (≥ 15%, or a boss's) pulses the screen's edge, at most once per 0.6 s; the camera never moves. */
   hurt(fx: number, fy: number, boss: boolean, frac = 0): void {
     const W = this.W;
     const hard = boss || frac >= 0.15;
@@ -940,9 +944,7 @@ export class Feel {
     this.hurtUx = ux; this.hurtUy = uy;
     if (hard && (W.t - this.lastHurtShake >= 0.6 || W.t < this.lastHurtShake)) {
       this.lastHurtShake = W.t;
-      this.addTrauma(0.45);
-      this.kick(ux, uy, KICK_MAX);
-      this.stop(40);
+      this.edgePulse(0.8);
     }
     // GDD §20.2: an 8 ms haptic tick (a boss's blow a little longer)
     this.vib(boss ? 20 : 8, 0.3);
@@ -1051,6 +1053,7 @@ export class Feel {
     if (L > 0.5) this.st.camOff++;
     if (this.zoom > 0.005) this.st.camZoom++;
     this.hurtAge += dt;
+    this.pulseAge += dt;
     // the low-HP heartbeat: 72 → 110 bpm as the last quarter drains
     const W = this.W;
     const frac = W.hpMax > 0 ? W.hp / W.hpMax : 1;
@@ -1063,8 +1066,14 @@ export class Feel {
     W.shakePx = amp;
   }
 
-  /** Ask for a stop of `ms`, paid from the bucket (a stop already running only costs its extension). */
+  /** A stop of `ms` asked for in ordinary play (a heavy crit, an elite's death): counted, never granted
+   *  (屏幕抖动 RC5: the whole picture froze 18–75 times a minute). Boss phases and deaths use stopHard. */
   stop(ms: number): void {
+    if (!this.motion || ms <= 0) return;
+    this.st.stopReqMs += ms;
+  }
+  /** The old bucketed stop (kept for a dev probe; nothing in play calls it). */
+  stopBucket(ms: number): void {
     const W = this.W;
     if (!this.motion || ms <= 0) return;
     this.st.stopReqMs += ms;
@@ -1084,32 +1093,32 @@ export class Feel {
     this.st.stopReqMs += ms; this.st.stopMs += Math.max(0, ms - Math.max(0, W.hitstopMs));
     W.hitstopMs = Math.max(W.hitstopMs, ms);
   }
+  /** Camera trauma: a no-op since round 5 (屏幕抖动 RC4; the picture never shakes). */
   addTrauma(a: number): void {
-    if (!this.shakeOn) return;
-    this.trauma = Math.min(1, this.trauma + a);
+    void a;
   }
-  /** The contract's shake(px), now a boss's slam (the bosses and 镜主; elites no longer call it): a
-   *  small, short shake of min(2, px / 2) px, at most once per 0.5 s. The player's own weapons and
-   *  镜技 never call it. */
+  /** The contract's shake(px), a boss's slam (the bosses and 镜主): a haptic tick, at most once per
+   *  0.5 s; the camera no longer moves (屏幕抖动 RC4). */
   shake(px: number): void {
     if (!this.shakeOn || !(px > 0)) return;
     const t = this.W.t;
     if (t - this.lastSlam < 0.5 && t >= this.lastSlam) return;
     this.lastSlam = t;
-    const amp = Math.min(2, 0.5 * px);
-    this.addTrauma(Math.sqrt(amp / MAX_SHAKE));
+    this.vib(Math.round(Math.min(30, 6 * px)), 0.5);
   }
-  /** A directional kick of the camera (CSS px; the total stays within KICK_MAX). */
+  /** The big moments' feedback that leaves the picture still: a brief dark pulse at the screen's edge
+   *  (render.ts overlays), strength k ≤ 1. */
+  edgePulse(k: number): void {
+    if (this.pulseAge < PULSE_S && this.pulseK * (1 - this.pulseAge / PULSE_S) >= k) return;
+    this.pulseAge = 0; this.pulseK = Math.max(0, Math.min(1, k));
+  }
+  /** A directional kick of the camera: a no-op since round 5 (屏幕抖动 RC4). */
   kick(ux: number, uy: number, px: number): void {
-    if (!this.shakeOn) return;
-    this.kickX += ux * px; this.kickY += uy * px;
-    const L = Math.hypot(this.kickX, this.kickY);
-    if (L > KICK_MAX) { this.kickX *= KICK_MAX / L; this.kickY *= KICK_MAX / L; }
+    void ux; void uy; void px;
   }
-  /** A zoom punch (big moments only): off with the shake setting off and under reduced motion. */
+  /** A zoom punch: a no-op since round 5 (屏幕抖动 RC4: 7–26 px at the screen's edges). */
   punch(z: number): void {
-    if (!this.shakeOn) return;
-    this.zoom = Math.max(this.zoom, z);
+    void z;
   }
   /** A haptic tick (setting on, supported, not within `gap` s of the last). */
   vib(ms: number, gap: number): void {

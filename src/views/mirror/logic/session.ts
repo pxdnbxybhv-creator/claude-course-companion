@@ -13,7 +13,7 @@ import type {
 } from '../types';
 import { RUN_VER } from '../types';
 import { PAY, VOWS, HEAT_MAX, rateOf } from '../data';
-import { heatOf } from './formulas';
+import { heatOf, REVIVE } from './formulas';
 import { bankSleeve, nextRun, reconcileTicket, releaseHeld, rollDay, settlePay, withDay } from './economy';
 import { activeHeart, buyHeart, dailySpec, foldKills, masteryLevel, pickHeartFace, settleMeta, unlocksOf } from './meta';
 import { beginWave, endWave, foldPartial, newRun, waveSetup } from './run';
@@ -146,13 +146,22 @@ export function resumeCheck(): RunReport | null {
   const run = migrateRun(valid);
   if (!run) return settle({ ...valid, inWave: null }, 'migrate');
   if (run.inWave !== null) {
-    const r = { ...run, inWave: null, interruptions: run.interruptions + 1 };
+    // the tab closed while down (破镜重圆 on offer, unanswered): that is a death, never an interruption
+    if (run.downAt === run.inWave) return settle(clearDown({ ...run, inWave: null }), 'death');
+    const r = clearDown({ ...run, inWave: null, interruptions: run.interruptions + 1 });
     if (r.interruptions >= 3) return settle(r, 'interrupt');
     commit(r);
     return null;
   }
+  if (run.downAt !== undefined) { commit(clearDown(run)); return null; }
   if (run !== m.active) commit(run);
   return null;
+}
+/** The run without its `downAt` mark (the key removed, not set to undefined). */
+function clearDown(run: RunSave): RunSave {
+  if (!('downAt' in run)) return run;
+  const { downAt: _gone, ...rest } = run;
+  return rest;
 }
 
 /**
@@ -222,11 +231,15 @@ export function abandon(): RunReport {
   if (!m.active) throw new Error('mirror: no active run');
   return settle({ ...m.active, inWave: null }, 'abandon');
 }
-/** 暂离 mid-wave: that wave will replay; the third such exit settles the run. */
+/**
+ * 暂离 mid-wave: that wave will replay; the third such exit settles the run. Leaving while down (the
+ * revive on offer, unanswered) is a death: stepping away never dodges one.
+ */
 export function leaveMidWave(): { interruptions: number; report: RunReport | null } {
   const m = mirror.value;
   if (!m.active) return { interruptions: 0, report: null };
   if (m.active.inWave === null) return { interruptions: m.active.interruptions, report: null };
+  if (m.active.downAt === m.active.inWave) return { interruptions: m.active.interruptions, report: settle(clearDown({ ...m.active, inWave: null }), 'death') };
   const r = { ...m.active, inWave: null, interruptions: m.active.interruptions + 1 };
   if (r.interruptions >= 3) return { interruptions: r.interruptions, report: settle(r, 'interrupt') };
   commit(r);
@@ -251,6 +264,45 @@ export function voidRun(): void {
   if (sameDay) d.runs = Math.max(0, d.runs - 1);
   if (back) { refund(back); flushPlay(); } // the refund lands before meta drops the run
   set({ ...m, payDay: d, active: null });
+}
+// ───────────────────────────────────────────── 破镜重圆: the run's one paid revive (API.md §3)
+/**
+ * `downed` fired: remember the wave, so a closed tab or a 暂离 settles as a death, not an interruption.
+ * Only the wave in play is marked.
+ */
+export function wentDown(wave: number): void {
+  const a = mirror.value.active;
+  if (!a || a.inWave === null || a.inWave !== wave) return;
+  commit({ ...a, downAt: wave });
+}
+/**
+ * 以 50 文 重圆, atomic: spend(REVIVE.price) and record('mirror:revive') in one batch, the purse written,
+ * then the run saved as revived. 'ok': charged and saved — now call engine.revive(). 'short': nothing
+ * changed. 'used': this run has had its revive (or is the tutorial's). 'none': no run, or none in a wave.
+ * The owner's code changes none of this: the 50 文 always go through spend().
+ */
+export function payRevive(): 'ok' | 'short' | 'used' | 'none' {
+  const a = mirror.value.active;
+  if (!a || a.inWave === null) return 'none';
+  if (a.revived === true || a.tutorial === true) return 'used';
+  let ok = false;
+  batch(() => { ok = spend(REVIVE.price); if (ok) record('mirror:revive'); });
+  if (!ok) return 'short';
+  flushPlay(); // the coins land before the run says "revived"
+  commit({ ...clearDown(a), revived: true });
+  return 'ok';
+}
+/**
+ * The engine could not rise after payRevive() said 'ok' (disposed or failed meanwhile): the 50 文 go
+ * back and the run is no longer marked revived. The death that follows settles as usual.
+ */
+export function reviveFailed(): void {
+  const a = mirror.value.active;
+  if (!a || a.revived !== true) return;
+  refund(REVIVE.price);
+  flushPlay();
+  const { revived: _r, ...rest } = a;
+  commit(rest);
 }
 /** The engine gave up (a second throw within 5 s): void before wave 2, else settle as 镜碎 ('error'). */
 export function engineFailed(): RunReport | null {
@@ -313,12 +365,17 @@ export interface RunSession {
   markSeen(keys: readonly CodexKey[]): void;
   /** What the account has open, for the shop, crates and 镜心 (fixed for the run). */
   unlocks(): Unlocks;
+  /** 破镜重圆 (optional: the tutorial's session has none, so its run is never offered the revive). */
+  wentDown?(wave: number): void;
+  payRevive?(): 'ok' | 'short' | 'used' | 'none';
+  reviveFailed?(): void;
 }
 /** The real session: this module's writers, unchanged. */
 export const realSession: RunSession = {
   practice: false,
   commit, startWave, waveWon, died, leaveMidWave, abandon, engineFailed, markSeen,
   unlocks: () => unlocksOf(mirror.value),
+  wentDown, payRevive, reviveFailed,
 };
 
 // ───────────────────────────────────────────── the tutorial's flags

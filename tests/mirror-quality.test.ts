@@ -191,7 +191,7 @@ describe('dynamic resolution', () => {
     W.godmode = true; W.plan = { ...W.plan, groups: [], elites: [], treasures: [] }; W.len = 1e9;
     return { eng, W, cv };
   }
-  it('slow frames step the canvas dpr down (3 → 2.5 → 2 → 1.5) before any effect is cut; fast frames bring it back', () => {
+  it('slow frames step the canvas dpr down (3 → 2.5 → 2 → 1.5) before any effect is cut; a minute of fast frames brings one notch back, once a run', () => {
     const { eng, W, cv } = make('mid', 3);
     expect(eng.resolution).toBe(3);
     expect(cv.width).toBe(1170);
@@ -206,7 +206,14 @@ describe('dynamic resolution', () => {
     expect(W.degrade).toBe(0);
     expect(eng.resolution).toBe(1.5);
     for (let f = 0; f < 60 * 22; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(eng.resolution).toBe(1.5); // (each notch is a visible change: no step up after only 20 s)
+    for (let f = 0; f < 60 * 40; f++) { now += 1000 / 60; eng.frame(now); }
     expect(eng.resolution).toBe(2);
+    // slow again: down it goes, and it stays down (one step up a run: no flip-flop)
+    for (let f = 0; f < 60 * 12; f++) { now += 40; eng.frame(now); if (eng.resolution < 2) break; }
+    expect(eng.resolution).toBe(1.5);
+    for (let f = 0; f < 60 * 70; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(eng.resolution).toBe(1.5);
     expect(RES_STEPS[0]).toBe(3);
     eng.dispose();
   });
@@ -218,12 +225,13 @@ describe('dynamic resolution', () => {
     const state = () => `${amb.shed ? 'shed' : 'full'}@${eng.resolution}`;
     for (let f = 0; f < 60 * 14; f++) { now += 40; eng.frame(now); if (seen[seen.length - 1] !== state()) seen.push(state()); if (W.degrade) break; }
     expect(seen).toEqual(['full@3', 'shed@3', 'shed@2.5', 'shed@2', 'shed@1.5']);
-    // fast again: effects, then resolution notch by notch, the overlays only once it is all back
+    // fast again: effects, then one notch of resolution after a minute; the overlays would come back only
+    // once the resolution is all back, which one step up a run never reaches after a fall this deep
     for (let f = 0; f < 60 * 9; f++) { now += 1000 / 60; eng.frame(now); }
     expect(W.degrade).toBe(0);
-    for (let f = 0; f < 60 * 21 * 3; f++) { now += 1000 / 60; eng.frame(now); }
-    expect(eng.resolution).toBe(3);
-    expect(amb.shed).toBe(true); // three step-ups a run: the resolution came first
+    for (let f = 0; f < 60 * 63 * 3; f++) { now += 1000 / 60; eng.frame(now); }
+    expect(eng.resolution).toBe(2);
+    expect(amb.shed).toBe(true); // the resolution comes first
     eng.dispose();
     // a low-quality run draws no overlays: nothing to shed, resolution first as before
     const low = { shed: false };

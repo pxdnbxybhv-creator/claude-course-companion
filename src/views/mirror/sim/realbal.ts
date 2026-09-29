@@ -9,7 +9,9 @@
 // lines / circles, finds the gap of a gapped ring, holds an orbit ~230 u from a boss (inside most
 // weapons' reach), fetches 月华 when nothing is close, and casts its 镜技 on cooldown when enemies are
 // within 200. The beginner reacts every third step, ignores shots and telegraphs, keeps enemies at
-// 170, and buys at random (bot.ts's `beginner`). Bot play is not human play: read depths as relative.
+// 170, and buys at random (bot.ts's `beginner`). The average player (m6) reacts at 10 Hz (holds its
+// last move every other call), keeps enemies at 230, sidesteps shots but ignores telegraphs, and buys
+// like the skilled bot. Bot play is not human play: read depths as relative.
 import type { ArchetypeId, MapId } from '../ids';
 import type { BossEvent, CharacterId, ContentRegistry, DeathResult, DiffIndex, EngineHooks, EngineSettings, MirrorAudio, RunSave, WaveResult } from '../types';
 import { COMPANIONS } from '../data';
@@ -27,9 +29,13 @@ export interface RealOpts {
   map?: MapId;
   diff?: DiffIndex;
   maxWave?: number;
+  /** The bot: 'skilled' (default), 'average' or 'beginner' (`beginner: true` is the old spelling). */
+  level?: BotLevel;
   beginner?: boolean;
   /** Godmode for waves below this (to study later waves on their own). */
   godTo?: number;
+  /** The bot also steps out of enemy ground zones (clouds, webs, puddles), the way a person would. */
+  zones?: boolean;
   content?: ContentRegistry;
 }
 export interface RealRun {
@@ -47,7 +53,11 @@ export interface RealRun {
   trace: string[];
   /** Damage taken in the last wave played, by source (`p2 carp` in boss waves: the boss phase). */
   hurtBy: Record<string, number>;
+  /** 镜宝 held at the end (`wangchen2`), and the weapons (`qingfeng3`). */
+  relics: string[];
+  weapons: string[];
 }
+export type BotLevel = 'beginner' | 'average' | 'skilled';
 
 const SILENT: MirrorAudio = { prime: async () => {}, sfx: () => {}, pickup: () => {}, music: () => {}, dispose: () => {} };
 const DAY = '2026-09-27';
@@ -55,9 +65,11 @@ const DAY = '2026-09-27';
 // The world's internals are read directly (struct-of-arrays pools): this is a dev harness, not content.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Raw = any;
-interface BotState { wander: number; last: [number, number]; n: number }
+export interface BotState { wander: number; last: [number, number]; n: number; zones?: boolean }
 
-function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
+/** One bot decision (called every third step). Exported for the probes. */
+export function botStep(W: Raw, eng: Raw, level: BotLevel, st: BotState): void {
+  const skilled = level !== 'beginner', avg = level === 'average';
   const px = W.px, py = W.py, E = W.E;
   let fx = 0, fy = 0, near = 1e9, hold = false;
   for (let i = 0; i < E.n; i++) {
@@ -65,7 +77,7 @@ function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
     const dx = px - E.x[i], dy = py - E.y[i];
     const dd = Math.hypot(dx, dy) - E.r[i];
     if (dd < near) near = dd;
-    if (dd < (skilled ? 300 : 170)) {
+    if (dd < (!skilled ? 170 : avg ? 230 : 300)) {
       const k = (E.kind[i] === 2 ? 3 : 1) / Math.max(20, dd) ** 2;
       fx += (dx * k * 1e3) / Math.max(1, dd); fy += (dy * k * 1e3) / Math.max(1, dd);
     }
@@ -85,7 +97,7 @@ function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
       fx += (qx / ql) * k + (dx / dd) * k * 0.3; fy += (qy / ql) * k + (dy / dd) * k * 0.3;
     }
     const T = W.T;
-    for (let i = 0; i < T.n; i++) {
+    for (let i = 0; !avg && i < T.n; i++) {
       if (!T.alive[i]) continue;
       const s = T.shape[i];
       if (s.kind === 'ring' && s.gaps && s.gaps.length) {
@@ -119,6 +131,15 @@ function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
       fx += (dx / d) * pull * 1.5 + (-dy / d) * 0.6; fy += (dy / d) * pull * 1.5 + (dx / d) * 0.6;
     }
   }
+  // (zones) step out of enemy ground zones, the way a person would
+  if (st.zones) {
+    const Z = W.Z;
+    for (let i = 0; i < Z.n; i++) {
+      if (!Z.alive[i] || Z.side[i] !== 0 || !(Z.dps[i] > 0 || Z.slow[i] > 0)) continue;
+      const dx = px - Z.x[i], dy = py - Z.y[i], dd = Math.hypot(dx, dy) || 1;
+      if (dd < Z.r[i] + 45) { fx += (dx / dd) * 7; fy += (dy / dd) * 7; }
+    }
+  }
   const A = W.arena, m = 160;
   if (px < A.minX + m) fx += ((A.minX + m - px) / m) * 2.5;
   if (px > A.maxX - m) fx -= ((px - (A.maxX - m)) / m) * 2.5;
@@ -135,6 +156,7 @@ function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
   const L = Math.hypot(fx, fy);
   let mx = L > 0.02 ? fx / L : 0, my = L > 0.02 ? fy / L : 0;
   if (!skilled && st.n++ % 3) { mx = st.last[0]; my = st.last[1]; }
+  else if (avg && st.n++ % 2) { mx = st.last[0]; my = st.last[1]; }
   st.last = [mx, my];
   eng.input.move(mx, my);
   if (W.skillCd <= 0 && !W.skillRun && near < 200) eng.skill({ kind: 'auto' });
@@ -142,7 +164,8 @@ function botStep(W: Raw, eng: Raw, skilled: boolean, st: BotState): void {
 
 /** One whole run on the real engine. */
 export function playReal(o: RealOpts): RealRun {
-  const map = o.map ?? 'lake', maxWave = o.maxWave ?? 31, beginner = !!o.beginner;
+  const map = o.map ?? 'lake', maxWave = o.maxWave ?? 31;
+  const level: BotLevel = o.level ?? (o.beginner ? 'beginner' : 'skilled'), beginner = level === 'beginner';
   const u = allUnlocked();
   const arch: ArchetypeId = COMPANIONS[o.char].leans[0];
   const rng = rngFor(o.seed, 0, 'bot');
@@ -180,7 +203,7 @@ export function playReal(o: RealOpts): RealRun {
     }
     return d;
   };
-  const st: BotState = { wander: 0, last: [0, 0], n: 0 };
+  const st: BotState = { wander: 0, last: [0, 0], n: 0, zones: !!o.zones };
   const trace: string[] = [];
   let dead = false, deadAtBoss = false, timeout = false, ms = 0, steps = 0;
   for (let w = 1; w <= maxWave; w++) {
@@ -193,7 +216,7 @@ export function playReal(o: RealOpts): RealRun {
     let k = 0;
     while (ends.length === e0 && deaths.length === d0 && k < 60 * 400) {
       if (eng.paused) eng.resume();
-      if (k % 3 === 0 && W.phase === 'wave') { W.godmode = w < (o.godTo ?? 0); botStep(W, eng, !beginner, st); }
+      if (k % 3 === 0 && W.phase === 'wave') { W.godmode = w < (o.godTo ?? 0); botStep(W, eng, level, st); }
       eng.stepN(1);
       k++;
     }
@@ -223,10 +246,17 @@ export function playReal(o: RealOpts): RealRun {
   eng.dispose();
   const out: Record<string, number> = {};
   for (const [key, v] of Object.entries(hurtBy)) out[key] = Math.round(v);
-  return { char: o.char, seed: o.seed, W: run.wave, dead, deadAtBoss, timeout, errors, msPerStep: steps ? ms / steps : 0, trace, hurtBy: out };
+  const relics = Object.entries(run.items).filter(([k]) => k === 'wangchen' || k === 'longyuan').map(([k, v]) => `${k}${v}`);
+  return {
+    char: o.char, seed: o.seed, W: run.wave, dead, deadAtBoss, timeout, errors, msPerStep: steps ? ms / steps : 0, trace, hurtBy: out,
+    relics, weapons: run.weapons.map((x) => `${x.id}${x.t}`),
+  };
 }
 
-export interface RealSummary { runs: number; medianWave: number; meanWave: number; reached10: number; reached20: number; cleared30: number; bossDeaths: number; wave10Hazard: number }
+export interface RealSummary {
+  runs: number; medianWave: number; meanWave: number; reached10: number; reached20: number; cleared30: number; cleared40: number;
+  bossDeaths: number; wave10Hazard: number; errors: number; timeouts: number;
+}
 export function summarizeReal(runs: readonly RealRun[]): RealSummary {
   const ws = runs.map((r) => r.W).sort((a, b) => a - b), n = Math.max(1, runs.length);
   const at10 = runs.filter((r) => r.W >= 9).length;
@@ -237,7 +267,10 @@ export function summarizeReal(runs: readonly RealRun[]): RealSummary {
     reached10: runs.filter((r) => r.W >= 10).length / n,
     reached20: runs.filter((r) => r.W >= 20).length / n,
     cleared30: runs.filter((r) => r.W >= 30).length / n,
+    cleared40: runs.filter((r) => r.W >= 40).length / n,
     bossDeaths: runs.filter((r) => r.deadAtBoss).length,
     wave10Hazard: at10 ? runs.filter((r) => r.W === 9 && r.dead).length / at10 : 0,
+    errors: runs.reduce((a, r) => a + r.errors, 0),
+    timeouts: runs.filter((r) => r.timeout).length,
   };
 }

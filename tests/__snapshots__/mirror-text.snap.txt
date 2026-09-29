@@ -1,32 +1,32 @@
 ## zh
-qingfeng 1 | 伤害 10 · 0.9 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
-qingfeng 2 | 伤害 16 · 0.86 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
-qingfeng 3 | 伤害 26 · 0.81 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
-qingfeng 4 | 伤害 42 · 0.77 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 4 个敌人。 | 神品：暴击率再 +20%。
-longquan 1 | 伤害 5 · 0.7 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
-longquan 2 | 伤害 9 · 0.66 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
-longquan 3 | 伤害 14 · 0.63 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
-longquan 4 | 伤害 22 · 0.6 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每 3 轮有一轮转身砍一整圈。
-yanyue 1 | 伤害 20 · 1.8 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
-yanyue 2 | 伤害 33 · 1.71 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
-yanyue 3 | 伤害 53 · 1.62 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
-yanyue 4 | 伤害 82 · 1.53 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
-hoe 1 | 伤害 12 · 1.2 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 10% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
-hoe 2 | 伤害 19 · 1.14 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 15% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
-hoe 3 | 伤害 30 · 1.08 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 20% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
-hoe 4 | 伤害 48 · 1.02 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 25% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
-pestle 1 | 伤害 9 · 1.1 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
-pestle 2 | 伤害 15 · 1.05 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
-pestle 3 | 伤害 24 · 0.99 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
-pestle 4 | 伤害 38 · 0.94 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
-claw 1 | 伤害 5 · 0.4 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
-claw 2 | 伤害 8 · 0.38 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
-claw 3 | 伤害 13 · 0.36 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
-claw 4 | 伤害 20 · 0.34 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 15 层）。
-drunkfist 1 | 伤害 8 · 0.8 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
-drunkfist 2 | 伤害 13 · 0.76 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
-drunkfist 3 | 伤害 21 · 0.72 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
-drunkfist 4 | 伤害 33 · 0.68 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
+qingfeng 1 | 伤害 14 · 0.8 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
+qingfeng 2 | 伤害 22 · 0.76 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
+qingfeng 3 | 伤害 36 · 0.72 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 2 个敌人。 | 合到神品：暴击率再 +20%。
+qingfeng 4 | 伤害 58 · 0.68 秒一剑 | 受近战加成 | 向前直刺一剑，一剑最多刺中 4 个敌人。 | 神品：暴击率再 +20%。
+longquan 1 | 伤害 7 · 0.65 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
+longquan 2 | 伤害 12 · 0.62 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
+longquan 3 | 伤害 20 · 0.59 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 合到神品：每 3 轮有一轮转身砍一整圈。
+longquan 4 | 伤害 31 · 0.55 秒一轮 | 受近战加成 | 双剑连砍 2 下。每砍中一个敌人攻速 +2%（最多 +10%），3 秒没砍中就清零。 | 神品：每 3 轮有一轮转身砍一整圈。
+yanyue 1 | 伤害 25 · 1.6 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
+yanyue 2 | 伤害 41 · 1.52 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
+yanyue 3 | 伤害 66 · 1.44 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 合到神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
+yanyue 4 | 伤害 103 · 1.36 秒一刀 | 受近战、护甲加成 | 大刀横扫前方一大片，扫到的敌人都受伤，还会被远远推开。 | 神品：每砍 4 刀，最后一刀伤害翻倍，还甩出刀气飞向远处。
+hoe 1 | 伤害 15 · 1.1 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 10% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 2 | 伤害 24 · 1.05 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 15% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 3 | 伤害 38 · 0.99 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 20% 几率多掉 1 点月华（福缘越高越容易）。 | 合到神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+hoe 4 | 伤害 60 · 0.94 秒一下 | 受近战、回血加成 | 向前锄一下。锄倒敌人时，有 25% 几率多掉 1 点月华（福缘越高越容易）。 | 神品：锄倒的地方长出花，你踩到回 3 点血，敌人踩到会受伤。
+pestle 1 | 伤害 11 · 1 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 2 | 伤害 19 · 0.95 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 3 | 伤害 30 · 0.9 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 合到神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+pestle 4 | 伤害 48 · 0.85 秒一下 | 受回血、近战加成 | 朝敌人砸下一杵，震到一小圈。每次砸中，有 10% 几率给你回 1 点血。 | 神品：每砸中一个敌人，给你 1 点护盾（最多 10 点）。
+claw 1 | 伤害 7 · 0.4 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
+claw 2 | 伤害 11 · 0.38 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
+claw 3 | 伤害 18 · 0.36 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 5 层）。 | 合到神品：流血最多叠 15 层。
+claw 4 | 伤害 28 · 0.34 秒一轮 | 受近战加成 | 一轮连抓 3 下，第 3 下让敌人流血（最多叠 15 层）。
+drunkfist 1 | 伤害 11 · 0.7 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
+drunkfist 2 | 伤害 18 · 0.66 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
+drunkfist 3 | 伤害 29 · 0.63 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 合到神品：打出暴击时，马上能再出一拳。
+drunkfist 4 | 伤害 46 · 0.6 秒一拳 | 受近战加成 | 向前打出一拳，拳路会左右晃；每打中一个敌人，醉意 +1.8。 | 神品：打出暴击时，马上能再出一拳。
 dart 1 | 伤害 5 · 0.45 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 合到神品：能弹到 3 个敌人身上。
 dart 2 | 伤害 8 · 0.43 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 合到神品：能弹到 3 个敌人身上。
 dart 3 | 伤害 13 · 0.41 秒一镖 | 受远程加成 | 甩出飞镖，打中后还会弹到旁边 1 个敌人身上。 | 合到神品：能弹到 3 个敌人身上。
@@ -182,6 +182,8 @@ ambush | 乐器或符箓每出手 4 次，你其他的乐器和符箓就一起�
 needle | 护甲 +8。不会被击退；每点护甲伤害 +1%（和铁骨加起来最多 +40%）。
 jiangjinjiu | 醉意上限变成 200；醉意到 100 以上每下都暴击；醉意消得快一倍。
 watermoon | 每件兵器出手时，还会朝身后打出一次镜像（50% 伤害）。护甲 −4。
+wangchen | 伤害 +50%，暴击率 +50%，攻速 +20%，移速 +20%
+longyuan | 气血 +100，护甲 +20，移速 +20%。所有兵器攻击距离 +20%。
 yizi | 在敌人最多的地方写个大「镇」字，砸出 30 点伤害（按你兵器加成里最高的一项算）。字在地上留 5 秒，里面的敌人慢 40%，多受 20% 伤害。
 manyuan | 脚下种一片花圃，开 12 秒（最多 2 片）：花瓣每 0.8 秒打圃里 4 个敌人（受造物、回血加成），敌人慢 25%；你站在里面每秒回 1.5 点血。
 yiwang | 往敌人扎堆处撒网，把网里的敌人拖到中间定住 2 秒（精英 1 秒）；之后 4 秒它们多受 25% 伤害，打倒掉 2 倍月华。附近的月华也会飞过来。
@@ -220,36 +222,36 @@ jiuming | 一局有 8 次（每重最多一次）：挨了致命一击不倒，�
 yaoxiang | 血回满以后，再回的血变成护盾（最多到气血上限的 25%，每秒少 2%）；治疗效果 +15%。 | 射程 −15%
 baipian | 不带酒类兵器也有醉意条，醉意涨得快一倍。 | 自动瞄准会左右晃 10°
 yibo | 一下最多掉气血上限的 20%；每打完 3 重近战 +1（最多 +10）；身边一圈里的敌人伤害 −10%。 | 只有 5 个兵器位；商店不卖暗器
-yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；能飘过地上的险地。 | 加的护甲只算 75%
+yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；地上的险地只伤她一半，也拖不慢她。 | 加的护甲只算 75%
 ## en
-qingfeng 1 | 10 damage · every 0.9 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
-qingfeng 2 | 16 damage · every 0.86 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
-qingfeng 3 | 26 damage · every 0.81 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
-qingfeng 4 | 42 damage · every 0.77 s | scales with Melee | Thrusts straight ahead, hitting up to 4 enemies in a line. | Divine: +20% crit chance.
-longquan 1 | 5 damage · every 0.7 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
-longquan 2 | 9 damage · every 0.66 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
-longquan 3 | 14 damage · every 0.63 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
-longquan 4 | 22 damage · every 0.6 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
-yanyue 1 | 20 damage · every 1.8 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
-yanyue 2 | 33 damage · every 1.71 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
-yanyue 3 | 53 damage · every 1.62 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
-yanyue 4 | 82 damage · every 1.53 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
-hoe 1 | 12 damage · every 1.2 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 10% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
-hoe 2 | 19 damage · every 1.14 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 15% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
-hoe 3 | 30 damage · every 1.08 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 20% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
-hoe 4 | 48 damage · every 1.02 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 25% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
-pestle 1 | 9 damage · every 1.1 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
-pestle 2 | 15 damage · every 1.05 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
-pestle 3 | 24 damage · every 0.99 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
-pestle 4 | 38 damage · every 0.94 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
-claw 1 | 5 damage · every 0.4 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
-claw 2 | 8 damage · every 0.38 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
-claw 3 | 13 damage · every 0.36 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
-claw 4 | 20 damage · every 0.34 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 15 stacks).
-drunkfist 1 | 8 damage · every 0.8 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
-drunkfist 2 | 13 damage · every 0.76 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
-drunkfist 3 | 21 damage · every 0.72 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
-drunkfist 4 | 33 damage · every 0.68 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
+qingfeng 1 | 14 damage · every 0.8 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
+qingfeng 2 | 22 damage · every 0.76 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
+qingfeng 3 | 36 damage · every 0.72 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
+qingfeng 4 | 58 damage · every 0.68 s | scales with Melee | Thrusts straight ahead, hitting up to 4 enemies in a line. | Divine: +20% crit chance.
+longquan 1 | 7 damage · every 0.65 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
+longquan 2 | 12 damage · every 0.62 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
+longquan 3 | 20 damage · every 0.59 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | At Divine: Every 3rd round spins into a full-circle slash.
+longquan 4 | 31 damage · every 0.55 s | scales with Melee | 2 quick slashes. Each enemy hit gives +2% Attack speed (max +10%), lost after 3 s without a hit. | Divine: Every 3rd round spins into a full-circle slash.
+yanyue 1 | 25 damage · every 1.6 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 2 | 41 damage · every 1.52 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 3 | 66 damage · every 1.44 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | At Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+yanyue 4 | 103 damage · every 1.36 s | scales with Melee and Armour | Sweeps a wide arc in front, hitting everything it catches and knocking it far back. | Divine: Every 4th swing hits twice as hard and flings a blade wave that flies far.
+hoe 1 | 15 damage · every 1.1 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 10% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 2 | 24 damage · every 1.05 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 15% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 3 | 38 damage · every 0.99 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 20% chance to drop 1 extra moonlight (more with Luck). | At Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+hoe 4 | 60 damage · every 0.94 s | scales with Melee and HP Regen | Hoes the ground ahead. Kills have a 25% chance to drop 1 extra moonlight (more with Luck). | Divine: Kills grow flowers that heal you 3 HP and hurt enemies who step on them.
+pestle 1 | 11 damage · every 1 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 2 | 19 damage · every 0.95 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 3 | 30 damage · every 0.9 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | At Divine: Each enemy hit gives you 1 shield (max 10).
+pestle 4 | 48 damage · every 0.85 s | scales with HP Regen and Melee | Slams down on an enemy, hitting a small area. Each slam that lands has a 10% chance to heal you 1 HP. | Divine: Each enemy hit gives you 1 shield (max 10).
+claw 1 | 7 damage · every 0.4 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
+claw 2 | 11 damage · every 0.38 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
+claw 3 | 18 damage · every 0.36 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 5 stacks). | At Divine: Bleed stacks up to 15.
+claw 4 | 28 damage · every 0.34 s | scales with Melee | Swipes 3 times; the 3rd swipe makes enemies bleed (up to 15 stacks).
+drunkfist 1 | 11 damage · every 0.7 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
+drunkfist 2 | 18 damage · every 0.66 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
+drunkfist 3 | 29 damage · every 0.63 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | At Divine: A crit lets you punch again right away.
+drunkfist 4 | 46 damage · every 0.6 s | scales with Melee | Punches ahead in a swaying arc; each enemy hit adds 1.8 Drunk. | Divine: A crit lets you punch again right away.
 dart 1 | 5 damage · every 0.45 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | At Divine: Bounces to 3 more enemies.
 dart 2 | 8 damage · every 0.43 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | At Divine: Bounces to 3 more enemies.
 dart 3 | 13 damage · every 0.41 s | scales with Ranged | Throws a dart that bounces to 1 more enemy after a hit. | At Divine: Bounces to 3 more enemies.
@@ -405,6 +407,8 @@ ambush | Every 4th Music or Talisman attack fires all your other Music and Talis
 needle | +8 Armour. Immune to knockback; +1% Damage per point of Armour (with Iron Bones, max +40%).
 jiangjinjiu | Drunk cap becomes 200; at 100+ Drunk every hit crits; Drunk drains twice as fast.
 watermoon | Every weapon also attacks behind you as a mirror image (50% damage). −4 Armour.
+wangchen | +50% Damage, +50% Crit chance, +20% Attack speed, +20% Move speed
+longyuan | +100 HP, +20 Armour, +20% Move speed. +20% reach on every weapon.
 yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest of Melee, Ranged, Elemental and Craft). It stays 5 s: enemies inside are 40% slower and take 20% more damage.
 manyuan | Plants a flowerbed at your feet for 12 s (max 2): every 0.8 s petals hit 4 enemies inside (scales with Craft and HP Regen), enemies are 25% slower, and you heal 1.5 HP a second inside.
 yiwang | Throws a net where enemies crowd: they're dragged to the middle and held 2 s (elites 1 s). For 4 s they take 25% more damage and drop 2× moonlight. Loose moonlight nearby flies to you.
@@ -443,4 +447,4 @@ jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP a
 yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing. | −15% range
 baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. | Auto-aim sways 10°
 yibo | No hit takes more than 20% of max HP; +1 Melee every 3 waves cleared (max +10); enemies in a medium area around you deal 10% less. | Only 5 weapon slots; no Hidden weapons in his shop
-yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Floats over ground hazards. | Armour gains count 75%
+yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Ground hazards hurt her half as much and never slow her. | Armour gains count 75%

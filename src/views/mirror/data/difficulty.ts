@@ -6,10 +6,10 @@ import type { AffixDef, DifficultyDef, MutatorDef, VowDef } from '../types';
 export const DIFFS: readonly DifficultyDef[] = [
   { id: 'xianyou', index: 0, hp: 0.7, dmg: 0.6, pay: 0.5, unlock: null, noEliteBefore: 11, teleX: 1.3, enrageAt: 150 },
   { id: 'zhaoying', index: 1, hp: 1, dmg: 1, pay: 1, unlock: null, enrageAt: 90 },
-  { id: 'mingjing', index: 2, hp: 1.3, dmg: 1.15, pay: 1.15, unlock: { diff: 1, wave: 20 }, enrageAt: 90, extraEliteFrom: 12 },
-  { id: 'youjing', index: 3, hp: 1.6, dmg: 1.3, pay: 1.3, unlock: { diff: 2, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true },
-  { id: 'xuanjing', index: 4, hp: 1.9, dmg: 1.45, pay: 1.45, unlock: { diff: 3, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true, affixFrom: 11, heal: -20 },
-  { id: 'wuxiang', index: 5, hp: 2.2, dmg: 1.6, pay: 1.6, unlock: { diff: 4, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true, affixFrom: 11, affix2From: 21, heal: -20, twins20: 0.5, mutatorFrom: 11, enemySpeed: 1.08 },
+  { id: 'mingjing', index: 2, hp: 1.3, dmg: 1.3, pay: 1.15, unlock: { diff: 1, wave: 20 }, enrageAt: 90, extraEliteFrom: 12 },
+  { id: 'youjing', index: 3, hp: 1.6, dmg: 1.6, pay: 1.3, unlock: { diff: 2, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true },
+  { id: 'xuanjing', index: 4, hp: 1.9, dmg: 1.9, pay: 1.45, unlock: { diff: 3, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true, affixFrom: 11, heal: -20 },
+  { id: 'wuxiang', index: 5, hp: 2.2, dmg: 2.2, pay: 1.6, unlock: { diff: 4, wave: 30 }, enrageAt: 90, extraEliteFrom: 12, shotSpeed: 1.15, bossExtraPattern: true, affixFrom: 11, affix2From: 21, heal: -20, twins20: 0.5, mutatorFrom: 11, enemySpeed: 1.08 },
 ];
 
 /** Vows: `per` is per rank. Total heat is capped at 20. */

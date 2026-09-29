@@ -218,7 +218,8 @@ describe('mirror descriptions · numbers match the data', () => {
     expect(D.describeWeapon('claw', 4, zh).t4).toBeNull(); // IV only raises numbers the body shows
     expect(D.describeWeapon('claw', 1, zh).t4).toBe('合到神品：流血最多叠 15 层。');
     expect(D.describeWeapon('qingfeng', 1, zh).tierRow[1]).toBe('一剑刺中：凡 2 · 灵 2 · 仙 2 · 神 4');
-    expect(D.describeWeapon('qingfeng', 1, en).head).toBe('10 damage · every 0.9 s');
+    expect(D.describeWeapon('qingfeng', 1, en).head).toBe('14 damage · every 0.8 s'); // ⚖5 melee buff (was 10 · 0.9 s)
+    expect(D.describeWeapon('yanyue', 1, en).head).toBe('25 damage · every 1.6 s');
     expect(D.describeWeapon('yanyue', 1, zh).scales).toBe('受近战、护甲加成');
   });
 
@@ -267,7 +268,10 @@ describe('mirror descriptions · numbers match the data', () => {
   });
 
   it('set steps are generated from SETS: totals at each step, flags added', () => {
-    expect(D.setSteps('sword', zh).map((x) => x.text)).toEqual(['暴击率 +5%', '暴击率共 +10%', '暴击率共 +15%，剑类刺击多刺中 1 个敌人']);
+    expect(D.setSteps('sword', zh).map((x) => x.text)).toEqual([
+      '暴击率 +5%，近战 +2，吸血 +2%', '暴击率共 +10%，近战共 +4，吸血共 +4%', '暴击率共 +15%，近战共 +6，吸血共 +6%，剑类刺击多刺中 1 个敌人',
+    ]);
+    expect(D.setSteps('heavy', zh).map((x) => x.text)).toEqual(['近战 +3，护甲 +2', '近战共 +6，护甲共 +4，气血 +5', '近战共 +9，护甲共 +6，气血共 +10，范围 +15%']);
     expect(D.setSteps('music', zh)[2].text).toBe('乐器范围 +30%，迷惑几率翻倍');
     expect(D.setSteps('flying', en)[1].text).toBe('+5% Crit chance, +1 Extra sword');
   });

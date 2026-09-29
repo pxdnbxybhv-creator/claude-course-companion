@@ -15,19 +15,20 @@ import { openSheets, toast } from '../../../ui/kit';
 import { coinToast } from '../../../ui/coins';
 import { coins } from '../../../app/play';
 import { todayKey } from '../../../core/date';
-import { bakeScale, createPainter } from '../paint';
+import { bakeScale, createPainter, viewOf } from '../paint';
 import { arenaGeom, computeStats, nextScreen, openShop, unlocksOf } from '../logic';
 import { realSession, type RunSession } from '../logic/session';
 import { COMPANIONS } from '../data';
 import type {
-  BakeStage, BossEvent, CodexKey, DeathResult, Engine, EngineHooks, EngineSettings, HudState, MirrorAudio, MirrorSettings, Painter, Quality,
+  BakeStage, BossEvent, CodexKey, DeathResult, DownInfo, Engine, EngineHooks, EngineSettings, HudState, MirrorAudio, MirrorSettings, Painter, Quality,
   RunReport, RunSave, WaveResult,
 } from '../types';
+import type { HudRect } from '../engine/threats';
 import { loadEngine } from './engineHost';
 import { Controls, Hud, type HudApi } from './Hud';
 import { PauseSheet } from './Pause';
 import { Bake, Ritual } from './Ritual';
-import { BossCard, Cards, Crate, HeartPick, Ready, StartPick } from './Screens';
+import { BossCard, Cards, Crate, HeartPick, Ready, ReviveDialog, StartPick } from './Screens';
 import { Shop } from './Shop';
 import { WhoSheet } from './Panel';
 import { rememberPanelBase } from './panelView';
@@ -67,9 +68,9 @@ export function qualityOf(q: MirrorSettings['quality']): Quality {
 /** The canvas's device-pixel-ratio cap: native up to 3 at every quality (a DPR-3 phone is never
  *  stretched); the engine's dynamic resolution steps down from it under load (engine/index.ts). */
 export function dprCapOf(_q: Quality): number { return 3; }
-/** The run's sprite resolution (px per u) for this screen: the camera's scale here × a little headroom
- *  (paint/index.ts bakeScale). A desktop window may grow after the bake, so it bakes for the largest
- *  camera scale (a window ≥ 600 px on its short side). */
+/** The run's sprite resolution (px per u) for this screen and the saved 视野: the camera's scale here ×
+ *  a little headroom (paint/index.ts bakeScale). A desktop window may grow after the bake, so it bakes
+ *  for the largest camera scale (a window ≥ 600 px on its short side). */
 export function spriteScale(quality: Quality, el?: Element | null): number {
   const dpr = Math.min(dprCapOf(quality), (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
   let w = 0, h = 0;
@@ -78,17 +79,34 @@ export function spriteScale(quality: Quality, el?: Element | null): number {
   let coarse = true;
   try { coarse = matchMedia('(pointer: coarse)').matches; } catch { /* assume a phone */ }
   if (!coarse) { w = Math.max(w, 600); h = Math.max(h, 600); }
-  return bakeScale(w, h, dpr, quality);
+  return bakeScale(w, h, dpr, quality, viewOf(mirror.value.settings.view));
 }
 /** The engine's settings; the tutorial always auto-aims (its lines speak of auto-aim; the setting is kept). */
 function engineSettings(practice = false): EngineSettings {
   const s = mirror.value.settings;
   const quality = qualityOf(s.quality);
   const reduceMotion = prefersReduced();
-  return { quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: practice ? 'auto' : s.aim, lang: lang.value === 'en' ? 'en' : 'zh' };
+  return {
+    quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: practice ? 'auto' : s.aim, lang: lang.value === 'en' ? 'en' : 'zh',
+    view: viewOf(s.view),
+  };
 }
-/** A sheet or a coach hold is up: the run's own keys wait (Space during a hold never casts the skill). */
-const sheetOpen = () => !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold');
+/** A sheet, a coach hold or the revive dialog is up: the run's own keys wait (Space during a hold never casts the skill). */
+const sheetOpen = () => !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold, .mj-revive');
+/** The HUD blocks the off-screen chevrons keep clear of (engine/threats.ts via MirrorEngine.setHudRects). */
+const HUD_BLOCKS = ['.mj-hud-tl', '.mj-hud-tc', '.mj-hud-tr', '.mj-skill'] as const;
+/** Each HUD block's box in css px from the canvas's top-left (the ones laid out and visible). */
+export function hudRectsOf(root: ParentNode, canvasBox: { left: number; top: number }): HudRect[] {
+  const out: HudRect[] = [];
+  for (const sel of HUD_BLOCKS) {
+    const el = root.querySelector(sel);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) continue;
+    out.push({ x: Math.round(r.left - canvasBox.left), y: Math.round(r.top - canvasBox.top), w: Math.round(r.width), h: Math.round(r.height) });
+  }
+  return out;
+}
 
 type Hold = 'pause' | 'intro' | 'coach';
 
@@ -143,6 +161,14 @@ export function RunView(props: {
   const [skillLive, setSkillLive] = useState(true);
   /** 文 that sank with the glass (the fatal wave's sleeve), for the 镜碎 overlay. */
   const [sank, setSank] = useState(0);
+  /** 破镜重圆: down with the revive on offer (the engine's phase 'down'), and whether the dialog shows yet
+   *  (after the 1 s fall, at once under reduced motion). While down: no pause, no stick, no 技. */
+  const [down, setDownState] = useState<{ wave: number; price: number } | null>(null);
+  const downRef = useRef<{ wave: number; price: number } | null>(null);
+  const [downAsk, setDownAsk] = useState(false);
+  const askTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** The fight's music (wave or boss), for coming back after a revive. */
+  const fightMusic = useRef<'wave' | 'boss'>('wave');
   const wrap = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const engine = useRef<Engine | null>(null);
@@ -282,7 +308,8 @@ export function RunView(props: {
       onError(e, true);
       return;
     }
-    P.current.audio.music(setup.plan.boss ? 'boss' : 'wave', r.map);
+    fightMusic.current = setup.plan.boss ? 'boss' : 'wave';
+    P.current.audio.music(fightMusic.current, r.map);
     wrap.current?.focus({ preventScroll: true });
   };
 
@@ -291,6 +318,8 @@ export function RunView(props: {
     const before = runRef.current.coins;
     const next = S.waveWon(res);
     if (!next || ended.current) return;
+    // 镜宝 earned this wave: their codex pages are seen (见)
+    if (res.relics?.length) S.markSeen(res.relics.map((id) => `item:${id}` as CodexKey));
     if (!practice) rememberPlayed(todayKey(), next.seed);
     const banked = next.coins - before;
     if (banked > 0 && !practice) coinToast(banked, { note: t('入囊', 'into your purse') });
@@ -332,6 +361,52 @@ export function RunView(props: {
       P.current.onLeave();
     }
   };
+  // ── 破镜重圆: the first death of a real run goes down; the dialog answers (API.md §3)
+  const endDown = () => {
+    clearTimeout(askTimer.current);
+    downRef.current = null;
+    setDownState(null);
+    setDownAsk(false);
+  };
+  const onDowned = (d: DownInfo) => {
+    const eng = engine.current;
+    if (ended.current || !S.payRevive || practice) { eng?.giveUp(); return; }
+    S.wentDown?.(d.wave); // a reload or 暂离 from here settles as a death
+    downRef.current = { wave: d.wave, price: d.price };
+    setDownState(downRef.current);
+    setDownAsk(false);
+    P.current.audio.music('results', runRef.current.map); // the band drops out under the shatter
+    clearTimeout(askTimer.current);
+    askTimer.current = setTimeout(() => { if (downRef.current) setDownAsk(true); }, prefersReduced() ? 0 : 900);
+  };
+  /** 花 50 文复活: charge (session: spend → record → purse written → run saved), then rise. */
+  const onRevive = () => {
+    const eng = engine.current;
+    if (!downRef.current || !eng || !S.payRevive || ended.current) return;
+    const res = S.payRevive();
+    if (res === 'short') return; // the purse changed under the dialog: it shows the shortfall now
+    endDown();
+    if (res !== 'ok') { eng.giveUp(); return; } // already used (or no run in a wave): the death stands
+    if (!eng.revive()) {
+      // charged but the engine could not rise (disposed or failed meanwhile): the coins go back
+      S.reviveFailed?.();
+      eng.giveUp();
+      if (!ended.current && eng.phase !== 'dead') onError(new Error('mirror: the revive failed'), true);
+      return;
+    }
+    setRun({ ...runRef.current, revived: true });
+    // no toast here: the centre title 破镜重圆 says you rose, the dialog said it was the run's one revive,
+    // and a toast at the top would sit over the HP bar, the wave and the pause button just when you need them
+    P.current.audio.music(fightMusic.current, runRef.current.map);
+    wrap.current?.focus({ preventScroll: true });
+  };
+  /** 不了 / 结束这一局: the normal death (hooks.death → session.died → results). */
+  const onDeclineRevive = () => {
+    if (!downRef.current) return;
+    endDown();
+    engine.current?.giveUp();
+  };
+
   const hooks = useMemo<EngineHooks>(() => ({
     hud: (s) => { hud.current?.push(s); emit({ k: 'hud', s }); },
     levelUp: (l) => { hud.current?.levelUp(l); emit({ k: 'levelUp', level: l }); },
@@ -348,6 +423,8 @@ export function RunView(props: {
     waveEnd: (r) => onWaveEnd(r),
     death: (d) => onDeath(d),
     error: (e, fatal) => onError(e, fatal),
+    // the tutorial (and a session without the purse) never offers the revive: its death is at once
+    ...(!practice && S.payRevive ? { downed: (d: DownInfo) => onDowned(d) } : {}),
   }), []);
 
   // ── 研墨: bake the start plan, paint the arena, prime the voices, build the engine
@@ -400,6 +477,7 @@ export function RunView(props: {
 
   // ── unmount: stop everything and save
   useEffect(() => () => {
+    clearTimeout(askTimer.current);
     try { engine.current?.dispose(); } catch { /* already */ }
     engine.current = null;
     try { painter.current?.dispose(); } catch { /* already */ }
@@ -410,7 +488,8 @@ export function RunView(props: {
   // ── pause / resume
   const pause = () => {
     const s = stageRef.current;
-    if ((s !== 'wave' && s !== 'between') || pausedRef.current) return;
+    // down: the revive dialog is the only question (a blur or a letter waits behind it)
+    if ((s !== 'wave' && s !== 'between') || pausedRef.current || downRef.current) return;
     if (s === 'wave' && engine.current?.phase === 'ending') { pauseAfterEnd.current = true; return; }
     if (s === 'wave') addHold('pause');
     else engine.current?.pause();
@@ -527,15 +606,38 @@ export function RunView(props: {
   useEffect(() => {
     const el = wrap.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => { engine.current?.resize(); backdrop(); });
+    const ro = new ResizeObserver(() => { engine.current?.resize(); backdrop(); sendHudRects(); });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  /** A setting changed in the pause sheet: the live ones reach the engine now (quality waits for the next entry). */
+  /** Where the HUD sits, for the off-screen chevrons (they stay clear of it; a threat under it counts as
+   *  unseen). Sent when the wave's HUD mounts, on a resize, and whenever a HUD block changes size (the
+   *  boss's scroll, the 镜奁 row, the marks). */
+  const sendHudRects = () => {
+    const eng = engine.current as (Engine & { setHudRects?: (r: readonly HudRect[] | null) => void }) | null;
+    const c = canvas.current, w = wrap.current;
+    if (!eng || typeof eng.setHudRects !== 'function' || !c || !w || stageRef.current !== 'wave') return;
+    const cr = c.getBoundingClientRect();
+    if (!(cr.width > 0 && cr.height > 0)) return;
+    eng.setHudRects(hudRectsOf(w, cr));
+  };
+  useEffect(() => {
+    if (stage !== 'wave') return;
+    const w = wrap.current;
+    sendHudRects();
+    if (!w || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => sendHudRects());
+    for (const sel of HUD_BLOCKS) { const el = w.querySelector(sel); if (el) ro.observe(el); }
+    return () => ro.disconnect();
+  }, [stage, settings.left]);
+
+  /** A setting changed in the pause sheet: the live ones reach the engine now (quality waits for the next
+   *  entry; 视野 applies at once, the sprites re-baking behind the sheet). */
   const onSettings = () => {
     const s = engineSettings(practice);
-    engine.current?.setSettings({ nums: s.nums, shake: s.shake, aim: s.aim, lang: s.lang, reduceMotion: s.reduceMotion });
+    engine.current?.setSettings({ nums: s.nums, shake: s.shake, aim: s.aim, lang: s.lang, reduceMotion: s.reduceMotion, view: s.view });
+    requestAnimationFrame(() => sendHudRects());
   };
 
   const scr = stage === 'between' ? nextScreen(run) : null;
@@ -550,12 +652,12 @@ export function RunView(props: {
   // 倒影: from wave 31 the arena is painted inverted (engine/index.ts), so the HUD turns paper-light
   const inverted = (run.inWave ?? run.wave + 1) > 30;
   return (
-    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '') + (inverted ? ' is-inverted' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
+    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '') + (inverted ? ' is-inverted' : '') + (down ? ' is-down' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
       <canvas class="mj-canvas" ref={canvas} aria-hidden="true" />
       {stage === 'wave' && (
         <>
           <Hud api={hud} onPause={pause} wave={run.wave + 1} skill={COMPANIONS[run.char].skill} showSleeve={run.coins > 0} armor={armorNow} char={run.char} onWho={pause} />
-          <Controls engine={() => engine.current} left={settings.left} manualAim={!practice && settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={holdN === 0 && !paused && !intro} />
+          <Controls engine={() => engine.current} left={settings.left} manualAim={!practice && settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={holdN === 0 && !paused && !intro && !down} />
         </>
       )}
       {stage === 'ritual' && props.ritual && <Ritual kind={props.ritual} reduced={reduced} onDone={() => { if (stageRef.current === 'ritual') setStage('bake'); }} />}
@@ -580,8 +682,9 @@ export function RunView(props: {
           {sank > 0 && <p class="mj-shatter-note">{t(`袖中铜钱 ${sank} 文，随镜沉池`, `The ${sank} coins in your sleeve sink with the glass`)}</p>}
         </div>
       )}
+      {down && downAsk && stage === 'wave' && <ReviveDialog price={down.price} purse={coins.value} onRevive={onRevive} onEnd={onDeclineRevive} />}
       {intro && <BossCard ev={intro} tip={bossTip} onDone={() => { setIntro(null); setBossTip(null); dropHold('intro'); }} />}
-      <Coach brain={brain} inWave={stage === 'wave'} left={settings.left} hidden={paused || stage === 'ritual' || stage === 'bake' || stage === 'dying' || !!intro} onOk={coachOk} />
+      <Coach brain={brain} inWave={stage === 'wave'} left={settings.left} hidden={paused || stage === 'ritual' || stage === 'bake' || stage === 'dying' || !!intro || !!down} onOk={coachOk} />
       <PauseSheet
         open={paused}
         run={run}

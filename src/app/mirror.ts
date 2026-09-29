@@ -112,6 +112,8 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
       quality: st.quality === 'low' || st.quality === 'mid' || st.quality === 'high' ? st.quality : 'auto',
       tips: st.tips !== false, // 新手提示: on unless turned off
     };
+    // 视野: kept only when it is one of the three; missing means 中 ('mid', the engine's default)
+    if (st.view === 'near' || st.view === 'mid' || st.view === 'far') settings.view = st.view;
     const lastDay = date(r.lastDay, base.lastDay);
     const titles = strList<MirrorMeta['titles'][number]>(r.titles);
     const rims = strList<MirrorMeta['rims'][number]>(r.rims, 16);

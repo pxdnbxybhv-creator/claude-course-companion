@@ -31,16 +31,16 @@ describe('人物 panel · body tiles', () => {
     expect(tile(r, 'hp').value).toBe(String(COMPANIONS.scholar.hp));
     expect(tile(r, 'hp').sub).toBe('不会自己回血');
     const a = tile(r, 'armor');
-    expect(a.label).toBe('护甲 1');
-    expect(`${a.word} ${a.value}`).toBe(`少受 ${armorReduction(1)}%`);
-    expect(a.value).toBe('6%');
+    expect(a.label).toBe(`护甲 ${COMPANIONS.scholar.armor}`); // 4 (⚖5: +2, and +1 for a ranged companion)
+    expect(`${a.word} ${a.value}`).toBe(`少受 ${armorReduction(4)}%`);
+    expect(a.value).toBe('21%');
     expect(tile(r, 'dodge').value).toBe('0%');
     expect(tile(r, 'dodge').sub).toBe('最多 60%');
     expect(tile(r, 'speed').value).toBe('常速');
     expect(tile(r, 'speed').sub).toBe('和常人一样快');
   });
   it('says 多受 when armour is below zero', () => {
-    const r = run('scholar', { stats: { armor: -2 } });
+    const r = run('scholar', { stats: { armor: -5 } }); // 书生's own 4 − 5
     const a = tile(r, 'armor');
     expect(a.label).toBe('护甲 −1');
     expect(`${a.word} ${a.value}`).toBe('多受 7%');
@@ -193,9 +193,10 @@ describe('人物 panel · level-card preview', () => {
   it('shows armour as 少受 x% → y%, 嫦娥 gaining three quarters', () => {
     const r = run('change');
     const p = levelPreview(r, 'armor', 2, zh);
-    expect(p.line).toBe(`少受 0% → ${armorReduction(1.5)}%`);
-    // 书生's own 1 − 3 = −2, and a +4 card makes it 2
-    expect(levelPreview(run('scholar', { stats: { armor: -3 } }), 'armor', 4, zh).line).toBe(`多受 ${-armorReduction(-2)}% → 少受 ${armorReduction(2)}%`);
+    // 嫦娥's own 3, and a +2 card gives her 1.5
+    expect(p.line).toBe(`少受 ${armorReduction(3)}% → ${armorReduction(4.5)}%`);
+    // 书生's own 4 − 6 = −2, and a +4 card makes it 2
+    expect(levelPreview(run('scholar', { stats: { armor: -6 } }), 'armor', 4, zh).line).toBe(`多受 ${-armorReduction(-2)}% → 少受 ${armorReduction(2)}%`);
   });
   it('reads a percent card', () => {
     // one format on both sides: no '+' on the after-value (the 闪避 card reads 「0% → 3%」 too)
@@ -226,8 +227,9 @@ describe('人物 panel · since the last wave', () => {
     expect(texts).toContain('新道具 松子');
     expect(v.tiles.find((x) => x.id === 'hp')!.delta!.text).toBe('+4');
     // armour's change is said as what it was, never as a bare percent next to 「多受」
-    const worse = panelView({ ...after, items: { watermoon: 1 } }, base, zh).tiles.find((x) => x.id === 'armor')!;
-    expect(worse.delta!.text).toBe(`原来少受 ${armorReduction(1)}%`);
+    const worse = panelView({ ...after, items: { watermoon: 1 }, stats: { crit: 10, armor: -3 } }, base, zh).tiles.find((x) => x.id === 'armor')!;
+    expect(worse.word).toBe('多受');
+    expect(worse.delta!.text).toBe(`原来少受 ${armorReduction(COMPANIONS.scholar.armor)}%`);
     expect(worse.delta!.tone).toBe('down');
   });
   it('keeps the base per device, and only for this run and the wave just won', () => {

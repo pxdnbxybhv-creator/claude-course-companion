@@ -262,6 +262,8 @@ export function itemGetter(id: ItemId): Getter {
     if (/^f\d\./.test(path)) return fxGet(x.fx, path);
     if (path === 'curse') return x.curse ?? 0;
     if (path === 'max') return x.max;
+    if (path === 'reachPct') return x.reachPct;
+    if (path === 'inkCrit') return x.inkCrit;
     return undefined;
   };
 }
@@ -279,6 +281,8 @@ export function describeItem(id: ItemId, t: T): { body: string; detail: string[]
   // what each stat it gives does, in the glossary's plain words (a newcomer's first question)
   for (const id of Object.keys(x.stats ?? {}) as StatId[]) detail.push(`${termName(id, t)}${t('：', ': ')}${termLine(id, t)}`);
   for (const m of say?.more ?? []) detail.push(fillT(m, get, t));
+  // 镜宝: how it is earned (the glossary's line); it stacks without limit, so no 「最多带」
+  if (x.relic) detail.push(`${termName('relic', t)}${t('：', ': ')}${termLine('relic', t)}`);
   if (x.max === 1) detail.push(t('只能带 1 个', 'max 1'));
   else if (x.max > 1) detail.push(t(`最多带 ${x.max} 个`, `max ${x.max}`));
   if (x.from) detail.push(t(`第 ${x.from} 重起才会在商店出现`, `in shops from wave ${x.from}`));

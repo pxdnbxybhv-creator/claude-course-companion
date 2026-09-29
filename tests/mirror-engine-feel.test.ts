@@ -70,7 +70,7 @@ function crowd(W: MirrorEngine['world'], n: number): void {
 const BUSY: [WeaponId, 1 | 2 | 3 | 4][] = [['yanyue', 4], ['pestle', 4], ['longquan', 4], ['claw', 4], ['repeater', 4], ['thunder', 4]];
 
 describe('打击感: the feel layer', () => {
-  it('hitstop: ordinary hits and crits never stop the world; the rare heavy moments stay within ~15% of any second', () => {
+  it('hitstop: ordinary hits and crits never stop the world, heavy arms included (屏幕抖动 RC5); the frozen share stays 0', () => {
     // a fast crit build without heavy arms: the world never stops
     const LIGHT: [WeaponId, 1 | 2 | 3 | 4][] = [['longquan', 4], ['claw', 4], ['repeater', 4], ['thunder', 4], ['casket', 4], ['dart', 4]];
     for (const [ws, heavy] of [[LIGHT, false], [BUSY, true]] as const) {
@@ -89,11 +89,9 @@ describe('打击感: the feel layer', () => {
       }
       const st = W.feel.stats();
       expect(st.hits).toBeGreaterThan(200);
-      if (!heavy) expect(st.stopMs).toBe(0); // no global stop from your own blows
-      else {
-        expect(st.stopMs).toBeGreaterThan(0); // a heavy weapon's crit still lands a beat …
-        expect(st.stopMs).toBeLessThan(80 + 30 * 8 + 1); // … from a small bucket
-      }
+      // no global stop from your own blows, a heavy weapon's crits included (they asked; none was granted)
+      expect(st.stopMs).toBe(0);
+      if (heavy) expect(st.stopReqMs).toBeGreaterThan(0);
       for (const s of secs) expect(s).toBeLessThanOrEqual(0.15);
       expect(st.maxShare).toBeLessThanOrEqual(0.15);
       // the bodies took it instead: pulses and local freezes
@@ -164,29 +162,35 @@ describe('打击感: the feel layer', () => {
     eng.dispose();
   });
 
-  it('a hitstop holds the camera where it is: it never closes its follow lag in one frame', () => {
+  it('a boss stop (stopHard) holds the picture: the camera and the drawn figure stand still, and the frame it releases the camera moves exactly with the figure', () => {
     const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 21 })), []), wave: 3 });
     const { eng } = make(run);
     eng.start(run, setup);
     const W = quiet(eng);
+    // a drawing engine (the stub ctx; the renderer is replaced by a recorder of what it was handed)
+    const E = eng as unknown as { ctx: unknown; renderer: { draw: (Wd: { px: number; py: number }, c: unknown, cam: { x: number; y: number }) => void } };
+    E.ctx = {};
+    const seen: { px: number; py: number; cx: number; cy: number }[] = [];
+    E.renderer.draw = (Wd, _c, cam) => { seen.push({ px: Wd.px, py: Wd.py, cx: cam.x, cy: cam.y }); };
     let now = 1000;
-    let prev = eng.camera;
-    const stepOf = () => { const c = eng.camera; const d = Math.hypot(c.x - prev.x, c.y - prev.y); prev = c; return d; };
-    eng.input.move(1, 0.25);
-    let walk = 0;
-    for (let f = 0; f < 60; f++) { eng.frame((now += 1000 / 60)); walk = stepOf(); }
-    expect(walk).toBeGreaterThan(0.5); // following a walk …
-    // … from behind its target (you plus a 60 px lead): a lag the old code closed in a stop's first frame
-    const lead = (60 * prev.dpr) / prev.scale, sp = Math.max(1, W.moveSpd);
-    expect(Math.hypot(W.px + (W.pvx / sp) * lead - prev.x, W.py + (W.pvy / sp) * lead - prev.y)).toBeGreaterThan(5 * walk);
-    for (const ms of [40, 75]) {
-      W.hitstopMs = ms;
-      const t0 = W.tWave;
-      // the stop's frames and the first one after it: no step much larger than the walk's (the old code
-      // jumped ≈ 8× a walking step; the follow may catch up a little faster than the walk after a hold)
-      for (let f = 0; f < Math.ceil(ms / 16.7) + 1; f++) { eng.frame((now += 1000 / 60)); expect(stepOf()).toBeLessThanOrEqual(walk * 1.25 + 1e-6); }
-      expect(W.tWave - t0).toBeLessThanOrEqual(2 / 60 + 1e-6); // the world was held (the stop's tail and the frame after it ran)
-      for (let f = 0; f < 30; f++) { eng.frame((now += 1000 / 60)); walk = stepOf(); }
+    // (walking down, then up: the camera stays clear of the arena's edge, where it eases into its bounds)
+    for (const [ms, dy] of [[120, 1], [160, -1]] as const) {
+      eng.input.move(0.3 * dy, dy);
+      for (let f = 0; f < 60 + 30 * (1 - dy); f++) eng.frame((now += 1000 / 60)); // the lead has eased in
+      W.feel.stopHard(ms);
+      const t0 = W.tWave, at = seen.length;
+      for (let f = 0; f < Math.ceil(ms / 16.7) + 1; f++) eng.frame((now += 1000 / 60));
+      expect(W.tWave - t0).toBeLessThanOrEqual(2 / 60 + 1e-6); // the world was held
+      // every frame of the stop drew the same picture; the release frame moved camera and figure alike
+      let held = 0, mismatch = 0;
+      for (let k = at; k < seen.length; k++) {
+        const a = seen[k - 1], b = seen[k];
+        const dfx = b.px - a.px, dfy = b.py - a.py, dcx = b.cx - a.cx, dcy = b.cy - a.cy;
+        if (Math.hypot(dfx, dfy) < 1e-6 && Math.hypot(dcx, dcy) < 1e-6) held++;
+        if (Math.hypot(dcx - dfx, dcy - dfy) > 0.05) mismatch++;
+      }
+      expect(held).toBeGreaterThanOrEqual(Math.floor(ms / 16.7) - 1);
+      expect(mismatch).toBe(0);
     }
     eng.dispose();
   });
@@ -270,7 +274,7 @@ describe('打击感: the feel layer', () => {
     eng.dispose();
   });
 
-  it('the camera stays still for your own hits, crits and kills; big moments only move it (≤ 3 px), and the setting turns them off', () => {
+  it('the camera never moves: not for your own hits, crits and kills, nor a blow you take, a slam, a phase or the 镜技 (屏幕抖动 RC4); the big moments pulse the edge instead', () => {
     for (const shake of [true, false]) {
       const { run, setup } = setupFor({ ...withWeapons(newRun(opts({ seed: 3 })), BUSY), wave: 11, stats: { aspd: 150, crit: 60 } });
       const { eng } = make(run, { shake });
@@ -292,26 +296,27 @@ describe('打击感: the feel layer', () => {
       expect(W.critN).toBeGreaterThan(50);
       expect(worst).toBe(0); // not a pixel from your own blows
       expect(z).toBe(0);
-      // the 镜技's landing: a gentle zoom, no shake
+      // the 镜技's landing: no zoom, no shake
       W.feel.skillImpact(W.px, W.py);
       eng.frame((now += 1000 / 60));
-      if (shake) { expect(W.feel.zoom).toBeGreaterThan(0.01); expect(W.feel.zoom).toBeLessThanOrEqual(0.02); } else expect(W.feel.zoom).toBe(0);
+      expect(W.feel.zoom).toBe(0);
       expect(Math.hypot(W.feel.offX, W.feel.offY)).toBe(0);
       for (let f = 0; f < 60; f++) eng.frame((now += 1000 / 60));
-      // a light blow you take: still; a hard one (≥ 15% of your HP): a small, short nudge
+      // a blow you take, light or hard, a slam, a phase, a boss's death: the picture holds still; the
+      // hard blow, the phase and the death pulse the screen's edge (an overlay) instead
       const peak = (fn: () => void) => {
+        W.feel.pulseAge = 9; W.feel.pulseK = 0;
         fn();
-        let m = 0, frames = 0;
-        for (let f = 0; f < 60; f++) { eng.frame((now += 1000 / 60)); const o = Math.hypot(W.feel.offX, W.feel.offY); m = Math.max(m, o); if (o > 0.5) frames++; }
-        return { m, frames };
+        let m = 0, z2 = 0;
+        const pulsed = W.feel.pulseK > 0 && W.feel.pulseAge < 0.3;
+        for (let f = 0; f < 60; f++) { eng.frame((now += 1000 / 60)); m = Math.max(m, Math.hypot(W.feel.offX, W.feel.offY)); z2 = Math.max(z2, W.feel.zoom); }
+        return { m, z2, pulsed };
       };
-      expect(peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.05)).m).toBe(0);
-      const hard = peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.3));
-      const slam = peak(() => { W.shake(5); W.shake(5); });
-      const phase = peak(() => W.feel.phase(W.px, W.py));
-      for (const p of [hard, slam, phase]) {
-        if (shake) { expect(p.m).toBeGreaterThan(0.3); expect(p.m).toBeLessThanOrEqual(3.0001); expect(p.frames).toBeLessThan(20); } else expect(p.m).toBe(0);
-      }
+      expect(peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.05))).toEqual({ m: 0, z2: 0, pulsed: false });
+      expect(peak(() => W.feel.hurt(W.px + 40, W.py, false, 0.3))).toEqual({ m: 0, z2: 0, pulsed: true });
+      expect(peak(() => { W.shake(5); W.shake(5); })).toEqual({ m: 0, z2: 0, pulsed: false });
+      expect(peak(() => W.feel.phase(W.px, W.py))).toEqual({ m: 0, z2: 0, pulsed: true });
+      expect(peak(() => W.feel.bossDown(W.px, W.py))).toEqual({ m: 0, z2: 0, pulsed: true });
       eng.dispose();
     }
   });
@@ -361,7 +366,7 @@ describe('打击感: the feel layer', () => {
     expect(Math.abs(F.po.ang)).toBeLessThan(0.01); // the blow's axis: +x
     expect(F.po.s).toBeGreaterThan(0.25);
     expect(Math.abs(F.po.x - (x0 + 0.35 * F.rR[i]))).toBeLessThan(0.01); // held (plus the first of its recoil)
-    expect(Math.abs(F.po.y - E.y[i])).toBeGreaterThan(1); // jitter across the blow
+    expect(Math.abs(F.po.y - E.y[i])).toBeLessThan(0.01); // no square-wave shiver across the blow (屏幕抖动 RC7)
     eng.stepN(8);
     F.pose(i);
     expect(F.po.x).toBeGreaterThan(x0 + 15); // released: it flies after its body

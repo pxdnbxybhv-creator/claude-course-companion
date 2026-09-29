@@ -329,7 +329,7 @@ describe('流光: the renderer', () => {
     eng.dispose();
   });
 
-  it('reduced motion: the i-frames hold a steady half-tone instead of a 10 Hz blink; the dash ribbon is short', () => {
+  it('the i-frames hold a steady half-tone (no 10 Hz blink, reduced motion or not: 屏幕抖动 RC8); the dash ribbon is short', () => {
     const alphas = (calm: boolean) => {
       const { run, setup } = setupFor(newRun(opts({ char: 'swordsman' })));
       const eng = make(run, { reduceMotion: calm });
@@ -350,7 +350,7 @@ describe('流光: the renderer', () => {
       return seen;
     };
     const blink = alphas(false), calm = alphas(true);
-    expect(blink.size).toBeGreaterThan(1);
+    expect([...blink]).toEqual([55]);
     expect([...calm]).toEqual([55]);
   });
 });

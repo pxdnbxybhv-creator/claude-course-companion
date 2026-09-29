@@ -264,6 +264,23 @@ describe('engine-core: drops, caps and statuses', () => {
     eng.dispose();
   });
 
+  it('重墨 never grows a body past 2.5× its own HP (⚖5 ceiling); the 月华 still moves', () => {
+    const { run, setup } = setupFor(newRun(opts()));
+    const { eng } = make(run, { settings: { quality: 'low' } });
+    eng.start(run, setup);
+    const W = eng.world;
+    W.plan = { ...W.plan, groups: [] };
+    for (let k = 0; k < 90; k++) W.spawn('blot', 300 + (k % 10) * 20, (k / 10 | 0) * 20, {});
+    let cost0 = 0; for (let i = 0; i < W.E.n; i++) if (W.E.alive[i]) cost0 += W.E.cost[i];
+    for (let k = 0; k < 200; k++) expect(W.spawn('blot', 0, 300, {})).toBe(-1);
+    expect(W.cappedAlive()).toBe(90);
+    let top = 0, cost = 0;
+    for (let i = 0; i < W.E.n; i++) if (W.E.alive[i]) { top = Math.max(top, W.E.hpMax[i]); cost += W.E.cost[i]; }
+    expect(top).toBeLessThanOrEqual(6 * W.plan.hpX * 2.5 + 1e-6);
+    expect(cost - cost0).toBe(200); // every fed spawn's 月华 still lands on a body
+    eng.dispose();
+  });
+
   it('statuses: burn stacks ignore armour, slows cap at 60%, bosses shrug off stun and root', () => {
     const { run, setup } = setupFor({ ...newRun(opts()), wave: 8, weapons: [] });
     const { eng } = make(run);
@@ -356,5 +373,30 @@ describe('engine-core: errors and cost', () => {
     expect(seen).toBeGreaterThanOrEqual(want);
     expect(computeStats(run).hp).toBeGreaterThan(0);
     eng.dispose();
+  });
+});
+
+describe('engine-core: 嫦娥 over ground hazards (round 5)', () => {
+  it('a core ground zone never slows her and burns her for half; anyone else is slowed and burnt in full', () => {
+    const lost = (char: NewRunOpts['char']) => {
+      const { run, setup } = setupFor(newRun(opts({ char })));
+      const { eng } = make(run);
+      eng.start(run, { ...setup, plan: { ...setup.plan, groups: [], elites: [], treasures: [] } });
+      const W = eng.world;
+      W.len = 1e9;
+      const hp0 = W.hp;
+      W.coreZone(0, 'spore' as never, W.px, W.py, 80, 5, 1, 0, 0.5, 2);
+      let slowed = 0;
+      for (let s = 0; s < 60; s++) { eng.stepN(1); if (W.pslowT > 0) slowed++; }
+      const out = { hp: hp0 - W.hp, slowed };
+      eng.dispose();
+      return out;
+    };
+    const her = lost('change'), him = lost('scholar');
+    expect(her.slowed).toBe(0);
+    expect(him.slowed).toBeGreaterThan(50);
+    expect(him.hp).toBeGreaterThan(5);
+    expect(her.hp / him.hp).toBeGreaterThan(0.4);
+    expect(her.hp / him.hp).toBeLessThan(0.6);
   });
 });

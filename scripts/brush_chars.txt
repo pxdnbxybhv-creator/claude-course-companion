@@ -67,3 +67,5 @@
 倍吸围法疗穿退造
 # 水月幻镜 · mirror3: the pause sheet titles (暂停 · 练习) and the 离开教程 confirm
 停练习教程
+# 水月幻镜 · m6: the boss relics 忘尘镜 / 龙渊剑 (centre title 「得 忘尘镜」 and the codex seal)
+忘尘渊

@@ -3,9 +3,9 @@
 // shows the same slots. Price, odds and reroll formulas use w = the wave just cleared (as the sim).
 import type { ItemId, WeaponId } from '../ids';
 import type { RunSave, ShopSlot, ShopState, ShopView, SlotView, Stats, Tier, Unlocks, WClass } from '../types';
-import { F, ITEMS, MAPS, HAZARDS } from '../data';
+import { F, ITEMS, MAPS, HAZARDS, WEAPONS } from '../data';
 import {
-  classCounts, computeStats, effectsOf, itemPrice, rerollCost, sellPrice, shopOdds, shopSlotsOf, weaponPrice, weaponSlotsOf,
+  classCounts, computeStats, effectsOf, itemOdds, itemPrice, rerollCost, sellPrice, shopOdds, shopSlotsOf, weaponPrice, weaponSlotsOf,
 } from './formulas';
 import { addItem, itemMaxed, itemPool, noReroll, weaponPool } from './items';
 import { rngFor, rollTier, type Rng } from './rng';
@@ -25,31 +25,57 @@ function extraOdds(run: RunSave): boolean {
   return effectsOf(run).some(({ e }) => e.hook === 'shop' && e.do === 'odds');
 }
 
+/**
+ * 同流派: pieces per class that steer this shop — the weapons you hold (duplicates and dual classes count)
+ * plus the weapons locked in this shop (a lock is a vote for its school).
+ */
+export function schoolPieces(run: RunSave, shown: readonly (ShopSlot | null)[]): Partial<Record<WClass, number>> {
+  const have = { ...classCounts(run) };
+  for (const s of shown) if (s?.kind === 'weapon' && s.locked) for (const c of WEAPONS[s.id].classes) have[c] = (have[c] ?? 0) + 1;
+  return have;
+}
+/** A weapon's draw weight: 1 + schoolK · min(schoolCap, pieces of its classes). */
+export function schoolWeight(id: WeaponId, have: Partial<Record<WClass, number>>): number {
+  let n = 0;
+  for (const c of WEAPONS[id].classes) n += have[c] ?? 0;
+  return 1 + F.schoolK * Math.min(F.schoolCap, n);
+}
+function pickWeighted<T>(rng: Rng, xs: readonly T[], wt: (x: T) => number): T {
+  let tot = 0;
+  for (const x of xs) tot += wt(x);
+  let r = rng() * tot;
+  for (const x of xs) { r -= wt(x); if (r < 0) return x; }
+  return xs[xs.length - 1];
+}
+
 function rollSlot(run: RunSave, unlocks: Unlocks, w: number, rng: Rng, stats: Stats, shown: readonly (ShopSlot | null)[]): ShopSlot {
   const odds = shopOdds(w, stats.luck, extraOdds(run));
   const full = run.weapons.length >= weaponSlotsOf(run);
+  const have = schoolPieces(run, shown);
   if (rng() < (full ? F.fullWeaponRoll : F.weaponRoll)) {
     const lean = rng();
-    if (run.weapons.length && (full || lean < F.copyLean)) {
-      const h = run.weapons[Math.floor(rng() * run.weapons.length)];
+    const mergeable = run.weapons.filter((x) => x.t < 4);
+    if (mergeable.length && (full || lean < F.copyLean)) {
+      const h = pickWeighted(rng, mergeable, (x) => schoolWeight(x.id, have));
       return { kind: 'weapon', id: h.id, t: h.t, locked: false };
     }
-    const pool = weaponPool(run, unlocks);
-    const t = rollTier(rng, odds);
-    const id = pool[Math.floor(rng() * pool.length)];
-    return { kind: 'weapon', id, t, locked: false };
+    if (!full) {
+      const pool = weaponPool(run, unlocks);
+      const t = rollTier(rng, odds);
+      const id = pickWeighted(rng, pool, (x) => schoolWeight(x, have));
+      return { kind: 'weapon', id, t, locked: false };
+    }
   }
-  const t = rollTier(rng, odds);
+  const t = rollTier(rng, itemOdds(w, stats.luck, extraOdds(run)));
   const unique = (id: ItemId) => !(ITEMS[id].max === 1 && shown.some((s) => s?.kind === 'item' && s.id === id));
   let pool: ItemId[] = [];
-  const cnt = classCounts(run);
-  const cls = (Object.keys(cnt) as WClass[]).filter((c) => (cnt[c] ?? 0) >= 2);
+  const cls = (Object.keys(have) as WClass[]).filter((c) => (have[c] ?? 0) >= F.classLeanFrom);
   const leanRoll = rng();
   if (cls.length && leanRoll < F.classLean) {
-    const c = cls[Math.floor(rng() * cls.length)];
+    const c = pickWeighted(rng, cls, (x) => have[x] ?? 0);
     pool = itemPool(run, unlocks, t, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id));
-    if (!pool.length) {
-      for (const tt of [1, 2, 3, 4] as Tier[]) pool.push(...itemPool(run, unlocks, tt, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id)));
+    if (!pool.length && t <= 2) {
+      for (const tt of [1, 2] as Tier[]) pool.push(...itemPool(run, unlocks, tt, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id)));
     }
   }
   if (!pool.length) pool = itemPool(run, unlocks, t, w).filter(unique);

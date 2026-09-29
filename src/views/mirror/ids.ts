@@ -58,7 +58,7 @@ export const STARTER_WEAPONS: readonly WeaponId[] = [
 
 // ─────────────────────────────────────────────────────────────── items (75; 53 open, 22 by deeds)
 /** Codex / shop grouping of items (GDD §9.1–9.8). */
-export type ItemGroup = 'stat' | 'cond' | 'econ' | 'ink' | 'flying' | 'arch' | 'curse' | 'legend';
+export type ItemGroup = 'stat' | 'cond' | 'econ' | 'ink' | 'flying' | 'arch' | 'curse' | 'legend' | 'relic';
 interface ItemNamed extends Named { readonly group: ItemGroup }
 
 export const ITEM_REG = [
@@ -145,6 +145,9 @@ export const ITEM_REG = [
   { id: 'needle', zh: '定海神针', en: 'Sea-Calming Pillar', group: 'legend', look: 'gold-banded iron pillar rising from waves' },
   { id: 'jiangjinjiu', zh: '将进酒', en: 'Bring In the Wine', group: 'legend', look: 'tipped wine jar pouring a river' },
   { id: 'watermoon', zh: '水月镜', en: 'Mirror of Water and Moon', group: 'legend', look: 'mirror showing a moon that is also in water' },
+  // 9.9 镜宝: boss relics (one per boss felled; never in the shop, a 镜奁 or 镜心)
+  { id: 'wangchen', zh: '忘尘镜', en: 'Dustless Mirror', group: 'relic', look: 'bronze hand mirror wiped clean, a streak of dust lifting off its face' },
+  { id: 'longyuan', zh: '龙渊剑', en: 'Longyuan Sword', group: 'relic', look: 'long straight sword with a dragon-scale ridge rising out of dark water' },
 ] as const satisfies readonly ItemNamed[];
 export type ItemId = (typeof ITEM_REG)[number]['id'];
 
@@ -220,7 +223,7 @@ export const PASSIVE_REG = [
   { id: 'yaoxiang', char: 'rabbit', zh: '月宫药香', en: 'Moon-Palace Herbs', look: 'overheal becomes a moon shield, healing +15%; −15% 射程' },
   { id: 'baipian', char: 'poet', zh: '斗酒百篇', en: 'A Hundred Poems a Jug', look: 'the 醉 meter without wine, twice as fast; his aim sways' },
   { id: 'yibo', char: 'guan', zh: '义薄云天', en: 'Righteous as the Clouds', look: 'no hit takes over 20% of max HP, grows 近战; five weapon slots, no hidden weapons' },
-  { id: 'yinqing', char: 'change', zh: '阴晴圆缺', en: 'Waxing and Waning', look: 'a 16 s moon cycle from full-moon damage to new-moon dodge; floats over hazards' },
+  { id: 'yinqing', char: 'change', zh: '阴晴圆缺', en: 'Waxing and Waning', look: 'a 16 s moon cycle from full-moon damage to new-moon dodge; ground hazards hurt her half and never slow her' },
 ] as const satisfies readonly CharNamed[];
 export type PassiveId = (typeof PASSIVE_REG)[number]['id'];
 
@@ -629,6 +632,9 @@ export const DROP_REG = [
   { id: 'cashCoin', zh: '铜钱', en: 'Copper Coin', look: 'bronze coin with a square hole spinning on its edge (4 frames), glint every 0.6 s' },
   { id: 'cashString', zh: '串钱', en: 'String of Coins', look: 'short string of holed coins that swings as it falls' },
   { id: 'cashTen', zh: '当十', en: 'Ten-Cash Coin', look: 'large holed coin with 当十 in seal script; thin gold ripple on landing' },
+  // 镜宝 fly-ins (cosmetic: the relic is already yours at the kill); the item icons at drop size
+  { id: 'relicMirror', zh: '忘尘镜', en: 'Dustless Mirror', look: 'the 忘尘镜 item icon in a jade ring, flying from the fallen boss to you' },
+  { id: 'relicSword', zh: '龙渊剑', en: 'Longyuan Sword', look: 'the 龙渊剑 item icon in a jade ring, flying from the fallen boss to you' },
 ] as const satisfies readonly Named[];
 export type DropKind = (typeof DROP_REG)[number]['id'];
 

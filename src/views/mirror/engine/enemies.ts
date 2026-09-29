@@ -355,25 +355,30 @@ function role(W: World, i: number, dt: number): void {
   if (decoy >= 0) { tx = W.S.x[decoy]; ty = W.S.y[decoy]; }
   const dx = tx - E.x[i], dy = ty - E.y[i], dist = Math.hypot(dx, dy) || 1;
   E.cool[i] -= dt;
+  // arrival (屏幕抖动 RC6): a chaser that would run through its target this step stops inside contact
+  // reach instead (it ran through your centre and back every step: a packed crowd buzzed ≈ 21 flips a
+  // body a second). Contact reach is r + your hitbox, so contact still lands
+  const stopR = (E.r[i] + W.pr) * 0.6;
+  const arriveK = Math.max(0, Math.min(1, (dist - stopR) / Math.max(1e-3, sp * dt)));
   switch (E.role[i]) {
     case ROLE.chaser: case ROLE.splitter: case ROLE.exploder: case ROLE.spore: {
       // wobble straight at you (桂花 petals home slowly)
       const wob = (p.wobble ?? 0.15) * Math.sin(E.age[i] * 6 + i);
       const a = Math.atan2(dy, dx) + wob;
-      E.vx[i] = Math.cos(a) * sp; E.vy[i] = Math.sin(a) * sp;
+      E.vx[i] = Math.cos(a) * sp * arriveK; E.vy[i] = Math.sin(a) * sp * arriveK;
       break;
     }
     case ROLE.tank: {
       // 蟹将 scuttles sideways toward you, its shield front
       const a = Math.atan2(dy, dx) + (p.sideways ? 0.6 * Math.sin(E.age[i] * 2 + i) : 0);
-      E.vx[i] = Math.cos(a) * sp; E.vy[i] = Math.sin(a) * sp;
+      E.vx[i] = Math.cos(a) * sp * arriveK; E.vy[i] = Math.sin(a) * sp * arriveK;
       break;
     }
     case ROLE.swarm: {
       if (m.ai === 'burrow') { burrowSwarm(W, i, dt, tx, ty, dist, sp); break; }
       // 墨蝌 schools zigzag
       const a = Math.atan2(dy, dx) + Math.sin(E.age[i] * TAU * (p.zigzag ?? 0.6) + E.a[i]) * 0.8;
-      E.vx[i] = Math.cos(a) * sp; E.vy[i] = Math.sin(a) * sp;
+      E.vx[i] = Math.cos(a) * sp * arriveK; E.vy[i] = Math.sin(a) * sp * arriveK;
       break;
     }
     case ROLE.lunger: case ROLE.charger: case ROLE.roller: case ROLE.hunter: {

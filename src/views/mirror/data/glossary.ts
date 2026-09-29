@@ -20,7 +20,7 @@ export type TermId =
   // the shop and its buttons
   | 'shop' | 'reroll' | 'lock' | 'merge' | 'sell' | 'next' | 'go' | 'leave' | 'pause'
   // gear
-  | 'tier' | 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'class' | 'set' | 'curseItem'
+  | 'tier' | 'tier1' | 'tier2' | 'tier3' | 'tier4' | 'class' | 'set' | 'curseItem' | 'relic'
   // the companion
   | 'panel' | 'skill' | 'passive' | 'cost' | 'alt' | 'mastery'
   // things weapons make, and the HUD marks
@@ -103,8 +103,8 @@ const STATS: Record<StatId, Term> = {
     '出手更快，+100% 就快一倍；墨宝、砚台、棋子只算一半。',
     'Attacks come faster; +100% is twice as often. Ink and stones get half.', '速'),
   crit: g('stat', '暴击率', 'Crit chance',
-    '打出暴击的几率，加在兵器自带的几率上。',
-    "Chance to crit, added to the weapon's own chance.", '暴'),
+    `加在兵器自带的几率上；超过 ${CLAMP.critMax}% 的部分变成暴击倍数。`,
+    `Added to each weapon's own; past ${CLAMP.critMax}% it becomes Crit multiplier.`, '暴'),
   critDmg: g('stat', '暴击倍数', 'Crit multiplier',
     `暴击时打几倍：兵器自带 ${CRIT_X_MIN}～${CRIT_X_MAX} 倍，这里再往上加。`,
     `How hard a crit hits: weapons crit ×${CRIT_X_MIN}–×${CRIT_X_MAX}; this adds on top.`, '倍'),
@@ -284,6 +284,9 @@ const TERMS: Record<TermId, Term> = {
   curseItem: g('term', '劫类道具', 'Curse item',
     '会加劫数的道具：你变强，敌人也变强。',
     'Items that add Curse: you get stronger, and so do the enemies.'),
+  relic: g('term', '镜宝', 'Boss relic',
+    '每击败一个首领必得一件。远程兵器多得忘尘镜，近战兵器多得龙渊剑；可以叠加，买不到。',
+    'One per boss you beat. The Dustless Mirror if most weapons are ranged, the Longyuan Sword if melee. Stacks; not sold.'),
   panel: g('term', '人物', 'Character',
     '你的同伴、保命的几项数、镜技，还有每把兵器每秒打多少，都在这里。',
     "Your companion, survival numbers, skill, and each weapon's damage per second.", '人'),

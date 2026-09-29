@@ -12,7 +12,8 @@ import { blit, blitRot } from '../paint/draw';
 import { EKind, SMode } from './pools';
 import { DROP_ATLAS, DROP_IDS, PROJ_ATLAS, PROJ_IDS, SK, SUMMON_ATLAS, SWORDS_ON_SCREEN, TAU } from './consts';
 import { ST } from './enemies';
-import { CRIT_NUM, MK, PF, fragGrid, fragWhite, numPop } from './feel';
+import { CRIT_NUM, MK, PF, PULSE_A, PULSE_S, fragGrid, fragWhite, numPop } from './feel';
+import { weaponRange } from '../logic/formulas';
 import { SH, TN } from '../paint/feel';
 import { drawAmbience } from '../paint/ambient';
 import { BK, FK, VF, VT, tintOfWeapon, vfxOf, type Vfx } from './vfx';
@@ -61,10 +62,15 @@ const CHAR_TINT: Readonly<Record<string, number>> = {
 };
 /** The largest glow under a shot (u): a soft light, never a wash over the field. */
 const GLOW_MAX_R = 34;
+/** Your figure while hurt (屏幕抖动 RC8): the i-frames' steady alpha, the drawn nudge along a blow (u),
+ *  the dark rim's peak alpha. */
+const IFRAME_A = 0.55;
+const HURT_KNOCK = 2;
+const HURT_RIM_A = 0.2;
 /** Orbiting blades drawn with an arc ribbon, per quality (the frame guard halves it). */
 const ARC_CAP = { low: 8, mid: 16, high: 24 } as const;
 /** Drops that always glow (moon pearls, gold, hearts, cases), by kind index; −1 only while streaming in. */
-const DROP_GLOW_OF: Readonly<Record<string, number>> = { moonThick: VT.moon, goldShard: VT.gold, carpGold: VT.gold, heartDrop: VT.moon, crateBox: VT.gold, cashTen: VT.gold };
+const DROP_GLOW_OF: Readonly<Record<string, number>> = { moonThick: VT.moon, goldShard: VT.gold, carpGold: VT.gold, heartDrop: VT.moon, crateBox: VT.gold, cashTen: VT.gold, relicMirror: VT.moon, relicSword: VT.moon };
 const DROP_GLOW = Int8Array.from(DROP_IDS, (id) => DROP_GLOW_OF[id] ?? -1);
 /** A drawNumber that also takes a scale (the painter's implementation accepts it). */
 type DrawNum = (ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale?: number) => void;
@@ -285,8 +291,9 @@ export class Renderer {
   }
 
   private drawSummons(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    // summons
-    const tt = W.t;
+    // summons (the render clock: the trail's speed divides the drawn positions' move by the time between
+    // the pictures they were drawn in)
+    const tt = W.tDraw;
     const S = W.S;
     // 流光: a diving crane leaves its path in paper-white light, a charging 墨宝 a wet ink wake
     const TR = this.trails;
@@ -753,12 +760,16 @@ export class Renderer {
     const passes = this.passesOf(W);
     let arcs = (ARC_CAP[W.quality] ?? 16) >> (W.degrade ? 1 : 0);
     let drawn = 0;
-    // 剑匣 blades: each trails an arc of light along its orbit (流光), a soft glow at its heart
+    // the orbits turn on the render clock (W.tDraw): a blade 90–240 u out moves 9–25 u a step, so on the
+    // simulation clock it stood still on every other frame of a 120 Hz screen and then jumped
+    const td = W.tDraw;
+    // 剑匣 blades: each trails an arc of light along its orbit (流光), a soft glow at its heart; drawn
+    // where they cut (the radius the blades hit at: weapons.ts tickSwords, with 龙渊剑's reach)
     for (const sl of W.slots) {
       if (sl.kind !== 'orbit' || sl.swords <= 0) continue;
-      const R = sl.flareT > 0 ? ((sl.def.p.flareR as number) ?? 240) : 90 + W.stats.range / 4;
+      const R = sl.flareT > 0 ? ((sl.def.p.flareR as number) ?? 240) : weaponRange(sl.def, sl.stats, W.reachPct);
       const revS = (sl.def.p.rev as number) ?? 1;
-      const rev = W.t * TAU * revS;
+      const rev = td * TAU * revS;
       const tint = this.slotTint[Math.min(15, sl.i)] ?? VT.jade;
       const g = this.glowsLeft > 0 ? VS.glow(tint) : null;
       let bladeGlows = Math.min(this.glowsLeft, vfxOf(W).caps.glows >> 2);
@@ -773,7 +784,7 @@ export class Renderer {
     // 残剑
     const can = this.sprite('sum:canjian');
     for (let k = 0; k < W.canjian && drawn < SWORDS_ON_SCREEN; k++, drawn++) {
-      const a = W.t * TAU * 1.3 + (k / W.canjian) * TAU;
+      const a = td * TAU * 1.3 + (k / W.canjian) * TAU;
       const x = W.px + Math.cos(a) * 60, y = W.py + Math.sin(a) * 60;
       if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 60, a, calm ? 0.3 : 0.7, 1, 3.5, VT.moon, passes, 0.75); }
       if (can) blitRot(ctx, cam, can, x, y, a + Math.PI / 2, 0.8); else circle(ctx, cam, x, y, 4, '#556');
@@ -784,7 +795,7 @@ export class Renderer {
     const nPeach = fly > 0 ? Math.round((W.idleSwords * fpeach) / fly) : 0;
     const peachS = nPeach > 0 ? this.sprite('proj:peachSword' as AtlasId) : null;
     for (let k = 0; k < W.idleSwords && drawn < SWORDS_ON_SCREEN; k++, drawn++) {
-      const a = W.t * TAU * 0.9 + (k / Math.max(1, W.idleSwords)) * TAU;
+      const a = td * TAU * 0.9 + (k / Math.max(1, W.idleSwords)) * TAU;
       const x = W.px + Math.cos(a) * 44, y = W.py + Math.sin(a) * 44;
       const pk = peachS !== null && k >= W.idleSwords - nPeach;
       if (arcs > 0) { arcs--; TR.arc(ctx, cam, W.px, W.py, 44, a, calm ? 0.3 : 0.75, 1, 3.2, pk ? VT.gamboge : VT.jade, passes, 0.7); }
@@ -803,7 +814,8 @@ export class Renderer {
     const v = hurt ? 3 : W.moving ? 1 + (Math.floor(W.t * 8) & 1) : 0;
     const s = this.sprite(id, v);
     const calm = W.settings.reduceMotion;
-    // i-frames: a 10 Hz blink, or (reduced motion) a steady half-tone with no flashing
+    // i-frames: a steady half-tone (屏幕抖动 RC8: the old 10 Hz blink of the figure at the centre of the
+    // screen read as the screen flickering, and sat in the photosensitive band)
     const inv = W.iframes > 0 || W.invulnT > 0;
     // 广寒清辉: untargetable and not leaping, she rises — lifted off the ground (eased up, a slow sway,
     // eased down to land) and drawn clear, not a pale ghost on pale paper
@@ -813,20 +825,21 @@ export class Renderer {
     if (W.untargT > 0 && W.leapT <= 0 && this.riseDur > 0) {
       const up = Math.min(1, (this.riseDur - W.untargT) / 0.35), down = Math.min(1, W.untargT / 0.3);
       const e = up * up * (3 - 2 * up) * down * down * (3 - 2 * down);
-      rise = e * (RISE_H + (calm ? 0 : 2.5 * Math.sin(W.t * 3)));
+      rise = e * (RISE_H + (calm ? 0 : 2.5 * Math.sin(W.tDraw * 3)));
     }
-    const a = W.untargT > 0 ? (rise > 0 ? 0.82 : 0.5) : inv ? (calm ? 0.55 : (Math.floor(W.t * 20) & 1) === 1 ? 0.45 : 1) : 1;
+    const a = W.untargT > 0 ? (rise > 0 ? 0.82 : 0.5) : inv ? IFRAME_A : 1;
     const lift = (W.leapT > 0 ? Math.sin((1 - W.leapT / W.leapDur) * Math.PI) * 30 : 0) + rise;
     const flip = Math.cos(W.face) < 0;
     const F = W.feel;
     // 流光: a dash or a leap draws a brush of light behind you, and your afterimages linger in it
     if (s) this.drawDash(W, ctx, cam, s, lift, flip, !!calm);
-    // a blow squashes you for a moment
+    // a blow squashes you a little (RC8: 40% of the old squash) …
     const hs = !calm && F.hurtAge < 0.2 ? Math.exp(-F.hurtAge / 0.06) * F.hurtK : 0;
-    // … and knocks your figure back a few u (drawn only; the hitbox dot stays where you are)
-    const kb = 7 * hs;
+    // … and nudges your figure ≤ 2 u along it (drawn only; the old 7 u knock at the centre of the screen
+    // was 3–10 px, and read as the screen jolting)
+    const kb = HURT_KNOCK * hs;
     this.youS = s; this.youLift = lift;
-    if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.16 * hs, 1 - 0.14 * hs);
+    if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.064 * hs, 1 - 0.056 * hs);
     else circle(ctx, cam, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 14, '#f4f1e8', a);
     // weapons held around you, pointing at the last attack: a wind-up as the cooldown ends
     // (anticipation), a swing through the blow (follow-through), a kick back on a shot (recoil)
@@ -837,7 +850,7 @@ export class Renderer {
       if (sl.kind === 'orbit' || sl.kind === 'familiar') continue;
       const ws = this.sprite(`wpn:${sl.id}` as AtlasId);
       if (!ws) continue;
-      const a0 = (k / n) * TAU + W.t * 0.4;
+      const a0 = (k / n) * TAU + W.tDraw * 0.4;
       let wx = W.px + Math.cos(a0) * 24, wy = W.py - lift + Math.sin(a0) * 18;
       const ft = k < 8 ? F.slotT[k] : 9;
       let wd = ft < 0.6 ? F.slotDir[k] : dir;
@@ -927,11 +940,16 @@ export class Renderer {
       const pulse = Math.max(Math.exp(-p / 0.08), p > 0.26 ? 0.65 * Math.exp(-(p - 0.26) / 0.07) : 0);
       ctx.globalAlpha = calm ? 0.65 : 0.45 + 0.45 * pulse; ctx.drawImage(this.edge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1;
     }
-    // a blow: a thin dark rim (ink, not the enemy's vermilion) closes in and drains; with reduced
-    // motion it holds still at a low alpha for the i-frames instead of pulsing
+    // a blow: a thin dark rim (ink, not the enemy's vermilion) closes in and drains (≤ 0.2); with reduced
+    // motion it holds still at a low alpha for the i-frames instead of pulsing. The big moments (a
+    // boss's phase or death, a hard blow) pulse the same rim darker a moment (≤ PULSE_A over PULSE_S s):
+    // the feedback the camera shake used to give, with nothing on the screen moving
     if (this.hurtEdge && W.phase !== 'idle') {
-      const ha = calm ? (F.hurtAge < 0.35 && F.hurtK > 0 ? 0.16 : 0) : Math.min(0.3, 0.3 * F.hurtK * Math.exp(-F.hurtAge / 0.18));
-      if (ha > 0.01) { ctx.globalAlpha = ha; ctx.drawImage(this.hurtEdge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1; }
+      const ha = calm ? (F.hurtAge < 0.35 && F.hurtK > 0 ? 0.16 : 0) : Math.min(HURT_RIM_A, HURT_RIM_A * F.hurtK * Math.exp(-F.hurtAge / 0.18));
+      const u = F.pulseAge / PULSE_S;
+      const pa = u < 1 && F.pulseK > 0 ? PULSE_A * F.pulseK * (calm ? 0.6 : Math.sin(Math.min(1, u * 4) * Math.PI * 0.5) * (1 - u) * (1 - u)) : 0;
+      const e = Math.max(ha, pa);
+      if (e > 0.01) { ctx.globalAlpha = e; ctx.drawImage(this.hurtEdge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1; }
     }
     // brush titles (synergies at the edge, boss phases and 「第 N 重 · 破」 in the centre)
     for (const t of W.titles) {

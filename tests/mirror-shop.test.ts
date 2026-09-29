@@ -1,10 +1,10 @@
 // 水月幻镜 · 镜市 (GDD §7): odds, prices, rerolls, locks, merging, slot limits and bans.
 import { describe, expect, it } from 'vitest';
 import type { NewRunOpts, RunSave, ShopSlot } from '../src/views/mirror/types';
-import { WEAPONS } from '../src/views/mirror/data';
+import { ITEMS, WEAPONS } from '../src/views/mirror/data';
 import {
   allUnlocked, buy, itemPrice, merge, openShop, reroll, rerollCost, sell, shopOdds, shopView, starterUnlocks, toggleLock,
-  weaponPrice, newRun, cardRerollCost, freeRerolls, sellPrice,
+  weaponPrice, newRun, cardRerollCost, freeRerolls, sellPrice, itemOdds, computeStats,
 } from '../src/views/mirror/logic';
 
 function run(o: Partial<NewRunOpts> = {}, r: Partial<RunSave> = {}): RunSave {
@@ -149,6 +149,74 @@ describe('the shop', () => {
         expect(['luckycat', 'yujian']).not.toContain(sl.id);
         expect(['wanjian', 'inkdragon', 'dugu', 'samadhi', 'treasurebowl', 'penglai', 'ambush', 'needle', 'jiangjinjiu', 'watermoon']).not.toContain(sl.id);
       }
+    }
+  });
+});
+
+// ⚖5 (m6, tiers.md §10): 紫/红 items cheaper and more often — items roll on F.itemOdds (weapons and 镜奁 keep
+// F.shopOdds); a 仙/神 roll keeps its tier under the class lean (3b); a rack full of 神品 never shows a copy (3c).
+describe('shop · 紫红 items (⚖5)', () => {
+  const u = allUnlocked();
+  it('item odds by band, with the same luck and 镜裂 rules', () => {
+    expect(itemOdds(1, 0)).toEqual([90, 10, 0, 0]);
+    expect(itemOdds(4, 0)).toEqual([62, 28, 10, 0]);
+    expect(itemOdds(20, 0)).toEqual([20, 34, 34, 12]);
+    expect(itemOdds(30, 0, true)).toEqual([4, 32, 43, 21]);
+    for (const w of [1, 8, 13, 20, 30, 45]) for (const luck of [-80, 0, 150]) expect(itemOdds(w, luck).reduce((a, b) => a + b, 0)).toBeCloseTo(100);
+    // weapons keep the old table
+    expect(shopOdds(20, 0)).toEqual([30, 38, 25, 7]);
+  });
+  it('purple and red items are cheaper: 金丹 80, 仙 ×0.7, 神 ×0.6', () => {
+    expect(ITEMS.elixir.price).toBe(80);
+    expect([ITEMS.inkpool.price, ITEMS.goldenbell.price, ITEMS.burnboats.price]).toEqual([52, 64, 55]);
+    expect([ITEMS.wanjian.price, ITEMS.treasurebowl.price, ITEMS.watermoon.price]).toEqual([90, 80, 96]);
+  });
+  it('an item slot rolls its tier on itemOdds, a new weapon on shopOdds', () => {
+    const items = [0, 0, 0, 0], weps = [0, 0, 0, 0];
+    for (let s = 1; s <= 600; s++) {
+      const r = openShop(run({ seed: s, char: 'scholar' }, { wave: 20, weapons: [{ id: 'dart', t: 1 }], moon: 0 }), u);
+      for (const sl of r.shop!.slots) {
+        if (sl?.kind === 'item') items[ITEMS[sl.id].tier - 1]++;
+        else if (sl?.kind === 'weapon' && sl.id !== 'dart') weps[sl.t - 1]++;
+      }
+    }
+    const share = (xs: number[]) => (xs[2] + xs[3]) / xs.reduce((a, b) => a + b, 0);
+    const luck = computeStats(run({ char: 'scholar' }, { weapons: [{ id: 'dart', t: 1 }] })).luck;
+    const io = itemOdds(20, luck), wo = shopOdds(20, luck);
+    expect(share(items)).toBeGreaterThan((io[2] + io[3]) / 100 - 0.06);
+    expect(share(items)).toBeLessThan((io[2] + io[3]) / 100 + 0.06);
+    expect(share(weps)).toBeGreaterThan((wo[2] + wo[3]) / 100 - 0.06);
+    expect(share(weps)).toBeLessThan((wo[2] + wo[3]) / 100 + 0.06);
+  });
+  it('3b: the class lean keeps a 仙/神 roll (a 剑 build at wave 20 still sees them in ≥ 40% of item slots)', () => {
+    let hi = 0, n = 0;
+    for (let s = 1; s <= 500; s++) {
+      const r = openShop(run({ seed: s, char: 'scholar' }, { wave: 20, weapons: [{ id: 'qingfeng', t: 2 }, { id: 'qingfeng', t: 2 }, { id: 'longquan', t: 2 }], moon: 0 }), u);
+      for (const sl of r.shop!.slots) if (sl?.kind === 'item') { n++; if (ITEMS[sl.id].tier >= 3) hi++; }
+    }
+    expect(hi / n).toBeGreaterThanOrEqual(0.4);
+  });
+  it('3c: a rack full of 神品 never shows a copy that cannot merge (关公, five IV weapons)', () => {
+    const five = (['yanyue', 'qingfeng', 'hoe', 'pestle', 'longquan'] as const).map((id) => ({ id, t: 4 as const }));
+    let weaponSlots = 0, items = 0;
+    for (let s = 1; s <= 400; s++) {
+      let r = openShop(run({ seed: s, char: 'guan' }, { wave: 25, weapons: five, moon: 1e5 }), u);
+      for (let k = 0; k < 3; k++) {
+        for (const sl of r.shop!.slots) { if (sl?.kind === 'weapon') weaponSlots++; else if (sl?.kind === 'item') items++; }
+        r = reroll(r, u) ?? r;
+      }
+    }
+    expect(weaponSlots).toBe(0);
+    expect(items).toBeGreaterThan(400 * 3 * 3);
+    // with one weapon still below IV, its copies are still offered (a full rack rolls a copy 20% of the time)
+    const mixed = [...five.slice(0, 4), { id: 'longquan' as const, t: 2 as const }];
+    let copies = 0;
+    for (let s = 1; s <= 200; s++) for (const sl of openShop(run({ seed: s, char: 'guan' }, { wave: 25, weapons: mixed }), u).shop!.slots) if (sl?.kind === 'weapon') { expect([sl.id, sl.t]).toEqual(['longquan', 2]); copies++; }
+    expect(copies).toBeGreaterThan(40);
+  });
+  it('镜宝 are never on sale', () => {
+    for (let s = 1; s <= 400; s++) for (const sl of openShop(run({ seed: s }, { wave: 5 + (s % 40) }), u).shop!.slots) {
+      if (sl?.kind === 'item') expect(ITEMS[sl.id].relic).toBeUndefined();
     }
   });
 });

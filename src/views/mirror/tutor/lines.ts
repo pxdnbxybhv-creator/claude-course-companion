@@ -172,6 +172,7 @@ export const TIPS = {
   curseSmall: L('between', s('每 1 点{curse}：敌人{hp}、伤害 +{e}%，你的伤害 +{d}%，{moon} +{m}%。', 'Each point: enemies +{e}% HP and damage; you +{d}% damage and +{m}% moonlight.')),
   lowHp: L('wave', s('{hp}快没了！先走远一些，兵器会自己打。下一重开场会回满。', 'HP is low! Back away; your weapons keep fighting. You start the next wave at full HP.')),
   cards: L('between', s('升级了：挑一张{card}，这一局都算数。', 'Level up: pick a bonus card; it counts for the whole run.')),
+  relic: L('between', s('打倒{boss}，得到一件{relic}：远程兵器多得{wc}，近战兵器多得{ly}。可以叠加，在「行囊」里。', 'Boss beaten: a relic for you. More ranged weapons earn the {wc}, more melee weapons the {ly}. They stack; see your Pack.')),
   shop: L('between', s('{shop}：点货就买。「{lock}」留到下次，「{reroll}」换一批，两把一样的兵器能「{merge}」。想看完整教程，镜前点「{tutorial}」。', 'The shop: pick to buy. {lock} keeps an item for next time; {reroll} brings new goods; two identical weapons merge. Full tutorial: {tutorial} in the lobby.')),
 } as const satisfies Record<string, Line>;
 export type TipLineId = keyof typeof TIPS;
@@ -184,7 +185,7 @@ export type Slots = Readonly<Record<string, SlotVal>>;
 export const LABEL_SLOTS = {
   reroll: 'reroll', panel: 'panel', lock: 'lock', merge: 'merge', sell: 'sell', next: 'next', go: 'go', keep: 'keep', melt: 'melt',
   leave: 'leave', tutorial: 'tutorial', moon: 'moon', hp: 'hp', armor: 'armor', card: 'card', crate: 'crate', elite: 'elite',
-  shop: 'shop', curse: 'curse', boss: 'boss', skillWord: 'skill', t1: 'tier1', t2: 'tier2',
+  shop: 'shop', curse: 'curse', boss: 'boss', skillWord: 'skill', t1: 'tier1', t2: 'tier2', relic: 'relic',
 } as const satisfies Record<string, GlossId>;
 
 const named = (id: string): Say => {
@@ -216,6 +217,7 @@ export function lineSlots(extra: Record<string, SlotVal> = {}): Slots {
     glyph: s(sk.glyph, sk.glyph), skill: s(sk.zh, sk.en),
     w0: named('qingfeng'), i2: named('sandals'), n0: 1, n2: 3,
     blot: named('blot'), lantern: named('lantern'), foe: named('whitesnake'),
+    wc: named('wangchen'), ly: named('longyuan'),
   };
   for (const [k, id] of Object.entries(LABEL_SLOTS)) { const x = termOf(id); out[k] = s(x.zh, x.en); }
   return { ...out, ...extra };
