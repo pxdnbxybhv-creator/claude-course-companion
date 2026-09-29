@@ -2,7 +2,7 @@
 // both ways (§4.2, §4.3), statuses (§4.4), drops and 蓄月 (§6), coins (§16.3), and the WorldApi
 // façade engine/content codes against (API.md §5). DOM-free; engine/index.ts owns the canvas and loop.
 import type { BossId, DropKind, EliteId, FxName, HazardId, MonsterId, SummonKind, TreasureId, WeaponId } from '../ids';
-import { BOSS_REG } from '../ids';
+import { BOSS_REG, named } from '../ids';
 import type {
   ActiveMutator, ArenaGeom, Behaviour, Bilingual, Camera, CoinDrop, ContentRegistry, DamageSrc, DifficultyDef, EngineHooks,
   EngineSettings, EnemyFilter, EnemyView, GameEvent, HeartSource, HitPacket, HudState, MapDef, MirrorAudio, Painter, PlayerView,
@@ -10,11 +10,11 @@ import type {
   StatMods, StatusKind, TeleSpec, Vec, WaveResult, WaveSetup, WorldApi, ZoneSpec, DeathResult, ActorImpl, DownInfo,
 } from '../types';
 import {
-  BOSSES, COMPANIONS, DIFFS, ELITES, ENDLESS_BOSS, F, HAZARDS, MAPS, MONSTERS, PASSIVES, SKILLS, TREASURES, WEAPONS,
+  BOSSES, COMPANIONS, DIFFS, ELITES, ENDLESS_BOSS, F, HAZARDS, MAPS, MONSTERS, PASSIVES, SKILLS, STAT_IDS, TREASURES, WEAPONS,
 } from '../data';
 import {
-  clamp, dodgeCapOf, dodgeChance, dmgMul, enemyArmorAdd, enemyHit, healMult, knockback, luckMult, maxHp, pickupRadius, playerHit,
-  regenPerSec, xpNext, REVIVE, canRevive,
+  clamp, computeStats, dodgeCapOf, dodgeChance, dmgMul, dottingX, enemyArmorAdd, enemyHit, healMult, knockback, luckMult, maxHp,
+  pickupRadius, playerHit, reachPct, regenPerSec, relicFor, xpNext, REVIVE, canRevive,
 } from '../logic/formulas';
 import { arenaGeom, insideShape } from '../logic/arena';
 import { rngFor, type Rng } from '../logic/rng';
@@ -43,6 +43,8 @@ const NUM_GRAVITY = 380;
 
 /** A reusable scratch vector for queries that return a point. */
 const V: Vec = { x: 0, y: 0 };
+/** A push into a round obstacle keeps at least this share of its speed, turned along it (collidePoint). */
+const SLIDE_KEEP = 0.8;
 
 /**
  * The UI's hooks, each behind a guard: a throw in UI code is logged (at most once per hook per 5 s)
@@ -101,6 +103,9 @@ export class World implements WorldApi {
 
   // ── time
   t = 0;
+  /** The render clock (engine/index.ts LerpSet): `t` less the part of a step the drawn picture lags
+   *  behind the simulation. Only drawing reads it (orbit angles); every rule reads `t`. */
+  tDraw = 0;
   dt = 1 / 60;
   wave = 0;
   /** The beat ticked this step: the core's 2 Hz clock, or a boss's own tempo while one keeps it (夔). */
@@ -210,6 +215,8 @@ export class World implements WorldApi {
   wanjianT = 0;
   captureT = 0;
   lingboT = 0;
+  /** 攻击距离 % on every weapon this wave (龙渊剑 +20 a copy, 玉兔 −15). */
+  reachPct = 0;
   sproutT = 0;
   dragonT = 0;
   stoneOrder = 0;
@@ -238,6 +245,10 @@ export class World implements WorldApi {
   killsBy: Record<string, number> = {};
   byWeapon: Partial<Record<WeaponId, { dmg: number; kills: number }>> = {};
   bossesKilled: (BossId | 'twins' | 'mirrorself')[] = [];
+  /** 镜宝 earned this wave (one per boss body felled); endWave adds them to run.items. */
+  relicsGot: ('wangchen' | 'longyuan')[] = [];
+  /** When the last 镜宝 title went up (world clock), so the wave's 「破」 does not print over it. */
+  relicTitleAt = -9;
   bossH: number[] = [];
   bossesSpawned = false;
   moonHeld = 0;
@@ -337,12 +348,14 @@ export class World implements WorldApi {
     this.pauseRequest = false; this.titles.length = 0;
     this.base = { ...setup.stats };
     this.stats = { ...setup.stats };
+    this.reachPct = reachPct(run);
     this.mods = readMods(run);
     // the player: full 气血 at every wave start (GDD §3 step 11)
     this.pr = hitboxOf(run);
-    // you enter at the centre (广寒: just south of the 桂树)
+    // you enter at the centre (广寒: south of the 桂树, 200 u clear of it — 0.7 s of walking up; it used
+    // to stand 56 u in front of you, so walking up stopped dead after 0.2 s)
     this.px = 0; this.py = 0;
-    for (const o of this.arena.obstacles) if (Math.hypot(o.x, o.y) < o.r + this.pr) this.py = o.y + o.r + 70;
+    for (const o of this.arena.obstacles) if (Math.hypot(o.x, o.y) < o.r + this.pr) this.py = o.y + o.r + this.pr + 200;
     this.pvx = this.pvy = 0; this.face = -Math.PI / 2; this.moving = false; this.stillFor = 0;
     this.hpBonus = 0;
     this.hpMax = maxHp(this.base);
@@ -360,7 +373,7 @@ export class World implements WorldApi {
     // tallies
     this.moonGot = 0; this.xpGot = 0; this.store = run.store; this.storeUsed = 0; this.crates = 0; this.killCrates = 0;
     this.hearts = []; this.sleeve = []; this.coinUsed = setup.coins.map(() => false);
-    this.kills = 0; this.eliteKills = 0; this.rs = {}; this.killsBy = {}; this.byWeapon = {}; this.bossesKilled = []; this.bossH = [];
+    this.kills = 0; this.eliteKills = 0; this.rs = {}; this.killsBy = {}; this.byWeapon = {}; this.bossesKilled = []; this.relicsGot = []; this.relicTitleAt = -9; this.bossH = [];
     this.bossesSpawned = false; this.moonHeld = run.moon;
     this.gi = 0; this.ei = 0; this.ti = 0; this.gongAt = 0;
     this.swordsAir = 0; this.summonsAlive = 0; this.summonOrder = 0; this.swordKills = 0; this.canjian = 0;
@@ -558,20 +571,36 @@ export class World implements WorldApi {
       this.py += this.pvy * dt;
       if (m > 0.05) this.face = Math.atan2(my, mx);
     }
-    this.collidePoint(true);
+    this.collidePoint(true, oldX, oldY);
     const moved = Math.hypot(this.px - oldX, this.py - oldY);
     this.moving = moved > 0.5 * dt * 60 * 0.05;
     if (this.moving) this.stillFor = 0; else this.stillFor += dt;
     this.live.still = this.stillFor;
   }
 
-  /** Keep the player inside the arena and out of obstacles. */
-  private collidePoint(player: boolean): void {
-    void player;
+  /** Keep the player inside the arena and out of obstacles. (ox, oy): where this step's move started.
+   *  A push into a round obstacle turns along it and keeps ≥ SLIDE_KEEP of its speed (a straight push
+   *  has no sideways part, so it used to stop dead: 广寒's 桂树 from any side); it slides toward the side
+   *  the push leans to (+x when dead on). */
+  private collidePoint(player: boolean, ox = this.px, oy = this.py): void {
     const r = this.pr;
     for (const o of this.arena.obstacles) {
       const dx = this.px - o.x, dy = this.py - o.y, d = Math.hypot(dx, dy), m = o.r + r;
-      if (d < m && d > 1e-6) { this.px = o.x + (dx / d) * m; this.py = o.y + (dy / d) * m; }
+      if (d < m && d > 1e-6) {
+        let nx = dx / d, ny = dy / d;
+        const mvx = this.px - ox, mvy = this.py - oy, mv = Math.hypot(mvx, mvy);
+        if (player && mv > 1e-6 && mvx * nx + mvy * ny < 0) {
+          // the move's part along the tangent t = (−ny, nx); what the push-out alone would slide
+          const tl = -mvx * ny + mvy * nx, got = Math.abs(tl), want = SLIDE_KEEP * mv;
+          if (got < want) {
+            const sgn = got > 1e-6 * mv ? Math.sign(tl) : ny !== 0 ? Math.sign(-ny) : Math.sign(nx) || 1;
+            const a = (sgn * (want - got)) / m, c = Math.cos(a), s = Math.sin(a);
+            const rx = nx * c - ny * s, ry = nx * s + ny * c;
+            nx = rx; ny = ry;
+          }
+        }
+        this.px = o.x + nx * m; this.py = o.y + ny * m;
+      }
       else if (d <= 1e-6) this.px = o.x + m;
     }
     this.clampXY(r);
@@ -756,8 +785,12 @@ export class World implements WorldApi {
       if (cost > 0) this.store += cost * (1 + 0.03 * Math.max(0, this.stats.curse) + this.mods.moonPct / 100);
       return false;
     }
-    E.hp[pick] += hp * F.heavyInk.hpFrac;
-    E.hpMax[pick] += hp * F.heavyInk.hpFrac;
+    // ⚖5 ceiling: a fed body never passes F.heavyInk.hpCap × its own HP (the 月华 and drops still move)
+    const mon = MONSTERS[E.id[pick] as MonsterId];
+    const lim = (mon ? mon.hp * this.plan.hpX : E.hpMax[pick]) * F.heavyInk.hpCap;
+    const add = Math.max(0, Math.min(hp * F.heavyInk.hpFrac, lim - E.hpMax[pick]));
+    E.hp[pick] += add;
+    E.hpMax[pick] += add;
     E.cost[pick] += cost;
     E.heavy[pick] = Math.min(F.heavyInk.max, E.heavy[pick] * (1 + F.heavyInk.grow));
     E.r[pick] = E.r0[pick] * E.heavy[pick];
@@ -1038,7 +1071,7 @@ export class World implements WorldApi {
     for (let i = 0; i < D.n; i++) {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
-      if (k === DK.heartDrop) continue;
+      if (k === DK.heartDrop || k === DK.relicMirror || k === DK.relicSword) continue;
       const dx = D.x[i] - x, dy = D.y[i] - y;
       if (dx * dx + dy * dy <= r2) D.magnet[i] = 2;
     }
@@ -1236,7 +1269,9 @@ export class World implements WorldApi {
     if (!(flags & HF.quiet) || !(flags & HF.dot)) this.feel.hit(i, fx, fy, d, crit, this.fcOf(slot, src, flags), (flags & HF.dot) !== 0, src, slot);
     // on-hit: lifesteal (weapons only), items, content
     if (!(flags & HF.noProc)) {
-      if (src === SRCI.weapon && this.stats.steal > 0 && this.erng() < (clamp(this.stats.steal, 0, 100) / 100) * proc) this.capHeal(0, 1, F.stealPerSec);
+      // melee weapon hits carry an innate 吸血 (F.meleeSteal) on top of the stat; the 10/s cap is shared
+      const steal = src === SRCI.weapon ? this.stats.steal + (flags & HF.melee ? F.meleeSteal : 0) : 0;
+      if (steal > 0 && this.erng() < (clamp(steal, 0, 100) / 100) * proc) this.capHeal(0, 1, F.stealPerSec);
       if (crit) {
         if (this.mods.critHeal) this.capHeal(1, this.mods.critHeal.v, this.mods.critHeal.cap);
         if (this.mods.critDrunk) this.addDrunk(this.mods.critDrunk * proc);
@@ -1536,6 +1571,33 @@ export class World implements WorldApi {
     void cost;
   }
 
+  /**
+   * A 镜宝 counts from the moment it is earned: the sheet is recomputed with it (so the static converts —
+   * 铁骨, 定海神针, 追风逐电, 悬壶 — follow at once; 气血 +100 heals by 100), the reach and 墨宝's crit follow,
+   * a centre title names it and its icon flies from the fallen boss to you (cosmetic: it is already yours).
+   */
+  private grantRelic(rid: 'wangchen' | 'longyuan', x: number, y: number): void {
+    const before = this.relicRun();
+    this.relicsGot.push(rid);
+    const after = this.relicRun();
+    const s0 = computeStats(before), s1 = computeStats(after);
+    for (const k of STAT_IDS) this.base[k] += s1[k] - s0[k];
+    this.reachPct = reachPct(after);
+    const dx = dottingX(after);
+    for (const sl of this.slots) if (sl.def.critX <= 0 && sl.ink) sl.critX = dx;
+    this.recomputeStats();
+    this.dropOne(rid === 'wangchen' ? DK.relicMirror : DK.relicSword, x, y, 1, -1);
+    this.fx('levelRing', x, y, { r: 90, life: 0.5 });
+    const rn = named(rid);
+    if (rn) { this.title({ zh: `得 ${rn.zh}`, en: `${rn.en} +1` }, 'centre'); this.relicTitleAt = this.t; }
+  }
+  /** The run as it stands inside this wave: its items plus the 镜宝 earned so far. */
+  private relicRun(): RunSave {
+    if (!this.relicsGot.length) return this.run;
+    const items = { ...this.run.items };
+    for (const id of this.relicsGot) items[id] = (items[id] ?? 0) + 1;
+    return { ...this.run, items };
+  }
   private onBossDeath(id: string, x: number, y: number): void {
     this.addStat('bosses', 1);
     if (this.wave > 30) this.addStat('endlessBosses', 1);
@@ -1543,6 +1605,12 @@ export class World implements WorldApi {
     this.feel.stopHard(160);
     this.feel.bossDown(x, y);
     this.sfx('shatter');
+    // 镜宝: one per boss felled — when the last living body of this boss id falls (无相's wave-20 pair of one
+    // boss = 1; endless 双生, two different bosses = 2; 镜主 = 1), by the weapons held (relicFor); it counts at once
+    const E = this.E;
+    let same = 0;
+    for (let j = 0; j < E.n; j++) if (E.alive[j] && E.kind[j] === EKind.Boss && E.id[j] === id) same++;
+    if (same === 0) this.grantRelic(relicFor(this.run), x, y);
     // the wave's boss reward waits for the last body of the fight
     let left = 0;
     for (const h of this.bossH) if (this.E.slotOf(h) >= 0) left++;
@@ -1573,7 +1641,7 @@ export class World implements WorldApi {
 
   /**
    * Damage to the player. `n` is scaled damage (E.dmg × waveDmg …). Dodge and armour apply unless
-   * flagged. i-frames 0.35 s after any hit. Returns what was dealt.
+   * flagged. i-frames F.iframes (0.5 s, ⚖5) after any hit. Returns what was dealt.
    */
   hurt(n: number, o?: { undodgeable?: boolean; noArmor?: boolean; src?: string }): void {
     this.hurtFrom(n, -1, !!o?.undodgeable, !!o?.noArmor, o?.src ?? 'hazard', !!(o as { dot?: boolean } | undefined)?.dot, false);
@@ -1985,7 +2053,10 @@ export class World implements WorldApi {
     }
     const a = this.erng() * TAU, s = 60 + 80 * this.erng();
     D.kind[i] = kind; D.x[i] = x; D.y[i] = y; D.vx[i] = Math.cos(a) * s; D.vy[i] = Math.sin(a) * s;
-    D.worth[i] = worth; D.age[i] = 0; D.magnet[i] = kind === DK.crateBox || kind === DK.heartDrop ? 1 : 0; D.coin[i] = coin;
+    D.worth[i] = worth; D.age[i] = 0; D.magnet[i] = kind === DK.crateBox || kind === DK.heartDrop || kind === DK.relicMirror || kind === DK.relicSword ? 1 : 0; D.coin[i] = coin;
+    // a 镜宝 rises from the fallen boss and hangs there ~0.75 s (the pop arc runs while age < 0.25) before it
+    // flies to you, so the moment reads; same RNG draws as any drop
+    if (kind === DK.relicMirror || kind === DK.relicSword) { D.vx[i] = 0; D.vy[i] = -150; D.age[i] = -0.5; }
   }
 
   private tickDrops(dt: number): void {
@@ -2022,6 +2093,7 @@ export class World implements WorldApi {
       case DK.crateBox: this.sfx('crate'); break;
       case DK.lotusSeed: this.heal(F.lotusHeal); this.sfx('pickup'); break;
       case DK.heartDrop: this.sfx('bell'); break;
+      case DK.relicMirror: case DK.relicSword: this.sfx('merge'); this.fx('levelRing', this.px, this.py, { r: 60, life: 0.45 }); break;
       case DK.cashCoin: case DK.cashString: case DK.cashTen: {
         const c = D.coin[i];
         const drop = c >= 0 && c < this.setup.coins.length ? this.setup.coins[c] : { kind: 'cashCoin', worth: 1, src: 'wave' } as CoinDrop;
@@ -2328,7 +2400,9 @@ export class World implements WorldApi {
     if (this.phase !== 'wave') return;
     this.phase = 'ending';
     this.endingT = 1.2;
-    this.title({ zh: `第 ${this.wave} 重 · 破`, en: `Wave ${this.wave} · Clear` }, 'centre');
+    // a boss's 镜宝 title is up in the centre already (the last body just fell): it says the wave is won,
+    // and 「破」 would print over it
+    if (this.t - this.relicTitleAt > 1.2) this.title({ zh: `第 ${this.wave} 重 · 破`, en: `Wave ${this.wave} · Clear` }, 'centre');
     this.sfx('gong');
     // the HUD (and the band's clear cue) hear the wave end now, with the 「破」, not 1.2 s later
     this.pushHud(true);
@@ -2346,7 +2420,7 @@ export class World implements WorldApi {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
       if (k === DK.moonDrop || k === DK.moonThick || k === DK.goldShard || k === DK.carpGold) { field += D.worth[i]; this.fx('petalBurst', D.x[i], D.y[i], { r: 8, life: 0.4 }); D.release(i); }
-      else D.magnet[i] = 2;
+      else if (k !== DK.relicMirror && k !== DK.relicSword) D.magnet[i] = 2; // a 镜宝 keeps its own rise and flight
     }
     this.fieldMoon = field;
     for (const r of this.running) { if (!r.failed && r.b.end) { try { r.b.end(this, r.s); } catch (e) { this.hooks.error(e, false); } } }
@@ -2398,6 +2472,7 @@ export class World implements WorldApi {
       killsBy: { ...this.killsBy },
       byWeapon: JSON.parse(JSON.stringify(this.byWeapon)),
       bosses: this.bossesKilled.slice() as WaveResult['bosses'],
+      relics: this.relicsGot.slice(),
       ms: Math.round(this.tWave * 1000),
     };
   }

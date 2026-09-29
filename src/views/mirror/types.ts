@@ -15,7 +15,7 @@ import type {
 export type { CharacterId, DateKey };
 
 /** Bump with a migration in logic/save.ts (GDD §23: a run that can't migrate settles as 镜碎). */
-export const RUN_VER = 1;
+export const RUN_VER = 2;
 export const META_VER = 1;
 
 // ═════════════════════════════════════════════════════════════ 1 · basics
@@ -170,6 +170,12 @@ export interface ItemDef {
   curse?: number;
   /** Earliest shop wave (神品: 8). */
   from?: number;
+  /** 镜宝 (boss relic): which school earns it. Never in the shop, a 镜奁 or 镜心; its stats are exact (the 大橘/嫦娥 gain factors skip it). */
+  relic?: 'ranged' | 'melee';
+  /** 攻击距离 % per copy (every weapon's reach, through weaponRange's pct). */
+  reachPct?: number;
+  /** While held, 墨宝 (critX 0) crit at this multiplier (dottingX takes the largest source; 画龙点睛 is ×2.0). */
+  inkCrit?: number;
   /** Its words live in data/say.ts (ITEM_SAY; stats-only items are generated); ui/describe.ts renders them. */
   verse?: Bilingual;
 }
@@ -294,6 +300,8 @@ export interface CompanionDef {
   extra: StatMods;
   /** 'choice' = 书生 picks from 3 random unlocked tier-I weapons. */
   start: WeaponId | 'choice';
+  /** Natural fighting style: breaks a tie when a boss relic is chosen (relicFor). */
+  style: 'melee' | 'ranged';
   /** Mastery-3 second starting choice ('more' = 书生's +1 option). */
   alt: WeaponId | 'more';
   slots: 5 | 6;
@@ -647,7 +655,7 @@ export interface MirrorSettings {
   view?: 'near' | 'mid' | 'far';
 }
 /** The tutorial's first-time tips (ui/tips.ts): one line each, shown once per account. */
-export type TutorTipId = 'boss' | 'crate' | 'crateOpen' | 'elite' | 'curse' | 'lowHp' | 'cards' | 'shop';
+export type TutorTipId = 'boss' | 'crate' | 'crateOpen' | 'elite' | 'curse' | 'lowHp' | 'cards' | 'shop' | 'relic';
 /**
  * The tutorial 「初入镜中」 (ui/Tutorial.tsx): `offered` once the sheet, ribbon or tutorial was seen,
  * `done` once it was played to its end card; `tips` the first-time tips already shown. They unlock
@@ -765,6 +773,8 @@ export interface WaveResult {
   killsBy: Readonly<Record<string, number>>;
   byWeapon: Partial<Record<WeaponId, { dmg: number; kills: number }>>;
   bosses: readonly (BossId | EndlessBossId)[];
+  /** 镜宝 earned this wave, one per boss body felled (engine: relicFor at the kill). Absent in older results. */
+  relics?: readonly ItemId[];
   ms: number;
 }
 /** 镜碎 during a wave. `partial` counts for deeds, tallies and records; its sleeve is lost (「袖中铜钱，随镜沉池」). */

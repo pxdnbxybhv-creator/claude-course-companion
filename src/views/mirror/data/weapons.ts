@@ -7,36 +7,36 @@ const b = (zh: string, en: string) => ({ zh, en });
 
 export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
   qingfeng: {
-    id: 'qingfeng', classes: ['sword'], kind: 'thrust', dmg: [10, 16, 26, 42], cd: 0.9, range: 150, scale: { melee: 1 },
-    crit: 10, critX: 2.0, knock: 20, price: 22, p: { pierce: [1, 1, 1, 3], w: 24, critT4: 20 },
+    id: 'qingfeng', classes: ['sword'], kind: 'thrust', dmg: [14, 22, 36, 58], cd: 0.8, range: 180, scale: { melee: 1 },
+    crit: 10, critX: 2.0, knock: 40, price: 22, p: { pierce: [1, 1, 1, 3], w: 24, critT4: 20 },
     verse: b('十年磨一剑，霜刃未曾试', 'Ten years to grind one sword; its frosty edge untried'),
   },
   longquan: {
-    id: 'longquan', classes: ['sword'], kind: 'combo', dmg: [5, 9, 14, 22], cd: 0.7, range: 130, scale: { melee: 0.8 },
-    crit: 5, critX: 1.8, knock: 10, price: 26, p: { hits: 2, deg: 90, stack: 2, stackMax: 10, stackDur: 3, spinEvery: 3 }, verse: b('龙泉太阿，双剑合璧', 'Longquan and Tai\'e, twin blades as one'),
+    id: 'longquan', classes: ['sword'], kind: 'combo', dmg: [7, 12, 20, 31], cd: 0.65, range: 160, scale: { melee: 0.8 },
+    crit: 5, critX: 1.8, knock: 30, price: 26, p: { hits: 2, deg: 90, stack: 2, stackMax: 10, stackDur: 3, spinEvery: 3 }, verse: b('龙泉太阿，双剑合璧', 'Longquan and Tai\'e, twin blades as one'),
   },
   yanyue: {
-    id: 'yanyue', classes: ['heavy'], kind: 'sweep', dmg: [20, 33, 53, 82], cd: 1.8, range: 200, scale: { melee: 1.1, armor: 0.3 },
+    id: 'yanyue', classes: ['heavy'], kind: 'sweep', dmg: [25, 41, 66, 103], cd: 1.6, range: 230, scale: { melee: 1.1, armor: 0.3 },
     crit: 5, critX: 2.0, knock: 120, price: 42, p: { deg: 140, bigEvery: 4, waveLen: 400 },
     verse: b('青龙偃月，过五关斩六将', 'The Green Dragon crescent, five passes and six generals'),
   },
   hoe: {
-    id: 'hoe', classes: ['heavy', 'fortune'], kind: 'smash', dmg: [12, 19, 30, 48], cd: 1.2, range: 140, scale: { melee: 0.9, regen: 0.3 },
-    crit: 5, critX: 1.5, knock: 60, price: 20, p: { deg: 90, gold: [0.1, 0.15, 0.2, 0.25], flowers: 8, flowerHeal: 3, flowerBase: 10 },
+    id: 'hoe', classes: ['heavy', 'fortune'], kind: 'smash', dmg: [15, 24, 38, 60], cd: 1.1, range: 170, scale: { melee: 0.9, regen: 0.3 },
+    crit: 5, critX: 1.5, knock: 80, price: 20, p: { deg: 90, gold: [0.1, 0.15, 0.2, 0.25], flowers: 8, flowerHeal: 3, flowerBase: 10 },
     verse: b('晨兴理荒秽，带月荷锄归', 'Up at dawn to weed; home with the hoe by moonlight'),
   },
   pestle: {
-    id: 'pestle', classes: ['heavy', 'moon'], kind: 'slam', dmg: [9, 15, 24, 38], cd: 1.1, range: 130, scale: { melee: 0.6, regen: 0.7 },
+    id: 'pestle', classes: ['heavy', 'moon'], kind: 'slam', dmg: [11, 19, 30, 48], cd: 1.0, range: 150, scale: { melee: 0.6, regen: 0.7 },
     crit: 5, critX: 1.5, knock: 80, price: 24, p: { r: 80, healChance: 0.1, shieldMax: 10 }, verse: b('玉兔捣药，秋复春', 'The jade rabbit pounds, autumn into spring'),
   },
   claw: {
-    id: 'claw', classes: ['fist'], kind: 'combo', dmg: [5, 8, 13, 20], cd: 0.4, range: 90, scale: { melee: 0.7 },
-    crit: 10, critX: 1.5, knock: 5, price: 18, p: { hits: 3, deg: 60, bleedEvery: 3, bleedStacks: [5, 5, 5, 15] },
+    id: 'claw', classes: ['fist'], kind: 'combo', dmg: [7, 11, 18, 28], cd: 0.4, range: 120, scale: { melee: 0.7 },
+    crit: 10, critX: 1.5, knock: 20, price: 18, p: { hits: 3, deg: 60, bleedEvery: 3, bleedStacks: [5, 5, 5, 15] },
     verse: b('猫有九命，爪有三痕', 'A cat has nine lives and three claw marks'),
   },
   drunkfist: {
-    id: 'drunkfist', classes: ['fist', 'wine'], kind: 'punch', dmg: [8, 13, 21, 33], cd: 0.8, range: 110, scale: { melee: 0.9 },
-    crit: 15, critX: 2.2, knock: 40, price: 26, p: { deg: 70, sway: 25, drunk: 3 },
+    id: 'drunkfist', classes: ['fist', 'wine'], kind: 'punch', dmg: [11, 18, 29, 46], cd: 0.7, range: 140, scale: { melee: 0.9 },
+    crit: 15, critX: 2.2, knock: 60, price: 26, p: { deg: 70, sway: 25, drunk: 3 },
     verse: b('醉里乾坤大', 'In wine the world is wide'),
   },
   dart: {
@@ -128,9 +128,9 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
 
 /** Class set bonuses at 2 / 4 / 6 weapons (GDD §8.1). Flags are rule switches the engine reads. */
 export const SETS: Readonly<Record<WClass, ClassSetDef>> = {
-  sword: { cls: 'sword', tiers: [{ stats: { crit: 5 } }, { stats: { crit: 10 } }, { stats: { crit: 15 }, flags: ['swordPierce'] }] },
-  heavy: { cls: 'heavy', tiers: [{ stats: { melee: 2 } }, { stats: { melee: 4, armor: 1 } }, { stats: { melee: 6, armor: 2, area: 15 } }] },
-  fist: { cls: 'fist', tiers: [{ stats: { dodge: 3 } }, { stats: { dodge: 6 } }, { stats: { dodge: 10, aspd: 10 } }] },
+  sword: { cls: 'sword', tiers: [{ stats: { crit: 5, melee: 2, steal: 2 } }, { stats: { crit: 10, melee: 4, steal: 4 } }, { stats: { crit: 15, melee: 6, steal: 6 }, flags: ['swordPierce'] }] },
+  heavy: { cls: 'heavy', tiers: [{ stats: { melee: 3, armor: 2 } }, { stats: { melee: 6, armor: 4, hp: 5 } }, { stats: { melee: 9, armor: 6, hp: 10, area: 15 } }] },
+  fist: { cls: 'fist', tiers: [{ stats: { dodge: 3, aspd: 5, steal: 2 } }, { stats: { dodge: 6, aspd: 10, steal: 4 } }, { stats: { dodge: 10, aspd: 20, steal: 6 } }] },
   hidden: { cls: 'hidden', tiers: [{ stats: { aspd: 5 } }, { stats: { aspd: 10 } }, { stats: { aspd: 15 }, flags: ['hiddenBounce'] }] },
   bow: { cls: 'bow', tiers: [{ stats: { range: 20 } }, { stats: { range: 40 } }, { stats: { range: 60, pierce: 1 } }] },
   fortune: { cls: 'fortune', tiers: [{ stats: { harvest: 4 } }, { stats: { harvest: 8 } }, { stats: { harvest: 12, luck: 10 } }] },

@@ -10,7 +10,7 @@ import { activeMutators, computeStats, effectsOf, harvestNext, heatOf, isBossWav
 import { coinPlan } from './economy';
 import { addItem, itemPool, weaponPool } from './items';
 import { pickDistinct, rngFor } from './rng';
-import { wavePlan } from './spawn';
+import { bossesAt, wavePlan } from './spawn';
 
 /** 心镜 宿器: is the starting weapon tier II? (rolled once per run from the 'start' stream). */
 export function keepsakeTier(run: Pick<RunSave, 'seed' | 'heart'>): 1 | 2 {
@@ -178,7 +178,12 @@ export function endWave(run: RunSave, r: WaveResult): RunSave {
     pending: { ...run.pending, cards, cardK: run.pending.cards > 0 ? run.pending.cardK : 0, crates: run.pending.crates + Math.max(0, r.crates), hearts: [...run.pending.hearts, ...r.hearts] },
     byWeapon, lives: Math.max(0, r.lives), once: [...new Set([...run.once, ...r.once])], drunk: Math.max(0, r.drunk), ms: run.ms + Math.max(0, r.ms),
   };
-  next = { ...next, runStats: foldStats(run.runStats, r.stats) };
+  // 镜宝: one per boss felled (the engine names each when a boss id's last body falls); never more than the
+  // fight's distinct bosses (无相's wave-20 pair of one boss = 1, endless 双生 = 2), none off a boss wave;
+  // only the two relic ids; not a purchase (lastBuy stays)
+  const cap = isBossWave(w) ? new Set(bossesAt(run, w)?.ids ?? []).size : 0;
+  for (const id of (r.relics ?? []).filter((x) => x === 'wangchen' || x === 'longyuan').slice(0, cap)) next = addItem(next, id);
+  next = { ...next, lastBuy: run.lastBuy, runStats: foldStats(run.runStats, r.stats) };
   const ls = logicStats(next, r);
   next = { ...next, runStats: { ...foldStats(next.runStats, ls), ...pickSet(ls) } };
   return { ...next, wave: w, inWave: null };

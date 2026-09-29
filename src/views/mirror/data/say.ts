@@ -353,6 +353,9 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
   needle: { say: b('不会被击退；每点护甲伤害 +{f1.k}%（和{@ironbone}加起来最多 +{f1.max}%）。', 'Immune to knockback; +{f1.k}% Damage per point of Armour (with {@ironbone}, max +{f1.max}%).') },
   jiangjinjiu: { say: b('醉意上限变成 {f0.p.cap}；醉意到 {f0.p.autoCrit} 以上每下都暴击；醉意消得{f0.p.drain:faster}。', 'Drunk cap becomes {f0.p.cap}; at {f0.p.autoCrit}+ Drunk every hit crits; Drunk drains {f0.p.drain:times} as fast.') },
   watermoon: { say: b('每件兵器出手时，还会朝身后打出一次镜像（{f0.p.pct}% 伤害）。', 'Every weapon also attacks behind you as a mirror image ({f0.p.pct}% damage).') },
+  // 9.9 镜宝 (the stats line is generated; the relic's own rules)
+  wangchen: { more: [b('墨宝也能暴击，暴击打 {inkCrit} 倍。', 'Ink summons can crit too, at ×{inkCrit}.')] },
+  longyuan: { say: b('所有兵器攻击距离 +{reachPct}%。', '+{reachPct}% reach on every weapon.') },
 };
 
 // ───────────────────────────────────────────── 镜技 (13) and ☆ 别传 (13)

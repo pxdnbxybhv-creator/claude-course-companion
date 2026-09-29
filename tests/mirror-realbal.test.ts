@@ -1,11 +1,12 @@
 // 水月幻镜 · 镜衡 on the real engine (sim/realbal.ts): a short smoke on every run of the suite, and the
-// balance sweep on demand: MIRROR_REALBAL=1 [SEEDS=3 MAXW=31 MAP=lake BEGIN=1 OUT=file.jsonl] npx vitest
-// run tests/mirror-realbal.test.ts. The sweep prints a summary; it asserts nothing about depth.
+// balance sweep on demand: MIRROR_REALBAL=1 [SEEDS=3 MAXW=31 MAP=lake LEVEL=average CHARS=guan DIFF=1
+// OUT=file.jsonl] npx vitest run tests/mirror-realbal.test.ts. The sweep prints a summary a bot level; it
+// asserts nothing about depth.
 import { appendFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COMPANION_REG, type MapId } from '../src/views/mirror/ids';
-import type { CharacterId } from '../src/views/mirror/types';
-import { playReal, summarizeReal, type RealRun } from '../src/views/mirror/sim/realbal';
+import type { CharacterId, DiffIndex } from '../src/views/mirror/types';
+import { playReal, summarizeReal, type BotLevel, type RealRun } from '../src/views/mirror/sim/realbal';
 
 describe('镜衡 on the real engine', () => {
   it('plays a short run headless, deterministically, without errors', () => {
@@ -18,15 +19,24 @@ describe('镜衡 on the real engine', () => {
   });
 
   const env = (typeof process !== 'undefined' ? process.env : {}) as Record<string, string | undefined>;
-  it.runIf(env.MIRROR_REALBAL === '1')('sweep: every companion × SEEDS', () => {
-    const seeds = +(env.SEEDS ?? 3), maxWave = +(env.MAXW ?? 31), map = (env.MAP ?? 'lake') as MapId, beginner = env.BEGIN === '1';
-    const runs: RealRun[] = [];
-    for (const c of COMPANION_REG) for (let s = 1; s <= seeds; s++) {
-      const r = playReal({ seed: s * 7919 + c.id.length, char: c.id as CharacterId, map, maxWave, beginner });
-      runs.push(r);
-      if (env.OUT) appendFileSync(env.OUT, JSON.stringify(r) + '\n');
+  // LEVEL=beginner|average|skilled (comma-separated; default all three, BEGIN=1 = beginner only), CHARS=a,b
+  // (default all 13), DIFF=0..5, SEEDS=n (seeds 1..n), MAXW, MAP, OUT=file.jsonl (one line a run, with its level)
+  it.runIf(env.MIRROR_REALBAL === '1')('sweep: every companion × SEEDS, for each bot level', () => {
+    const seeds = +(env.SEEDS ?? 3), maxWave = +(env.MAXW ?? 31), map = (env.MAP ?? 'lake') as MapId;
+    const diff = +(env.DIFF ?? 1) as DiffIndex;
+    const levels = (env.BEGIN === '1' ? 'beginner' : env.LEVEL ?? 'beginner,average,skilled').split(',') as BotLevel[];
+    const chars = env.CHARS ? (env.CHARS.split(',') as CharacterId[]) : COMPANION_REG.map((c) => c.id as CharacterId);
+    const all: RealRun[] = [];
+    for (const level of levels) {
+      const runs: RealRun[] = [];
+      for (const c of chars) for (let s = 1; s <= seeds; s++) {
+        const r = playReal({ seed: s * 7919 + c.length, char: c, map, maxWave, level, diff });
+        runs.push(r);
+        if (env.OUT) appendFileSync(env.OUT, JSON.stringify({ ...r, trace: r.trace.slice(-3), level, diff }) + '\n');
+      }
+      console.log(level, JSON.stringify(summarizeReal(runs)));
+      all.push(...runs);
     }
-    console.log(JSON.stringify(summarizeReal(runs)));
-    expect(runs.every((r) => r.errors === 0)).toBe(true);
-  }, 1_800_000);
+    expect(all.every((r) => r.errors === 0)).toBe(true);
+  }, 7_200_000);
 });

@@ -7,7 +7,7 @@ import type { Stats, Tier, WClass, WeaponDef, WeaponKind } from '../types';
 import { F, PASSIVES, WEAPONS } from '../data';
 import {
   charMult, clamp, cooldown, critChance, critMult, dmgMult, dottingX, luckMult, perTier, procCoef, rawDamage, stonesOf, summonCapOf,
-  tierCd, weaponRange,
+  tierCd, weaponRange, CLAMP_SPEED_MAX,
 } from '../logic/formulas';
 import { emptyStats } from '../logic/formulas';
 import { EKind, SF, SMode } from './pools';
@@ -122,8 +122,7 @@ function stoneRadius(W: World, s: WeaponSlot, st: Stats): number {
   return F.stone.r * Math.sqrt(Math.max(0.2, 1 + (st.area - manual) / 100)) * (1 + lin / 100);
 }
 function rangeOf(W: World, s: WeaponSlot, st: Stats): number {
-  const pct = W.run.char === 'rabbit' ? PASSIVES.yaoxiang.p.rangePct : 0;
-  return weaponRange(s.def, st, pct);
+  return weaponRange(s.def, st, W.reachPct);
 }
 
 // ─────────────────────────────────────────────────────────────── firing
@@ -1414,7 +1413,7 @@ export function tickSwords(W: World, dt: number): void {
     if (n <= 0) continue;
     blades += n;
     s.swords = n;
-    const R = (s.flareT > 0 ? ((s.def.p.flareR as number) ?? 240) : weaponRange(s.def, st));
+    const R = (s.flareT > 0 ? ((s.def.p.flareR as number) ?? 240) : weaponRange(s.def, st, W.reachPct));
     const per = cooldown(tierCd(s.def, s.t) , st.aspd);
     const d = dmgOf(W, s, st), cp = critPOf(s, st), cm = critMOf(s, st);
     const touch = s.touch!;
@@ -1486,7 +1485,8 @@ export function tickSwords(W: World, dt: number): void {
     W.lingboT -= dt;
     if (W.lingboT <= 0) {
       W.lingboT = 0.25;
-      const v = ((lb.base ?? 3) + (lb.per10 ?? 8) * Math.max(0, W.stats.speed) / 10) * W.dmgMultNow();
+      // 身法 counts up to its +100 cap (镜宝 stack 身法 past it)
+      const v = ((lb.base ?? 3) + (lb.per10 ?? 8) * Math.min(CLAMP_SPEED_MAX, Math.max(0, W.stats.speed)) / 10) * W.dmgMultNow();
       W.coreZone(1, 'stepTrail', W.px, W.py, 26, 1.2, ZC.trail, v);
     }
   }

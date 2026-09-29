@@ -4,6 +4,7 @@
 import type { DropKind, FxName } from '../ids';
 import { B, blob, ell, arcW, rot, rotW, spine, star, h01, type Pt, type Spec } from './kit';
 import { CINNABAR, CLASS_WASH, DANGER, GOLD, INK, JADE, MOON, PAPER, SILVER } from './palette';
+import { ITEM_SPECS } from './items';
 
 const COIN = '#d4a23a', COIN_D = '#8a5a12', COIN_L = '#f6d77a';
 
@@ -27,6 +28,21 @@ function coin(b: B, r: number, squash: number, glint: boolean, label?: string, x
 }
 
 const d = (r: number, paint: (b: B, v: number) => void, n = 1, halo: Spec['halo'] = 'dark'): Spec => ({ box: [-r, -r, r, r], n, halo, paint });
+/** A spec painted k× larger: every point, stroke width and crisp mark scaled (as paint/index.ts does for 镜主). */
+function larger(sp: Spec, k: number): Spec {
+  return {
+    ...sp, box: [sp.box[0] * k, sp.box[1] * k, sp.box[2] * k, sp.box[3] * k],
+    paint: (b, v) => {
+      const from = b.ops.length;
+      sp.paint(b, v);
+      for (let i = from; i < b.ops.length; i++) {
+        const op = b.ops[i];
+        if (op.k === 'stroke') op.s = { ...op.s, pts: op.s.pts.map((q) => ({ x: q.x * k, y: q.y * k, w: op.s.kind === 'fill' || op.s.kind === 'wash' ? q.w : q.w * k })) };
+        else { const f = op.f; op.f = (g) => { g.scale(k, k); f(g); }; if (op.bb) op.bb = [op.bb[0] * k, op.bb[1] * k, op.bb[2] * k, op.bb[3] * k]; }
+      }
+    },
+  };
+}
 
 export const DROP_SPECS: Record<DropKind, Spec> = {
   moonDrop: d(6, (b) => { b.fill(MOON, [[-4, 0], [-1, -5], [4, -1], [1, 5]], 0.97, 0.3); b.line([[-4, 0], [-1, -5], [4, -1], [1, 5], [-4, 0]], 0.4, 0.5, '#6f8ea6'); b.disc(-0.6, -1.8, 0.9, '#ffffff'); b.line([[-1, -5], [1, 5]], 0.3, 0.35, SILVER); }),
@@ -44,6 +60,9 @@ export const DROP_SPECS: Record<DropKind, Spec> = {
     b.brush(rotW([[0, 11, 1.4], [-2, 14, 1], [1, 15, 0.4]], sw), 0.9, '#8e2b3a');
   }, 2, 'dark'),
   cashTen: d(10, (b) => { coin(b, 9, 1, true, '当十'); b.ring(0, 0, 9.4, 0.5, COIN_L, 0.9); }, 1, 'dark'),
+  // 镜宝 fly-ins: the relic's own item icon, half again as large (it hangs over the fallen boss, then flies to you)
+  relicMirror: larger(ITEM_SPECS.wangchen, 1.5),
+  relicSword: larger(ITEM_SPECS.longyuan, 1.5),
 };
 
 // ───────────────────────────────────────────── effects

@@ -103,6 +103,9 @@ export function validateRun(raw: unknown): RunSave | null {
 /** Upgrade an older save to RUN_VER, or null when it can't be (the run then settles as 镜碎). */
 export function migrateRun(run: RunSave): RunSave | null {
   if (run.ver === RUN_VER) return run;
-  // v1 is the first version: nothing older exists yet. A newer save (from a later build) is not ours to run.
+  // v1 → v2 (round 5): nothing to convert. The bump exists so an older build refuses a run that may hold
+  // 镜宝 ids it does not know (it would drop them silently) and asks for a reload instead (newerSave).
+  if (run.ver === 1) return { ...run, ver: RUN_VER };
+  // A newer save (from a later build) is not ours to run.
   return null;
 }

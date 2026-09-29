@@ -1,5 +1,5 @@
 // 水月幻镜 · the UI's pure helpers (src/views/mirror/ui/text.ts): words for every stat and term, the
-// results scroll's pay lines, the stick / keys / 技 drag maths, the codex's 185 pages and their
+// results scroll's pay lines, the stick / keys / 技 drag maths, the codex's 187 pages and their
 // pictures, and the day arithmetic behind 「镜中人已候 N 日」.
 import { describe, expect, it } from 'vitest';
 import {
@@ -92,14 +92,16 @@ describe('mirror ui · the pay lines of the scroll', () => {
 });
 
 describe('mirror ui · input maths', () => {
-  it('the stick has an 8 px dead zone and saturates at its 56 px radius', () => {
+  it('the stick has an 8 px dead zone, full speed from 24 px, and its knob draws out to the 56 px radius', () => {
     expect(stickVector(5, 5)).toMatchObject({ x: 0, y: 0 });
     const full = stickVector(200, 0);
     expect(full.x).toBeCloseTo(1);
     expect(full.knobX).toBeCloseTo(STICK_R);
-    const half = stickVector(0, 32);
+    const half = stickVector(0, 16);
     expect(half.y).toBeGreaterThan(0.4);
     expect(half.y).toBeLessThan(0.6);
+    expect(stickVector(0, 24).y).toBeCloseTo(1);
+    expect(stickVector(0, 24).knobY).toBeCloseTo(24); // the knob follows the thumb to the rim
     expect(Math.hypot(stickVector(40, 40).x, stickVector(40, 40).y)).toBeLessThanOrEqual(1);
     expect(stickVector(NaN, 1)).toMatchObject({ x: 0, y: 0 });
   });
@@ -118,8 +120,8 @@ describe('mirror ui · input maths', () => {
 });
 
 describe('mirror ui · codex', () => {
-  it('holds 185 pages in seven tabs, plus the 候签 album', () => {
-    expect(CODEX_TOTAL).toBe(185);
+  it('holds 187 pages in seven tabs, plus the 候签 album', () => {
+    expect(CODEX_TOTAL).toBe(187); // 185 + the two 镜宝 (忘尘镜, 龙渊剑)
     expect(CODEX_TABS.map((x) => x.id)).toContain('slip');
     const all = CODEX_TABS.flatMap((x) => codexKeys(x.id));
     expect(new Set(all).size).toBe(all.length);

@@ -764,3 +764,29 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-res-who summary { min-height: 44px; display: flex; align-items: center; padding: 0 12px; cursor: pointer; font-size: 15px; }
 .mj-res-who[open] summary { border-bottom: 1px solid var(--line); }
 .mj-res-who .mj-cp { padding: 12px; max-width: none; }
+
+/* 破镜重圆: the revive dialog over the still picture (the player's colours: jade and gold on paper) */
+.mj-revive { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 16px); background: rgba(20, 18, 14, 0.38); outline: none; animation: mj-fadein 0.3s ease-out; }
+.mj-revive-card { width: min(100%, 360px); padding: 20px 20px 16px; border-radius: 14px; background: var(--paper); color: var(--ink); text-align: center; box-shadow: 0 0 0 1px color-mix(in srgb, var(--mj-gold) 55%, transparent), 0 18px 40px -16px rgba(0, 0, 0, 0.6); }
+.mj-revive-card h2 { margin: 0 0 8px; font-size: 34px; font-weight: 400; letter-spacing: 0.08em; }
+.mj-revive-line { margin: 0 0 12px; font-size: 15px; line-height: 1.6; color: var(--ink-2); text-align: left; }
+.mj-revive-purse { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 0 0 14px; font-size: 15px; color: var(--ink); }
+.mj-revive-actions { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.mj-revive-go { width: 100%; background: #3e9a63; border-color: #3e9a63; color: #fbf5ea; font-size: 16px; }
+.mj-revive-go:hover { background: color-mix(in srgb, #3e9a63 86%, black); }
+.mj-revive-go[disabled] { background: var(--paper-3); border-color: var(--line-strong); color: var(--ink-3); opacity: 1; }
+.mj-revive-short { margin: -2px 0 2px; font-size: 13.5px; color: var(--ink-2); }
+.mj-revive-end { width: 100%; }
+.mj-revive-card.is-arming button { pointer-events: none; }
+/* while down: nothing but the dialog answers (the 技 button and the pause key are put away) */
+.mj-run.is-down .mj-hud { pointer-events: none; }
+.mj-run.is-down .mj-skill, .mj-run.is-down .mj-pause, .mj-run.is-down .mj-stick { visibility: hidden; }
+
+/* 视野 in the settings: the segmented 近 / 中 / 远 and the line under it */
+.mj-settings .mj-view-row { flex-direction: column; align-items: stretch; gap: 2px; padding-bottom: 10px; }
+.mj-view-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mj-view-row .mj-view-hint { margin-top: 2px; font-size: 12px; }
+
+/* 镜宝: the shop's line before a boss wave, and the relic in the pack */
+.mj-relic-next { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--mj-gold) 12%, var(--paper)); border: 1px solid color-mix(in srgb, var(--mj-gold) 45%, transparent); font-size: 13.5px; color: var(--ink); }
+.mj-bagitem.is-relic { border-color: color-mix(in srgb, var(--mj-gold) 70%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mj-gold) 40%, transparent); }

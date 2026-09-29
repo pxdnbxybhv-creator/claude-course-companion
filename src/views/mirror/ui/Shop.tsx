@@ -8,10 +8,10 @@ import { useT } from '../../../app/i18n';
 import { lang } from '../../../app/store';
 import { HAZARD_REG, type ItemId } from '../ids';
 import type { RunSave, Tier, Unlocks } from '../types';
-import { COMPANIONS, ITEMS } from '../data';
+import { COMPANIONS, ITEMS, WEAPONS } from '../data';
 import { termLine, termName } from '../data/glossary';
 import {
-  buy, fmtBig, isBossWave, merge, noReroll, reroll, sell, sellPrice, shopView, shopW, toggleLock, wavePlan, weaponSlotsOf,
+  buy, fmtBig, isBossWave, isMeleeWeapon, merge, noReroll, reroll, relicFor, sell, sellPrice, shopView, shopW, toggleLock, wavePlan, weaponSlotsOf,
 } from '../logic';
 import { GearCard, useScreenKeys } from './Screens';
 import { Icon } from './icons';
@@ -196,6 +196,7 @@ export function Shop(props: {
           {props.baking !== null ? t(`研墨 ${Math.round(props.baking * 100)}%`, `Ink ${Math.round(props.baking * 100)}%`) : termName('next', t)}
         </button>
       </header>
+      {boss && <RelicNext run={run} t={t} n={plan.boss ? new Set(plan.boss.ids).size : 1} />}
       {wide ? (
         <div class="mj-shop-body">
           {main}
@@ -269,17 +270,38 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
   );
 }
 
+/** Before a boss wave: which 镜宝 beating it gives (logic relicFor: the weapons you carry decide); `n` bosses
+ *  of different ids (endless 双生) give one each. */
+function RelicNext(props: { run: RunSave; t: T; n: number }) {
+  const { run, t, n } = props;
+  const id = relicFor(run);
+  let m = 0, r = 0;
+  for (const x of run.weapons) { if (isMeleeWeapon(WEAPONS[x.id])) m++; else r++; }
+  const name = nameOf(id, t);
+  const why = m === r ? '' : m > r ? t('（你的近战兵器多）', ' (you carry more melee weapons)') : t('（你的远程兵器多）', ' (you carry more ranged weapons)');
+  return (
+    <p class="mj-relic-next">
+      <Icon id={`item:${id}`} px={22} />
+      <span>{n > 1
+        ? t(`下一重有${n === 2 ? '两' : n}位首领：每打倒一位，得一件${termName('relic', (z) => z)}「${name}」${why}。`, `Next wave has ${n} bosses: each one you beat gives the ${name}${why}.`)
+        : t(`下一重首领：击败后得${termName('relic', (z) => z)}「${name}」${why}。`, `Next boss: beat it for the ${name}${why}.`)}</span>
+    </p>
+  );
+}
+
 function BagTab(props: { run: RunSave; t: T }) {
   const { run, t } = props;
   const [open, setOpen] = useState<ItemId | null>(null);
-  const ids = (Object.keys(run.items) as ItemId[]).filter((id) => (run.items[id] ?? 0) > 0).sort((a, b) => ITEMS[b].tier - ITEMS[a].tier);
+  // 镜宝 first, then by tier
+  const rank = (id: ItemId) => ITEMS[id].tier + (ITEMS[id].relic ? 10 : 0);
+  const ids = (Object.keys(run.items) as ItemId[]).filter((id) => (run.items[id] ?? 0) > 0).sort((a, b) => rank(b) - rank(a));
   if (!ids.length) return <p class="muted mj-empty" data-tut="bag">{t('行囊还是空的。', 'Your pack is empty.')}</p>;
   return (
     <div data-tut="bag">
       <p class="mj-tabhint">{t('点一件道具，看它做什么。', 'Pick an item to see what it does.')}</p>
       <div class="mj-bag">
         {ids.map((id) => (
-          <button type="button" class={`mj-bagitem tier-${ITEMS[id].tier}` + (open === id ? ' is-sel' : '')} onClick={() => setOpen(open === id ? null : id)} aria-label={`${nameOf(id, t)} ×${run.items[id]}`} aria-pressed={open === id}>
+          <button type="button" class={`mj-bagitem tier-${ITEMS[id].tier}` + (ITEMS[id].relic ? ' is-relic' : '') + (open === id ? ' is-sel' : '')} onClick={() => setOpen(open === id ? null : id)} aria-label={`${nameOf(id, t)} ×${run.items[id]}`} aria-pressed={open === id}>
             <Icon id={`item:${id}`} px={36} />
             {(run.items[id] ?? 0) > 1 && <span class="mj-count num">×{run.items[id]}</span>}
           </button>

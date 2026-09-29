@@ -9,67 +9,67 @@ const MELEE_PEN = [{ match: { scale: 'melee' as const }, pct: -25 }];
 
 export const COMPANIONS: Readonly<Record<CharacterId, CompanionDef>> = {
   scholar: {
-    id: 'scholar', hp: 24, armor: 1, speed: 0, dodge: 0, extra: {}, start: 'choice', alt: 'more', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'scholar', hp: 34, armor: 4, speed: 0, dodge: 0, extra: {}, start: 'choice', style: 'ranged', alt: 'more', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'yizi', passive: 'bolan', altSkill: 'tishi', leans: ['dugubaijia'],
     quip: b('书中自有千钟粟。', 'In books there are a thousand bushels.'), verse: b('半亩方塘一鉴开', 'The half-acre pond opens like a mirror'),
   },
   gardener: {
-    id: 'gardener', hp: 26, armor: 2, speed: -10, dodge: 0, extra: { regen: 2 }, start: 'hoe', alt: 'pestle', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'gardener', hp: 36, armor: 4, speed: -10, dodge: 0, extra: { regen: 3 }, start: 'hoe', style: 'melee', alt: 'pestle', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'manyuan', passive: 'chunzhong', altSkill: 'cuihua', leans: ['fuyuan', 'huichun', 'mobao'],
     quip: b('春种一粒粟。', 'Sow one grain in spring.'), verse: b('晨兴理荒秽，带月荷锄归', 'Up at dawn to weed; home with the hoe by moonlight'),
   },
   fisher: {
-    id: 'fisher', hp: 24, armor: 1, speed: -5, dodge: 0, extra: {}, start: 'rod', alt: 'coindart', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'fisher', hp: 34, armor: 4, speed: -5, dodge: 0, extra: {}, start: 'rod', style: 'ranged', alt: 'coindart', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'yiwang', passive: 'yuanzhe', altSkill: 'dudiao', leans: ['fuyuan', 'qizhen'],
     quip: b('愿者上钩。', 'Only the willing bite.'), verse: b('孤舟蓑笠翁，独钓寒江雪', 'A lone boat, an old man in a straw cape, fishing the snowy river'),
   },
   musician: {
-    id: 'musician', hp: 18, armor: 0, speed: 0, dodge: 0, extra: {}, start: 'qin', alt: 'flute', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'musician', hp: 28, armor: 3, speed: 0, dodge: 0, extra: {}, start: 'qin', style: 'ranged', alt: 'flute', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [...MELEE_PEN, { match: { cls: 'music' }, pct: 20 }], bans: [], skill: 'guangling', passive: 'zhiyin', altSkill: 'gaoshan', leans: ['qinxin', 'fulu'],
     quip: b('知音难觅。', 'A kindred ear is hard to find.'), verse: b('此曲只应天上有', 'Such music belongs in heaven'),
   },
   swordsman: {
-    id: 'swordsman', hp: 18, armor: 0, speed: 15, dodge: 5, extra: {}, start: 'qingping', alt: 'casket', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'swordsman', hp: 28, armor: 3, speed: 15, dodge: 10, extra: {}, start: 'qingping', style: 'ranged', alt: 'casket', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: MELEE_PEN, bans: [], skill: 'yijian', passive: 'jianyi', altSkill: 'qinggong', leans: ['xianjian', 'jifeng'],
     quip: b('十步杀一人。', 'One foe every ten paces.'), verse: b('事了拂衣去，深藏身与名', 'The deed done, he shakes his sleeves and goes'),
   },
   taoist: {
-    id: 'taoist', hp: 16, armor: 0, speed: 5, dodge: 0, extra: { elem: 3 }, start: 'thunder', alt: 'fire', slots: 6, hitbox: 11, dodgeCap: 60,
+    id: 'taoist', hp: 26, armor: 3, speed: 5, dodge: 0, extra: { elem: 5 }, start: 'thunder', style: 'ranged', alt: 'fire', slots: 6, hitbox: 11, dodgeCap: 60,
     wmult: MELEE_PEN, bans: [], skill: 'jiji', passive: 'tongzi', altSkill: 'yufeng', leans: ['fulu', 'xianjian'],
     quip: b('急急如律令！', 'By swift decree!'), verse: b('松下问童子，言师采药去', 'Asked the child beneath the pine; the master is out gathering herbs'),
   },
   painter: {
-    id: 'painter', hp: 24, armor: 1, speed: 0, dodge: 0, extra: {}, start: 'brush', alt: 'crane', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'painter', hp: 34, armor: 4, speed: 0, dodge: 0, extra: {}, start: 'brush', style: 'ranged', alt: 'crane', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [{ match: { notCls: 'ink' }, pct: -25 }, { match: { cls: 'ink' }, pct: 35 }], bans: [], skill: 'dianhua', passive: 'chengzhu', altSkill: 'shenbi', leans: ['mobao'],
     quip: b('胸有成竹。', 'The bamboo is already in my heart.'), verse: b('搜尽奇峰打草稿', 'Sketching every strange peak'),
   },
   player: {
-    id: 'player', hp: 20, armor: 2, speed: -10, dodge: 0, extra: {}, start: 'gobowl', alt: 'rod', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'player', hp: 30, armor: 5, speed: -10, dodge: 0, extra: {}, start: 'gobowl', style: 'ranged', alt: 'rod', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'wei', passive: 'luozi', altSkill: 'tuiyan', leans: ['qizhen', 'mobao', 'fuyuan'],
     quip: b('落子无悔。', 'A stone placed is never taken back.'), verse: b('闲敲棋子落灯花', 'Idly tapping stones as the wick burns down'),
   },
   cat: {
-    id: 'cat', hp: 16, armor: 0, speed: 25, dodge: 15, extra: {}, start: 'claw', alt: 'drunkfist', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'cat', hp: 26, armor: 2, speed: 25, dodge: 20, extra: {}, start: 'claw', style: 'melee', alt: 'drunkfist', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: ['heavy', 'bow'], skill: 'pudie', passive: 'jiuming', altSkill: 'maoyue', leans: ['jifeng', 'yueying', 'zuixian'],
     quip: b('喵。（在市中睡着了）', 'Meow. (asleep in the shop)'), verse: b('猫有九命', 'A cat has nine lives'),
   },
   rabbit: {
-    id: 'rabbit', hp: 18, armor: 1, speed: 10, dodge: 5, extra: { regen: 2 }, start: 'pestle', alt: 'moonwheel', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'rabbit', hp: 28, armor: 3, speed: 10, dodge: 5, extra: { regen: 3 }, start: 'pestle', style: 'melee', alt: 'moonwheel', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'daoyao', passive: 'yaoxiang', altSkill: 'dengyue', leans: ['huichun', 'yueying'],
     quip: b('捣药去也。', 'Off to pound the elixir.'), verse: b('白兔捣药秋复春', 'The white rabbit pounds, autumn into spring'),
   },
   poet: {
-    id: 'poet', hp: 22, armor: 0, speed: 5, dodge: 0, extra: { crit: 10 }, start: 'gourd', alt: 'qingping', slots: 6, hitbox: 14, dodgeCap: 60,
+    id: 'poet', hp: 32, armor: 3, speed: 5, dodge: 0, extra: { crit: 15 }, start: 'gourd', style: 'ranged', alt: 'qingping', slots: 6, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: [], skill: 'yaoyue', passive: 'baipian', altSkill: 'doujiu', leans: ['zuixian', 'xianjian'],
     quip: b('天子呼来不上船。', 'Even the emperor\'s call won\'t get me on the boat.'), verse: b('举杯邀明月，对影成三人', 'I raise my cup to the moon; with my shadow we make three'),
   },
   guan: {
-    id: 'guan', hp: 28, armor: 3, speed: -15, dodge: 0, extra: {}, start: 'yanyue', alt: 'qingfeng', slots: 5, hitbox: 14, dodgeCap: 60,
+    id: 'guan', hp: 40, armor: 6, speed: -15, dodge: 0, extra: {}, start: 'yanyue', style: 'melee', alt: 'qingfeng', slots: 5, hitbox: 14, dodgeCap: 60,
     wmult: [], bans: ['hidden'], skill: 'tuodao', passive: 'yibo', altSkill: 'chitu', leans: ['zhongbing', 'jinzhong'],
     quip: b('暗器？关某不屑。', 'Hidden weapons? Beneath Lord Guan.'), verse: b('温酒斩华雄', 'Slaying Hua Xiong before the wine went cold'),
   },
   change: {
-    id: 'change', hp: 19, armor: 0, speed: 5, dodge: 10, extra: {}, start: 'moonmirror', alt: 'moonwheel', slots: 6, hitbox: 14, dodgeCap: 70,
+    id: 'change', hp: 29, armor: 3, speed: 5, dodge: 15, extra: {}, start: 'moonmirror', style: 'ranged', alt: 'moonwheel', slots: 6, hitbox: 14, dodgeCap: 70,
     wmult: [], bans: [], skill: 'qinghui', passive: 'yinqing', altSkill: 'benyue', leans: ['yueying', 'fulu'],
     quip: b('碧海青天夜夜心。', 'Blue sea, clear sky, a heart every night.'), verse: b('嫦娥应悔偷灵药', 'Chang\'e must regret the elixir she stole'),
   },

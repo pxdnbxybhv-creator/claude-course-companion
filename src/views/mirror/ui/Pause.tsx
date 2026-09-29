@@ -73,6 +73,16 @@ function VolumeRow(props: { title: string; value: number; on: boolean; offNote: 
   );
 }
 
+/** 视野's three sizes (EngineSettings.view; missing = 中), each with its one plain line. */
+type View = NonNullable<MirrorSettings['view']>;
+export const VIEW_OPTS: readonly { v: View; zh: string; en: string; lineZh: string; lineEn: string }[] = [
+  { v: 'near', zh: '近', en: 'Near', lineZh: '人物大，看得近（旧视野）', lineEn: 'Bigger figures, closer view (the old one)' },
+  { v: 'mid', zh: '中', en: 'Middle', lineZh: '看得更远，远处的敌人也在画面里（推荐）', lineEn: 'See farther; enemies stay on screen (recommended)' },
+  { v: 'far', zh: '远', en: 'Far', lineZh: '看得最远，人物更小', lineEn: 'See the most; smaller figures' },
+];
+/** The view in use: the saved one, or 中. */
+export const viewNow = (s: Pick<MirrorSettings, 'view'>): View => (s.view === 'near' || s.view === 'far' ? s.view : 'mid');
+
 /** The mirror's own settings (shared by the pause sheet and the lobby), with the app's two volumes. */
 export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) => void }) {
   const t = useT();
@@ -89,16 +99,26 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
       </div>
     </div>
   );
+  const view = viewNow(s);
+  const viewOpt = VIEW_OPTS.find((o) => o.v === view)!;
   return (
     <div class="mj-settings">
+      <div class="row mj-view-row">
+        <div class="mj-view-head">
+          <div class="row-title">{t('视野', 'View')}</div>
+          <div class="seg" role="group" aria-label={t('视野', 'View')}>
+            {VIEW_OPTS.map((o) => (
+              <button type="button" data-view={o.v} aria-pressed={o.v === view} title={t(o.lineZh, o.lineEn)} onClick={() => set({ view: o.v })}>{t(o.zh, o.en)}</button>
+            ))}
+          </div>
+        </div>
+        <div class="row-sub">{t(`${viewOpt.zh}：${viewOpt.lineZh}`, `${viewOpt.en}: ${viewOpt.lineEn}`)}</div>
+        <div class="row-sub mj-view-hint">{t('看不到远处射来的攻击时，调到「中」或「远」。', 'If attacks come from off the screen, pick Middle or Far.')}</div>
+      </div>
       <VolumeRow title={t('音效', 'Sound effects')} value={app.volume} on={app.sound} offNote={t('音效已关（设置）', 'off in Settings')} onInput={(v) => setSettings({ volume: v })} />
       <VolumeRow title={t('乐声', 'Music volume')} value={app.musicVolume} on={app.music} offNote={t('背景乐已关（设置）', 'off in Settings')} onInput={(v) => setSettings({ musicVolume: v })} />
       {seg(t('瞄准', 'Aim'), s.aim, [['auto', t('自动', 'Auto')], ['manual', t('手瞄', 'Manual')]], (v) => set({ aim: v }))}
       {seg(t('伤害数字', 'Damage numbers'), s.nums, [[0, t('关', 'Off')], [1, t('暴击', 'Crits')], [2, t('全部', 'All')]], (v) => set({ nums: v }))}
-      <div class="row">
-        <div class="row-main"><div class="row-title">{t('震屏', 'Screen shake')}</div><div class="row-sub">{t('只在重创与首领出招时轻震；减少动态时关闭', 'A small shake only for hard hits and boss blows; off with reduced motion')}</div></div>
-        <Switch checked={s.shake && !calm} disabled={calm} onChange={(v) => set({ shake: v })} label={t('震屏', 'Screen shake')} />
-      </div>
       <div class="row">
         <div class="row-main"><div class="row-title">{t('震动', 'Vibration')}</div><div class="row-sub">{t('受击、击破精英与首领时手机轻震', 'A light buzz when you are hit, and on elite kills and boss blows (phones)')}</div></div>
         <Toggle checked={vibePref.value} onChange={setVibe} label={t('震动', 'Vibration')} />

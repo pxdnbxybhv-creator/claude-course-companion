@@ -36,7 +36,7 @@ export function itemPool(run: RunSave, unlocks: Unlocks, t: Tier, w: number): It
   const out: ItemId[] = [];
   for (const r of ITEM_REG) {
     const it = ITEMS[r.id];
-    if (it.tier !== t || !unlocks.items.has(r.id) || itemMaxed(run, r.id)) continue;
+    if (it.tier !== t || it.relic || !unlocks.items.has(r.id) || itemMaxed(run, r.id)) continue;
     if ((it.from ?? 0) > w) continue;
     out.push(r.id);
   }

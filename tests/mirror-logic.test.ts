@@ -53,7 +53,7 @@ describe('formulas', () => {
     const s = { ...computeStats({ ...r, weapons: [{ id: 'qingfeng', t: 1 }] }), crit: 120, critDmg: 50 };
     expect(critMult(2, 10, s)).toBeCloseTo(2 + 0.5 + 0.3);
     const h = weaponHit({ ...r, weapons: [{ id: 'qingfeng', t: 1 }] }, { ...s, melee: 5, dmg: 50 }, 'qingfeng', 1);
-    expect(h.raw).toBe(15);
+    expect(h.raw).toBe(19); // 青锋剑 I 14 (⚖5) + 近战 5
     expect(h.mult).toBeCloseTo(1.5);
     expect(playerHit(15, 1.5, false, 2, { armor: 2 })).toBe(21); // round(22.5 − 2)
     expect(playerHit(15, 1.5, false, 2, { armor: 99 })).toBe(1);
@@ -70,8 +70,13 @@ describe('formulas', () => {
     expect(budgetBase(10)).toBe(150);
     expect(budgetBase(30)).toBe(650);
     expect(budgetBase(45)).toBeCloseTo(650 * Math.pow(1.02, 15));
-    // DMG grows 1.06 a wave from 11 (⚖3, the real-engine harness: was 1.08, 20.8 at 29 and 23.1 at 30)
-    const rows: [number, number, number][] = [[1, 1, 1], [5, 2.2, 1.6], [9, 3.4, 2.2], [10, 3.7, 2.35], [12, 5.5, 2.81], [15, 14, 3.91], [19, 46, 5.9], [20, 62, 6.5], [25, 260, 10.4], [29, 800, 14.84], [30, 1056, 16.19]];
+    // DMG grows 1.06 a wave from 11 (⚖3, the real-engine harness: was 1.08, 20.8 at 29 and 23.1 at 30), then ⚖5
+    // (m6) 1.09 a wave for 21–30. HP (⚖5, m6 scaling): 1.28 a wave to 20, 1.20 to 25, 1.13 to 30 (was 1.28 all the
+    // way: 260 at 25, 800 at 29, 1,056 at 30) — waves 1–20 unchanged
+    const rows: [number, number, number][] = [
+      [1, 1, 1], [5, 2.2, 1.6], [9, 3.4, 2.2], [10, 3.7, 2.35], [12, 5.5, 2.81], [15, 14, 3.91], [19, 46, 5.9], [20, 62, 6.5],
+      [25, 188.2, 11.96], [29, 351.8, 19.08], [30, 410.2, 21.4],
+    ];
     for (const [w, hp, dmg] of rows) {
       expect(hpMul(w) / hp).toBeGreaterThan(0.99);
       expect(hpMul(w) / hp).toBeLessThan(1.01);
@@ -79,12 +84,21 @@ describe('formulas', () => {
       expect(dmgMul(w) / dmg).toBeLessThan(1.01);
     }
     expect(hpMul(31)).toBeCloseTo(hpMul(30)); // no cliff at 31
-    expect(hpMul(32)).toBeCloseTo(hpMul(30) * 1.08);
+    expect(hpMul(32)).toBeCloseTo(hpMul(30) * 1.055);
+    expect(hpMul(40) / hpMul(30)).toBeCloseTo(Math.pow(1.055, 9));
+    for (let w = 2; w <= 60; w++) {
+      expect(hpMul(w) / hpMul(w - 1), `hp ${w}`).toBeLessThanOrEqual(1.38);
+      if (w >= 32) expect(hpMul(w) / hpMul(w - 1), `hp ${w}`).toBeLessThanOrEqual(1.0551);
+    }
+    // late danger is damage, not HP: wave 20 unchanged, ×1.09 a wave to 30, ×1.06 a wave in endless
+    expect(dmgMul(30) / dmgMul(20)).toBeCloseTo(((1 + 0.15 * 29) / (1 + 0.15 * 19)) * Math.pow(1.09, 10));
+    expect(dmgMul(31)).toBeCloseTo(dmgMul(30));
+    expect(dmgMul(32) / dmgMul(31)).toBeCloseTo(1.06);
     const lake = newRun(opts()), palace = newRun(opts({ map: 'palace' }));
     expect(Math.round(bossHp(10, lake))).toBe(4810);
     expect(Math.round(bossHp(10, palace))).toBe(5051);
     expect(Math.round(bossHp(20, lake) / 100) * 100).toBe(74200);
-    expect(Math.round(bossHp(30, lake) / 1000) * 1000).toBe(739000);
+    expect(Math.round(bossHp(30, lake) / 1000) * 1000).toBe(287000);
     expect(budget(10, { ...lake, vows: { qunmo: 2 } })).toBeCloseTo(150 * 1.24);
     expect(budget(10, { ...lake, items: { delusion: 1 } })).toBeCloseTo(180);
   });
@@ -141,7 +155,7 @@ describe('stats', () => {
       expect(s.stones).toBe(c.id === 'player' ? 8 : 6);
     }
     const g = computeStats(newRun(opts({ char: 'gardener' })));
-    expect([g.regen, g.harvest, g.aspd]).toEqual([2, 8, -15]);
+    expect([g.regen, g.harvest, g.aspd]).toEqual([3, 8, -15]);
     const f = computeStats(newRun(opts({ char: 'fisher' })));
     expect([f.luck, f.pickup, f.dmg]).toEqual([15, 40, -5]);
   });
@@ -150,22 +164,22 @@ describe('stats', () => {
     const two = computeStats({ ...r, weapons: [{ id: 'qingfeng', t: 1 }, { id: 'qingfeng', t: 1 }] });
     expect(two.crit).toBe(5);
     const six = computeStats({ ...r, weapons: Array.from({ length: 6 }, () => ({ id: 'yanyue' as const, t: 1 as const })) });
-    expect([six.melee, six.armor, six.area]).toEqual([6, 1 + 2, 15]);
+    expect([six.melee, six.armor, six.area, six.hp]).toEqual([9, 4 + 6, 15, 34 + 10]); // 重器 6-set (⚖5): 近战 9, 护甲 6, 气血 10
     const cursed = computeStats({ ...r, items: { cuthair: 2 } });
     expect(cursed.curse).toBe(2);
     expect(cursed.dmg).toBe(20 + 4);
-    expect(cursed.hp).toBe(24 - 4);
+    expect(cursed.hp).toBe(34 - 4);
     const armoured = computeStats({ ...r, items: { ironbone: 1, needle: 1, guardmirror: 10 } });
-    expect(armoured.armor).toBe(1 + 8 + 20);
+    expect(armoured.armor).toBe(4 + 8 + 20);
     expect(armoured.dmg).toBe(40); // 铁骨 + 定海神针 share a +40% cap
     const fast = computeStats({ ...r, items: { chasewind: 1, sandals: 6 } });
     expect(fast.dmg).toBeCloseTo(10);
     const heart = computeStats({ ...r, heart: { heartHp: 2, heartLuck: 1 } });
-    expect([heart.hp, heart.luck]).toEqual([28, 4]);
+    expect([heart.hp, heart.luck]).toEqual([38, 4]);
     const cat = computeStats({ ...newRun(opts({ char: 'cat' })), items: { songzi: 2 } });
-    expect(cat.hp).toBe(16 + 4);
+    expect(cat.hp).toBe(26 + 4);
     const change = computeStats({ ...newRun(opts({ char: 'change' })), items: { guardmirror: 2 } });
-    expect(change.armor).toBe(3);
+    expect(change.armor).toBe(3 + 3);
     const guan = computeStats({ ...newRun(opts({ char: 'guan' })), wave: 40 });
     expect(guan.melee).toBe(10);
     const solo = computeStats({ ...r, weapons: [{ id: 'qingfeng', t: 1 }], items: { dugu: 1 } });

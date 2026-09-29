@@ -146,6 +146,8 @@ describe('mirror glossary · numbers come from the data', () => {
     expect(line('drunk')).toContain(`+${F.drunk.critPer10}%`);
     expect(line('drunk')).toContain(`+${F.drunk.critMax}%`);
     expect(line('drunk')).toContain(`${F.drunk.cap}`);
+    expect(line('crit')).toContain(`超过 ${CLAMP.critMax}%`); // the overflow rule: past 100% it becomes 暴击倍数
+    expect(GLOSSARY.crit.plainEn).toContain(`past ${CLAMP.critMax}%`);
     expect(F.sellFrac === 0.25 ? line('sell') : '四分之一').toContain('四分之一');
   });
   it('quotes the weapons’ real crit multiplier range', () => {
@@ -157,7 +159,7 @@ describe('mirror glossary · numbers come from the data', () => {
     const fixed: Partial<Record<GlossId, true>> = {
       hp: true, level: true, steal: true, aspd: true, regen: true, armor: true, dodge: true, speed: true, harvest: true, curse: true,
       summonCap: true, swords: true, stones: true, knock: true, critDmg: true, drunk: true, lives: true, store: true, boss: true,
-      set: true, clear: true,
+      set: true, clear: true, crit: true,
     };
     const loose = entries.filter(([id, x]) => /\d/.test(x.plainZh) && !fixed[id]).map(([id]) => id);
     expect(loose).toEqual([]);

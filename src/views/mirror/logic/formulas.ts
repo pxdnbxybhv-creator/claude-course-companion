@@ -50,14 +50,28 @@ const heartRank = (run: Pick<RunSave, 'heart'>, id: HeartFaceId) => run.heart[id
 export function dmx(m: number, w: number): number {
   return m <= 1 ? m : 1 + (m - 1) * Math.min(1, w / F.diffRamp);
 }
-/** HP(w)/HP₀ before difficulty: (1 + 0.3(w−1))·1.28^max(0, w−11); endless ×1.08^(w−31). */
-export function hpMul(w: number): number {
-  const f = (x: number) => (1 + F.hp.slope * (x - 1)) * Math.pow(F.hp.grow, Math.max(0, x - F.hp.from));
-  return w <= 30 ? f(Math.max(1, w)) : f(30) * Math.pow(F.endless.hp, w - 31);
+/** Per-wave HP growth of wave x (F.hp.bands: [lastWave, growth]). */
+function hpGrow(x: number): number {
+  for (const [to, g] of F.hp.bands) if (x <= to) return g;
+  return F.hp.bands[F.hp.bands.length - 1][1];
 }
-/** DMG(w)/D₀ before difficulty: (1 + 0.15(w−1))·1.06^max(0, w−11) (⚖3; GDD §5.2 had 1.08); endless ×1.05^(w−31). */
+/**
+ * HP(w)/HP₀ before difficulty: (1 + 0.3(min(w,30)−1)) · Π_{x=2..min(w,30)} grow(x) (1 to 11, 1.28 to 20, 1.20 to 25,
+ * 1.13 to 30); endless × F.endless.hp^(w−31) (no cliff at 31).
+ */
+export function hpMul(w: number): number {
+  const W = Math.max(1, Math.min(30, Math.floor(w)));
+  let g = 1;
+  for (let x = 2; x <= W; x++) g *= hpGrow(x);
+  const m = (1 + F.hp.slope * (W - 1)) * g;
+  return w <= 30 ? m : m * Math.pow(F.endless.hp, w - 31);
+}
+/**
+ * DMG(w)/D₀ before difficulty: (1 + 0.15(w−1)) · 1.06^max(0, min(w,20)−11) · 1.09^max(0, w−20) (⚖3 1.06; ⚖5 late
+ * 1.09 for waves 21–30); endless × F.endless.dmg^(w−31).
+ */
 export function dmgMul(w: number): number {
-  const f = (x: number) => (1 + F.dmg.slope * (x - 1)) * Math.pow(F.dmg.grow, Math.max(0, x - F.dmg.from));
+  const f = (x: number) => (1 + F.dmg.slope * (x - 1)) * Math.pow(F.dmg.grow, Math.max(0, Math.min(x, 20) - F.dmg.from)) * Math.pow(F.dmg.lateGrow, Math.max(0, x - 20));
   return w <= 30 ? f(Math.max(1, w)) : f(30) * Math.pow(F.endless.dmg, w - 31);
 }
 /** SPD(w)/S₀: 1 + 0.005·min(w−1, 30); endless +1%/wave up to +30%. */
@@ -229,6 +243,8 @@ export function computeStats(run: RunSave): Stats {
     const n = run.items[id as ItemId] ?? 0;
     const it = ITEMS[id as ItemId];
     if (!it || n <= 0) continue;
+    // 镜宝 are exact: 龙渊剑 is +100 气血 for 大橘 too (the gain factors below skip them)
+    if (it.relic) { addMods(s, it.stats, n); continue; }
     addMods(gains, it.stats, n);
     if (it.fx) for (const e of it.fx) if (e.hook === 'cond' && e.do === 'stats' && !e.when && !e.cls && !e.pct) addMods(gains, e.stats, n);
   }
@@ -394,7 +410,7 @@ export function weaponHit(run: RunSave, stats: Stats, id: WeaponId, t: Tier, ite
   const def = WEAPONS[id];
   const tier4Crit = t === 4 ? def.p.critT4 : undefined;
   const wc = def.crit + (typeof tier4Crit === 'number' ? tier4Crit : 0);
-  // 墨宝 (critX 0) crit only with 画龙点睛, at its ×2.0 (§4.5)
+  // 墨宝 (critX 0) crit only with 画龙点睛 (×2.0) or 忘尘镜 (×1.5): dottingX
   const critX = def.critX > 0 ? def.critX : def.classes.includes('ink') ? dottingX(run) : 0;
   return {
     raw: rawDamage(def, t, stats),
@@ -403,10 +419,18 @@ export function weaponHit(run: RunSave, stats: Stats, id: WeaponId, t: Tier, ite
     critM: critX > 0 ? critMult(critX, wc, stats) : 1,
   };
 }
-/** 画龙点睛's crit multiplier for 墨宝 (0 without it: they cannot crit). */
+/**
+ * 墨宝's crit multiplier: the largest of 画龙点睛's (×2.0) and a held 忘尘镜's (×1.5); 0 without either
+ * (they cannot crit).
+ */
 export function dottingX(run: Pick<RunSave, 'items' | 'char'>): number {
-  for (const { e } of effectsOf(run)) if (e.hook === 'summon' && e.do === 'crit') return e.x;
-  return 0;
+  let x = 0;
+  for (const { e } of effectsOf(run)) if (e.hook === 'summon' && e.do === 'crit') x = Math.max(x, e.x);
+  for (const id in run.items) {
+    const it = ITEMS[id as ItemId];
+    if (it?.inkCrit && (run.items[id as ItemId] ?? 0) > 0) x = Math.max(x, it.inkCrit);
+  }
+  return x;
 }
 /**
  * One enemy hit on the player (§4.3), after dodge and i-frames: `scaled` is E.dmg × dmgX(w) (and any
@@ -440,14 +464,36 @@ export const pickupRadius = (stats: Stats) => Math.max(10, F.pickupBase * (1 + s
 export const REVIVE = { price: 50, hpPct: 0.5, invuln: 2, pushR: 230, push: 170, clearR: 420 } as const;
 /** May this run still be revived? Not after the revive was used, never in a tutorial. The purse is the UI's to check. */
 export const canRevive = (run: Pick<RunSave, 'revived' | 'tutorial'>): boolean => run.revived !== true && run.tutorial !== true;
+/** The 身法 cap (+100%): movement, and every effect that reads 身法 (凌波微步). */
+export const CLAMP_SPEED_MAX = CLAMP.speedMax;
 /** Movement speed (u/s), 身法 clamped −60…+100%. */
 export const moveSpeed = (stats: Stats) => F.baseSpeed * (1 + clamp(stats.speed, CLAMP.speedMin, CLAMP.speedMax) / 100);
 /** Luck factor for chances (福缘 ≥ −80). */
 export const luckMult = (luck: number) => 1 + Math.max(CLAMP.luckMin, luck) / 100;
+/** The melee weapon kinds (the rest — projectiles, orbits, pulses, summons, mines — count as ranged). */
+export const MELEE_KINDS: ReadonlySet<WeaponDef['kind']> = new Set(['thrust', 'combo', 'sweep', 'smash', 'slam', 'punch']);
+export const isMeleeWeapon = (def: WeaponDef) => MELEE_KINDS.has(def.kind);
+/**
+ * Which 镜宝 a boss kill gives: 龙渊剑 when more of the weapons held are melee, 忘尘镜 when more are ranged;
+ * a tie goes to the higher sum of tiers, then to the companion's natural style.
+ */
+export function relicFor(run: Pick<RunSave, 'weapons' | 'char'>): 'wangchen' | 'longyuan' {
+  let m = 0, r = 0, mt = 0, rt = 0;
+  for (const w of run.weapons) { if (isMeleeWeapon(WEAPONS[w.id])) { m++; mt += w.t; } else { r++; rt += w.t; } }
+  if (m !== r) return m > r ? 'longyuan' : 'wangchen';
+  if (mt !== rt) return mt > rt ? 'longyuan' : 'wangchen';
+  return COMPANIONS[run.char].style === 'melee' ? 'longyuan' : 'wangchen';
+}
+/** 攻击距离 % on every weapon: 龙渊剑 +20 a copy, 玉兔 −15 (weaponRange's pct). */
+export function reachPct(run: Pick<RunSave, 'items' | 'char'>): number {
+  let p = run.char === 'rabbit' ? PASSIVES.yaoxiang.p.rangePct : 0;
+  for (const id in run.items) { const n = run.items[id as ItemId] ?? 0; const it = ITEMS[id as ItemId]; if (n > 0 && it?.reachPct) p += it.reachPct * n; }
+  return p;
+}
 /** A weapon's range after 射程: ranged/beam/lob +range, melee +range/2, orbit +range/4; ≥ 50% of base. */
 export function weaponRange(def: WeaponDef, stats: Stats, pct = 0): number {
   const k = def.kind;
-  const melee = k === 'thrust' || k === 'combo' || k === 'sweep' || k === 'smash' || k === 'slam' || k === 'punch';
+  const melee = MELEE_KINDS.has(k);
   const add = k === 'orbit' ? stats.range / 4 : melee ? stats.range / 2 : stats.range;
   return Math.max(def.range * 0.5, (def.range + add) * (1 + pct / 100));
 }
@@ -487,15 +533,19 @@ export function cardOdds(level: number, luck: number): PerTier {
   const lm = luckMult(luck);
   return renorm(clamp(6 + 3 * level, 0, 55) * lm, clamp(2 * (level - 6), 0, 25) * lm, clamp(0.8 * (level - 18), 0, 10) * lm);
 }
-/** Shop tier odds (%) by wave band; luck × 灵+; 镜裂 +5/+5 to 仙/神; 凡 takes the rest. */
-export function shopOdds(w: number, luck: number, extra = false): PerTier {
-  let r: readonly number[] = F.shopOdds[0];
-  for (const x of F.shopOdds) if (w >= x[0]) r = x;
+/** Tier odds (%) by wave band from a [fromWave, 凡, 灵, 仙, 神] table; luck × 灵+; 镜裂 +5/+5 to 仙/神; 凡 takes the rest. */
+function bandOdds(table: readonly (readonly number[])[], w: number, luck: number, extra: boolean): PerTier {
+  let r: readonly number[] = table[0];
+  for (const x of table) if (w >= x[0]) r = x;
   const lm = luckMult(luck);
   let t3 = r[3] * lm, t4 = r[4] * lm;
   if (extra) { t3 += 5; t4 += 5; }
   return renorm(r[2] * lm, t3, t4);
 }
+/** Weapon tier odds in the shop, and a 镜奁's item (F.shopOdds). */
+export function shopOdds(w: number, luck: number, extra = false): PerTier { return bandOdds(F.shopOdds, w, luck, extra); }
+/** Item (道具) tier odds in the shop (F.itemOdds, ⚖5: more 仙 and 神), the same luck and 镜裂 rules. */
+export function itemOdds(w: number, luck: number, extra = false): PerTier { return bandOdds(F.itemOdds, w, luck, extra); }
 
 // ───────────────────────────────────────────── prices (§7)
 /** Shop price multiplier: 铁公鸡 +8%, 悭吝 +8%/rank, 小满 +10%. */

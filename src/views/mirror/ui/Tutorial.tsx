@@ -264,6 +264,8 @@ export class TipsBrain extends Base implements CoachBrain {
           this.card('crateOpen', this.text('crateOpen', { meltN: melt }), ['crateKeep', 'crateMelt']);
         } else if (ev.s === 'cards' && primerDue(mirror.value, 'cards')) this.card('cards', this.text('cards'), ['cards']);
         else if (ev.s === 'shop' && primerDue(mirror.value, 'shop')) this.card('shop', this.text('shop'), ['slots']);
+        // the first 镜宝 (a boss fell): what it is and where it went, once
+        else if (ev.s === 'shop' && this.due('relic') && Object.entries(run.items).some(([id, n]) => (n ?? 0) > 0 && !!ITEMS[id as keyof typeof ITEMS]?.relic)) this.card('relic', this.text('relic'), ['tab:bag']);
         if (!this.bubble) this.curseCheck();
         break;
       }

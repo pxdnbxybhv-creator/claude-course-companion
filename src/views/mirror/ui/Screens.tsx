@@ -302,3 +302,60 @@ export function BossCard(props: { ev: BossEvent & { kind: 'intro' }; onDone: () 
     </button>
   );
 }
+
+// ───────────────────────────────────────────── 破镜重圆: the revive dialog (API.md §3, §4)
+/** The words and the state of the revive dialog for a purse (pure: the render test reads it). */
+export function reviveView(purse: number, price: number, t: T): {
+  title: string; line: string; purse: string; can: boolean; go: string; short: string | null; end: string;
+} {
+  const n = Math.max(0, Math.floor(purse));
+  const can = n >= price;
+  return {
+    title: t('镜碎了', 'The mirror breaks'),
+    line: t(
+      `这一局可以复活一次：花 ${price} 文，以一半气血原地站起，身边的敌人会被震开。`,
+      `You can come back once this run: pay ${price} coins to stand up where you fell with half your health. Enemies near you are knocked back.`,
+    ),
+    purse: t(`你有 ${n} 文`, `You have ${n} ${n === 1 ? 'coin' : 'coins'}`),
+    can,
+    go: t(`花 ${price} 文复活`, `Revive for ${price} coins`),
+    short: can ? null : t(`文不够（还差 ${price - n} 文）。`, `Not enough coins (${price - n} short).`),
+    end: can ? t('不了，结束这一局', 'No, end the run') : t('结束这一局', 'End the run'),
+  };
+}
+
+/** The body of the dialog: no hooks, so a test can read the tree it returns. */
+export function ReviveBody(props: { price: number; purse: number; t: T; armed: boolean; onRevive: () => void; onEnd: () => void }) {
+  const v = reviveView(props.purse, props.price, props.t);
+  const tap = (f: () => void) => () => { if (props.armed) f(); };
+  return (
+    <div class={'mj-revive-card' + (props.armed ? '' : ' is-arming')}>
+      <h2 class="brush" id="mj-revive-title">{v.title}</h2>
+      <p class="mj-revive-line">{v.line}</p>
+      <p class="mj-revive-purse"><i class="coin-icon" aria-hidden="true" /><span class="num">{v.purse}</span></p>
+      <div class="mj-revive-actions">
+        <button type="button" class="btn mj-big mj-revive-go" data-act="revive" disabled={!v.can} onClick={tap(props.onRevive)}>{v.go}</button>
+        {v.short && <p class="mj-revive-short" data-act="short">{v.short}</p>}
+        <button type="button" class={'btn mj-revive-end' + (v.can ? ' btn-ghost' : '')} data-act="end" onClick={tap(props.onEnd)}>{v.end}</button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 镜碎了: the run's one revive, over the still picture. No timer (a death is never rushed); the taps
+ * wake after 0.4 s, so a thumb still pressing where the 技 button was never pays by accident; focus
+ * lands on the dialog itself, not on a button (a Space still held for the 镜技 never pays either).
+ */
+export function ReviveDialog(props: { price: number; purse: number; onRevive: () => void; onEnd: () => void }) {
+  const t = useT();
+  const [armed, setArmed] = useState(false);
+  const [box, setBox] = useState<HTMLDivElement | null>(null);
+  useEffect(() => { const k = setTimeout(() => setArmed(true), 400); return () => clearTimeout(k); }, []);
+  useEffect(() => { box?.focus({ preventScroll: true }); }, [box]);
+  return (
+    <div class="mj-revive" role="alertdialog" aria-modal="true" aria-labelledby="mj-revive-title" tabIndex={-1} ref={setBox}>
+      <ReviveBody price={props.price} purse={props.purse} t={t} armed={armed} onRevive={props.onRevive} onEnd={props.onEnd} />
+    </div>
+  );
+}

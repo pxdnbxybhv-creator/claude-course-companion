@@ -264,6 +264,23 @@ describe('engine-core: drops, caps and statuses', () => {
     eng.dispose();
   });
 
+  it('重墨 never grows a body past 2.5× its own HP (⚖5 ceiling); the 月华 still moves', () => {
+    const { run, setup } = setupFor(newRun(opts()));
+    const { eng } = make(run, { settings: { quality: 'low' } });
+    eng.start(run, setup);
+    const W = eng.world;
+    W.plan = { ...W.plan, groups: [] };
+    for (let k = 0; k < 90; k++) W.spawn('blot', 300 + (k % 10) * 20, (k / 10 | 0) * 20, {});
+    let cost0 = 0; for (let i = 0; i < W.E.n; i++) if (W.E.alive[i]) cost0 += W.E.cost[i];
+    for (let k = 0; k < 200; k++) expect(W.spawn('blot', 0, 300, {})).toBe(-1);
+    expect(W.cappedAlive()).toBe(90);
+    let top = 0, cost = 0;
+    for (let i = 0; i < W.E.n; i++) if (W.E.alive[i]) { top = Math.max(top, W.E.hpMax[i]); cost += W.E.cost[i]; }
+    expect(top).toBeLessThanOrEqual(6 * W.plan.hpX * 2.5 + 1e-6);
+    expect(cost - cost0).toBe(200); // every fed spawn's 月华 still lands on a body
+    eng.dispose();
+  });
+
   it('statuses: burn stacks ignore armour, slows cap at 60%, bosses shrug off stun and root', () => {
     const { run, setup } = setupFor({ ...newRun(opts()), wave: 8, weapons: [] });
     const { eng } = make(run);
