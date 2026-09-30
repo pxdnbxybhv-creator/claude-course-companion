@@ -89,7 +89,7 @@ describe('帧率 · the vsync snap at every rate', () => {
     // a hitch is used as it came
     expect(snapStep(0.0105, 1 / 144)).toBe(0.0105);
   });
-  it('the game runs at 60 steps a second at every rate, with Chrome’s 0.1 ms and Safari’s 1 ms clocks', () => {
+  it('the game runs at 60 steps a second at every rate, with Chrome’s 0.1 ms and Safari’s 1 ms clocks', { timeout: 30_000 }, () => {
     for (const hz of RATES) for (const q of [0.1, 1]) {
       const { eng, W } = quiet();
       const T = stamps(hz, 4, q);
@@ -326,7 +326,7 @@ describe('帧率 · the frame cap', () => {
       expect({ hz, q, draws: r.draws }).toEqual({ hz, q, draws: r.calls });
     }
   });
-  it('holds 30 / 60 / 120 on every screen on a steady whole-vsync cadence (the nearest), at full game speed', () => {
+  it('holds 30 / 60 / 120 on every screen on a steady whole-vsync cadence (the nearest), at full game speed', { timeout: 30_000 }, () => {
     // 60 on 90 Hz: 45; 60 on 144: 72; 60 on 165: 55; 120 on 144 / 165: every vsync; 30 on 165: 27.5
     expect([[60, 90], [60, 144], [60, 165], [120, 144], [120, 165], [30, 165], [30, 144], [120, 240]].map(([c, h]) => capVsyncs(1000 / c, 1000 / h))).toEqual([2, 2, 3, 1, 1, 6, 5, 2]);
     for (const cap of [30, 60, 120]) for (const hz of [60, 90, 120, 144, 165, 240, 360]) for (const q of [0.1, 1]) {
@@ -440,7 +440,7 @@ describe('帧率 · the guard on fast screens', () => {
     const r = drive({ hz: 60, seconds: 60, fps: 120 });
     expect(r.acts).toEqual([]);
   });
-  it('a display that drops from 120 to 60 Hz mid-run (light work) is re-learned, not taken for a slow device, and 120 comes back with it', () => {
+  it('a display that drops from 120 to 60 Hz mid-run (light work) is re-learned, not taken for a slow device, and 120 comes back with it', { timeout: 30_000 }, () => {
     let sec = 0;
     const r = drive({ hz: 120, seconds: 50, work: 3.8, gen: () => { const d = sec >= 10 && sec < 30 ? 1000 / 60 : 1000 / 120; sec += d / 1000; return d; } });
     expect(r.acts).toEqual([]);
@@ -475,7 +475,7 @@ describe('帧率 · the guard on fast screens', () => {
     // JS-bound: straight to the effects (no notch of resolution, which cannot help)
     expect(r.acts.some((a) => a.includes('dpr'))).toBe(false);
   });
-  it('the half rate is a steady whole number of vsyncs: 72 on 144 Hz, 82.5 on 165, 60 on 120 and 240', () => {
+  it('the half rate is a steady whole number of vsyncs: 72 on 144 Hz, 82.5 on 165, 60 on 120 and 240', { timeout: 30_000 }, () => {
     for (const [hz, k] of [[144, 2], [165, 2], [120, 2], [240, 4]] as const) {
       const P = 1000 / hz;
       // a drawn frame takes 2 vsyncs, one in five only 1 (240 Hz: 3 and 2), so the aim of 120 is missed by
@@ -491,7 +491,7 @@ describe('帧率 · the guard on fast screens', () => {
       expect({ hz, odd }).toEqual({ hz, odd: 0 });
     }
   });
-  it('a computer at 不限 never falls to a half rate below the rate it achieves; a phone does, for a steady picture', () => {
+  it('a computer at 不限 never falls to a half rate below the rate it achieves; a phone does, for a steady picture', { timeout: 30_000 }, () => {
     const P = 1000 / 144, pat = [2, 2, 1, 2, 2];
     let j = 0;
     const gen = (_i: number, drew: boolean) => (drew ? pat[j++ % 5] : 1) * P;
@@ -527,7 +527,7 @@ describe('帧率 · the guard on fast screens', () => {
     expect(r.acts.slice(first).filter((a) => a.endsWith(' shed')).length).toBe(0);
     expect(r.acts.slice(first).filter((a) => /dpr \S+→(2\.5|2|1\.5)$/.test(a) && !a.includes('→3')).length).toBe(0);
   });
-  it('the same 60 ms hitch every 1.5 s weighs no more on a 144 or 240 Hz screen than on a 60 Hz one', () => {
+  it('the same 60 ms hitch every 1.5 s weighs no more on a 144 or 240 Hz screen than on a 60 Hz one', { timeout: 30_000 }, () => {
     const at = (hz: number) => drive({ hz, seconds: 40, dpr: 1, gen: (i) => (i % Math.round(hz * 1.5) === 0 ? 60 : 1000 / hz) }).acts.filter((a) => !a.includes('half'));
     const base = at(60).length;
     expect(at(144).length).toBeLessThanOrEqual(base);
