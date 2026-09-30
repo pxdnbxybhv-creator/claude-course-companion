@@ -6,7 +6,11 @@
 //   · every pool is a structure of typed arrays with a cap per quality (VFX_CAP), halved under the
 //     frame-time guard (W.degrade), which also drops the soft halos; nothing allocates per frame;
 //   · entries live on simulation time (W.t): they hold with the hitstop and pause, and a new wave
-//     (W.t restarts) clears them; the renderer sweeps the finished ones as it draws;
+//     (W.t restarts) clears them; the renderer sweeps the finished ones as it draws; they are drawn
+//     at their age on the effects clock (W.t + dFx, m7: t itself at 60 Hz; on a 90–360 Hz screen it
+//     moves on every frame), released on W.t;
+//   · what the drawing itself spawns takes its random numbers from a stream of its own (drawing()),
+//     so the simulation's effects draw the same shapes at every frame rate;
 //   · crisp parts are vector paths with flat colours (arc, lineTo, fill, stroke); soft parts are the
 //     sprites baked once in paint/vfx.ts; no gradient, shadowBlur, filter or blend mode per frame;
 //   · reduced motion: no white flash cores on rings, no re-jagging lightning, no pulsing, short
@@ -19,6 +23,7 @@ import type { World } from './world';
 import { Pool } from './pools';
 import { TAU } from './consts';
 import { SH, TN } from '../paint/feel';
+import { fxDelta } from './feel';
 import { RING_EDGE, STAIN, VFX_BODY, VFX_CORE, VFX_EDGE, VFX_HALO, VT, type VfxSprites, isInkTint, vfxSprites } from '../paint/vfx';
 import { VIEW_SPAN, viewOf } from '../paint/draw';
 
@@ -195,6 +200,22 @@ export class Vfx {
     P.trim();
   }
   private seed(): number { let x = this.seedN; x ^= x << 13; x ^= x >>> 17; x ^= x << 5; this.seedN = x >>> 0; return this.seedN; }
+  /** The renderer's own random stream, swapped in while a frame is drawn (drawing(true)): motes shed off
+   *  shots, pickup pings and legacy fx taken over never take numbers from the simulation's effects. */
+  private seedR = 0x85ebca6b;
+  private inDraw = false;
+  drawing(on: boolean): void {
+    if (on === this.inDraw) return;
+    this.inDraw = on;
+    const s = this.seedN; this.seedN = this.seedR; this.seedR = s;
+  }
+  /** The clocks a draw reads (clocks()): the simulation's (releases) and the effects clock (ages). */
+  private ts = 0;
+  private tf = 0;
+  private clocks(): void { const W = this.W; this.ts = W.t; this.tf = W.t + fxDelta(W); }
+  /** An entry's drawn age (s) on the effects clock; one the simulation has begun never draws before its
+   *  start (a blow struck in this frame's steps shows at 0, as at 60 Hz). */
+  private age(t0: number): number { const a = this.tf - t0; return a < 0 && this.ts >= t0 ? 0 : a; }
   private rnd(): number { return this.seed() / 4294967296; }
   /** A cosmetic random in [0, 1) (the renderer's jitter; never the simulation's streams). */
   rnd01(): number { return this.rnd(); }
@@ -434,13 +455,15 @@ export class Vfx {
   /** Ground stains (under the bodies). */
   drawGround(ctx: CanvasRenderingContext2D, cam: Camera): void {
     this.sync();
-    const P = this.stains, S = this.sprites, t = this.W.t;
+    this.clocks();
+    const P = this.stains, S = this.sprites;
     if (!P.count) return;
     const pa = this.W.degrade ? 0.6 : 1;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       const s = S.stain(P.kind[i]);
       if (!s || !onScreen(cam, P.x[i], P.y[i], P.r[i])) continue;
       const al = (u < 0.06 ? u / 0.06 : 1 - Math.pow((u - 0.06) / 0.94, 2)) * pa;
@@ -453,6 +476,7 @@ export class Vfx {
    *  with the player's layer before the player, so the light rises behind her instead of washing her out. */
   drawUnder(ctx: CanvasRenderingContext2D, cam: Camera, spr: (id: AtlasId) => Sprite | null): void {
     this.sync();
+    this.clocks();
     if (!this.blooms.count) return;
     this.drawBlooms(ctx, cam, spr, this.W.degrade ? 0.65 : 1, true);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -463,6 +487,7 @@ export class Vfx {
   draw(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, spr: (id: AtlasId) => Sprite | null): void {
     this.sync();
     if (!this.count()) return;
+    this.clocks();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     const pa = this.W.degrade ? 0.65 : 1;
     this.drawBlooms(ctx, cam, spr, pa, false);
@@ -479,11 +504,12 @@ export class Vfx {
   }
 
   private drawBlooms(ctx: CanvasRenderingContext2D, cam: Camera, spr: (id: AtlasId) => Sprite | null, pa: number, under: boolean): void {
-    const P = this.blooms, S = this.sprites, t = this.W.t, calm = this.calm;
+    const P = this.blooms, S = this.sprites, calm = this.calm;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       const k = P.kind[i];
       if ((k === BK.column) !== under) continue;
       if (u < 0 || !onScreen(cam, P.x[i], P.y[i], P.r[i] * 1.5)) continue;
@@ -524,12 +550,13 @@ export class Vfx {
   }
 
   private drawRings(ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
-    const P = this.rings, t = this.W.t;
+    const P = this.rings;
     if (!P.count) return;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       this.ringAt(ctx, cam, P.x[i], P.y[i], P.r[i], u, P.tint[i], P.flags[i], pa);
     }
@@ -597,14 +624,15 @@ export class Vfx {
   }
 
   private drawSlashes(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, pa: number): void {
-    const P = this.slashes, t = this.W.t, q = this.q, calm = this.calm;
+    const P = this.slashes, q = this.q, calm = this.calm;
     if (!P.count) return;
     const d = cam.dpr || 1;
     const star = feel ? feel.get(SH.star, TN.white) : null;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       if (u < 0 || !onScreen(cam, P.x[i], P.y[i], P.r[i] + 30)) continue;
       const fl = P.flags[i], tint = P.tint[i];
       const sg = fl & VF.flip ? -1 : 1;
@@ -675,14 +703,15 @@ export class Vfx {
   }
 
   private drawLances(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, pa: number): void {
-    const P = this.lances, t = this.W.t, calm = this.calm;
+    const P = this.lances, calm = this.calm;
     if (!P.count) return;
     const d = cam.dpr || 1;
     const star = feel ? feel.get(SH.star, TN.white) : null;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       const fl = P.flags[i], tint = P.tint[i];
       const cutK = (fl & VF.cut) !== 0;
@@ -738,14 +767,15 @@ export class Vfx {
    * two strokes per impact (the tint, then the white core), no sprite per spark.
    */
   private drawImpacts(ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
-    const P = this.impacts, t = this.W.t, S = this.sprites, calm = this.calm;
+    const P = this.impacts, S = this.sprites, calm = this.calm;
     if (!P.count) return;
     const d = cam.dpr || 1, k0 = cam.scale;
     const white = S.glow(VT.white);
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const u = (t - P.t0[i]) / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const u = this.age(P.t0[i]) / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       const x = P.x[i], y = P.y[i], r = P.r[i], fl = P.flags[i], tint = P.tint[i], ang = P.a[i];
       if (!onScreen(cam, x, y, r * 4)) continue;
@@ -825,14 +855,15 @@ export class Vfx {
   }
 
   private drawBolts(ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
-    const P = this.bolts, t = this.W.t, calm = this.calm, S = this.sprites;
+    const P = this.bolts, calm = this.calm, S = this.sprites;
     if (!P.count) return;
     const d = cam.dpr || 1;
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const age = t - P.t0[i], u = age / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const age = this.age(P.t0[i]), u = age / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       const x0 = P.x[i], y0 = P.y[i], x1 = P.a[i], y1 = P.b[i];
       const len = Math.hypot(x1 - x0, y1 - y0);
@@ -878,13 +909,14 @@ export class Vfx {
   }
 
   private drawBeams(ctx: CanvasRenderingContext2D, cam: Camera, pa: number): void {
-    const P = this.beams, t = this.W.t, S = this.sprites, calm = this.calm;
+    const P = this.beams, S = this.sprites, calm = this.calm;
     if (!P.count) return;
     const d = cam.dpr || 1;
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const age = t - P.t0[i], u = age / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const age = this.age(P.t0[i]), u = age / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       const x = P.x[i], y = P.y[i], dir = P.a[i], len = P.b[i], tint = P.tint[i];
       const c = Math.cos(dir), s = Math.sin(dir);
@@ -912,12 +944,13 @@ export class Vfx {
   }
 
   private drawFlecks(ctx: CanvasRenderingContext2D, cam: Camera, feel: { get(shape: number, tint: number, frame?: number): Sprite | null } | null, pa: number): void {
-    const P = this.flecks, t = this.W.t;
+    const P = this.flecks;
     if (!P.count || !feel) { if (P.count) this.sweep(P); return; }
     for (let i = 0; i < P.n; i++) {
       if (!P.alive[i]) continue;
-      const age = t - P.t0[i], u = age / P.life[i];
-      if (u >= 1) { P.release(i); continue; }
+      if (this.ts - P.t0[i] >= P.life[i]) { P.release(i); continue; }
+      const age = this.age(P.t0[i]), u = age / P.life[i];
+      if (u >= 1) continue;
       if (u < 0) continue;
       const k = P.kind[i];
       const drag = k === FK.glint ? 1.5 : k === FK.flame ? 2.5 : k === FK.note ? 2 : 6;
@@ -945,11 +978,11 @@ export class Vfx {
         if (s) rot(ctx, cam, s, x, y, age * 5 + (P.seed[i] & 7), sz * (1 - 0.4 * u), sz * (1 - 0.4 * u), pa * (u < 0.3 ? 1 : (1 - u) / 0.7));
       } else if (k === FK.ember) {
         const s = feel.get(SH.ember, tn);
-        const sp = Math.hypot(P.vx[i], P.vy[i]) * ev;
+        const fvx = P.vx[i], fvy = P.vy[i], sp = Math.sqrt(fvx * fvx + fvy * fvy) * ev;
         if (s) rot(ctx, cam, s, x, y, Math.atan2(P.vy[i], P.vx[i]), sz * (0.45 + Math.min(0.9, sp / 320)), sz, pa * (1 - u));
       } else {
         const s = feel.get(k === FK.drop ? SH.drop : SH.dot, tn);
-        const sp = Math.hypot(P.vx[i], P.vy[i]) * ev;
+        const fvx = P.vx[i], fvy = P.vy[i], sp = Math.sqrt(fvx * fvx + fvy * fvy) * ev;
         // the pressure wind: a fast chip is a streak along its flight, settling into a dot
         const kx = k === FK.drop ? sz * (1 + Math.min(1.4, sp / 260)) : sz * (1 - 0.35 * u) * (1 + Math.min(1.8, sp / 170));
         if (s) rot(ctx, cam, s, x, y, Math.atan2(P.vy[i], P.vx[i]), kx, sz * (1 - 0.35 * u), pa * (1 - u * u) * 0.95);

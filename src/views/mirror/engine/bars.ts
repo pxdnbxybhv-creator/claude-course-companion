@@ -15,6 +15,7 @@
 // allocation, no per-bar state change.
 import type { Camera, Sprite } from '../types';
 import { EKind } from './pools';
+import { fxDelta } from './feel';
 import type { World } from './world';
 
 /** Alpha of an untouched body's bar (full HP): there, but quiet. */
@@ -64,7 +65,8 @@ export class HpBars {
   /** Your chip. */
   private youLag = 1;
   private youHold = 0;
-  /** The world clock at the last frame (the chips drain on simulation time: they hold with a hitstop). */
+  /** The effects clock at the last frame (W.tFx: simulation time, drawn on every frame; the chips hold
+   *  with a hitstop, and drain as smoothly at 240 Hz as at 60). */
   private lastT = -1;
   private dt = 0;
   /** Bars recorded this frame (tests, the perf probe). */
@@ -76,9 +78,10 @@ export class HpBars {
     this.idle.ensure(cap); this.hurt.ensure(cap);
     if (this.lag.length < cap) { this.lag = new Float32Array(cap).fill(1); this.hold = new Float32Array(cap); this.gen = new Uint32Array(cap).fill(0xffffffff); }
     this.idle.n = 0; this.hurt.n = 0; this.count = 0;
-    const t = W.t;
+    const t = W.t + fxDelta(W);
+    // (the effects clock may step back a hair after a still redraw: that frame's chip holds)
     this.dt = this.lastT >= 0 && t >= this.lastT ? Math.min(0.1, t - this.lastT) : 0;
-    this.lastT = t;
+    if (this.lastT < 0 || t >= this.lastT || this.lastT - t > 0.05) this.lastT = t;
   }
 
   /**

@@ -83,8 +83,75 @@ export const VIEW_OPTS: readonly { v: View; zh: string; en: string; lineZh: stri
 /** The view in use: the saved one, or 中. */
 export const viewNow = (s: Pick<MirrorSettings, 'view'>): View => (s.view === 'near' || s.view === 'far' ? s.view : 'mid');
 
+/** 帧率 (m7): the most frames a second the game draws; 0 不限 follows the screen (EngineSettings.fps). */
+export type FpsOpt = 0 | 30 | 60 | 120;
+export const FPS_OPTS: readonly { v: FpsOpt; zh: string; en: string; lineZh: string; lineEn: string }[] = [
+  { v: 30, zh: '省电', en: 'Saver', lineZh: '每秒约 30 帧，最省电', lineEn: 'about 30 fps, easiest on the battery' },
+  { v: 60, zh: '60', en: '60', lineZh: '每秒约 60 帧', lineEn: 'about 60 fps' },
+  { v: 120, zh: '120', en: '120', lineZh: '每秒约 120 帧（屏幕支持时）', lineEn: 'about 120 fps where the screen can' },
+  { v: 0, zh: '不限', en: 'Max', lineZh: '跟随屏幕，144、240 Hz 的屏也跑满', lineEn: 'follows the screen, 144 and 240 Hz included' },
+];
+/** The cadence note under the row: a cap is kept on whole screen refreshes (engine capVsyncs), so it is
+ *  "about" its number (60 on a 90 Hz screen is 45, 120 on a 144 Hz one is 144). */
+export const FPS_EVEN = { zh: '帧数跟着屏幕的刷新走，画面才匀，所以是「约」。', en: 'Frames keep step with the screen’s refresh so motion stays even, hence “about”.' } as const;
+/** This device's default: 120 on a phone or tablet (a coarse pointer), 不限 on a computer. */
+export function fpsDefault(): FpsOpt {
+  try { return matchMedia('(pointer: coarse)').matches ? 120 : 0; } catch { return 120; }
+}
+/** The 帧率 in use: the saved one, or this device's default. */
+export const fpsOf = (s: Pick<MirrorSettings, 'fps'>): FpsOpt => (s.fps === 0 || s.fps === 30 || s.fps === 60 || s.fps === 120 ? s.fps : fpsDefault());
+/** An iPhone, iPad or iPod (iPadOS reports a Mac with a touch screen). */
+export function appleTouch(): boolean {
+  try {
+    const n = navigator;
+    return /iP(hone|ad|od)/.test(n.userAgent) || (n.platform === 'MacIntel' && (n.maxTouchPoints || 0) > 1);
+  } catch { return false; }
+}
+/**
+ * Safari holding the page to 60 (m7 F): an Apple touch device whose animation frames come at ≈ 60 Hz
+ * while 帧率 asks for more. No browser API says whether the panel can do 120, so a 60 Hz iPhone gets
+ * the tip too (its text says only the Pro models can).
+ */
+export function held60(hz: number, want: FpsOpt, apple = appleTouch()): boolean {
+  return apple && (want === 0 || want === 120) && hz > 50 && hz < 66;
+}
+/** Safari in Low Power Mode (m7): an Apple touch device whose animation frames come at ≈ 30 Hz while
+ *  帧率 asks for more than 30 (the engine does not count those frames as slow: engine paced()). */
+export function held30(hz: number, want: FpsOpt, apple = appleTouch()): boolean {
+  return apple && want !== 30 && hz > 25 && hz < 35;
+}
+/** Which tip applies (null: none). */
+export function heldTip(hz: number, want: FpsOpt, apple = appleTouch()): 'p60' | 'p30' | null {
+  return held60(hz, want, apple) ? 'p60' : held30(hz, want, apple) ? 'p30' : null;
+}
+/** How to unlock 120 on an iPhone / iPad (the flag's name stays in English: iOS does not translate it). */
+export const FPS_TIP = {
+  zh: '画面现在是 60 帧。iPhone / iPad 的 Pro 机型（ProMotion 屏）能到 120 帧，但 Safari 默认把网页限在 60 帧。打开 设置 › App › Safari浏览器 › 高级 › 功能标志（iOS 17 及更早：设置 › Safari浏览器 › 高级 › 功能标志），关掉「Prefer Page Rendering Updates near 60fps」，回到游戏即可。低电量模式下会限在 30 帧。',
+  en: 'Running at 60 fps. ProMotion iPhones and iPads can show 120, but Safari limits web pages to 60 by default. Open Settings › Apps › Safari › Advanced › Feature Flags (iOS 17 and earlier: Settings › Safari › Advanced › Feature Flags), turn off "Prefer Page Rendering Updates near 60fps", and come back. Low Power Mode limits it to 30.',
+} as const;
+/** Low Power Mode: Safari holds web pages to 30 frames a second. */
+export const FPS_TIP30 = {
+  zh: '画面现在是 30 帧：低电量模式下 Safari 把网页限在 30 帧。关掉低电量模式（设置 › 电池）即可回到 60 或 120 帧。',
+  en: 'Running at 30 fps: in Low Power Mode Safari holds web pages to 30. Turn Low Power Mode off (Settings › Battery) to get 60 or 120 back.',
+} as const;
+/** The live numbers the settings row shows (the engine's last second; the lobby has none). */
+export interface FrameNow { fps: number; hz: number }
+
+/** The one-time tip (m7 F): shown on one between-wave screen, never again (settings.fpsTip). */
+export function FpsTip(props: { onClose: () => void; kind?: 'p60' | 'p30' }) {
+  const t = useT();
+  const low = props.kind === 'p30';
+  return (
+    <div class="mj-fpstip" role="note">
+      <p class="mj-fpstip-title">{low ? t('低电量模式', 'Low Power Mode') : t('想要 120 帧？', 'Want 120 fps?')}</p>
+      <p>{low ? t(FPS_TIP30.zh, FPS_TIP30.en) : t(FPS_TIP.zh, FPS_TIP.en)}</p>
+      <button type="button" class="btn btn-ghost" onClick={props.onClose}>{t('知道了', 'Got it')}</button>
+    </div>
+  );
+}
+
 /** The mirror's own settings (shared by the pause sheet and the lobby), with the app's two volumes. */
-export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) => void }) {
+export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) => void; frame?: FrameNow | null }) {
   const t = useT();
   const s = mirror.value.settings;
   const app = state.value.settings;
@@ -101,6 +168,11 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
   );
   const view = viewNow(s);
   const viewOpt = VIEW_OPTS.find((o) => o.v === view)!;
+  const fps = fpsOf(s);
+  const fpsOpt = FPS_OPTS.find((o) => o.v === fps)!;
+  const fr = props.frame;
+  const hz = fr && fr.hz > 0 ? Math.round(fr.hz) : 0;
+  const now = fr && fr.fps > 0 ? Math.round(fr.fps) : 0;
   return (
     <div class="mj-settings">
       <div class="row mj-view-row">
@@ -135,7 +207,26 @@ export function SettingsRows(props: { onChange?: (p: Partial<MirrorSettings>) =>
         <Toggle checked={s.left} onChange={(v) => set({ left: v })} label={t('左手', 'Left-handed')} />
       </div>
       {seg(t('画质', 'Quality'), s.quality, [['auto', t('自动', 'Auto')], ['low', t('低', 'Low')], ['mid', t('中', 'Mid')], ['high', t('高', 'High')]], (v) => set({ quality: v }))}
-      <p class="muted mj-settings-note">{t('画质在下一次入镜时生效；音量与「设置」相通。', 'Quality applies from the next time you enter; the volumes are the same as in Settings.')}</p>
+      <div class="row mj-view-row mj-fps-row">
+        <div class="mj-view-head">
+          <div class="row-title">{t('帧率', 'Frame rate')}</div>
+          <div class="seg" role="group" aria-label={t('帧率', 'Frame rate')}>
+            {FPS_OPTS.map((o) => (
+              <button type="button" data-fps={o.v} aria-pressed={o.v === fps} title={t(o.lineZh, o.lineEn)} onClick={() => set({ fps: o.v })}>{t(o.zh, o.en)}</button>
+            ))}
+          </div>
+        </div>
+        <div class="row-sub">{t(`${fpsOpt.zh}：${fpsOpt.lineZh}`, `${fpsOpt.en}: ${fpsOpt.lineEn}`)}</div>
+        {now > 0 && <div class="row-sub num mj-fps-live">{hz > 0 ? t(`此刻 ${now} 帧 · 屏幕 ${hz} Hz`, `Now ${now} fps · screen ${hz} Hz`) : t(`此刻 ${now} 帧`, `Now ${now} fps`)}</div>}
+        {fps !== 0 && <div class="row-sub mj-view-hint">{t(FPS_EVEN.zh, FPS_EVEN.en)}</div>}
+        {hz > 0 && held60(hz, fps) && <div class="row-sub mj-view-hint">{t(FPS_TIP.zh, FPS_TIP.en)}</div>}
+        {hz > 0 && held30(hz, fps) && <div class="row-sub mj-view-hint">{t(FPS_TIP30.zh, FPS_TIP30.en)}</div>}
+      </div>
+      <div class="row">
+        <div class="row-main"><div class="row-title">{t('显示帧率', 'Show frame rate')}</div><div class="row-sub">{t('打的时候在角落小字显示每秒帧数', 'A small frames-per-second readout in a corner during a wave')}</div></div>
+        <Toggle checked={s.showFps === true} onChange={(v) => set({ showFps: v })} label={t('显示帧率', 'Show frame rate')} />
+      </div>
+      <p class="muted mj-settings-note">{t('画质在下一次入镜时生效，帧率马上生效；音量与「设置」相通。', 'Quality applies from the next time you enter, the frame rate at once; the volumes are the same as in Settings.')}</p>
     </div>
   );
 }
@@ -147,6 +238,8 @@ export function PauseSheet(props: {
   live?: HudState | null;
   /** The tutorial's practice run: 「暂停 · 练习」, and one 「离开教程」 in place of 暂离 / 弃镜. */
   practice?: boolean;
+  /** The engine's last second of frames (the 帧率 row's 「此刻」). */
+  frame?: FrameNow | null;
 }) {
   const t = useT();
   const { run } = props;
@@ -176,7 +269,7 @@ export function PauseSheet(props: {
           </div>
           {seg === 'who'
             ? <CharacterPanel run={run} t={t} density="compact" live={props.midWave ? props.live ?? null : null} />
-            : <SettingsRows onChange={props.onSettings} />}
+            : <SettingsRows onChange={props.onSettings} frame={props.frame ?? null} />}
           {props.practice ? (
             <div class="mj-row-actions mj-pause-exits" data-tut="pauseExit">
               <button type="button" class="btn" data-tut="leaveTutor" onClick={() => props.setConfirm('leave')}>{t('离开教程', 'Leave the tutorial')}</button>

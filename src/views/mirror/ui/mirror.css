@@ -194,9 +194,13 @@
 .mj-hp-fill { background: linear-gradient(90deg, #8e2b1f, #c0412f); }
 .mj-hp-shield { background: rgba(220, 232, 240, 0.8); mix-blend-mode: screen; }
 .mj-hp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13.5px; color: #fbf5ea; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
-.mj-hud.is-low .mj-hp { animation: mj-pulse 0.9s ease-in-out infinite; }
+/* low HP: a vermilion ring that pulses by opacity alone (a composited layer: no style recalc or repaint a
+   frame, m7 PERF), held still under 省电 (帧率 30: no animation at all) */
+.mj-hp::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 2px #c0412f; opacity: 0; pointer-events: none; }
+.mj-hud.is-low .mj-hp::after { will-change: opacity; animation: mj-pulse 0.9s ease-in-out infinite; }
+.mj-run.is-saver .mj-hud.is-low .mj-hp::after { will-change: auto; animation: none; opacity: 0.75; }
 .mj-hud.is-low::after { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 60px 20px rgba(110, 60, 20, 0.35); }
-@keyframes mj-pulse { 50% { box-shadow: 0 0 0 2px #c0412f; } }
+@keyframes mj-pulse { 50% { opacity: 1; } }
 .mj-armor { font-size: 12.5px; color: var(--hud-ink); text-shadow: var(--hud-glow); white-space: nowrap; }
 .mj-moon, .mj-sleeve { display: inline-flex; align-items: center; gap: 4px; font-size: 16px; text-shadow: var(--hud-glow); }
 .mj-sleeve { font-size: 14px; }
@@ -787,6 +791,14 @@ button.mj-card[disabled] { opacity: 0.55; }
 .mj-settings .mj-view-row { flex-direction: column; align-items: stretch; gap: 2px; padding-bottom: 10px; }
 .mj-view-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .mj-view-row .mj-view-hint { margin-top: 2px; font-size: 12px; }
+/* 帧率 (m7): the live line under the choice; the 显示帧率 readout (under the pause button, never in the
+   way of a finger); the one-time iPhone / iPad tip at the top of a between-wave screen */
+.mj-fps-row .mj-fps-live { font-size: 12px; color: var(--mj-muted); }
+.mj-fps { position: absolute; z-index: 3; top: calc(env(safe-area-inset-top) + 57px); right: calc(env(safe-area-inset-right) + 10px); padding: 1px 6px; border-radius: 999px; background: var(--hud-pill); font: 11px/1.3 var(--font-latin); font-variant-numeric: tabular-nums; color: var(--hud-ink); opacity: 0.85; pointer-events: none; white-space: nowrap; }
+.mj-fpstip { max-width: 560px; margin: 0 auto 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink); font-size: 13px; line-height: 1.55; }
+.mj-fpstip p { margin: 0 0 6px; }
+.mj-fpstip .mj-fpstip-title { font-weight: 700; }
+.mj-fpstip .btn { margin-top: 2px; }
 
 /* 镜宝: the shop's line before a boss wave, and the relic in the pack */
 .mj-relic-next { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--mj-gold) 12%, var(--paper)); border: 1px solid color-mix(in srgb, var(--mj-gold) 45%, transparent); font-size: 13.5px; color: var(--ink); }

@@ -25,8 +25,10 @@ import type {
 } from '../types';
 import type { HudRect } from '../engine/threats';
 import { loadEngine } from './engineHost';
-import { Controls, Hud, type HudApi } from './Hud';
-import { PauseSheet } from './Pause';
+import { Controls, FpsMeter, Hud, type HudApi } from './Hud';
+import { appleTouch, FpsTip, fpsOf, heldTip, PauseSheet, type FrameNow } from './Pause';
+import { setMirrorSettings } from '../logic/session';
+import type { FrameStats } from '../engine';
 import { Bake, Ritual } from './Ritual';
 import { BossCard, Cards, Crate, HeartPick, Ready, ReviveDialog, StartPick } from './Screens';
 import { Shop } from './Shop';
@@ -88,9 +90,11 @@ function engineSettings(practice = false): EngineSettings {
   const reduceMotion = prefersReduced();
   return {
     quality, dprCap: dprCapOf(quality), reduceMotion, nums: s.nums, shake: s.shake && !reduceMotion, aim: practice ? 'auto' : s.aim, lang: lang.value === 'en' ? 'en' : 'zh',
-    view: viewOf(s.view),
+    view: viewOf(s.view), fps: fpsOf(s),
   };
 }
+/** The engine's frame numbers (MirrorEngine: not in the Engine contract; a stub engine has none). */
+type FrameEngine = Engine & { displayHz?: number; frameStats?: Readonly<FrameStats> };
 /** A sheet, a coach hold or the revive dialog is up: the run's own keys wait (Space during a hold never casts the skill). */
 const sheetOpen = () => !!document.querySelector('.sheet-backdrop, .mj-coach.is-hold, .mj-revive');
 /** The HUD blocks the off-screen chevrons keep clear of (engine/threats.ts via MirrorEngine.setHudRects). */
@@ -167,6 +171,10 @@ export function RunView(props: {
   const downRef = useRef<{ wave: number; price: number } | null>(null);
   const [downAsk, setDownAsk] = useState(false);
   const askTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** The iPhone / iPad frame-rate tip (m7 F) is due (Safari's 60 fps flag, or Low Power Mode's 30): shown
+   *  on the next between-wave screen only, and stored as seen the moment it shows (知道了 closes it early). */
+  const [fpsTipDue, setFpsTipDue] = useState<'p60' | 'p30' | null>(null);
+  const fpsTipShown = useRef(false);
   /** The fight's music (wave or boss), for coming back after a revive. */
   const fightMusic = useRef<'wave' | 'boss'>('wave');
   const wrap = useRef<HTMLDivElement>(null);
@@ -636,9 +644,39 @@ export function RunView(props: {
    *  entry; 视野 applies at once, the sprites re-baking behind the sheet). */
   const onSettings = () => {
     const s = engineSettings(practice);
-    engine.current?.setSettings({ nums: s.nums, shake: s.shake, aim: s.aim, lang: s.lang, reduceMotion: s.reduceMotion, view: s.view });
+    engine.current?.setSettings({ nums: s.nums, shake: s.shake, aim: s.aim, lang: s.lang, reduceMotion: s.reduceMotion, view: s.view, fps: s.fps });
     requestAnimationFrame(() => sendHudRects());
   };
+
+  /** The engine's last second of frames and the display's rate (the pause sheet's 帧率 row). */
+  const frameNow = (): FrameNow | null => {
+    const e = engine.current as FrameEngine | null;
+    const f = e?.frameStats;
+    return e && f && f.fps > 0 ? { fps: f.fps, hz: e.displayHz ?? NaN } : null;
+  };
+  // an iPhone / iPad held to 60 by Safari while 帧率 asks for 120 or more, or to 30 by Low Power Mode: the
+  // tip, once (a check every 2 s of a wave until the engine has a second of frames and knows the display)
+  useEffect(() => {
+    if (stage !== 'wave' || practice || fpsTipDue || mirror.value.settings.fpsTip || !appleTouch()) return;
+    const id = setInterval(() => {
+      if (pausedRef.current) return;
+      const e = engine.current as FrameEngine | null;
+      const hz = e?.displayHz ?? NaN;
+      if (!(e?.frameStats && e.frameStats.fps > 0) || !(hz > 0)) return;
+      clearInterval(id);
+      const kind = heldTip(hz, fpsOf(mirror.value.settings), true);
+      if (kind) setFpsTipDue(kind);
+    }, 2000);
+    return () => clearInterval(id);
+  }, [stage]);
+  // one between-wave screen: seen once it shows (never again, this run or later), gone with the next wave
+  useEffect(() => {
+    if (!fpsTipDue) { fpsTipShown.current = false; return; }
+    if (stage === 'between') {
+      if (!fpsTipShown.current) { fpsTipShown.current = true; setMirrorSettings({ fpsTip: true }); }
+    } else if (fpsTipShown.current) setFpsTipDue(null);
+  }, [stage, fpsTipDue]);
+  const closeFpsTip = () => { setFpsTipDue(null); setMirrorSettings({ fpsTip: true }); };
 
   const scr = stage === 'between' ? nextScreen(run) : null;
   const armorNow = useMemo(() => computeStats(run).armor, [run]);
@@ -652,18 +690,20 @@ export function RunView(props: {
   // 倒影: from wave 31 the arena is painted inverted (engine/index.ts), so the HUD turns paper-light
   const inverted = (run.inWave ?? run.wave + 1) > 30;
   return (
-    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '') + (inverted ? ' is-inverted' : '') + (down ? ' is-down' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
+    <div class={'mj-run' + (stage === 'between' ? ' is-between' : '') + (stage === 'wave' ? ' is-wave' : '') + (lowQ ? ' is-lowq' : '') + (inverted ? ' is-inverted' : '') + (down ? ' is-down' : '') + (fpsOf(settings) === 30 ? ' is-saver' : '')} ref={wrap} tabIndex={-1} aria-label={t('幻镜', 'Mirror')}>
       <canvas class="mj-canvas" ref={canvas} aria-hidden="true" />
       {stage === 'wave' && (
         <>
           <Hud api={hud} onPause={pause} wave={run.wave + 1} skill={COMPANIONS[run.char].skill} showSleeve={run.coins > 0} armor={armorNow} char={run.char} onWho={pause} />
           <Controls engine={() => engine.current} left={settings.left} manualAim={!practice && settings.aim === 'manual'} skill={COMPANIONS[run.char].skill} skillLive={skillLive} enabled={holdN === 0 && !paused && !intro && !down} />
+          {settings.showFps === true && <FpsMeter engine={() => engine.current} />}
         </>
       )}
       {stage === 'ritual' && props.ritual && <Ritual kind={props.ritual} reduced={reduced} onDone={() => { if (stageRef.current === 'ritual') setStage('bake'); }} />}
       {stage === 'bake' && <Bake progress={progress} />}
       {stage === 'between' && (
         <div class="mj-between">
+          {fpsTipDue && <FpsTip kind={fpsTipDue} onClose={closeFpsTip} />}
           {scr === 'start' && <StartPick run={run} onRun={onRun} onPause={pause} />}
           {scr === 'cards' && <Cards run={run} onRun={onRun} onPause={pause} onWho={() => setWhoOpen(true)} />}
           {scr === 'crate' && <Crate run={run} unlocks={unlocks} onRun={onRun} onPause={pause} />}
@@ -697,6 +737,7 @@ export function RunView(props: {
         setConfirm={setConfirm}
         live={paused && midWave ? liveHud() : null}
         practice={practice}
+        frame={paused ? frameNow() : null}
       />
       <WhoSheet open={whoOpen} run={run} onClose={() => setWhoOpen(false)} />
     </div>

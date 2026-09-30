@@ -1,8 +1,12 @@
 // 水月幻镜 · pooled ribbon trails (流光拖尾): flying swords leave long tapered ribbons of light (a
 // luminous core, a soft halo, a fading edge), fast shots short streaks, the player's dash and leap a
 // brush of light, a diving crane its path; orbiting blades draw analytic arc ribbons (no history).
-// Points are recorded as the frame is drawn (one per simulation step at most), aged on simulation time
-// (they hold with the hitstop), and each trail is one tapered polygon per pass (halo, body, core; ink
+// Points are recorded as the frame is drawn (a new one after a whole number of steps' worth of time,
+// gapOf, so a trail has the same points at 60 and at 360 Hz; between, the newest follows its owner),
+// each labelled with the render-clock time of the drawn position it holds (World.tDraw, so the tail
+// moves on every frame as the head does; it holds with the hitstop) and aged by that plus the lag the
+// 60 Hz points always had (lagOf: one frame short of the gap, so a ribbon is as long at every rate as
+// it was at 60 Hz), and each trail is one tapered polygon per pass (halo, body, core; ink
 // trails body only). Everything lives in typed arrays sized once per quality; no allocation per frame.
 import type { Camera, Quality } from '../types';
 import { VFX_CAP } from './vfx';
@@ -16,6 +20,17 @@ export const TG = { shot: 0, player: 1, summon: 2 } as const;
 export const TSY = { light: 0, ink: 1 } as const;
 /** A trail continues only while its owner stays within this of its last point (else a new owner took the slot). */
 const JUMP = 140;
+/** The simulation's step (s): a new point waits a whole number of steps, as it always did at 60 Hz. */
+const STEP = 1 / 60;
+/** The least time between a trail's points: its share of the length, rounded up to whole steps. */
+function gapOf(dur: number): number {
+  return Math.ceil(((dur / (TRAIL_PTS - 1)) * 0.8) / STEP - 1e-6) * STEP - 1e-6;
+}
+/** The age a point is drawn older than its label: at 60 Hz a point's position was the one its owner had
+ *  on the last frame before the next point (a gap less a step after its label); kept at every rate. */
+function lagOf(dur: number): number {
+  return Math.max(0, gapOf(dur) + 1e-6 - STEP);
+}
 
 export class Trails {
   q: Quality = 'mid';
@@ -24,6 +39,8 @@ export class Trails {
   alive!: Uint8Array;
   px!: Float32Array; py!: Float32Array; pt!: Float32Array;
   head!: Uint8Array; np!: Uint8Array;
+  /** When each trail's newest point was made (the gap to the next is counted from it). */
+  made!: Float32Array;
   group!: Uint8Array; key!: Int32Array; fed!: Uint32Array;
   width!: Float32Array; dur!: Float32Array; tint!: Uint8Array; style!: Uint8Array;
   /** Owner → trail index, per group (grown on demand to the owner pool's size). */
@@ -37,8 +54,13 @@ export class Trails {
   private readonly sw = new Float32Array(TRAIL_PTS + 2);
   private readonly nx = new Float32Array(TRAIL_PTS + 2);
   private readonly ny = new Float32Array(TRAIL_PTS + 2);
+  /** Half-widths of the pass being built (path). */
+  private readonly hw = new Float64Array(TRAIL_PTS + 2);
   /** Stats (dev): trails fed this frame, refused for want of room. */
   fedN = 0; refused = 0;
+  /** The frame and clock of the last full sweep (feed reaps at most once per frame and t). */
+  private reapF = 0;
+  private reapT = NaN;
 
   constructor(q: Quality) { this.build(q); }
 
@@ -49,7 +71,7 @@ export class Trails {
     const P = cap * TRAIL_PTS;
     this.alive = new Uint8Array(cap);
     this.px = new Float32Array(P); this.py = new Float32Array(P); this.pt = new Float32Array(P);
-    this.head = new Uint8Array(cap); this.np = new Uint8Array(cap);
+    this.head = new Uint8Array(cap); this.np = new Uint8Array(cap); this.made = new Float32Array(cap);
     this.group = new Uint8Array(cap); this.key = new Int32Array(cap); this.fed = new Uint32Array(cap);
     this.width = new Float32Array(cap); this.dur = new Float32Array(cap); this.tint = new Uint8Array(cap); this.style = new Uint8Array(cap);
     for (const m of this.maps) m.fill(-1);
@@ -83,7 +105,9 @@ export class Trails {
       if (dx * dx + dy * dy > jump * jump) i = -1;
     }
     if (i < 0) {
-      if (this.count >= Math.min(lim, this.cap)) this.reap(t);
+      // (the pool is swept at most once per frame and clock: a full frame of refused shots — hundreds —
+      // would each rescan it for nothing; a second sweep at the same t frees nothing the first did not)
+      if (this.count >= Math.min(lim, this.cap) && (this.reapF !== this.frame || this.reapT !== t)) { this.reapF = this.frame; this.reapT = t; this.reap(t); }
       if (this.count >= Math.min(lim, this.cap)) { this.refused++; m[key] = -1; return -1; }
       i = this.alive.indexOf(0);
       if (i < 0) { this.refused++; return -1; }
@@ -98,16 +122,17 @@ export class Trails {
     if (this.np[i] > 0) {
       const h = base + this.head[i];
       const dx = x - this.px[h], dy = y - this.py[h];
-      if (dx * dx + dy * dy < 0.25 || t - this.pt[h] < dur / (TRAIL_PTS - 1) * 0.8) {
-        // too close in space or time: the head moves (a still owner's trail drains away behind it)
-        this.px[h] = x; this.py[h] = y;
-        if (dx * dx + dy * dy < 0.25) this.pt[h] = t;
+      if (dx * dx + dy * dy < 0.25 || t - this.made[i] < gapOf(dur)) {
+        // too close in space or time: the head moves, labelled now (a still owner's trail drains away
+        // behind it)
+        this.px[h] = x; this.py[h] = y; this.pt[h] = t;
         return i;
       }
       this.head[i] = (this.head[i] + 1) % TRAIL_PTS;
     }
     const h = base + this.head[i];
     this.px[h] = x; this.py[h] = y; this.pt[h] = t;
+    this.made[i] = t;
     if (this.np[i] < TRAIL_PTS) this.np[i]++;
     return i;
   }
@@ -129,21 +154,21 @@ export class Trails {
     for (let i = 0; i < this.cap; i++) {
       if (!this.alive[i]) continue;
       const h = i * TRAIL_PTS + this.head[i];
-      if (this.np[i] === 0 || t - this.pt[h] > this.dur[i] || t < this.pt[h] - 0.25) { this.alive[i] = 0; this.count--; }
+      if (this.np[i] === 0 || t - this.pt[h] + lagOf(this.dur[i]) > this.dur[i] || t < this.pt[h] - 0.25) { this.alive[i] = 0; this.count--; }
     }
   }
 
   /** Where the trail was `age` s ago (for afterimages), into out; false when it has no such point. */
   sample(i: number, t: number, age: number, out: { x: number; y: number }): boolean {
     if (i < 0 || !this.alive[i] || this.np[i] < 2) return false;
-    const base = i * TRAIL_PTS, n = this.np[i];
+    const base = i * TRAIL_PTS, n = this.np[i], lag = lagOf(this.dur[i]);
     let prev = -1;
     for (let k = 0; k < n; k++) {
       const j = base + ((this.head[i] - k + TRAIL_PTS) % TRAIL_PTS);
-      const a = t - this.pt[j];
+      const a = t - this.pt[j] + (k ? lag : 0);
       if (a >= age) {
         if (prev < 0) { out.x = this.px[j]; out.y = this.py[j]; return true; }
-        const ap = t - this.pt[prev], f = a - ap > 1e-5 ? (age - ap) / (a - ap) : 0;
+        const ap = t - this.pt[prev] + (prev !== base + this.head[i] ? lag : 0), f = a - ap > 1e-5 ? (age - ap) / (a - ap) : 0;
         out.x = this.px[prev] + (this.px[j] - this.px[prev]) * f; out.y = this.py[prev] + (this.py[j] - this.py[prev]) * f;
         return true;
       }
@@ -155,6 +180,8 @@ export class Trails {
   /** Draw the trails of one group (and let the finished ones go). `passes` 2 (body, core) or 3 (+ halo). */
   draw(ctx: CanvasRenderingContext2D, cam: Camera, t: number, group: number, passes: number, alpha = 1): void {
     if (!this.count) return;
+    // the ribbons are built in screen px: one identity transform for the whole group
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (let i = 0; i < this.cap; i++) {
       if (!this.alive[i] || this.group[i] !== group) continue;
       const m = this.fill(i, cam, t);
@@ -182,6 +209,7 @@ export class Trails {
       this.sw[k] = w * k0 * Math.pow(p, 0.9);
     }
     this.normals(n);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ribbon(ctx, n, tint, 0, passes, alpha, cam.dpr || 1);
     ctx.globalAlpha = 1;
   }
@@ -190,13 +218,14 @@ export class Trails {
   private fill(i: number, cam: Camera, t: number): number {
     const base = i * TRAIL_PTS, n = this.np[i], dur = this.dur[i], k0 = cam.scale;
     if (n === 0) return -1;
-    const newest = base + this.head[i];
-    if (t - this.pt[newest] > dur || t < this.pt[newest] - 0.25) return -1;
+    const newest = base + this.head[i], lag = lagOf(dur);
+    if (t - this.pt[newest] + lag > dur || t < this.pt[newest] - 0.25) return -1;
     let m = -1;
     let px = 0, py = 0, pa = 0, have = false;
     for (let k = n - 1; k >= 0; k--) {
       const j = base + ((this.head[i] - k + TRAIL_PTS) % TRAIL_PTS);
-      const age = t - this.pt[j];
+      // (the newest point is where its owner is now: no lag)
+      const age = t - this.pt[j] + (k ? lag : 0);
       if (age >= dur) { px = this.px[j]; py = this.py[j]; pa = age; have = true; continue; }
       if (have && m < 0) {
         // the tail: exactly at the trail's length, between the last point too old and this one
@@ -225,14 +254,14 @@ export class Trails {
     for (let k = 0; k <= m; k++) {
       const a = k > 0 ? k - 1 : 0, b = k < m ? k + 1 : m;
       const dx = this.sx[b] - this.sx[a], dy = this.sy[b] - this.sy[a];
-      const L = Math.hypot(dx, dy);
+      const L = Math.sqrt(dx * dx + dy * dy);
       if (L > 1e-3) { lx = -dy / L; ly = dx / L; }
       this.nx[k] = lx; this.ny[k] = ly;
     }
   }
 
+  /** One ribbon's passes (the caller has set the identity transform). */
   private ribbon(ctx: CanvasRenderingContext2D, m: number, tint: number, style: number, passes: number, alpha: number, d: number): void {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (style === TSY.ink) {
       this.path(ctx, m, 1.35, 0.8 * d); this.paint(ctx, VFX_EDGE, alpha * 0.14);
       this.path(ctx, m, 1, 0); this.paint(ctx, VFX_BODY[tint], alpha * 0.62);
@@ -245,21 +274,20 @@ export class Trails {
   }
   /** The tapered polygon: widths × k plus `add` px (tapering with them), at least `min` px where the trail has width. */
   private path(ctx: CanvasRenderingContext2D, m: number, k: number, add: number, min = 0): void {
-    ctx.beginPath();
+    // the half-widths once (both edges use them)
+    const H = this.hw, sw = this.sw, sx = this.sx, sy = this.sy, nx = this.nx, ny = this.ny;
+    const wm = Math.max(1e-3, sw[m]);
     for (let j = 0; j <= m; j++) {
-      const w0 = this.sw[j];
-      const hw = w0 > 0 ? Math.max(min, w0 * k + add * Math.min(1, w0 / Math.max(1e-3, this.sw[m]))) * 0.5 : 0;
-      const x = this.sx[j] + this.nx[j] * hw, y = this.sy[j] + this.ny[j] * hw;
-      if (j === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      const w0 = sw[j];
+      H[j] = w0 > 0 ? Math.max(min, w0 * k + add * Math.min(1, w0 / wm)) * 0.5 : 0;
     }
+    ctx.beginPath();
+    ctx.moveTo(sx[0] + nx[0] * H[0], sy[0] + ny[0] * H[0]);
+    for (let j = 1; j <= m; j++) ctx.lineTo(sx[j] + nx[j] * H[j], sy[j] + ny[j] * H[j]);
     // a rounded point ahead of the head
-    const hw = Math.max(min, this.sw[m] * k + add) * 0.5;
-    ctx.lineTo(this.sx[m] + this.ny[m] * hw * 0.9, this.sy[m] - this.nx[m] * hw * 0.9);
-    for (let j = m; j >= 0; j--) {
-      const w0 = this.sw[j];
-      const hw2 = w0 > 0 ? Math.max(min, w0 * k + add * Math.min(1, w0 / Math.max(1e-3, this.sw[m]))) * 0.5 : 0;
-      ctx.lineTo(this.sx[j] - this.nx[j] * hw2, this.sy[j] - this.ny[j] * hw2);
-    }
+    const hw = Math.max(min, sw[m] * k + add) * 0.5;
+    ctx.lineTo(sx[m] + ny[m] * hw * 0.9, sy[m] - nx[m] * hw * 0.9);
+    for (let j = m; j >= 0; j--) ctx.lineTo(sx[j] - nx[j] * H[j], sy[j] - ny[j] * H[j]);
     ctx.closePath();
   }
   private paint(ctx: CanvasRenderingContext2D, col: string, a: number): void {

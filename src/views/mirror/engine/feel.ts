@@ -646,11 +646,15 @@ export class Feel {
     o.x = E.x[i]; o.y = E.y[i]; o.ang = 0; o.s = 0; o.wob = 0; o.fl = 0; o.fa = 0; o.ink = 0;
     const calm = !this.motion;
     const valid = this.rGen[i] === E.gen[i];
-    const t = W.t;
+    // (m7) every window opens and closes on the simulation's clock `t`, as it always did; what is drawn
+    // inside it reads the effects clock (t + dFx, engine/index.ts), so on a 120–360 Hz screen the recoil,
+    // the squash and the flash move on every frame instead of every step. At 60 Hz dFx is 0: unchanged.
+    const t = W.t, dFx = fxDelta(W);
     if (E.flash[i] > 0) {
       const f0 = valid && this.rFl0[i] > 0 ? this.rFl0[i] : 0.05;
-      const el = Math.max(0, f0 - E.flash[i]);
-      const k = Math.max(0, Math.min(1, E.flash[i] / f0));
+      const fl = dFx === 0 ? E.flash[i] : Math.max(0, E.flash[i] - dFx);
+      const el = Math.max(0, f0 - fl);
+      const k = Math.max(0, Math.min(1, fl / f0));
       if (calm) { o.fl = 2; o.fa = 0.3 * k; }
       else if (E.kind[i] === EKind.Boss) { o.fl = 2; o.fa = el < FLASH_FULL ? 0.6 : 0.4 * k; }
       else if (el < FLASH_FULL) o.fl = 1;
@@ -658,11 +662,13 @@ export class Feel {
     } else if (valid && !calm) {
       // the ink tint the flash leaves behind
       const fa = t - this.rFlAt[i] - this.rFl0[i];
-      if (fa >= -0.001 && fa < INK_T) o.ink = INK_A * (1 - Math.max(0, fa) / INK_T);
+      if (fa >= -0.001 && fa < INK_T) o.ink = INK_A * (1 - Math.max(0, fa + dFx) / INK_T);
     }
     if (!valid) return o.fl !== 0;
-    const age = t - this.rAt[i];
-    if (age >= 0 && age < 0.5) {
+    const age0 = t - this.rAt[i];
+    if (age0 >= 0 && age0 < 0.5) {
+      // (a blow struck in this frame's step shows at age 0 on this frame, never late)
+      const age = dFx === 0 ? age0 : Math.max(0, age0 + dFx);
       const frz = this.rFrz[i], S = this.rS[i], R = this.rR[i];
       let off: number;
       o.ang = this.rA[i];
@@ -688,8 +694,11 @@ export class Feel {
       const c = Math.cos(o.ang), n = Math.sin(o.ang);
       o.x += c * off - n * jit; o.y += n * off + c * jit;
     }
-    const wa = t - this.rWobAt[i];
-    if (!calm && wa >= 0 && wa < 0.45 && this.rWob[i] > 0) o.wob = this.rWob[i] * Math.exp(-wa / 0.12) * Math.sin(wa * 32);
+    const wa0 = t - this.rWobAt[i];
+    if (!calm && wa0 >= 0 && wa0 < 0.45 && this.rWob[i] > 0) {
+      const wa = dFx === 0 ? wa0 : Math.max(0, wa0 + dFx);
+      o.wob = this.rWob[i] * Math.exp(-wa / 0.12) * Math.sin(wa * 32);
+    }
     return true;
   }
 
@@ -1211,6 +1220,19 @@ export function numPop(t: number, crit: boolean, calm: boolean): number {
   if (t < 0.18) { const u = (t - 0.06) / 0.12; return 1.15 - 0.15 * (1 - (1 - u) * (1 - u)); }
   return 1;
 }
+
+/**
+ * The effects clock's lead over `t` for this draw (m7, engine/index.ts World.tFx): the engine sets tFx
+ * and dFx = tFx − t for each frame it draws (within half a step); a renderer driven by hand, or a
+ * world whose clock moved since, reads 0 (draw on `t`, as before). Drawing only.
+ */
+export function fxDelta(W: { t: number; tFx?: number; dFx?: number }): number {
+  const f = W.tFx, d0 = W.dFx;
+  if (f === undefined || d0 === undefined || d0 === 0) return 0;
+  const d = f - W.t;
+  return d === d0 && d >= -FX_HALF && d <= FX_HALF ? d : 0;
+}
+const FX_HALF = 1 / 120 + 1e-9;
 
 /** Device-level feel preferences the UI sets (the pause sheet's 震动 switch: blows you take, elite
  *  kills, the 镜技 and bosses — never ordinary crits). */

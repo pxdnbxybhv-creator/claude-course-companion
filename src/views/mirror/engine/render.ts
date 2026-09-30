@@ -8,11 +8,11 @@
 // filters or per-frame gradients (the two overlay masks are baked once). A null sprite draws as a
 // plain ink circle, so the game is playable before (or without) the art.
 import type { AtlasId, Camera, NumStyle, Painter, Sprite } from '../types';
-import { blit, blitRot } from '../paint/draw';
+import { blit, blitAt, blitRot, offCanvas, reach } from '../paint/draw';
 import { EKind, SMode } from './pools';
 import { DROP_ATLAS, DROP_IDS, PROJ_ATLAS, PROJ_IDS, SK, SUMMON_ATLAS, SWORDS_ON_SCREEN, TAU } from './consts';
 import { ST } from './enemies';
-import { CRIT_NUM, MK, PF, PULSE_A, PULSE_S, fragGrid, fragWhite, numPop } from './feel';
+import { CRIT_NUM, MK, PF, PULSE_A, PULSE_S, fragGrid, fragWhite, fxDelta, numPop } from './feel';
 import { weaponRange } from '../logic/formulas';
 import { SH, TN } from '../paint/feel';
 import { drawAmbience } from '../paint/ambient';
@@ -117,7 +117,12 @@ export class Renderer {
   private readonly pt = { x: 0, y: 0 };
   /** Shot glows left this frame. */
   private glowsLeft = 0;
-  /** Frames drawn (the shots take turns shedding motes), and the world time they last shed at. */
+  /** Sprites looked up once a frame: drops by kind × coin frame, shots by kind (undefined: not yet). */
+  private readonly dropSpr: (Sprite | null | undefined)[] = new Array(DROP_ATLAS.length * 4).fill(undefined);
+  private readonly projSpr: (Sprite | null | undefined)[] = new Array(NPK).fill(undefined);
+  /** Simulation steps seen by the shot layer (the shots take turns shedding motes, one step in eight
+   *  each), and the world time it last looked at: shedding counts steps, never drawn frames, so every
+   *  shot sheds at the same rate at 30–360 Hz. */
   private shedN = 0;
   private shedT = -1;
   /** The painter's sprite lookup, bound once (the VFX layer's glyph). */
@@ -146,10 +151,16 @@ export class Renderer {
   draw(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    this.beginVfx(W);
-    this.bars.begin(W);
-    const order = drawOrder(W.lightR !== null);
-    for (let k = 0; k < order.length; k++) this.layer(order[k], W, ctx, cam);
+    // what the drawing itself spawns (motes off shots, pickup pings, legacy fx taken over) draws on the
+    // renderer's own random stream: the simulation's effects get the same numbers at every frame rate
+    const V = vfxOf(W);
+    V.drawing(true);
+    try {
+      this.beginVfx(W);
+      this.bars.begin(W);
+      const order = drawOrder(W.lightR !== null);
+      for (let k = 0; k < order.length; k++) this.layer(order[k], W, ctx, cam);
+    } finally { V.drawing(false); }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }
@@ -246,6 +257,13 @@ export class Renderer {
     const VS = vfxOf(W).sprites;
     // glows: the precious drops always (within the frame's budget), a streaming pearl while there is room
     let glows = Math.min(this.glowsLeft, vfxOf(W).caps.glows >> 2);
+    // the drops are upright: glows and bodies are destination rects under one identity transform (a
+    // streak's turn breaks the run: `ident`), the alpha set only when it changes (`al`); sprites by kind
+    // and coin frame looked up once a frame
+    const dsp = this.dropSpr;
+    dsp.fill(undefined);
+    let ident = false, al = 1;
+    ctx.globalAlpha = 1;
     for (let i = 0; i < D.n; i++) {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
@@ -254,19 +272,31 @@ export class Renderer {
         const gt = DROP_GLOW[k];
         const gt2 = gt >= 0 ? gt : D.magnet[i] && D.age[i] >= 0.25 ? VT.moon : -1;
         const g = gt2 >= 0 ? VS.glow(gt2) : null;
-        if (g) { glows--; this.glowsLeft--; blit(ctx, cam, g, D.x[i], D.y[i], gt >= 0 ? 0.9 : 0.55, false, gt >= 0 ? 0.55 : 0.4); }
+        if (g) {
+          glows--; this.glowsLeft--;
+          const ga = gt >= 0 ? 0.55 : 0.4;
+          if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; }
+          if (al !== ga) ctx.globalAlpha = al = ga;
+          blitAt(ctx, cam, g, D.x[i], D.y[i], gt >= 0 ? 0.9 : 0.55);
+        }
       }
       const v = id === 'drop:cashCoin' ? Math.floor(tt * 8 + i) & 3 : 0;
-      const s = this.sprite(id, v);
+      const si = k * 4 + v;
+      let s = dsp[si];
+      if (s === undefined) s = dsp[si] = this.sprite(id, v);
       const bob = D.age[i] < 0.25 ? Math.sin((D.age[i] / 0.25) * Math.PI) * 10 : 0;
       if (zip && D.magnet[i] && D.age[i] >= 0.25) {
         // 月华 streaming in leaves a thin moon-white streak
         const dx = W.px - D.x[i], dy = W.py - D.y[i];
-        if (dx * dx + dy * dy > 900) blitAff(ctx, cam, zip, D.x[i], D.y[i], Math.atan2(dy, dx), 0.55, 0.55, 0.55);
+        if (dx * dx + dy * dy > 900 && blitAff(ctx, cam, zip, D.x[i], D.y[i], Math.atan2(dy, dx), 0.55, 0.55, 0.55)) { ident = false; al = 1; }
       }
-      if (s) blit(ctx, cam, s, D.x[i], D.y[i] - bob, D.worth[i] >= 5 && k === 0 ? 1.4 : 1);
-      else circle(ctx, cam, D.x[i], D.y[i] - bob, k <= 1 ? 4 : 7, k >= 7 ? '#b8862b' : '#e8eef2');
+      if (al !== 1) ctx.globalAlpha = al = 1;
+      if (s) {
+        if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; }
+        blitAt(ctx, cam, s, D.x[i], D.y[i] - bob, D.worth[i] >= 5 && k === 0 ? 1.4 : 1);
+      } else { circle(ctx, cam, D.x[i], D.y[i] - bob, k <= 1 ? 4 : 7, k >= 7 ? '#b8862b' : '#e8eef2'); ident = true; }
     }
+    if (al !== 1) ctx.globalAlpha = 1;
   }
 
   private drawEnemies(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -293,7 +323,7 @@ export class Renderer {
   private drawSummons(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
     // summons (the render clock: the trail's speed divides the drawn positions' move by the time between
     // the pictures they were drawn in)
-    const tt = W.tDraw;
+    const tt = drawClock(W);
     const S = W.S;
     // 流光: a diving crane leaves its path in paper-white light, a charging 墨宝 a wet ink wake
     const TR = this.trails;
@@ -434,8 +464,10 @@ export class Renderer {
   }
 
   private drawPlayerShots(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
-    // player shots: a ribbon of light behind each (流光), a soft glow under it, then the shot itself
-    const tt = W.t, pa = W.degrade ? 0.6 : 1;
+    // player shots: a ribbon of light behind each (流光), a soft glow under it, then the shot itself.
+    // Ribbons age on the render clock (W.tDraw, the time of the drawn positions they record: the tail
+    // moves on every frame, as the head does); spins and the flicker on the effects clock (t at 60 Hz)
+    const tt = W.t + fxDelta(W), td = drawClock(W), pa = W.degrade ? 0.6 : 1;
     const PS = W.PS;
     const TR = this.trails;
     const VS = vfxOf(W).sprites;
@@ -444,8 +476,12 @@ export class Renderer {
     const lim = Math.max(1, (W.degrade ? TR.cap >> 1 : TR.cap) - 3);
     const nsl = W.slots.length;
     const hot = VS.glow(VT.white);
-    // (only while the world moves: a hitstop or a held frame sheds nothing, so motes never pile up)
-    let sheds = W.degrade || calm || W.phase !== 'wave' || W.t === this.shedT ? 0 : vfxOf(W).caps.sheds;
+    // the simulation steps since the last look (a hitstop or a held frame: none, so motes never pile up);
+    // a shot sheds when its turn (one step in eight) came in them, on the budget of that many steps
+    const ns = Math.max(0, Math.min(4, Math.round((W.t - this.shedT) / (1 / 60))));
+    let sheds = W.degrade || calm || W.phase !== 'wave' || !ns ? 0 : vfxOf(W).caps.sheds * ns;
+    const n0 = this.shedN;
+    this.shedN = (this.shedN + ns) >>> 0;
     this.shedT = W.t;
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) { this.shotKind[i] = -1; continue; }
@@ -461,14 +497,26 @@ export class Renderer {
       const y = mode === SMode.Lob ? PS.y[i] - Math.sin((1 - PS.life[i] / PS.life0[i]) * Math.PI) * 60 : PS.y[i];
       const sl = PS.slot[i];
       const tint = sl >= 0 && sl < nsl && sl < 16 ? this.slotTint[sl] : KIND_TINT[k];
-      const sp = Math.hypot(PS.vx[i], PS.vy[i]);
-      TR.feed(TG.shot, i, PS.x[i], y, tt, TR_W[k], TR_DUR[k] * (calm ? 0.5 : 1), tint, sty === 2 ? TSY.ink : TSY.light, lim, Math.max(34, sp * 0.09 + 24));
+      const svx = PS.vx[i], svy = PS.vy[i], sp = Math.sqrt(svx * svx + svy * svy);
+      TR.feed(TG.shot, i, PS.x[i], y, td, TR_W[k], TR_DUR[k] * (calm ? 0.5 : 1), tint, sty === 2 ? TSY.ink : TSY.light, lim, Math.max(34, sp * 0.09 + 24));
     }
-    TR.draw(ctx, cam, tt, TG.shot, this.passesOf(W), pa);
+    TR.draw(ctx, cam, td, TG.shot, this.passesOf(W), pa);
+    const psp = this.projSpr;
+    psp.fill(undefined);
+    // each shot is drawn in its own turned frame: the transform is its rotation alone at cam.scale (rA: the
+    // angle set, NaN when something else set the transform), and its glow, body and head are destination
+    // rects in that frame. One setTransform per shot at most, none along a run of shots turning together
+    // (a boomerang's or a lob's spin is the clock's: they share the angle). The body's matrix is blitRot's;
+    // the glow and the head are round (radial, anchored at their centre), so turning them changes nothing.
+    // The alpha is set only when it changes (al); a shot wholly off the canvas makes no call.
+    let rA = NaN, rc = 1, rn = 0, al = 1;
+    const k0 = cam.scale, hw = cam.w / 2, hh = cam.h / 2;
+    ctx.globalAlpha = 1;
     for (let i = 0; i < PS.n; i++) {
       if (!PS.alive[i]) continue;
       const k = PS.kind[i];
-      const s = this.sprite(PROJ_ATLAS[k]);
+      let s = psp[k];
+      if (s === undefined) s = psp[k] = this.sprite(PROJ_ATLAS[k]);
       let ang = Math.atan2(PS.vy[i], PS.vx[i]);
       let sz = TR_SZ[k];
       let y = PS.y[i];
@@ -478,32 +526,62 @@ export class Renderer {
         ang = tt * 9;
         sz = 1 + Math.sin(u * Math.PI) * 0.3;
       } else if (PS.mode[i] === SMode.BoomOut || PS.mode[i] === SMode.BoomBack) ang = tt * 16;
+      const px = (PS.x[i] - cam.x) * k0 + hw, py = (y - cam.y) * k0 + hh;
       // the glow under it: a white-hot heart in the weapon's light
       const sl = PS.slot[i];
       const tint = sl >= 0 && sl < nsl && sl < 16 ? this.slotTint[sl] : KIND_TINT[k];
       if (this.glowsLeft > 0 && TR_GLOW[k] > 0) {
         const g = VS.glow(tint);
-        // (capped: a falling 七星 sword's r is its landing's reach, not its size)
-        if (g) { this.glowsLeft--; blit(ctx, cam, g, PS.x[i], y, Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16, false, 0.6 * pa); }
+        if (g) {
+          this.glowsLeft--;
+          // (capped: a falling 七星 sword's r is its landing's reach, not its size)
+          const gs = Math.min(GLOW_MAX_R, Math.max(6, PS.r[i]) * TR_GLOW[k]) / 16;
+          if (!offCanvas(cam, px, py, reach(g, k0 * gs))) {
+            if (ang !== rA) { rc = Math.cos(ang); rn = Math.sin(ang); rA = ang; ctx.setTransform(rc * k0, rn * k0, -rn * k0, rc * k0, 0, 0); }
+            const qx = (rc * px + rn * py) / k0, qy = (rc * py - rn * px) / k0;
+            const ga = 0.6 * pa;
+            if (al !== ga) ctx.globalAlpha = al = ga;
+            ctx.drawImage(g.img, g.sx, g.sy, g.sw, g.sh, qx - g.ax * g.w * gs, qy - g.ay * g.h * gs, g.w * gs, g.h * gs);
+          }
+        }
       }
-      if (s) blitRot(ctx, cam, s, PS.x[i], y, ang, sz, pa);
-      else circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
+      if (s) {
+        if (!offCanvas(cam, px, py, reach(s, k0 * sz))) {
+          if (ang !== rA) { rc = Math.cos(ang); rn = Math.sin(ang); rA = ang; ctx.setTransform(rc * k0, rn * k0, -rn * k0, rc * k0, 0, 0); }
+          // the shot's screen point, back in the turned frame
+          const qx = (rc * px + rn * py) / k0, qy = (rc * py - rn * px) / k0;
+          if (al !== pa) ctx.globalAlpha = al = pa;
+          ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, qx - s.ax * s.w * sz, qy - s.ay * s.h * sz, s.w * sz, s.h * sz);
+        }
+      } else {
+        if (al !== 1) ctx.globalAlpha = al = 1;
+        circle(ctx, cam, PS.x[i], y, PS.r[i] * 0.7, '#3f6f8f', pa);
+        rA = NaN;
+      }
       // its head burns white: a small hot point of light over the tip (light shots only)
       if (TR_HEAD[k] >= 0 && TR_STY[k] === 1 && this.glowsLeft > 0 && hot) {
         this.glowsLeft--;
         const hx = PS.x[i] + Math.cos(ang) * TR_HEAD[k] * sz, hy = y + Math.sin(ang) * TR_HEAD[k] * sz;
         const flick = calm ? 1 : 0.9 + 0.1 * Math.sin(tt * 40 + i);
-        blit(ctx, cam, hot, hx, hy, (Math.min(10, Math.max(4, PS.r[i] * 0.8)) / 16) * flick, false, 0.85 * pa);
+        const hs = (Math.min(10, Math.max(4, PS.r[i] * 0.8)) / 16) * flick;
+        const hpx = (hx - cam.x) * k0 + hw, hpy = (hy - cam.y) * k0 + hh;
+        if (!offCanvas(cam, hpx, hpy, reach(hot, k0 * hs))) {
+          if (ang !== rA) { rc = Math.cos(ang); rn = Math.sin(ang); rA = ang; ctx.setTransform(rc * k0, rn * k0, -rn * k0, rc * k0, 0, 0); }
+          const qx = (rc * hpx + rn * hpy) / k0, qy = (rc * hpy - rn * hpx) / k0;
+          const ha = 0.85 * pa;
+          if (al !== ha) ctx.globalAlpha = al = ha;
+          ctx.drawImage(hot.img, hot.sx, hot.sy, hot.sw, hot.sh, qx - hot.ax * hot.w * hs, qy - hot.ay * hot.h * hs, hot.w * hs, hot.h * hs);
+        }
       }
       // 流光 sheds a few motes of its light in its wake (budgeted per frame; none on low or calm)
-      if (sheds > 0 && TR_STY[k] === 1 && PS.mode[i] !== SMode.Lob && ((this.shedN + i) & 7) === 0) {
+      if (sheds > 0 && TR_STY[k] === 1 && PS.mode[i] !== SMode.Lob && ((8 - ((n0 + i) & 7)) & 7) < ns) {
         sheds--;
         const V = vfxOf(W);
-        const vx = PS.vx[i], vy = PS.vy[i], L = Math.hypot(vx, vy) || 1;
+        const vx = PS.vx[i], vy = PS.vy[i], L = Math.sqrt(vx * vx + vy * vy) || 1;
         V.fleck(PS.x[i] - (vx / L) * 14, y - (vy / L) * 14, -vx * 0.06 + (V.rnd01() - 0.5) * 50, -vy * 0.06 + (V.rnd01() - 0.5) * 50, FK.glint, tint, 0.3, 0.6);
       }
     }
-    this.shedN++;
+    if (al !== 1) ctx.globalAlpha = 1;
   }
 
   private drawNumbers(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -737,7 +815,7 @@ export class Renderer {
         alpha = P.a0[i] * Math.min(1, k * 2.2);
         kx = sz; ky = sz;
         if (fl & PF.stretch) {
-          const sp = Math.hypot(P.vx[i], P.vy[i]);
+          const pvx = P.vx[i], pvy = P.vy[i], sp = Math.sqrt(pvx * pvx + pvy * pvy);
           ang = Math.atan2(P.vy[i], P.vx[i]);
           kx = sz * (1 + Math.min(2.2, sp / 240));
         }
@@ -889,7 +967,8 @@ export class Renderer {
    * to three afterimages of your figure fading behind you (reduced motion: a short ribbon, one ghost).
    */
   private drawDash(W: World, ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, lift: number, flip: boolean, calm: boolean): void {
-    const TR = this.trails, t = W.t;
+    // (the render clock: the ribbon records your drawn positions — see drawPlayerShots)
+    const TR = this.trails, t = drawClock(W);
     const moving = W.dashT > 0 || W.leapT > 0;
     const tint = CHAR_TINT[W.run.char] ?? VT.moon;
     if (moving) {
@@ -938,7 +1017,7 @@ export class Renderer {
     if (W.hp < W.hpMax * 0.3 && W.phase === 'wave' && this.edge) {
       const p = F.beat - Math.floor(F.beat);
       const pulse = Math.max(Math.exp(-p / 0.08), p > 0.26 ? 0.65 * Math.exp(-(p - 0.26) / 0.07) : 0);
-      ctx.globalAlpha = calm ? 0.65 : 0.45 + 0.45 * pulse; ctx.drawImage(this.edge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1;
+      ctx.globalAlpha = calm ? 0.65 : 0.45 + 0.45 * pulse; edgeBands(ctx, this.edge, cam.w, cam.h, 0.7); ctx.globalAlpha = 1;
     }
     // a blow: a thin dark rim (ink, not the enemy's vermilion) closes in and drains (≤ 0.2); with reduced
     // motion it holds still at a low alpha for the i-frames instead of pulsing. The big moments (a
@@ -949,7 +1028,7 @@ export class Renderer {
       const u = F.pulseAge / PULSE_S;
       const pa = u < 1 && F.pulseK > 0 ? PULSE_A * F.pulseK * (calm ? 0.6 : Math.sin(Math.min(1, u * 4) * Math.PI * 0.5) * (1 - u) * (1 - u)) : 0;
       const e = Math.max(ha, pa);
-      if (e > 0.01) { ctx.globalAlpha = e; ctx.drawImage(this.hurtEdge, 0, 0, cam.w, cam.h); ctx.globalAlpha = 1; }
+      if (e > 0.01) { ctx.globalAlpha = e; edgeBands(ctx, this.hurtEdge, cam.w, cam.h, 0.8); ctx.globalAlpha = 1; }
     }
     // brush titles (synergies at the edge, boss phases and 「第 N 重 · 破」 in the centre)
     for (const t of W.titles) {
@@ -989,6 +1068,12 @@ const DARK: readonly Layer[] = [
 ];
 /** The render order list: what draw() walks, lit or in the dark. */
 export function drawOrder(dark: boolean): readonly Layer[] { return dark ? DARK : LIT; }
+/** The render clock (World.tDraw: the time of the drawn positions, within a step before t while the
+ *  engine draws); a renderer driven by hand, or a stale one, reads t. */
+function drawClock(W: World): number {
+  const d = W.tDraw, t = W.t;
+  return d <= t && d >= t - 1 / 60 - 1e-9 ? d : t;
+}
 
 /** A zone's wash alpha: fading in over its first 0.2 s (from its age, never from a float32 life, which
  *  at 1e9 never counts down) and out over its last 0.4 s. */
@@ -1015,14 +1100,18 @@ export function holeRects(out: Float64Array | number[], w: number, h: number, sx
 }
 
 /** A sprite rotated by `ang` and scaled kx along it, ky across it (ky < 0 mirrors), about its anchor. */
-function blitAff(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, ang: number, kx: number, ky: number, a: number): void {
-  if (a <= 0.01) return;
+function blitAff(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, ang: number, kx: number, ky: number, a: number): boolean {
+  if (a <= 0.01) return false;
   const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
+  // wholly off the canvas: no call
+  const ak = kx < 0 ? -kx : kx, bk = ky < 0 ? -ky : ky;
+  if (offCanvas(cam, px, py, reach(s, cam.scale * (ak > bk ? ak : bk)))) return false;
   const c = Math.cos(ang) * cam.scale, n = Math.sin(ang) * cam.scale;
   ctx.setTransform(c * kx, n * kx, -n * ky, c * ky, px, py);
   ctx.globalAlpha = Math.min(1, a);
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
   ctx.globalAlpha = 1;
+  return true;
 }
 
 /**
@@ -1034,6 +1123,8 @@ function blitBody(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: numb
   if (a <= 0.01) return;
   const k = cam.scale * size;
   const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
+  // wholly off the canvas: no call (the squash stretches by ≤ 1 + |sq|, the wobble only turns it)
+  if (offCanvas(cam, px, py, reach(s, k) * (bx > by ? bx : by) * (1 + (sq < 0 ? -sq : sq)))) return;
   const fx = (flip ? -k : k) * bx, fy = k * by;
   let m11 = fx, m12 = 0, m21 = 0, m22 = fy;
   if (sq !== 0) {
@@ -1079,6 +1170,23 @@ function makeLight(): HTMLCanvasElement | null {
   g.fillStyle = grad;
   g.fillRect(0, 0, 256, 256);
   return c;
+}
+/**
+ * An edge mask (makeEdge) stretched over the w × h screen, drawn as the four bands around its clear
+ * middle: the mask is clear inside `inner` of each half-axis (an ellipse), so the rect inscribed in that
+ * ellipse, two texels in, is never touched. Each band's source rect maps onto its whole-pixel destination
+ * exactly as the one stretched draw did — a quarter to a third less fill while the rim is up.
+ */
+function edgeBands(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement, w: number, h: number, inner: number): void {
+  const cw = img.width, ch = img.height, kx = w / cw, ky = h / ch;
+  const hx = ((cw / 2) * inner) / Math.SQRT2 - 2, hy = ((ch / 2) * inner) / Math.SQRT2 - 2;
+  const x0 = Math.ceil((cw / 2 - hx) * kx), x1 = Math.floor((cw / 2 + hx) * kx);
+  const y0 = Math.ceil((ch / 2 - hy) * ky), y1 = Math.floor((ch / 2 + hy) * ky);
+  if (hx <= 0 || hy <= 0 || x1 <= x0 || y1 <= y0) { ctx.drawImage(img, 0, 0, w, h); return; }
+  ctx.drawImage(img, 0, 0, cw, y0 / ky, 0, 0, w, y0);
+  ctx.drawImage(img, 0, y1 / ky, cw, ch - y1 / ky, 0, y1, w, h - y1);
+  ctx.drawImage(img, 0, y0 / ky, x0 / kx, (y1 - y0) / ky, 0, y0, x0, y1 - y0);
+  ctx.drawImage(img, x1 / kx, y0 / ky, cw - x1 / kx, (y1 - y0) / ky, x1, y0, w - x1, y1 - y0);
 }
 /**
  * An edge vignette (baked per screen shape, small; drawn stretched to the screen): `rim` at the edge,

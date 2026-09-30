@@ -289,14 +289,20 @@ export class ArenaLayer {
   draw(ctx: CanvasRenderingContext2D, cam: Camera): void {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
-    ctx.fillStyle = this.inverted ? voidOf(this.pal) : this.pal.outside;
-    ctx.fillRect(0, 0, cam.w, cam.h);
     const base = this.base;
-    if (!base) return;
     const s = cam.scale, k = this.k;
     // the camera's world rect
     const wx0 = cam.x - cam.w / 2 / s, wy0 = cam.y - cam.h / 2 / s;
     const wx1 = cam.x + cam.w / 2 / s, wy1 = cam.y + cam.h / 2 / s;
+    // the ground under the layer: only when the opaque base (inset by its tiles' 2 px border, where a
+    // tile samples its clear edge) leaves some of the screen uncovered — else it is a full screen of fill
+    // that the base paints over
+    const e = 3 / k;
+    if (!base || this.x0 + e > wx0 || this.y0 + e > wy0 || this.x0 + base.w / k - e < wx1 || this.y0 + base.h / k - e < wy1) {
+      ctx.fillStyle = this.inverted ? voidOf(this.pal) : this.pal.outside;
+      ctx.fillRect(0, 0, cam.w, cam.h);
+    }
+    if (!base) return;
     const lx0 = Math.max(this.x0, wx0), ly0 = Math.max(this.y0, wy0);
     const lx1 = Math.min(this.x0 + base.w / k, wx1), ly1 = Math.min(this.y0 + base.h / k, wy1);
     if (lx1 <= lx0 || ly1 <= ly0) return;
@@ -336,6 +342,7 @@ export class ArenaLayer {
     const st = this.stains;
     if (!st) return;
     const fill = `rgba(0,0,0,${Math.max(0, Math.min(1, f))})`;
+    // (a tile no stamp has touched is clear: washing it changes nothing)
     st.each((c) => {
       const g = ctx2d(c);
       g.setTransform(1, 0, 0, 1, 0, 0);
@@ -387,9 +394,13 @@ class Tiles {
   readonly cols: number;
   readonly rows: number;
   readonly tiles: HTMLCanvasElement[] = [];
+  /** Per tile: whether anything was ever painted into it (a new layer starts clear; `from` fills all).
+   *  A clear tile is never drawn or washed: both would change nothing. */
+  readonly ink: Uint8Array;
   constructor(readonly w: number, readonly h: number) {
     this.cols = Math.max(1, Math.ceil(w / TILE));
     this.rows = Math.max(1, Math.ceil(h / TILE));
+    this.ink = new Uint8Array(this.cols * this.rows);
     for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) {
       const tw = Math.min(TILE, w - i * TILE), th = Math.min(TILE, h - j * TILE);
       this.tiles.push(canvas(tw + TB * 2, th + TB * 2));
@@ -398,18 +409,19 @@ class Tiles {
   /** Cut a painted canvas into tiles. */
   static from(src: HTMLCanvasElement): Tiles {
     const t = new Tiles(src.width, src.height);
+    t.ink.fill(1);
     t.each((c, tx, ty) => ctx2d(c).drawImage(src, -(tx - TB), -(ty - TB)));
     return t;
   }
-  /** Each tile with its layer-px origin (tx, ty) of its interior (the canvas's (TB, TB)). */
+  /** Each tile that holds paint, with its layer-px origin (tx, ty) of its interior (the canvas's (TB, TB)). */
   each(f: (c: HTMLCanvasElement, tx: number, ty: number) => void): void {
-    for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) f(this.tiles[j * this.cols + i], i * TILE, j * TILE);
+    for (let j = 0; j < this.rows; j++) for (let i = 0; i < this.cols; i++) if (this.ink[j * this.cols + i]) f(this.tiles[j * this.cols + i], i * TILE, j * TILE);
   }
   /** Each tile whose canvas (border included) meets the layer-px rect; g draws in layer px − (ox, oy). */
   over(x0: number, y0: number, x1: number, y1: number, f: (g: CanvasRenderingContext2D, ox: number, oy: number) => void): void {
     const i0 = Math.max(0, Math.floor((x0 - TB) / TILE)), i1 = Math.min(this.cols - 1, Math.floor((x1 + TB) / TILE));
     const j0 = Math.max(0, Math.floor((y0 - TB) / TILE)), j1 = Math.min(this.rows - 1, Math.floor((y1 + TB) / TILE));
-    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) f(ctx2d(this.tiles[j * this.cols + i]), i * TILE - TB, j * TILE - TB);
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { this.ink[j * this.cols + i] = 1; f(ctx2d(this.tiles[j * this.cols + i]), i * TILE - TB, j * TILE - TB); }
   }
   /**
    * Draw the layer-px rect [x0, x1) × [y0, y1) at screen = ox + p · f (the same f on both axes): only
@@ -424,6 +436,7 @@ class Tiles {
       const dy0 = Math.round(oy + Math.max(y0, ty) * f), dy1 = Math.round(oy + Math.min(y1, ty + TILE, this.h) * f);
       if (dy1 <= dy0) continue;
       for (let i = i0; i <= i1; i++) {
+        if (!this.ink[j * this.cols + i]) continue;
         const tx = i * TILE;
         const dx0 = Math.round(ox + Math.max(x0, tx) * f), dx1 = Math.round(ox + Math.min(x1, tx + TILE, this.w) * f);
         if (dx1 <= dx0) continue;

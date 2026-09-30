@@ -268,8 +268,14 @@ function separate(W: World, i: number): void {
 function collideBody(W: World, i: number): void {
   const E = W.E;
   if (!E.air[i] && E.id[i] !== 'stick') {
-    for (const o of W.arena.obstacles) {
-      const dx = E.x[i] - o.x, dy = E.y[i] - o.y, d = Math.hypot(dx, dy), m = o.r + E.r[i] * 0.8;
+    const obs = W.arena.obstacles;
+    for (let q = 0; q < obs.length; q++) {
+      const o = obs[q];
+      const dx = E.x[i] - o.x, dy = E.y[i] - o.y, m = o.r + E.r[i] * 0.8;
+      // (clearly outside: no hypot — its boxed result was ≈ 12 KB of garbage a frame; the margin is far
+      // above rounding, so every body the exact test would touch still takes it)
+      if (dx * dx + dy * dy > m * m * 1.000001) continue;
+      const d = Math.hypot(dx, dy);
       if (d < m) {
         if (d < 1e-3) { E.x[i] = o.x + m; continue; }
         E.x[i] = o.x + (dx / d) * m; E.y[i] = o.y + (dy / d) * m;

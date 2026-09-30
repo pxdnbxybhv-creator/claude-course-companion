@@ -15,6 +15,7 @@
 import type { Camera } from '../types';
 import { EKind } from './pools';
 import { ST } from './enemies';
+import { fxDelta } from './feel';
 import type { World } from './world';
 
 /** Chevrons on screen at most, by quality. */
@@ -152,6 +153,7 @@ export class Threats {
     const ox = (W.px - cam.x) * cam.scale + cam.w / 2, oy = (W.py - cam.y) * cam.scale + cam.h / 2;
     const x0 = INSET_X * d, x1 = cam.w - INSET_X * d, y0 = INSET_TOP * d, y1 = cam.h - INSET_BOT * d;
     if (x1 <= x0 || y1 <= y0) return;
+    const tFx = W.t + fxDelta(W);
     const cx = Math.max(x0, Math.min(x1, ox)), cy = Math.max(y0, Math.min(y1, oy));
     const merge2 = (MERGE_PX * d) ** 2;
     for (let j = 0; j < this.n; j++) {
@@ -180,7 +182,8 @@ export class Threats {
       const big = k === TK.boss || k === TK.elite ? 1.2 : k === TK.shot ? 0.85 : 1;
       const size = (SIZE_FAR + (SIZE_NEAR - SIZE_FAR) * near) * big * d;
       let a = 0.62 + 0.33 * near;
-      if (k === TK.tell && !calm) a *= 0.78 + 0.22 * Math.sin(W.t * 11 + j * 1.7);
+      // (the tell's pulse on the effects clock: smooth at every refresh rate; W.t at 60 Hz)
+      if (k === TK.tell && !calm) a *= 0.78 + 0.22 * Math.sin(tFx * 11 + j * 1.7);
       const img = k === TK.shot ? this.chevronShot : this.chevron;
       const ang = Math.atan2(vy, vx);
       this.put(ctx, img, ex - vx * size * 0.1, ey - vy * size * 0.1, ang, size, a);

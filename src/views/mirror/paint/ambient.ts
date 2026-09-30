@@ -25,6 +25,9 @@ import { canvas, ctx2d, invertLightness } from './atlas';
 /** The world fields the ambience reads (engine/world.ts World satisfies it). */
 export interface AmbWorld {
   t: number;
+  /** The effects clock and its lead over t (engine/index.ts World.tFx / dFx; missing or stale: t). */
+  tFx?: number;
+  dFx?: number;
   px: number; py: number;
   leapT: number; leapDur: number;
   lightR: number | null;
@@ -34,6 +37,15 @@ export interface AmbWorld {
   painter: Painter | null;
   E: { n: number; alive: Uint8Array; hidden: Uint8Array; decoy: Uint8Array; kind: Uint8Array; st: Uint8Array; air: Uint8Array; x: Float32Array; y: Float32Array; r: Float32Array };
   S: { n: number; alive: Uint8Array; kind: Uint8Array; dragon: Uint8Array; x: Float32Array; y: Float32Array; r: Float32Array };
+}
+
+/** The effects clock when the engine set it for this draw (tFx − t = dFx, within half a step), else t
+ *  (a world drawn by hand): motes and ripples move on every frame at 120–360 Hz (m7). */
+function fxT(W: AmbWorld): number {
+  const f = W.tFx, d0 = W.dFx;
+  if (f === undefined || d0 === undefined || d0 === 0) return W.t;
+  const d = f - W.t;
+  return d === d0 && Math.abs(d) <= 1 / 120 + 1e-9 ? f : W.t;
 }
 
 /** Enemy kinds and states (engine/pools.ts EKind, engine/enemies.ts ST; a test keeps them in step). */
@@ -190,10 +202,30 @@ export class Ambience {
     // 1:1 at whole pixels: a plain copy-blend per pixel, no filtering (a fractional pattern fill costs
     // ≈ 4× as much under CPU raster), so this full-screen pass stays cheap on any phone
     const ox = Math.round(fmod(-cam.x * cam.scale + cam.w / 2, TILE)) - TILE, oy = Math.round(fmod(-cam.y * cam.scale + cam.h / 2, TILE)) - TILE;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = a;
-    for (let y = oy; y < cam.h; y += TILE) for (let x = ox; x < cam.w; x += TILE) ctx.drawImage(img, x, y);
+    // one fill with the tile as a repeating pattern, its origin moved by the same whole pixels: the same
+    // 1:1 copy per pixel as the tiles (no filtering), one call instead of one per tile (66–77)
+    const pat = this.pattern(ctx, img);
+    if (pat) {
+      ctx.setTransform(1, 0, 0, 1, ox, oy);
+      ctx.fillStyle = pat;
+      ctx.fillRect(-ox, -oy, cam.w, cam.h);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    } else {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      for (let y = oy; y < cam.h; y += TILE) for (let x = ox; x < cam.w; x += TILE) ctx.drawImage(img, x, y);
+    }
     ctx.globalAlpha = 1;
+  }
+  /** The grain as a repeating pattern, made once per target context and tile (null: tiles instead). */
+  private pat: CanvasPattern | null = null;
+  private patOf: { ctx: CanvasRenderingContext2D | null; img: HTMLCanvasElement | null } = { ctx: null, img: null };
+  private pattern(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement): CanvasPattern | null {
+    if (this.patOf.ctx !== ctx || this.patOf.img !== img) {
+      this.patOf.ctx = ctx; this.patOf.img = img;
+      try { this.pat = typeof ctx.createPattern === 'function' ? ctx.createPattern(img, 'repeat') : null; } catch { this.pat = null; }
+    }
+    return this.pat;
   }
 
   private drawVignette(ctx: CanvasRenderingContext2D, cam: Camera, a: number): void {
@@ -221,6 +253,10 @@ export class Ambience {
     // you: the light is from the upper left, so the shadow leans a little down-right
     const lift = W.leapT > 0 && W.leapDur > 0 ? Math.sin((1 - W.leapT / W.leapDur) * Math.PI) : 0;
     const kl = 1 - 0.35 * lift;
+    // every shadow is an upright ellipse: a destination rect under one identity transform, the alpha
+    // set only when it changes
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.al = -1;
     this.shadowAt(ctx, cam, W.px + 3, W.py + 17, 17 * kl, 6 * kl, (SHADOW_A + 0.08) * (1 - 0.45 * lift));
     const S = W.S;
     for (let i = 0; i < S.n && this.left > 0; i++) {
@@ -251,11 +287,12 @@ export class Ambience {
     const px = (x - cam.x) * s + cam.w / 2, py = (y - cam.y) * s + cam.h / 2;
     const ex = rw * s, ey = rh * s;
     if (px < -ex || py < -ey || px > cam.w + ex || py > cam.h + ey) return;
-    ctx.setTransform(ex / (SHW / 2), 0, 0, ey / (SHH / 2), px, py);
-    ctx.globalAlpha = a;
-    ctx.drawImage(this.shadow!, -SHW / 2, -SHH / 2);
+    if (a !== this.al) ctx.globalAlpha = this.al = a;
+    ctx.drawImage(this.shadow!, px - ex, py - ey, 2 * ex, 2 * ey);
     this.left--;
   }
+  /** The alpha last set by shadowAt this frame (−1: unknown). */
+  private al = -1;
 
   /** The view's world rect grown by a margin, on a span that changes rarely (so motes never jump). */
   private span(cam: Camera): { x0: number; y0: number; w: number; h: number } {
@@ -270,7 +307,7 @@ export class Ambience {
     const n = calm ? this.n >> 1 : this.n;
     if (!n) return;
     const { x0, y0, w, h } = this.span(cam);
-    const t = W.t * (calm ? 0.5 : 1);
+    const t = fxT(W) * (calm ? 0.5 : 1);
     const s = cam.scale, hw = cam.w / 2, hh = cam.h / 2;
     for (let i = 0; i < n; i++) {
       const kind = this.mk[i];
@@ -323,7 +360,7 @@ export class Ambience {
     const n = calm ? this.rn >> 1 : this.rn;
     if (!n) return;
     const P = 3.4;
-    const t = W.t * (calm ? 0.5 : 1);
+    const t = fxT(W) * (calm ? 0.5 : 1);
     const s = cam.scale, hw = cam.w / 2, hh = cam.h / 2;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.lineWidth = Math.max(1, 1.1 * cam.dpr);

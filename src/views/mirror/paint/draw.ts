@@ -10,6 +10,9 @@ export function blit(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: n
   const k = cam.scale * size;
   const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
   const kx = (flip ? -k : k) * sx, ky = k * sy;
+  // wholly off the canvas: it would draw nothing (no call at all)
+  const ex = Math.max(s.ax, 1 - s.ax) * s.w * (kx < 0 ? -kx : kx), ey = Math.max(s.ay, 1 - s.ay) * s.h * (ky < 0 ? -ky : ky);
+  if (px + ex < 0 || py + ey < 0 || px - ex > cam.w || py - ey > cam.h) return;
   ctx.setTransform(kx, 0, 0, ky, px, py);
   if (a !== 1) ctx.globalAlpha = a;
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
@@ -20,11 +23,34 @@ export function blit(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: n
 export function blitRot(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, ang: number, size = 1, a = 1, stretch = 1): void {
   const k = cam.scale * size;
   const px = (x - cam.x) * cam.scale + cam.w / 2, py = (y - cam.y) * cam.scale + cam.h / 2;
+  if (offCanvas(cam, px, py, reach(s, k * (stretch > 1 ? stretch : 1)))) return;
   const c = Math.cos(ang), n = Math.sin(ang);
   ctx.setTransform(c * k * stretch, n * k * stretch, -n * k, c * k, px, py);
   if (a !== 1) ctx.globalAlpha = a;
   ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, -s.ax * s.w, -s.ay * s.h, s.w, s.h);
   if (a !== 1) ctx.globalAlpha = 1;
+}
+
+/** The screen radius (px) that bounds a sprite drawn at k px per u about its anchor, at any rotation. */
+export function reach(s: Sprite, k: number): number {
+  const ex = Math.max(s.ax, 1 - s.ax) * s.w, ey = Math.max(s.ay, 1 - s.ay) * s.h;
+  return (k < 0 ? -k : k) * Math.sqrt(ex * ex + ey * ey);
+}
+/** Whether a disc of radius r (px) about screen (px, py) misses the canvas (a draw there is a no-op). */
+export function offCanvas(cam: Camera, px: number, py: number, r: number): boolean {
+  return px + r < 0 || py + r < 0 || px - r > cam.w || py - r > cam.h;
+}
+/**
+ * An upright, unmirrored sprite at `size` as a destination rect: the caller has set the identity
+ * transform (once for a run of these) and the alpha. The same pixels as blit's scale-and-translate
+ * matrix, without a setTransform per sprite; wholly off the canvas, no call.
+ */
+export function blitAt(ctx: CanvasRenderingContext2D, cam: Camera, s: Sprite, x: number, y: number, size = 1): void {
+  const k = cam.scale * size;
+  const w = s.w * k, h = s.h * k;
+  const dx = (x - cam.x) * cam.scale + cam.w / 2 - s.ax * w, dy = (y - cam.y) * cam.scale + cam.h / 2 - s.ay * h;
+  if (dx > cam.w || dy > cam.h || dx + w < 0 || dy + h < 0) return;
+  ctx.drawImage(s.img, s.sx, s.sy, s.sw, s.sh, dx, dy, w, h);
 }
 
 /** The player's choice of view size (EngineSettings.view): 'near' is the old close view, 'mid' (the

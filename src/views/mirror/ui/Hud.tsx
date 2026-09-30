@@ -8,6 +8,7 @@ import { lang } from '../../../app/store';
 import { armorReduction, fmtBig } from '../logic';
 import { COMPANION_REG, SKILL_REG, type SkillId } from '../ids';
 import type { CharacterId, Engine, HudState } from '../types';
+import type { FrameStats } from '../engine';
 import { termLine, termName } from '../data/glossary';
 import { Portrait } from './icons';
 import { bossName, fmtClock, skillDrag, stickFollow, stickVector, STICK_R } from './text';
@@ -179,6 +180,29 @@ export function Hud(props: {
       </div>
     </div>
   );
+}
+
+/**
+ * 显示帧率 (m7): frames a second and ms a frame over the engine's last second, in small type under the
+ * pause button. Written through a ref four times a second (a timer: never Preact state, never an
+ * animation frame of its own); decoration for the eye only (aria-hidden).
+ */
+export function FpsMeter(props: { engine: () => Engine | null }) {
+  const el = useRef<HTMLSpanElement>(null);
+  const get = useRef(props.engine);
+  get.current = props.engine;
+  useEffect(() => {
+    let last = '';
+    const tick = () => {
+      const f = (get.current() as (Engine & { frameStats?: Readonly<FrameStats> }) | null)?.frameStats;
+      const txt = f && f.fps > 0 ? `${Math.round(f.fps)} fps · ${f.ms.toFixed(1)} ms` : '– fps';
+      if (el.current && txt !== last) { el.current.textContent = txt; last = txt; }
+    };
+    tick();
+    const id = setInterval(tick, 250);
+    return () => clearInterval(id);
+  }, []);
+  return <span class="mj-fps num" ref={el} aria-hidden="true" />;
 }
 
 /** The touch layer: floating stick, 技 button, and (手瞄) an aim stick. Desktop mouse moves feed cursor(). */
