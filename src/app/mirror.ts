@@ -14,6 +14,19 @@ import { earnFrom, play, record } from './play';
 
 export const MIRROR_KEY = 'banmu.mirror.v1';
 
+declare module '../views/mirror/types' {
+  interface MirrorSettings {
+    /** 帧率 (m7): 30 省电 · 60 · 120 · 0 不限 (every frame the screen shows: 144, 240, 360 Hz). Missing:
+     *  this device's default (ui/Pause.tsx fpsOf: 120 on a phone or tablet, 不限 on a computer), so a
+     *  backup opened on another device takes that device's. Kept only when it is one of the four. */
+    fps?: 0 | 30 | 60 | 120;
+    /** 显示帧率: a small readout of frames a second over the wave (off unless true). */
+    showFps?: boolean;
+    /** The iPhone / iPad 120 fps tip was dismissed: it never shows again (true only). */
+    fpsTip?: boolean;
+  }
+}
+
 const CHAR_IDS = new Set<string>(CHARACTERS.map((c) => c.id));
 const MAP_IDS = ['lake', 'forest', 'palace'] as const;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -114,6 +127,10 @@ export function sanitizeMirror(raw: unknown, today: DateKey = todayKey()): Mirro
     };
     // 视野: kept only when it is one of the three; missing means 中 ('mid', the engine's default)
     if (st.view === 'near' || st.view === 'mid' || st.view === 'far') settings.view = st.view;
+    // 帧率 and its readout: kept only when well-formed; missing means this device's default
+    if (st.fps === 0 || st.fps === 30 || st.fps === 60 || st.fps === 120) settings.fps = st.fps;
+    if (st.showFps === true) settings.showFps = true;
+    if (st.fpsTip === true) settings.fpsTip = true;
     const lastDay = date(r.lastDay, base.lastDay);
     const titles = strList<MirrorMeta['titles'][number]>(r.titles);
     const rims = strList<MirrorMeta['rims'][number]>(r.rims, 16);
