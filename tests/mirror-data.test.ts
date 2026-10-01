@@ -149,7 +149,7 @@ describe('mirror catalogue', () => {
     expect(WEAPONS.thunder.p.fall).toBe(0.85);
     expect(WEAPONS.rod.p.hooks).toEqual([1, 1, 2, 3]);
     expect(ITEMS.luckycat.max).toBe(2);
-    expect(ITEMS.cuthair.stats).toEqual({ dmg: 4, hp: -3 }); // m8 劫律
+    expect(ITEMS.cuthair.stats).toEqual({ dmg: 5 }); // m8 劫律: a little more for you than for the monsters
     expect(ITEMS.cuthair.max).toBe(5);
     expect(ITEMS.inkpool.price).toBe(52); // ⚖5 紫红: 仙 ×0.7
     expect(ITEMS.yujian.max).toBe(2);

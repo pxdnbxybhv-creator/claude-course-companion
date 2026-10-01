@@ -241,9 +241,9 @@ describe('mirror descriptions · numbers match the data', () => {
     expect(D.describeItem('songzi', zh).body).toBe('气血 +4');
     expect(D.describeItem('tea', zh).detail[0]).toBe(`回血：${GLOSSARY.regen.plainZh}`); // the plain line explains the stat
     expect(D.describeItem('swordheart', zh).body).toContain('暴击倍数 +0.3'); // critDmg 30 read as +0.3
-    // m8 劫律 (balance.md §4.2): 断发 +4 / −3, max 5
-    expect(D.describeItem('cuthair', zh).body).toBe('伤害 +4%，气血 −3。劫数 +1。');
-    expect(D.describeItem('cuthair', en).body).toBe('+4% Damage, −3 HP. Curse +1.');
+    // m8 劫律: 断发 +5, max 5 (a little more for you than for the monsters)
+    expect(D.describeItem('cuthair', zh).body).toBe('伤害 +5%。劫数 +1。');
+    expect(D.describeItem('cuthair', en).body).toBe('+5% Damage. Curse +1.');
   });
 
   it('节气 and 心镜 lines print only their data’s numbers', () => {

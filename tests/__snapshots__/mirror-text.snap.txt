@@ -166,12 +166,12 @@ moonsoul | 每闪避一次，射出 3 枚会追人的月魄（受法术加成）
 osmanthus | 闪避上限 +10%；闪避后 2 秒内伤害 +30%。
 lingbo | 走动时留下脚印，每 0.5 秒伤到踩着的敌人；移速越高越痛。
 cushion | 站着不动 1 秒后，回血 +50%（带几个就加几份）。
-cuthair | 伤害 +4%，气血 −3。劫数 +1。
-burnboats | 伤害 +8%。不能再刷新、锁货；商店只出灵品、仙品、神品的道具和兵器。劫数 +2。
-yanwang | 每重一次：挨了致命一击不倒，剩 1 点血。劫数 +2。
-delusion | 每重多来 20% 的敌人；每只掉的月华 −15%。劫数 +2。
-innerdemon | 伤害 +6%。每重来个心魔（你 40% 的血和伤害）。劫数 +3。
-crackedmirror | 商店多 1 个货位；仙品几率 +5%，神品几率 +5%。劫数 +2。
+cuthair | 伤害 +5%。劫数 +1。
+burnboats | 伤害 +18%。不能再刷新、锁货；商店只出灵品、仙品、神品的道具和兵器。劫数 +2。
+yanwang | 每重一次：挨了致命一击不倒，剩 1 点血。劫数 +1。
+delusion | 每重多来 20% 的敌人；每只掉的月华 +10%。劫数 +2。
+innerdemon | 伤害 +6%。每重来个心魔（你 40% 的血和伤害）。劫数 +2。
+crackedmirror | 伤害 +8%。商店多 1 个货位；仙品几率 +10%，神品 +10%。劫数 +1。
 wanjian | 飞剑数 +2。有 8 把以上飞剑时，每 8 秒全部扑进怪堆一次（60% 伤害）。
 inkdragon | 总有一只墨宝变成墨龙：伤害 5 倍，会飞，能穿过敌人。墨龙没了，12 秒后再变一只。
 dugu | 只带 1 把兵器时：套装按 6 把算，伤害变成 3 倍，攻速 +60%。
@@ -202,8 +202,8 @@ sanjin | 伤害 +25%。挨打时手里 8% 的月华（最多 60）撒在远处�
 huobi | 在一家店里每刷新一次（免费的也算），这家店的东西都便宜 5%（最多便宜 25%）。
 qihuo | 商店多 1 个货位，但从此不再出兵器（新的、同款的都没有）。
 dianshi | 每家店 1 次：付同款兵器现价的 150%，不用同款就把一件兵器升一品（神品除外）。
-zhenjiu | 伤害 +20%。每重开始时只有 70% 的气血。治疗效果 −30%。劫数 +2。
-mouhu | 精英多 1 个镜印；打倒精英月华 +100%。劫数 +2。
+zhenjiu | 伤害 +30%。每重开始时只有 90% 的气血。治疗效果 −20%。劫数 +1。
+mouhu | 精英多 1 个镜印；打倒精英月华 +200%。劫数 +1。
 lianhuan | 打倒的敌人会炸开，炸伤身边的敌人（它最大气血的 25%）；炸死的也会接着炸。
 xianzhi | 闪避后 1.5 秒内，每件兵器下一击必定暴击，伤害再 +50%（每 2 秒一次）。
 jingru | 站着不动 1 秒，伤害 +12%；站满 3 秒，再 +20%；一走动就没了。
@@ -426,12 +426,12 @@ moonsoul | Each dodge fires 3 homing moon shards (scales with Elemental).
 osmanthus | Dodge cap +10%; +30% Damage for 2 s after a dodge.
 lingbo | Moving leaves footprints that hurt enemies on them every 0.5 s; the faster you move, the harder.
 cushion | After standing still for 1 s: +50% HP Regen (each copy adds more).
-cuthair | +4% Damage, −3 HP. Curse +1.
-burnboats | +8% Damage. No more rerolls or locks; the shop only offers Spirit, Immortal and Divine items and weapons. Curse +2.
-yanwang | Once a wave, a lethal hit leaves you at 1 HP. Curse +2.
-delusion | 20% more enemies each wave; −15% moonlight from each. Curse +2.
-innerdemon | +6% Damage. Each wave your inner demon appears (40% of your HP and damage). Curse +3.
-crackedmirror | +1 shop slot; Immortal odds +5%, Divine odds +5%. Curse +2.
+cuthair | +5% Damage. Curse +1.
+burnboats | +18% Damage. No more rerolls or locks; the shop only offers Spirit, Immortal and Divine items and weapons. Curse +2.
+yanwang | Once a wave, a lethal hit leaves you at 1 HP. Curse +1.
+delusion | 20% more enemies each wave; +10% moonlight from each. Curse +2.
+innerdemon | +6% Damage. Each wave your inner demon appears (40% of your HP and damage). Curse +2.
+crackedmirror | +8% Damage. +1 shop slot; Immortal odds +10%, Divine odds +10%. Curse +1.
 wanjian | +2 Extra swords. With 8+ swords, every 8 s they all dive through the thickest crowd (60% damage).
 inkdragon | One ink summon is always an ink dragon: 5× damage, flies and passes through enemies. If it's gone, another turns in 12 s.
 dugu | With exactly 1 weapon: its set counts as 6, it deals 3× damage and gets +60% Attack speed.
@@ -462,8 +462,8 @@ sanjin | +25% Damage. When hit, 8% of the moonlight in hand (max 60) scatters aw
 huobi | Each reroll in a shop (free ones too) takes 5% off every price there (max 25% off).
 qihuo | +1 shop slot, but the shop never offers weapons again (no new ones, no copies).
 dianshi | 1 use per shop: pay 150% of a copy's price to raise a weapon a tier without the copy (not Divine).
-zhenjiu | +20% Damage. Every wave starts at 70% HP. −30% Healing. Curse +2.
-mouhu | Elites carry 1 more mirror mark; each one you beat gives +100% moonlight. Curse +2.
+zhenjiu | +30% Damage. Every wave starts at 90% HP. −20% Healing. Curse +1.
+mouhu | Elites carry 1 more mirror mark; each one you beat gives +200% moonlight. Curse +1.
 lianhuan | Enemies you kill burst, hurting those nearby for 25% of the victim's max HP; burst kills burst too.
 xianzhi | For 1.5 s after a dodge, each weapon's next attack is a sure crit with +50% damage (at most once every 2 s).
 jingru | Stand still for 1 s: +12% Damage; for 3 s: another +20%. Moving ends it.

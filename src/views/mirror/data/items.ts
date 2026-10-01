@@ -158,21 +158,21 @@ export const ITEMS: Readonly<Record<ItemId, ItemDef>> = {
   },
   // ─────────────────────────────── 9.7 劫
   // m8 劫律 (balance.md §4.2): every 劫 item gives you less than it gives the monsters (4 + 4 a 劫 point)
-  cuthair: { id: 'cuthair', tier: 1, price: 12, max: 5, tags: [], stats: { dmg: 4, hp: -3 }, curse: 1, verse: b('断发明志', 'Cutting the hair to show resolve') },
+  cuthair: { id: 'cuthair', tier: 1, price: 12, max: 5, tags: [], stats: { dmg: 5 }, curse: 1, verse: b('断发明志', 'Cutting the hair to show resolve') },
   burnboats: {
-    id: 'burnboats', tier: 3, price: 55, max: 1, tags: [], stats: { dmg: 8 }, curse: 2, fx: [{ hook: 'shop', do: 'noReroll' }, { hook: 'shop', do: 'tierFloor', t: 2 }], verse: b('破釜沉舟', 'Break the pots, sink the boats'),
+    id: 'burnboats', tier: 3, price: 55, max: 1, tags: [], stats: { dmg: 18 }, curse: 2, fx: [{ hook: 'shop', do: 'noReroll' }, { hook: 'shop', do: 'tierFloor', t: 2 }], verse: b('破釜沉舟', 'Break the pots, sink the boats'),
   },
   yanwang: {
-    id: 'yanwang', tier: 3, price: 60, max: 1, tags: [], curse: 2, fx: [{ hook: 'onLethal', do: 'survive', per: 'wave', hpPct: 0 }], verse: b('阎王叫你三更死', 'When Yama calls at the third watch'),
+    id: 'yanwang', tier: 3, price: 60, max: 1, tags: [], curse: 1, fx: [{ hook: 'onLethal', do: 'survive', per: 'wave', hpPct: 0 }], verse: b('阎王叫你三更死', 'When Yama calls at the third watch'),
   },
   delusion: {
-    id: 'delusion', tier: 2, price: 20, max: 1, tags: [], curse: 2, fx: [{ hook: 'cond', do: 'world', budgetPct: 20, moonPct: -15 }], verse: b('妄念纷飞', 'Deluded thoughts scatter'),
+    id: 'delusion', tier: 2, price: 20, max: 1, tags: [], curse: 2, fx: [{ hook: 'cond', do: 'world', budgetPct: 20, moonPct: 10 }], verse: b('妄念纷飞', 'Deluded thoughts scatter'),
   },
   innerdemon: {
-    id: 'innerdemon', tier: 2, price: 30, max: 1, tags: [], stats: { dmg: 6 }, curse: 3, fx: [{ hook: 'onWaveStart', do: 'demon', pct: 40, crate: 10 }], verse: b('心魔难除', 'The inner demon is hard to slay'),
+    id: 'innerdemon', tier: 2, price: 30, max: 1, tags: [], stats: { dmg: 6 }, curse: 2, fx: [{ hook: 'onWaveStart', do: 'demon', pct: 40, crate: 50 }], verse: b('心魔难除', 'The inner demon is hard to slay'),
   },
   crackedmirror: {
-    id: 'crackedmirror', tier: 3, price: 55, max: 1, tags: [], curse: 2, fx: [{ hook: 'shop', do: 'slot', n: 1 }, { hook: 'shop', do: 'odds', t3: 5, t4: 5 }], verse: b('破镜难圆', 'A broken mirror is hard to mend'),
+    id: 'crackedmirror', tier: 3, price: 55, max: 1, tags: [], stats: { dmg: 8 }, curse: 1, fx: [{ hook: 'shop', do: 'slot', n: 1 }, { hook: 'shop', do: 'odds', t3: 10, t4: 10 }], verse: b('破镜难圆', 'A broken mirror is hard to mend'),
   },
   // ─────────────────────────────── 9.8 神品
   wanjian: {
@@ -234,8 +234,8 @@ export const ITEMS: Readonly<Record<ItemId, ItemDef>> = {
   huobi: { id: 'huobi', tier: 2, price: 40, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'rerollOff', pct: 5, max: 25 }], verse: b('货比三家不吃亏', 'Compare three shops and you never lose') },
   qihuo: { id: 'qihuo', tier: 3, price: 50, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'noWeapons' }, { hook: 'shop', do: 'slot', n: 1 }], verse: b('此奇货可居', 'These are rare goods, worth hoarding') },
   dianshi: { id: 'dianshi', tier: 3, price: 58, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'upgrade', x: 1.5, n: 1 }], verse: b('还丹一粒，点铁成金', 'One grain of elixir, and iron turns to gold') },
-  zhenjiu: { id: 'zhenjiu', tier: 2, price: 32, max: 1, tags: [], stats: { dmg: 20, heal: -30 }, curse: 2, fx: [{ hook: 'onWaveStart', do: 'hpPct', v: 70 }], verse: b('止渴于鸩毒，未入肠胃，已绝咽喉', 'Quench thirst with poison: before it reaches the belly, the throat is closed') },
-  mouhu: { id: 'mouhu', tier: 2, price: 34, max: 1, tags: [], stats: {}, curse: 2, fx: [{ hook: 'cond', do: 'world', eliteAffix: 1, eliteMoonPct: 100 }], verse: b('欲为千金之裘，而与狐谋其皮', 'Wanting a coat worth a thousand, he asked the foxes for their fur') },
+  zhenjiu: { id: 'zhenjiu', tier: 2, price: 32, max: 1, tags: [], stats: { dmg: 30, heal: -20 }, curse: 1, fx: [{ hook: 'onWaveStart', do: 'hpPct', v: 90 }], verse: b('止渴于鸩毒，未入肠胃，已绝咽喉', 'Quench thirst with poison: before it reaches the belly, the throat is closed') },
+  mouhu: { id: 'mouhu', tier: 2, price: 34, max: 1, tags: [], stats: {}, curse: 1, fx: [{ hook: 'cond', do: 'world', eliteAffix: 1, eliteMoonPct: 200 }], verse: b('欲为千金之裘，而与狐谋其皮', 'Wanting a coat worth a thousand, he asked the foxes for their fur') },
   lianhuan: { id: 'lianhuan', tier: 4, price: 88, max: 1, tags: ['talisman', 'go'], from: 8, stats: {}, fx: [{ hook: 'onKill', do: 'blast', pct: 25, r: 90, bossPct: 2, bossPerSec: 1, perSec: 15 }], verse: b('将多兵众，不可以敌，使其自累，以杀其势', 'Too many to fight: make them weigh each other down, and their strength is broken') },
   xianzhi: { id: 'xianzhi', tier: 3, price: 56, max: 1, tags: ['moon', 'fist'], stats: {}, fx: [{ hook: 'onDodge', do: 'prime', dur: 1.5, x: 1.5, cd: 2 }], verse: b('后之发，先之至，此用兵之要术也', 'Set out after, arrive before: this is the heart of the art of war') },
   jingru: { id: 'jingru', tier: 1, price: 20, max: 1, tags: ['heavy', 'go', 'ink'], stats: {}, fx: [{ hook: 'cond', do: 'stats', stats: { dmg: 12 }, when: { k: 'still', s: 1 } }, { hook: 'cond', do: 'stats', stats: { dmg: 20 }, when: { k: 'still', s: 3 } }], verse: b('始如处女，敌人开户', 'First be still as a maiden, and the enemy opens his door') },

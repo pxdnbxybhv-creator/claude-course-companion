@@ -733,15 +733,15 @@ describe('m8 items · batch c: 月华 and risk', () => {
     eng.dispose();
   });
 
-  it('饮鸩止渴: +20 伤害, 疗效 −30, 劫 +2; every wave starts at 70% 气血', () => {
+  it('饮鸩止渴: +30 伤害, 疗效 −20, 劫 +1; every wave starts at 90% 气血', () => {
     const plain = computeStats({ ...newRun(opts()), items: {} });
     const s = computeStats({ ...newRun(opts()), items: { zhenjiu: 1 } as RunSave['items'] });
-    expect(s.dmg - plain.dmg).toBe(20 + F.curseDmg * 2);
-    expect(s.heal - plain.heal).toBe(-30);
-    expect(s.curse - plain.curse).toBe(2);
+    expect(s.dmg - plain.dmg).toBe(30 + F.curseDmg * 1);
+    expect(s.heal - plain.heal).toBe(-20);
+    expect(s.curse - plain.curse).toBe(1);
     const { run, setup } = runAt(9, [['qingfeng', 1]], { zhenjiu: 1 });
     const { eng, W } = quiet(run, setup);
-    expect(W.hp).toBe(Math.round(W.hpMax * 0.7));
+    expect(W.hp).toBe(Math.round(W.hpMax * 0.9));
     eng.dispose();
     const { run: r0, setup: s0 } = runAt(9, [['qingfeng', 1]], {});
     const q = quiet(r0, s0);
@@ -749,8 +749,8 @@ describe('m8 items · batch c: 月华 and risk', () => {
     q.eng.dispose();
   });
 
-  it('与虎谋皮: 劫 +2; elites carry one more 镜印 (≤ 3); a beaten elite drops 1 more 镜奁 and twice the 月华', () => {
-    expect(ITEMS.mouhu.curse).toBe(2);
+  it('与虎谋皮: 劫 +1; elites carry one more 镜印 (≤ 3); a beaten elite drops three times the 月华', () => {
+    expect(ITEMS.mouhu.curse).toBe(1);
     for (const [w, diff] of [[5, 1], [12, 4], [22, 5]] as const) {
       const base = { ...newRun(opts({ diff })), wave: w };
       const p0 = wavePlan({ ...base, items: {} }, w), p1 = wavePlan({ ...base, items: { mouhu: 1 } as RunSave['items'] }, w);
@@ -774,8 +774,8 @@ describe('m8 items · batch c: 月华 and risk', () => {
     const a = drops({}), b = drops({ mouhu: 1 });
     // no extra 镜奁 any more (QA: the casket made it a net gain against its 劫)
     expect(b.crates).toBe(a.crates);
-    // 劫 2 adds F.curseMoon × 2 to every 月华 too
-    expect(b.moon / a.moon).toBeCloseTo((2 * (1 + F.curseMoon * 2)) / 1, 1);
+    // +200% elite 月华, and 劫 1 adds F.curseMoon to every 月华 too
+    expect(b.moon / a.moon).toBeCloseTo(3 * (1 + F.curseMoon * 1), 1);
   });
 });
 
