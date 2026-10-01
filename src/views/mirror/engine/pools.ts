@@ -276,11 +276,14 @@ export class Drops extends Pool {
   readonly worth: Float32Array; readonly age: Float32Array; readonly magnet: Uint8Array;
   /** Coin drops: index into the wave's coin plan. */
   readonly coin: Int16Array;
+  /** m8 (PLAN E4): your own scattered 月华 (千金散尽), and the seconds before a piece can be pulled or taken. */
+  readonly own: Uint8Array; readonly hold: Float32Array;
   constructor(cap: number) {
     super(cap);
     this.kind = new Uint8Array(cap);
     this.x = new Float32Array(cap); this.y = new Float32Array(cap); this.vx = new Float32Array(cap); this.vy = new Float32Array(cap);
     this.worth = new Float32Array(cap); this.age = new Float32Array(cap); this.magnet = new Uint8Array(cap); this.coin = new Int16Array(cap);
+    this.own = new Uint8Array(cap); this.hold = new Float32Array(cap);
   }
 }
 
@@ -383,3 +386,8 @@ export class Timers extends Pool {
     this.t = new Float32Array(cap); this.every = new Float32Array(cap); this.fn = new Array(cap).fill(null); this.gen = new Uint32Array(cap);
   }
 }
+
+// ═════════════════════════════════════════════ m8 · lane blocks (PLAN §3.5 U2): append-only, each lane under its own anchor
+// ── m8:items ──
+// ── m8:hidden ──
+// ── m8:art ──

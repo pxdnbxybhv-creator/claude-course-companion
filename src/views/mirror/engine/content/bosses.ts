@@ -102,7 +102,7 @@ function hurt(c: PatCtx, k = 1, o: { undodgeable?: boolean } = {}): void {
 }
 /** A telegraph this pattern owns (ended with it); `then` runs only while the pattern lives. */
 function tele(c: PatCtx, shape: TeleShape, dur: number, then?: (w: WorldApi) => void): number {
-  const id = c.w.tele({ shape, dur, then: then ? (w) => { if (!c.ended && !c.st.dead) then(w); } : undefined });
+  const id = c.w.tele({ shape, dur, owner: c.h, then: then ? (w) => { if (!c.ended && !c.st.dead) then(w); } : undefined });
   if (id >= 0) c.teles.push(id);
   return id;
 }
@@ -289,7 +289,7 @@ function phantomVolley(w: WorldApi, h: number, st: BossState, s: Phantom): void 
   const fan = s.kind === 'illusion' ? 40 : 60;
   const kind = s.kind === 'illusion' ? 'eFoxfire' : 'eBubble';
   w.tele({
-    shape: { kind: 'fan', x: e.x, y: e.y, dir, deg: fan, n }, dur: 0.6,
+    shape: { kind: 'fan', x: e.x, y: e.y, dir, deg: fan, n }, dur: 0.6, owner: h,
     then: (ww) => {
       if (!ww.alive(h)) return;
       const v = ww.enemy(h);
@@ -341,7 +341,7 @@ function treeFell(w: WorldApi, st: BossState, h: number, x: number, y: number): 
   const dir = Math.atan2(-y, -x);
   const len = call.p?.len ?? 1400, wd = call.p?.w ?? 80;
   const shape: TeleShape = { kind: 'line', x: x - Math.cos(dir) * 60, y: y - Math.sin(dir) * 60, dir, len, w: wd };
-  w.tele({ shape, dur: call.tele, then: (ww) => {
+  w.tele({ shape, dur: call.tele, owner: st.h, then: (ww) => {
     if (st.dead) return;
     c.w = ww;
     fxLine(ww, 'slashArc', shape.x, shape.y, dir, len, 0.4, 2);

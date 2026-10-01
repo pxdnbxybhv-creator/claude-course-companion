@@ -6,10 +6,11 @@ import { named } from '../../ids';
 import type { WeaponId } from '../../ids';
 import type { ActorImpl, CharacterId, TeleShape, WeaponKind, WorldApi } from '../../types';
 import { COMPANIONS, ENDLESS_BOSS, SKILLS, WEAPONS } from '../../data';
-import { dmgMul } from '../../logic/formulas';
+import { dmgMul, moveSpeedOf } from '../../logic/formulas';
 import { core, endTele, enemyShot, expire, fxLine, liveTele, pullPlayer, pushPlayer, setAir, teleShape } from './bridge';
 import { shotSpeedX } from './field';
 import { CoRun, DEG, TAU, b, clamp, dist, hurtPlayer, playerIn, shared, teleT, toPlayer, type Co } from './util';
+import { HIDDEN_MIRROR } from './hidden';
 
 const MELEE: ReadonlySet<WeaponKind> = new Set(['thrust', 'combo', 'sweep', 'smash', 'punch']);
 const TIER_X = [1, 1.3, 1.7, 2.2] as const;
@@ -45,7 +46,7 @@ function hurtMe(s: MS, n: number, o: { undodgeable?: boolean } = {}): void {
   hurtPlayer(s.w, n, 'mirrorself', { undodgeable: o.undodgeable, from: { x: e.x, y: e.y } });
 }
 function tele(s: MS, shape: TeleShape, dur: number, then?: (w: WorldApi) => void): void {
-  const id = s.w.tele({ shape, dur, then: then ? (w) => { if (w.alive(s.h)) { s.w = w; then(w); } } : undefined });
+  const id = s.w.tele({ shape, dur, owner: s.h, then: then ? (w) => { if (w.alive(s.h)) { s.w = w; then(w); } } : undefined });
   if (id >= 0) s.teles.push(id);
   if (s.teles.length > 40) s.teles.splice(0, s.teles.length - 40);
 }
@@ -208,7 +209,23 @@ function* mirrorSkill(s: MS, char: CharacterId): Co {
       for (let k = 0; k < 8; k++) { const a = (k / 8) * TAU; enemyShot(s.w, 'eMoonShard', e.x, e.y, Math.cos(a) * 240, Math.sin(a) * 240, 9, 4, S(s, 0.3), { homing: 1.2 }); }
       return;
     }
+    // m8:hidden · the hidden three's mirrored 镜技 (engine/content/hidden.ts HIDDEN_MIRROR, HIDDEN H7)
+    default: {
+      const g = HIDDEN_MIRROR[char as keyof typeof HIDDEN_MIRROR];
+      if (g) yield* g(s.w, s.h, (k = 1) => S(s, k));
+      else mirrorTally(s.w).misses++;
+      return;
+    }
   }
+}
+
+/** m8:hidden · tests: the mirrored 镜技 a world's 镜主 began, and how many found no case for the companion (stays 0). */
+const TALLY = new WeakMap<object, { casts: number; misses: number }>();
+export function mirrorTally(w: WorldApi): { casts: number; misses: number } {
+  const W = core(w);
+  let t = TALLY.get(W);
+  if (!t) { t = { casts: 0, misses: 0 }; TALLY.set(W, t); }
+  return t;
 }
 
 export const MIRROR_SELF: ActorImpl<MS> = {
@@ -278,7 +295,7 @@ export const MIRROR_SELF: ActorImpl<MS> = {
     if (s.skill) { if (!s.skill.tick(dt)) s.skill = null; }
     else {
       s.skillT -= dt;
-      if (s.skillT <= 0) { s.skillT = s.skillCd; s.skill = new CoRun(mirrorSkill(s, w.run.char)); }
+      if (s.skillT <= 0) { s.skillT = s.skillCd; s.skill = new CoRun(mirrorSkill(s, w.run.char)); mirrorTally(w).casts++; }
     }
     // its weapons
     for (const a of s.arms) { a.timer -= dt; if (a.timer <= 0) { a.timer = a.cd * (s.phase ? 0.9 : 1); fireArm(s, a); } }
@@ -287,7 +304,8 @@ export const MIRROR_SELF: ActorImpl<MS> = {
     else {
       const dx = e.x - w.player.x, dy = e.y - w.player.y, d = Math.hypot(dx, dy) || 1;
       const want = s.melee ? 80 : 250;
-      const sp = 280 * (1 + clamp(w.stats.speed, -60, 100) / 100) * 0.8 * (1 + 0.05 * s.enrage);
+      // m8: the one walking-speed formula (身法 clamp and 画地为牢's cap: PLAN L3)
+      const sp = moveSpeedOf(w.stats, core(w).moveCap) * 0.8 * (1 + 0.05 * s.enrage);
       const radial = d > want + 30 ? -1 : d < want - 30 ? 1 : 0;
       const tx = -dy / d * s.strafe, ty = dx / d * s.strafe;
       e.vx = ((dx / d) * radial * 1.2 + tx * 0.7) * sp;

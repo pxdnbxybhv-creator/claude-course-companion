@@ -7,8 +7,8 @@
 import { AFFIX_REG, ELITE_REG, type AffixId, type EliteId, type TreasureId } from '../../ids';
 import type { ActorImpl, AffixImpl, TeleShape, WorldApi } from '../../types';
 import { AFFIXES, ELITES, TREASURES } from '../../data';
-import { armorMult } from '../../logic/formulas';
-import { affixesOf, contactT, expire, fxLine, nearestSummon, setAir, setHp, setLook, setReflect, slowPlayer } from './bridge';
+import { armorMult, moveSpeedOf } from '../../logic/formulas';
+import { affixesOf, contactT, core, expire, fxLine, nearestSummon, setAir, setHp, setLook, setReflect, slowPlayer } from './bridge';
 import { CoRun, TAU, b, dist, hurtPlayer, playerIn, rayToWall, reflect, rimR, shared, swarmOf, teleT, toPlayer, type Co } from './util';
 
 // ─────────────────────────────────────────────── helpers
@@ -35,7 +35,7 @@ export function eliteHit(w: WorldApi, h: number, k: number, src: string, o: { un
 }
 /** An elite telegraph whose strike runs only while the elite still lives. */
 function strikeTele(w: WorldApi, h: number, shape: TeleShape, dur: number, fn: (w: WorldApi) => void): void {
-  w.tele({ shape, dur, then: (ww) => { if (ww.alive(h)) fn(ww); } });
+  w.tele({ shape, dur, owner: h, then: (ww) => { if (ww.alive(h)) fn(ww); } });
 }
 
 /** An elite as a coroutine per body (its `mem` keeps nothing; the state object does). */
@@ -392,7 +392,7 @@ const hound = coActor(function* (c) {
       const len = Math.min(460, dist(e.x, e.y, tx, ty) + 80);
       const shape: TeleShape = { kind: 'line', x: e.x, y: e.y, dir, len, w: 50 };
       stop(w, h);
-      w.tele({ shape, dur: p.tell });
+      w.tele({ shape, dur: p.tell, owner: h });
       for (let t = 0, T = teleT(w, p.tell); t < T; t += c.w.dt) { stop(c.w, h); yield 0; }
       // the dash: whoever is on the line when it goes
       const ww = c.w;
@@ -508,7 +508,8 @@ const pixiu: ActorImpl<Tre> = {
       return;
     }
     const dx = e.x - w.player.x, dy = e.y - w.player.y, d = Math.hypot(dx, dy) || 1;
-    const sp = w.player.r > 0 ? (280 * (1 + Math.max(-60, Math.min(100, w.stats.speed)) / 100)) * TREASURES.pixiu.p.fleeX : 300;
+    // m8: the one walking-speed formula (身法 clamp and 画地为牢's cap: PLAN L3)
+    const sp = w.player.r > 0 ? moveSpeedOf(w.stats, core(w).moveCap) * TREASURES.pixiu.p.fleeX : 300;
     const v = sp * (d < 420 ? 1 : 0.35);
     // away from you, weaving; along the rim instead of into it
     let a = Math.atan2(dy, dx) + Math.sin(s.life * 1.3) * 0.6;

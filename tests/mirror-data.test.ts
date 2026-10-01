@@ -10,6 +10,7 @@ import {
   SKILLS, TERM_MODS, TREASURES, VOWS, WCLASSES, WEAPONS,
 } from '../src/views/mirror/data';
 import { CHARACTERS } from '../src/data/characters';
+import { HIDDEN_CHARS, isHidden } from '../src/views/mirror/types';
 
 const keysMatch = (reg: readonly { id: string }[], table: Record<string, { id: string }>) => {
   expect(Object.keys(table).sort()).toEqual(reg.map((r) => r.id).sort());
@@ -20,15 +21,15 @@ describe('mirror catalogue', () => {
   it('has the GDD counts', () => {
     expect(WEAPON_REG).toHaveLength(27);
     expect(STARTER_WEAPONS).toHaveLength(18);
-    expect(ITEM_REG).toHaveLength(77); // + the two 镜宝 (忘尘镜, 龙渊剑)
-    expect(STARTER_ITEMS).toHaveLength(55); // 镜宝 carry no deed lock: itemPool keeps them out of every offer
+    expect(ITEM_REG).toHaveLength(103); // + the two 镜宝 (忘尘镜, 龙渊剑); m8: + the 26 new items
+    expect(STARTER_ITEMS).toHaveLength(103); // m8 ask B (「直接开放」): every item is open; 镜宝 stay out of every offer (itemPool)
     expect(ARCHETYPE_REG).toHaveLength(14);
     expect(MAP_REG).toHaveLength(3);
     expect(MONSTER_REG).toHaveLength(36);
     expect(ELITE_REG).toHaveLength(6);
     expect(TREASURE_REG).toHaveLength(2);
     expect(BOSS_REG).toHaveLength(9);
-    expect(COMPANION_REG).toHaveLength(13);
+    expect(COMPANION_REG).toHaveLength(16); // m8: the 13 + the hidden three
     expect(DEED_REG).toHaveLength(31);
     expect(HEART_REG).toHaveLength(16);
     expect(TERM_MOD_REG).toHaveLength(24);
@@ -65,7 +66,9 @@ describe('mirror catalogue', () => {
   });
 
   it('matches companions to the app roster', () => {
-    expect(COMPANION_REG.map((c) => c.id).sort()).toEqual(CHARACTERS.map((c) => c.id).sort());
+    // m8: the app's 13 are the mirror's companions, plus the three mirror-only hidden ones
+    expect(COMPANION_REG.filter((c) => !isHidden(c.id)).map((c) => c.id).sort()).toEqual(CHARACTERS.map((c) => c.id).sort());
+    expect(COMPANION_REG.filter((c) => isHidden(c.id)).map((c) => c.id)).toEqual([...HIDDEN_CHARS]);
     for (const c of COMPANION_REG) {
       const d = COMPANIONS[c.id];
       expect(SKILLS[d.skill].char).toBe(c.id);
@@ -73,7 +76,8 @@ describe('mirror catalogue', () => {
       expect(PASSIVES[d.passive].char).toBe(c.id);
       // ⚖5 (m6): every body +10 气血 (关公 +12), +2 护甲 (关公 +3), the nine ranged +1 more
       expect(d.hp).toBeGreaterThanOrEqual(26);
-      expect(d.hp).toBeLessThanOrEqual(40);
+      // m8 (PLAN D26): 侠客 and 诗仙 44; the hidden three stay inside 26–40
+      expect(d.hp).toBeLessThanOrEqual(isHidden(c.id) ? 40 : 44);
       expect(d.armor).toBeGreaterThanOrEqual(2);
       expect(d.armor).toBeLessThanOrEqual(6);
       expect(['melee', 'ranged']).toContain(d.style);
@@ -92,8 +96,8 @@ describe('mirror catalogue', () => {
       expect(!!lock).toBe(!STARTER_WEAPONS.includes(w.id));
       if (lock) expect(deeds.has(lock)).toBe(true);
     }
-    // legendaries are all 锁 and unique; the 镜宝 (tier 4 too) are earned, never offered, and stack
-    for (const it of ITEM_REG) if (ITEMS[it.id].tier === 4 && !ITEMS[it.id].relic) expect(lockOf(it.id)).toBeTruthy();
+    // m8 ask B (「直接开放」): no item is locked; legendaries are unique; the 镜宝 (tier 4 too) are earned, never offered, and stack
+    for (const it of ITEM_REG) expect(lockOf(it.id), it.id).toBeUndefined();
     for (const it of ITEM_REG) if (ITEMS[it.id].tier === 4 && !ITEMS[it.id].relic) expect(ITEMS[it.id].max).toBe(1);
     for (const it of ITEM_REG) if (ITEMS[it.id].relic) expect([ITEMS[it.id].max, ITEMS[it.id].price, lockOf(it.id)]).toEqual([0, 0, undefined]);
   });
@@ -138,24 +142,25 @@ describe('mirror catalogue', () => {
   });
 
   it('carries the ⚖ numbers', () => {
-    expect(WEAPONS.qingping.dmg).toEqual([9, 15, 24, 38]);
+    expect(WEAPONS.qingping.dmg).toEqual([11, 18, 29, 46]); // m8: 侠客's kit
     expect(WEAPONS.qingping.cd).toBe(1.2);
     expect(WEAPONS.yanyue.scale).toEqual({ melee: 1.1, armor: 0.3 });
     expect(WEAPONS.brush.scale).toEqual({ spirit: 2 });
     expect(WEAPONS.thunder.p.fall).toBe(0.85);
     expect(WEAPONS.rod.p.hooks).toEqual([1, 1, 2, 3]);
     expect(ITEMS.luckycat.max).toBe(2);
-    expect(ITEMS.cuthair.stats).toEqual({ dmg: 10, hp: -2 });
+    expect(ITEMS.cuthair.stats).toEqual({ dmg: 4, hp: -3 }); // m8 劫律
+    expect(ITEMS.cuthair.max).toBe(5);
     expect(ITEMS.inkpool.price).toBe(52); // ⚖5 紫红: 仙 ×0.7
     expect(ITEMS.yujian.max).toBe(2);
     expect(ITEMS.swordheart.max).toBe(1);
-    expect(COMPANIONS.scholar.hp).toBe(34);
+    expect(COMPANIONS.scholar.hp).toBe(36); // m8: the middle six
     expect(COMPANIONS.scholar.armor).toBe(4);
     expect(COMPANIONS.guan.hp).toBe(40);
     expect(COMPANIONS.guan.armor).toBe(6);
-    expect(COMPANIONS.poet.armor).toBe(3);
+    expect(COMPANIONS.poet.armor).toBe(4); // m8: the weak five
     expect(SKILLS.yizi.p.base).toBe(30);
-    expect(SKILLS.tuodao.cd).toBe(14);
+    expect(SKILLS.tuodao.cd).toBe(12);
     expect(DIFFS.map((d) => d.hp)).toEqual([0.7, 1, 1.3, 1.6, 1.9, 2.2]);
     expect(DIFFS.map((d) => d.dmg)).toEqual([0.6, 1, 1.3, 1.6, 1.9, 2.2]); // ⚖5 ladder guard: the damage step doubled from 明镜
     expect(DIFFS.map((d) => d.pay)).toEqual([0.5, 1, 1.15, 1.3, 1.45, 1.6]);

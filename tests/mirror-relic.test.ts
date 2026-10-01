@@ -98,10 +98,10 @@ describe('镜宝: the boss relics', () => {
     }
   });
 
-  it('龙渊剑 lengthens every weapon\'s reach by 20% a copy (玉兔 −15% still applies)', () => {
+  it('龙渊剑 lengthens every weapon\'s reach by 20% a copy (m8: 玉兔\'s reach is no longer cut)', () => {
     const st: Stats = emptyStats();
     expect(reachPct(run({}, { items: { longyuan: 3 } }))).toBe(60);
-    expect(reachPct(run({ char: 'rabbit' }, { items: { longyuan: 1 } }))).toBe(5);
+    expect(reachPct(run({ char: 'rabbit' }, { items: { longyuan: 1 } }))).toBe(20);
     expect(weaponRange(WEAPONS.claw, st, reachPct(run({}, { items: { longyuan: 2 } })))).toBeCloseTo(WEAPONS.claw.range * 1.4);
   });
 
@@ -174,11 +174,16 @@ describe('round-5 buffs', () => {
     };
     // the QA fix round: the two who trailed the other ranged companions (skilled median 28–30 against 31–45)
     const qa: Record<string, [number, number]> = { swordsman: [8, 2], poet: [6, 0] };
+    // m8 (balance.md §1.3 / §1.4): the weak five and the middle six on top
+    const m8: Record<string, [number, number]> = {
+      swordsman: [8, 1], poet: [6, 1], rabbit: [4, 0], taoist: [2, 0], scholar: [2, 0], painter: [2, 1],
+    };
     for (const [id, [hp, ar]] of Object.entries(before)) {
       const c = COMPANIONS[id as keyof typeof COMPANIONS];
       const [qh, qr] = qa[id] ?? [0, 0];
-      expect(c.hp).toBe(hp + (id === 'guan' ? 12 : 10) + qh);
-      expect(c.armor).toBe(ar + (id === 'guan' ? 3 : 2) + (c.style === 'ranged' ? 1 : 0) + qr);
+      const [mh, mr] = m8[id] ?? [0, 0];
+      expect(c.hp).toBe(hp + (id === 'guan' ? 12 : 10) + qh + mh);
+      expect(c.armor).toBe(ar + (id === 'guan' ? 3 : 2) + (c.style === 'ranged' ? 1 : 0) + qr + mr);
     }
   });
   it('melee weapons hit harder and reach further', () => {

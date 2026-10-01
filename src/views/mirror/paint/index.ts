@@ -16,7 +16,7 @@
 //   drop:cashCoin    v 0–3 spin frames (edge-on at 2); the glint is v 0.
 //   wpn / proj       point along +x (rotate to the aim); weapons are anchored at the grip.
 //   everything else  v 0.
-import type { CharacterId } from '../../../data/characters';
+import type { CharacterId } from '../types';
 import { paintPortrait } from '../../walk/characters/portrait';
 import {
   BOSS_REG, DROP_REG, ELITE_REG, FX_REG, ITEM_REG, MONSTER_REG, PROJ_REG, SUMMON_REG, TREASURE_REG, WEAPON_REG,
@@ -37,7 +37,7 @@ import { B, extentOf, type Spec } from './kit';
 import { MON_SPECS } from './monsters';
 import { Numbers } from './numbers';
 import { Tele } from './tele';
-import { DROP_SPECS, FX_SPECS, isZone } from './things';
+import { DROP_SPECS, FX_SPECS, isZone, pearlMap } from './things';
 
 export { bakeScale, blit, blitRot, K_MAX, viewScale, viewOf, VIEWS, VIEW_DEFAULT, VIEW_SPAN, type ViewSize } from './draw';
 export { abbrev } from './numbers';
@@ -69,7 +69,7 @@ const FX_DRAWN: Readonly<Record<string, number>> = { 'fx:inkBurst': 1.5, 'fx:pet
 /** How large an id is drawn relative to 1 × its size (bake it that much larger or smaller). */
 export function kindScale(id: string): number {
   if (id.startsWith('boss:')) return 0.9; // the boss fight's camera zooms out to 0.84
-  if (id.startsWith('wpn:')) return 0.6; // held weapons are drawn at 0.55 (baked small: no shimmer)
+  if (id.startsWith('wpn:')) return 0.85; // m8: held weapons are drawn at 0.8 (engine/render.ts HELD; baked a little over: no shimmer)
   if (id.startsWith('proj:e')) return 1.5; // enemy shots are drawn at 1.5×
   if (id === 'sum:molong') return 1.4; // 墨龙 is drawn at 1.4×
   if (id === 'fx:stunMark' || id === 'fx:charmMark' || id === 'fx:burnMark' || id === 'fx:slowMark' || id === 'fx:rootMark') return 0.5;
@@ -77,6 +77,8 @@ export function kindScale(id: string): number {
 }
 /** Overlays that ride a body (点化's mark over a converted foe): never a body themselves. */
 const OVERLAYS = new Set<string>(['sum:inkAlly']);
+/** m8 (A4): a boss look's second idle frame shares frame 0's flash twin (not 镜主, whose frames are walk steps). */
+const sharesFlash = (id: string): boolean => id.startsWith('boss:') && !id.startsWith('boss:mirrorself');
 /** Only bodies flash (enemies, summons, the companion); the rest shares its sprite as its flash. */
 function flashes(id: string): boolean {
   if (OVERLAYS.has(id)) return false;
@@ -471,7 +473,10 @@ class InkPainter implements Painter {
       const edge = edgeOf(id);
       // the halo in px follows the bake scale (≈ 1 u; bosses 1.8 u), never under 1 px
       const halo = Math.max(1, Math.round(k * (big ? 1.8 : 1)));
-      const opts = { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, duo: sp.duo, flash: flashes(id), rim: edge.rim, outline: edge.outline, volume: edge.volume };
+      // m8 (A4): a boss's second idle frame shares the first one's hit-flash twin (a flash lasts ≈ 0.1 s), halving its memory
+      const opts = { k, seed: seedOf(id) + v * 7919, halo, invert: inv, ghost: sp.ghost, duo: sp.duo, flash: flashes(id) && !(v > 0 && sharesFlash(id)), rim: edge.rim, outline: edge.outline, volume: edge.volume };
+      // m8: 月华's indigo bleed is baked for this map (deeper on 天宫's cold wash)
+      if (id.startsWith('drop:moon')) pearlMap(this.map);
       const painted = renderSpec(sp.spec, v, opts);
       const { s, f } = pack(T.pages, painted);
       e.s[v] = s; e.f[v] = f;
@@ -483,6 +488,7 @@ class InkPainter implements Painter {
     if (v === n - 1) {
       // fill any failed frame with frame 0 so variants() stays honest
       for (let i = 0; i < n; i++) { if (!e.s[i]) e.s[i] = e.s[0]; if (!e.f[i]) e.f[i] = e.f[0]; }
+      if (sharesFlash(id)) for (let i = 1; i < n; i++) e.f[i] = e.f[0];
       if (e.s[0]) (inv ? T.inv : T.normal).set(key, e);
       pending.delete(key + (inv ? '|i' : ''));
     }

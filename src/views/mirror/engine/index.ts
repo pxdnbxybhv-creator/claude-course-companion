@@ -6,7 +6,7 @@
 // within 5 s is fatal). DOM-free apart from its canvas: the UI owns every listener and feeds
 // `engine.input`.
 import type {
-  Camera, CreateEngine, Engine, EngineDeps, EngineInput, EnginePhase, EngineSettings, Painter, RunSave, SkillTarget, WaveResult, WaveSetup,
+  Camera, CreateEngine, Engine, EngineDeps, EngineInput, EnginePhase, EngineSettings, Painter, RunSave, SkillTarget, Vec, WaveResult, WaveSetup,
 } from '../types';
 import { World } from './world';
 import { Renderer } from './render';
@@ -367,6 +367,9 @@ class MirrorEngine implements Engine {
   private raf = 0;
   private last = 0;
   private acc = 0;
+  /** m8 模拟场 (PLAN E6): game seconds per real second, and the step budget per frame that goes with it. */
+  private timeScale = 1;
+  private maxSteps = MAX_STEPS;
   private _paused = false;
   private disposed = false;
   private fatal = false;
@@ -565,6 +568,8 @@ class MirrorEngine implements Engine {
     // decides between 0 and 2 steps
     this.acc = STEP / 2;
     this.last = 0; this.lastCb = 0; this.credit = 0; this.phased = false;
+    // m8: every start runs at the normal speed (the 模拟场 sets its scale again after it)
+    this.timeScale = 1; this.maxSteps = MAX_STEPS;
     this.loop();
   }
 
@@ -689,6 +694,24 @@ class MirrorEngine implements Engine {
     const d = Math.hypot(t.x, t.y) || 1;
     const reach = w.skillDef?.reach ?? 200;
     w.castSkill({ x: w.px + (t.x / d) * reach, y: w.py + (t.y / d) * reach }, { x: t.x / d, y: t.y / d });
+  }
+  /** m8 (hidden.md §2.5): the 技 button down, `at` in s (performance.now() / 1000); a 'tap' skill casts as skill(). */
+  skillPress(at?: number): void {
+    const w = this.world;
+    if (this._paused || w.phase !== 'wave') return;
+    w.press(at ?? performanceNow() / 1000);
+  }
+  /** m8: the 技 button up (dir null = cancelled); nothing for a 'tap' skill. */
+  skillRelease(dir: Vec | null, at?: number): void {
+    const w = this.world;
+    // paused or between waves: still let go, as a cancel (a held draw ends with no arrow and no cooldown)
+    if (this._paused || w.phase !== 'wave') { w.release(null, at ?? performanceNow() / 1000); return; }
+    w.release(dir, at ?? performanceNow() / 1000);
+  }
+  /** m8 模拟场 (PLAN E6): run the world x times as fast (1 = normal; start() resets it). */
+  setTimeScale(x: number): void {
+    this.timeScale = Number.isFinite(x) && x > 0 ? x : 1;
+    this.maxSteps = Math.ceil(MAX_STEPS * this.timeScale);
   }
   skillPreview(t: SkillTarget | null): void {
     const w = this.world;
@@ -920,10 +943,10 @@ class MirrorEngine implements Engine {
       }
     }
     const real = Math.min(DT_CLAMP * 1000, interval > 0 ? interval : STEP * 1000);
-    this.acc += dt;
+    this.acc += dt * this.timeScale;
     let steps = 0;
     const draws = this.ctx !== null;
-    while (this.acc >= STEP && steps < MAX_STEPS) {
+    while (this.acc >= STEP && steps < this.maxSteps) {
       this.acc -= STEP;
       steps++;
       if (draws) this.lerp.snap(w);
@@ -931,7 +954,7 @@ class MirrorEngine implements Engine {
       if (w.pauseRequest) { w.pauseRequest = false; this.pause(); break; }
       if (w.phase !== 'wave' && w.phase !== 'ending' && w.phase !== 'down') break;
     }
-    if (this.acc > STEP * MAX_STEPS) this.acc = 0;
+    if (this.acc > STEP * this.maxSteps) this.acc = 0;
     // during a hitstop acc does not move, so α (and the picture) holds
     this.alpha = Math.max(0, Math.min(1, this.acc / STEP));
     const t1 = performanceNow();

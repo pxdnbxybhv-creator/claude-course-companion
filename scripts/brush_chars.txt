@@ -69,3 +69,9 @@
 停练习教程
 # 水月幻镜 · m6: the boss relics 忘尘镜 / 龙渊剑 (centre title 「得 忘尘镜」 and the codex seal)
 忘尘渊
+# 水月幻镜 · m8: the hidden three's skill glyphs (女萝 · 萝; 候 and 射 are already in the set)
+萝
+# 水月幻镜 · m8: the hidden three's brush titles and seals (夺 破招 绷紧 藤枯 弦松 · 镜中来客 · 接 缠 弓 · 越女 山鬼 后羿)
+夺招绷藤枯弦越鬼羿接缠弓紧
+# 水月幻镜 · m8: the test code's 「测」 seal and the lobby's 「试 · 模拟场」 (shown only while the code is on)
+测试模拟场

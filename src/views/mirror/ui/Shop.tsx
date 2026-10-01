@@ -13,6 +13,8 @@ import { termLine, termName } from '../data/glossary';
 import {
   buy, fmtBig, isBossWave, isMeleeWeapon, merge, noReroll, reroll, relicFor, sell, sellPrice, shopView, shopW, toggleLock, wavePlan, weaponSlotsOf,
 } from '../logic';
+import { rerollOffPct } from '../logic/items';
+import { upgrade, upgradePrice, upgradesLeft } from '../logic/shop';
 import { GearCard, useScreenKeys } from './Screens';
 import { Icon } from './icons';
 import { calmNow } from './prefs';
@@ -155,6 +157,7 @@ export function Shop(props: {
           {noReroll(run) ? t(`破釜沉舟：不能${termName('reroll', (z) => z)}`, 'No rerolls (Burn the Boats)') : v.freeRerolls > 0 ? t(`${termName('reroll', (z) => z)} · 免费 ×${v.freeRerolls}`, `Reroll · free ×${v.freeRerolls}`) : <>{termName('reroll', t)} <span class="mj-moon-cost num">{v.rerollCost}</span></>}
           <kbd class="mj-hotkey-inline">R</kbd>
         </button>
+        {rerollOffPct(run) > 0 && <span class="mj-off-chip num" title={t('货比三家：这家店每刷新一次都更便宜', 'Shop Around: every reroll here lowers the prices')}>{t(`已便宜 ${rerollOffPct(run)}%`, `${rerollOffPct(run)}% off`)}</span>}
         <span class="muted mj-keys-hint">{t('1–6 购买 · L+数字 锁住 · R 刷新 · Enter 下一重 · C 人物', '1–6 buy · L+number lock · R reroll · Enter next · C character')}</span>
       </div>
 
@@ -216,6 +219,8 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
   const w = run.weapons[sel ?? -1];
   const twin = w && sel !== null ? run.weapons.findIndex((x, j) => j !== sel && x.id === w.id && x.t === w.t) : -1;
   const d = w ? describeWeapon(w.id, w.t, t) : null;
+  // m8 点石成金: the 点金 price for the chosen weapon (null: no rule held, or it is already 神品)
+  const gild = w && sel !== null ? upgradePrice(run, sel) : null;
   return (
     <div>
       <p class="mj-tabhint">{t('点一把兵器，看它做什么、卖掉或合铸。', 'Pick a weapon to see what it does, sell it or merge it.')}</p>
@@ -246,6 +251,13 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
             <button type="button" class="btn btn-small" data-tut="merge" disabled={twin < 0 || w.t >= 4} title={termLine('merge', t)} onClick={() => { const r = merge(run, Math.min(sel, twin), Math.max(sel, twin)); if (r) { props.onRun(r, 'merge'); props.setSel(null); } }}>
               {termName('merge', t)} {w.t < 4 && <span class="num">→ {t(tierWord((w.t + 1) as Tier, t), TIER_ROMAN[(w.t + 1) as Tier])}</span>}
             </button>
+            {gild !== null && (
+              <button type="button" class="btn btn-small mj-gild" data-tut="gild" disabled={upgradesLeft(run) <= 0 || run.moon < gild}
+                title={upgradesLeft(run) <= 0 ? t('这家店已经点过金了', 'Already gilded in this shop') : termLine('gild', t)}
+                onClick={() => { const r = upgrade(run, sel); if (r) props.onRun(r, 'merge'); }}>
+                {termName('gild', t)} · <span class="mj-moon-cost num">{gild}</span>
+              </button>
+            )}
           </div>
           {w.t < 4 && twin < 0 && <p class="mj-small muted">{t(`再有一把${tierWord(w.t, t)}的${nameOf(w.id, t)}，就能合铸成更高一品。`, `One more ${nameOf(w.id, t)} ${TIER_ROMAN[w.t]} and you can merge them into the next tier.`)}</p>}
         </div>
@@ -256,8 +268,8 @@ function WeaponsTab(props: { run: RunSave; sel: number | null; setSel: (i: numbe
           {sets.map((c) => (
             <div class={'mj-set' + (c.tier >= 0 ? ' is-on' : '')}>
               <span class="mj-set-name">{c.name}</span>
-              <span class="mj-pips" aria-label={t(`${c.count} 把`, `${c.count}`)}>{[2, 4, 6].map((n) => <i class={c.count >= n ? 'is-on' : ''} />)}</span>
-              <span class="num">{t(`${c.count} 把`, `${c.count}`)}</span>
+              <span class="mj-pips" aria-label={t(`${c.count} 把`, `${c.count}`)}>{[2, 4, 6].map((n) => <i class={c.count + c.plus >= n ? 'is-on' : ''} />)}</span>
+              <span class="num">{t(`${c.count} 把`, `${c.count}`)}{c.plus > 0 && <span class="muted">{` +${c.plus}`}</span>}</span>
               <span class="mj-set-text">
                 {c.active && <span>{c.active}</span>}
                 {c.next && <span class="muted">{c.active ? ' · ' : ''}{c.next}</span>}

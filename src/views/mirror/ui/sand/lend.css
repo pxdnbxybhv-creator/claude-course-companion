@@ -1,0 +1,16 @@
+/* 水月幻镜 · m8 · the test code's overlays (ui/sand/overlay.tsx): the 心镜 / 心得 ribbon, the 「测」 seal,
+   lent pips and levels. Every selector carries an .mj-lend class so it may load before mirror.css. */
+.mj-lend-ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 8px 0 12px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--mj-t4, #c0412f) 55%, transparent); }
+.mj-lend-ribbon p { flex: 1 1 200px; margin: 0; font-size: 14px; line-height: 1.5; min-width: 0; }
+.mj-lend-ribbon .mj-lend-note { display: block; font-size: 12px; opacity: 0.75; }
+.mj-lend-switch { flex: 0 0 auto; gap: 6px; }
+.mj-lend-switch .chip { min-height: 36px; }
+.mj-lend-seal { display: inline-flex; vertical-align: middle; margin-left: 4px; line-height: 0; }
+/* a pip or level the code fills in (above what was earned): hollow vermilion, never mistaken for an earned one */
+.mj-petal-ranks b.is-lent { background: transparent; box-shadow: inset 0 0 0 1px #b93a2b; }
+.mj-lend-num { color: var(--mj-t4, #c0412f); }
+.mj-lend-own { font-size: 12px; opacity: 0.8; }
+/* the lobby footer with the 「试 · 模拟场」 button (only while the code is on): two rows on a phone */
+nav.mj-footer.has-sand { grid-template-columns: repeat(4, 1fr); }
+@media (min-width: 560px) { nav.mj-footer.has-sand { grid-template-columns: repeat(7, 1fr); } }
+.mj-footer-btn.mj-lend-sandbtn { border-color: var(--mj-t4, #c0412f); }

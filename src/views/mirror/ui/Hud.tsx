@@ -8,7 +8,8 @@ import { lang } from '../../../app/store';
 import { armorReduction, fmtBig } from '../logic';
 import { COMPANION_REG, SKILL_REG, type SkillId } from '../ids';
 import type { CharacterId, Engine, HudState } from '../types';
-import type { FrameStats } from '../engine';
+import type { FrameStats, MirrorEngine } from '../engine';
+import { SKILLS } from '../data';
 import { termLine, termName } from '../data/glossary';
 import { Portrait } from './icons';
 import { bossName, fmtClock, skillDrag, stickFollow, stickVector, STICK_R } from './text';
@@ -26,6 +27,24 @@ export interface HudApi {
 }
 
 const RING = 2 * Math.PI * 31;
+
+/** m8 (hidden.md §2.5): the 技 button's verb for a skill: 'tap' for the 13; 'guard', 'hold', 'recast' for the hidden three. */
+export const skillInput = (id: SkillId): 'tap' | 'hold' | 'recast' | 'guard' => SKILLS[id]?.input ?? 'tap';
+/** m8: the way from you to a point on the canvas (CSS px) as a world vector (the cursor's aim); null when unknown. */
+export function cursorDir(eng: Engine | null, sx: number, sy: number): { x: number; y: number } | null {
+  const m = eng as (Engine & Partial<Pick<MirrorEngine, 'camera' | 'world'>>) | null;
+  const c = m?.camera, w = m?.world;
+  if (!c || !w) return null;
+  const x = (sx * c.dpr - c.w / 2) / c.scale + c.x, y = (sy * c.dpr - c.h / 2) / c.scale + c.y;
+  const dx = x - w.px, dy = y - w.py;
+  return dx * dx + dy * dy > 1 ? { x: dx, y: dy } : null;
+}
+/** m8: the glyph the 技 button shows now: 「夺」 while 越女's 剑意 is full, 「断」 while 山鬼's vines live, else its own. */
+export function skillGlyphNow(s: Pick<HudState, 'ring' | 'skillRecast'>, own: string): string {
+  if (s.ring?.key === 'guard' && s.ring.of && (s.ring.pips ?? 0) >= s.ring.of) return '夺';
+  if (s.skillRecast) return '断';
+  return own;
+}
 
 /** An attribute value with its quotes escaped (the marks are written as HTML at the push rate). */
 const attr = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -56,6 +75,7 @@ export function Hud(props: {
   const crates = useRef<HTMLElement>(null);
   const last = useRef({ hp: '', moon: -1, time: '', lvl: -1, boss: '', marks: '' });
   const lastState = useRef<HudState | null>(null);
+  const moonPulse = useRef(-1e9);
   const char: CharacterId = props.char ?? (SKILL_REG.find((x) => x.id === props.skill)?.char as CharacterId | undefined) ?? 'scholar';
   const who = COMPANION_REG.find((c) => c.id === char);
 
@@ -73,7 +93,19 @@ export function Hud(props: {
         const hpT = `${Math.ceil(Math.max(0, s.hp))} / ${Math.round(hpMax)}`;
         if (hpText.current && hpT !== L.hp) { hpText.current.textContent = hpT; L.hp = hpT; }
         const m = Math.floor(s.moon);
-        if (moon.current && m !== L.moon) { moon.current.textContent = fmtBig(m, lng()); L.moon = m; }
+        if (moon.current && m !== L.moon) {
+          moon.current.textContent = fmtBig(m, lng());
+          // m8 (art §5.4, cr/A-hidden #3): the 月华 count pulses 1.15× for 120 ms on a change, at most 4 a second
+          const now = performance.now(), el = moon.current.parentElement;
+          if (L.moon >= 0 && el && now - moonPulse.current >= 250) {
+            moonPulse.current = now;
+            el.classList.remove('is-pulse');
+            void el.offsetWidth;
+            el.classList.add('is-pulse');
+            setTimeout(() => el.classList.remove('is-pulse'), 120);
+          }
+          L.moon = m;
+        }
         if (sleeve.current) {
           sleeve.current.hidden = !s.showSleeve;
           if (sleeveN.current) sleeveN.current.textContent = String(s.sleeve);
@@ -119,6 +151,18 @@ export function Hud(props: {
         if (ring) ring.style.strokeDashoffset = String(RING * Math.max(0, Math.min(1, s.skillCd)));
         const btn = root.current?.parentElement?.querySelector<HTMLElement>('.mj-skill');
         if (btn) { btn.classList.toggle('is-cd', s.skillCd > 0.001); btn.classList.toggle('is-active', s.skillActive); }
+        // m8:hidden: the button repeats the ring at the figure (后羿's draw, 山鬼's vines) and swaps its glyph (夺, 断)
+        if (btn && s.ring !== undefined) {
+          const drawing = !!s.skillHeld, recast = !!s.skillRecast;
+          btn.classList.toggle('is-drawing', drawing);
+          btn.classList.toggle('is-recast', recast);
+          btn.classList.toggle('is-notch', drawing && !!s.ring?.flash);
+          if (ring && s.ring && (drawing || recast)) ring.style.strokeDashoffset = String(RING * (1 - Math.max(0, Math.min(1, s.ring.v))));
+          const span = btn.querySelector<HTMLElement>('.mj-skill-glyph');
+          const g = span ? skillGlyphNow(s, span.dataset.glyph ?? '') : '';
+          if (span && span.textContent !== g) span.textContent = g;
+          btn.classList.toggle('is-seize', g === '夺');
+        }
       },
       levelUp(level) {
         if (lvl.current) { lvl.current.textContent = String(level); last.current.lvl = level; }
@@ -235,6 +279,8 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
     };
     const down = (e: PointerEvent) => {
       if (!opts.current.enabled) return;
+      // the right (or middle) mouse button is the 镜技's second press (Run.tsx), never the stick
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
       if ((e.target as HTMLElement).closest('button, .mj-hud-tr, .mj-hud-tc')) return;
       const p = local(e);
       const inStick = opts.current.left ? p.x > p.w * 0.4 : p.x < p.w * 0.6;
@@ -310,6 +356,8 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       b.classList.add('is-held');
       e.preventDefault();
       e.stopPropagation();
+      // m8:hidden: the hidden three act on the press too (越女's guard, 后羿's draw), timed by the event itself
+      if (skillInput(opts.current.skill) !== 'tap') opts.current.engine()?.skillPress?.(e.timeStamp / 1000);
     };
     const move = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
@@ -323,7 +371,11 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
       const d = skillDrag(e.clientX - drag.x, e.clientY - drag.y);
       const eng = opts.current.engine();
       eng?.skillPreview(null);
-      if (e.type === 'pointerup') {
+      if (skillInput(opts.current.skill) !== 'tap') {
+        // m8:hidden: the release: aimed (a drag), auto (a tap: zero), or cancelled (dragged back; null)
+        const dir = e.type !== 'pointerup' ? null : d.aim ? { x: d.x, y: d.y } : drag.far ? null : { x: 0, y: 0 };
+        eng?.skillRelease?.(dir, e.timeStamp / 1000);
+      } else if (e.type === 'pointerup') {
         if (d.aim) eng?.skill({ kind: 'dir', x: d.x, y: d.y });
         else if (!drag.far) eng?.skill({ kind: 'auto' });
       }
@@ -360,7 +412,7 @@ export function Controls(props: { engine: () => Engine | null; left: boolean; ma
           <circle class="mj-skill-track" cx="36" cy="36" r="31" />
           <circle class="mj-skill-ring" cx="36" cy="36" r="31" style={{ strokeDasharray: RING, strokeDashoffset: 0 }} />
         </svg>
-        <span>{glyph}</span>
+        <span class="mj-skill-glyph" data-glyph={glyph}>{glyph}</span>
         <div class="mj-skill-aim" ref={aimLine} aria-hidden="true" />
       </button>
     </div>

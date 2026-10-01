@@ -22,6 +22,7 @@ import { createEngine } from '../engine';
 import { createDebugPainter } from '../engine/debugPainter';
 import { CONTENT } from '../engine/content';
 import { doCards, doCrates, doHearts, doShop, prefers, value } from './bot';
+import { hiddenTally, vinesNow, type HiddenTally } from '../engine/content/hidden';
 
 export interface RealOpts {
   seed: number;
@@ -56,6 +57,8 @@ export interface RealRun {
   /** 镜宝 held at the end (`wangchen2`), and the weapons (`qingfeng3`). */
   relics: string[];
   weapons: string[];
+  /** m8: a hidden companion's verb counters over the run (engine/content/hidden.ts hiddenTally); absent for the 13. */
+  hidden?: HiddenTally;
 }
 export type BotLevel = 'beginner' | 'average' | 'skilled';
 
@@ -65,7 +68,14 @@ const DAY = '2026-09-27';
 // The world's internals are read directly (struct-of-arrays pools): this is a dev harness, not content.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Raw = any;
-export interface BotState { wander: number; last: [number, number]; n: number; zones?: boolean }
+export interface BotState {
+  wander: number; last: [number, number]; n: number; zones?: boolean;
+  /** m8 hidden (hidden.md §2.8): the verbs' own stream (seeded from the run when absent), and their state. */
+  rng?: () => number;
+  verb?: { holdTo: number; dir: { x: number; y: number }; snapAt: number; tautTo: number; bound: boolean };
+}
+/** hidden.md §2.8: how often each player level gets a timed verb right. */
+export const VERB_EXEC: Readonly<Record<BotLevel, number>> = { beginner: 0.25, average: 0.6, skilled: 0.85 };
 
 /** One bot decision (called every third step). Exported for the probes. */
 export function botStep(W: Raw, eng: Raw, level: BotLevel, st: BotState): void {
@@ -157,9 +167,137 @@ export function botStep(W: Raw, eng: Raw, level: BotLevel, st: BotState): void {
   let mx = L > 0.02 ? fx / L : 0, my = L > 0.02 ? fy / L : 0;
   if (!skilled && st.n++ % 3) { mx = st.last[0]; my = st.last[1]; }
   else if (avg && st.n++ % 2) { mx = st.last[0]; my = st.last[1]; }
+  // m8 hidden (hidden.md §3.8, §5.8): 越女 holds ground near an attacker while her guard is ready; 后羿 stands
+  // still between sidesteps (so 满弓 is read). The beginner keeps kiting.
+  const input = W.skillDef?.input ?? 'tap';
+  if (skilled && input !== 'tap') {
+    const ready = W.skillCd <= 0 && !W.skillRun;
+    if (input === 'guard' && ready && W.hp > W.hpMax * 0.35) {
+      let ni = -1, nd = 1e9;
+      for (let i = 0; i < E.n; i++) { if (!E.alive[i] || E.kind[i] === 4) continue; const d = Math.hypot(E.x[i] - px, E.y[i] - py) - E.r[i]; if (d < nd) { nd = d; ni = i; } }
+      if (ni >= 0 && nd < 260) {
+        if (nd > 60) { const dx = E.x[ni] - px, dy = E.y[ni] - py, d = Math.hypot(dx, dy) || 1; mx = dx / d; my = dy / d; } else { mx = 0; my = 0; }
+      }
+    } else if (input === 'hold' && near > 150 && !hold) {
+      let threat = false;
+      const S = W.ES;
+      for (let i = 0; i < S.n && !threat; i++) if (S.alive[i] && Math.hypot(S.x[i] - px, S.y[i] - py) < 170) threat = true;
+      const T = W.T;
+      for (let i = 0; i < T.n && !threat; i++) if (T.alive[i] && T.dur[i] - T.t[i] < 0.8 && Math.hypot(T.shape[i].x - px, T.shape[i].y - py) < 260) threat = true;
+      if (!threat) { mx = 0; my = 0; }
+    }
+  }
   st.last = [mx, my];
   eng.input.move(mx, my);
+  if (input !== 'tap') { verbStep(W, level, st, near); return; }
   if (W.skillCd <= 0 && !W.skillRun && near < 200) eng.skill({ kind: 'auto' });
+}
+
+const ZERO = { x: 0, y: 0 };
+/** The press / release on the world's own clock (no event lag): a non-finite time reads as lag 0 in worldAt, so a run is deterministic. */
+const nowS = () => NaN;
+/**
+ * hidden.md §2.8, §3.8, §4.8, §5.8: the hidden three's 镜技 for the bot. exec (VERB_EXEC) is how often a timed
+ * verb is right. The beginner mashes: guards on cooldown, binds and snaps 0.3 s later, holds a random 0.2–1.8 s.
+ */
+export function verbStep(W: Raw, level: BotLevel, st: BotState, near: number): void {
+  const rng = (st.rng ??= rngFor(W.run.seed, W.wave, 'verbs'));
+  const v = (st.verb ??= { holdTo: -1, dir: ZERO, snapAt: -1, tautTo: 150, bound: false });
+  const exec = VERB_EXEC[level], beginner = level === 'beginner';
+  const input = W.skillDef?.input;
+  const p = W.skillDef?.p ?? {};
+  const ready = W.skillCd <= 0 && !W.skillRun;
+  const px = W.px, py = W.py, E = W.E;
+  const tap = (dir: { x: number; y: number } = ZERO) => { W.press(nowS()); W.release(dir, nowS()); };
+  if (input === 'guard') {
+    if (!ready) return;
+    // 夺 with full 剑意 and a foe within the cut
+    if (W.hidBlades >= p.blades) { if (near < p.cutLen) tap(); return; }
+    if (beginner) { if (near < 200) tap(); return; }
+    // the earliest blow due: bodies (edge to edge), shots along their path, telegraphs over her
+    let tau = 9;
+    for (let i = 0; i < E.n; i++) {
+      if (!E.alive[i] || E.kind[i] === 4) continue;
+      // a body: the time to touch at its own pace (a still one only when touching)
+      const gap = Math.hypot(E.x[i] - px, E.y[i] - py) - E.r[i] - W.pr;
+      const t = gap <= 8 ? 0 : (gap - 8) / Math.max(1, E.speed[i]);
+      if (t < tau) tau = t;
+    }
+    const S = W.ES;
+    for (let i = 0; i < S.n; i++) {
+      if (!S.alive[i]) continue;
+      const dx = px - S.x[i], dy = py - S.y[i], sp = Math.hypot(S.vx[i], S.vy[i]) || 1;
+      const along = (dx * S.vx[i] + dy * S.vy[i]) / sp, perp = Math.abs((dx * S.vy[i] - dy * S.vx[i]) / sp);
+      if (along < 0 || perp > S.r[i] + W.pr) continue;
+      const t = along / sp;
+      if (t < tau) tau = t;
+    }
+    const T = W.T;
+    for (let i = 0; i < T.n; i++) {
+      if (!T.alive[i]) continue;
+      const sh = T.shape[i], left = T.dur[i] - T.t[i];
+      if (Math.hypot(sh.x - px, sh.y - py) < (sh.r ?? sh.len ?? 120) + W.pr && left < tau) tau = left;
+    }
+    if (tau <= 0.1) { if (rng() < exec) tap(); }
+    else if (tau <= 0.4 && rng() < (1 - exec) / 4) tap();
+    return;
+  }
+  if (input === 'recast') {
+    const vn = vinesNow(W);
+    if (vn) {
+      if (!v.bound) { v.bound = true; v.snapAt = W.t + 0.3; v.tautTo = rng() < exec ? p.taut : 60 + rng() * 90; }
+      const snap = beginner ? W.t >= v.snapAt : vn.mean >= v.tautTo || vn.left <= 0.4 || W.hp < W.hpMax * 0.3;
+      if (snap) { tap(); v.bound = false; }
+      return;
+    }
+    v.bound = false;
+    if (!ready) return;
+    if (beginner) { if (near < 200) tap(); return; }
+    let n = 0;
+    for (let i = 0; i < E.n; i++) if (E.alive[i] && E.kind[i] !== 4 && Math.hypot(E.x[i] - px, E.y[i] - py) <= p.r) n++;
+    if (n < 3) return;
+    if (level === 'skilled') {
+      const c = W.densest(px, py, W.skillDef.reach ?? 300, 120);
+      const d = c ? Math.hypot(c.x - px, c.y - py) : 0;
+      if (c && d >= 180 && d <= 300) { tap({ x: (c.x - px) / d, y: (c.y - py) / d }); return; }
+    }
+    tap();
+    return;
+  }
+  if (input === 'hold') {
+    if (W.verbDown && W.skillRun) {
+      if (W.t >= v.holdTo) W.release(v.dir, nowS());
+      return;
+    }
+    if (!ready || near > 520) return;
+    const mid = (p.sweet0 + p.sweet1) / 2;
+    const held = beginner ? 0.2 + rng() * 1.6 : rng() < exec ? mid : mid + (rng() < 0.5 ? -1 : 1) * 0.25;
+    v.dir = level === 'skilled' ? bestLine(W, p.len, p.w) : ZERO;
+    W.press(nowS());
+    v.holdTo = W.t + held;
+  }
+}
+
+/** 后羿's skilled aim: of 8 bearings and the one to the strongest, the line with the most foes on it. */
+function bestLine(W: Raw, len: number, wd: number): { x: number; y: number } {
+  const px = W.px, py = W.py, E = W.E;
+  const s = W.strongest(px, py, len, 'any');
+  const angs: number[] = [];
+  for (let k = 0; k < 8; k++) angs.push((k / 8) * Math.PI * 2);
+  if (s >= 0) { const e = W.enemy(s); angs.unshift(Math.atan2(e.y - py, e.x - px)); }
+  let best = 0, bn = 0;
+  for (const a of angs) {
+    const ux = Math.cos(a), uy = Math.sin(a);
+    let n = 0;
+    for (let i = 0; i < E.n; i++) {
+      if (!E.alive[i] || E.kind[i] === 4) continue;
+      const rx = E.x[i] - px, ry = E.y[i] - py, along = rx * ux + ry * uy;
+      if (along < 0 || along > len) continue;
+      if (Math.abs(-rx * uy + ry * ux) <= wd / 2 + E.r[i]) n++;
+    }
+    if (n > bn) { bn = n; best = a; }
+  }
+  return bn > 0 ? { x: Math.cos(best), y: Math.sin(best) } : ZERO;
 }
 
 /** One whole run on the real engine. */
@@ -193,8 +331,9 @@ export function playReal(o: RealOpts): RealRun {
   const W: Raw = eng.world;
   const hurtBy: Record<string, number> = {};
   const orig = W.hurtFrom.bind(W);
-  W.hurtFrom = (n: number, att: number, und: boolean, noArmor: boolean, src: string, dot: boolean, melee: boolean): number => {
-    const d = orig(n, att, und, noArmor, src, dot, melee);
+  // m8 (cr/S-hidden #2): pass the shot slot through, or 越女's shot catch never sees it
+  W.hurtFrom = (n: number, att: number, und: boolean, noArmor: boolean, src: string, dot: boolean, melee: boolean, shot = -1): number => {
+    const d = orig(n, att, und, noArmor, src, dot, melee, shot);
     if (d > 0) {
       let phase = '';
       for (const h of W.bossH ?? []) if (W.alive(h)) { const e = W.enemy(h); const f = e.hp / e.hpMax; phase = f > 0.6 ? 'p1 ' : f > 0.25 ? 'p2 ' : 'p3 '; }
@@ -243,13 +382,14 @@ export function playReal(o: RealOpts): RealRun {
     }
     run = doShop(run, u, rng, beginner, arch);
   }
+  const hid = W.skillDef?.input && W.skillDef.input !== 'tap' ? { ...hiddenTally(W) } : null;
   eng.dispose();
   const out: Record<string, number> = {};
   for (const [key, v] of Object.entries(hurtBy)) out[key] = Math.round(v);
   const relics = Object.entries(run.items).filter(([k]) => k === 'wangchen' || k === 'longyuan').map(([k, v]) => `${k}${v}`);
   return {
     char: o.char, seed: o.seed, W: run.wave, dead, deadAtBoss, timeout, errors, msPerStep: steps ? ms / steps : 0, trace, hurtBy: out,
-    relics, weapons: run.weapons.map((x) => `${x.id}${x.t}`),
+    relics, weapons: run.weapons.map((x) => `${x.id}${x.t}`), ...(hid ? { hidden: hid } : {}),
   };
 }
 

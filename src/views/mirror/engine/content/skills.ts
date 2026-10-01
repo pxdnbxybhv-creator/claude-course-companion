@@ -11,6 +11,7 @@ import { charMult, luckMult, rawDamage } from '../../logic/formulas';
 import { costOf, fxSprite, restoreHp, setMoon } from './bridge';
 import { CoRun, DEG, TAU, angDiff, shared, type Co } from './util';
 import { BK, FK, STAIN, VF, VT, vfxW } from '../vfx';
+import { HIDDEN_SKILL_IMPLS } from './hidden';
 
 /** A skill as a coroutine: `body` yields seconds; `on` sees combat events while it runs. */
 function coSkill(w0: WorldApi, body: (c: { w: WorldApi }) => Co, o: { on?: (w: WorldApi, ev: GameEvent) => void; end?: (w: WorldApi) => void } = {}): SkillRun {
@@ -250,8 +251,12 @@ const yijian: SkillImpl = {
       }
     }, {
       on: (_w, ev) => { if (ev.type === 'kill' && ev.src === 'skill') killed = true; },
-      // a kill by the streak refunds 1 s (after the core has set the cooldown)
-      end: (w) => { if (killed) w.after(0.02, (ww) => ww.refundSkill(p.refund)); },
+      // a kill by the streak refunds 1 s (after the core has set the cooldown); m8 剑幕: the dash ends under a
+      // screen of swords, +p.guard 护甲 for p.guardDur s (balance.md §1.3, PLAN D25: at the skill's end, not its cast)
+      end: (w) => {
+        if (killed) w.after(0.02, (ww) => ww.refundSkill(p.refund));
+        if (p.guard > 0) w.buff('jianmu', { armor: p.guard }, p.guardDur);
+      },
     });
   },
 };
@@ -481,7 +486,9 @@ const daoyao: SkillImpl = {
       for (let k = 0; k < p.pounds; k++) {
         yield step * 0.75;
         const w = c.w, x = w.player.x, y = w.player.y;
-        const n = w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock }));
+        // m8 捣药 marks: each pound leaves what it strikes open, +p.vuln% damage taken for p.vulnDur s (balance.md §1.3)
+        const mark = p.vuln > 0 ? { status: { kind: 'vuln' as const, dur: p.vulnDur, v: p.vuln } } : {};
+        const n = w.hitArea(x, y, p.r, hit(p.base + p.kHp * w.player.hpMax, { regen: p.kRegen }, { knock: p.knock, ...mark }));
         // the jade pestle comes down: a jade double ring, moon dust thrown up
         const V = vfxW(w);
         V.lance(x, y - 70, Math.PI / 2, 64, 12, VT.jade, 0.16, VF.streak, 2);
@@ -627,4 +634,6 @@ const qinghui: SkillImpl = {
 
 export const SKILL_IMPLS: Partial<Record<SkillId, SkillImpl>> = {
   yizi, manyuan, yiwang, guangling, yijian, jiji, dianhua, wei, pudie, daoyao, yaoyue, tuodao, qinghui,
+  // m8:hidden · 候气, 女萝, 射日 (engine/content/hidden.ts, HIDDEN)
+  ...HIDDEN_SKILL_IMPLS,
 };

@@ -58,19 +58,19 @@ export const TERM_MODS: Readonly<Record<TermModId, TermModDef>> = {
 
 // ─────────────────────────────── 流派 (§10)
 export const ARCHETYPES: Readonly<Record<ArchetypeId, ArchetypeDef>> = {
-  mobao: { id: 'mobao', weapons: ['brush', 'inkstone', 'crane'], keys: ['xuan', 'duanyan', 'splash', 'inkbamboo', 'inkcrane', 'inkpool', 'dotting'], capstone: 'inkdragon', scales: ['spirit', 'summonCap', 'aspd'], flagship: ['painter', 'gardener', 'player'] },
-  xianjian: { id: 'xianjian', weapons: ['qingping', 'casket', 'peach', 'seven'], keys: ['tassel', 'swordqi', 'swordheart', 'washpool', 'yujian', 'swordtomb'], capstone: 'wanjian', scales: ['ranged', 'swords', 'crit'], flagship: ['swordsman', 'poet', 'taoist'] },
-  zhongbing: { id: 'zhongbing', weapons: ['yanyue', 'hoe', 'pestle'], keys: ['whetstone', 'dragblade', 'backwater'], capstone: 'needle', scales: ['melee', 'area', 'knock'], flagship: ['guan'] },
-  jinzhong: { id: 'jinzhong', weapons: ['yanyue', 'pestle'], keys: ['guardmirror', 'thorns', 'ironbone', 'goldenbell', 'atease'], capstone: 'needle', scales: ['armor'], flagship: ['guan', 'gardener'] },
-  fulu: { id: 'fulu', weapons: ['thunder', 'fire', 'gourd', 'peach', 'moonmirror'], keys: ['cinnabar', 'yellowpaper', 'fivethunder'], capstone: 'samadhi', scales: ['elem'], flagship: ['taoist'] },
-  qinxin: { id: 'qinxin', weapons: ['qin', 'flute'], keys: ['lingering', 'boya', 'atease'], capstone: 'ambush', scales: ['elem', 'area'], flagship: ['musician'] },
-  zuixian: { id: 'zuixian', weapons: ['gourd', 'drunkfist', 'sunbow', 'qingfeng'], keys: ['eagle', 'dukang', 'nightcup'], capstone: 'jiangjinjiu', scales: ['crit', 'critDmg'], flagship: ['poet'] },
-  fuyuan: { id: 'fuyuan', weapons: ['hoe', 'rod', 'coindart'], keys: ['basket', 'coinstring', 'luckycat', 'miser', 'abacus', 'lots'], capstone: 'treasurebowl', scales: ['harvest', 'luck'], flagship: ['fisher', 'gardener'] },
+  mobao: { id: 'mobao', weapons: ['brush', 'inkstone', 'crane'], keys: ['xuan', 'duanyan', 'splash', 'inkbamboo', 'inkcrane', 'inkpool', 'dotting', 'jibai', 'daoge'], capstone: 'inkdragon', scales: ['spirit', 'summonCap', 'aspd'], flagship: ['painter', 'gardener', 'player'] },
+  xianjian: { id: 'xianjian', weapons: ['qingping', 'casket', 'peach', 'seven'], keys: ['tassel', 'swordqi', 'swordheart', 'washpool', 'yujian', 'swordtomb', 'chulei'], capstone: 'wanjian', scales: ['ranged', 'swords', 'crit'], flagship: ['swordsman', 'poet', 'taoist'] },
+  zhongbing: { id: 'zhongbing', weapons: ['yanyue', 'hoe', 'pestle'], keys: ['whetstone', 'dragblade', 'backwater', 'zhancao'], capstone: 'needle', scales: ['melee', 'area', 'knock'], flagship: ['guan'] },
+  jinzhong: { id: 'jinzhong', weapons: ['yanyue', 'pestle'], keys: ['guardmirror', 'thorns', 'ironbone', 'goldenbell', 'atease', 'duanbing', 'taishan'], capstone: 'needle', scales: ['armor'], flagship: ['guan', 'gardener'] },
+  fulu: { id: 'fulu', weapons: ['thunder', 'fire', 'gourd', 'peach', 'moonmirror'], keys: ['cinnabar', 'yellowpaper', 'fivethunder', 'liaoyuan', 'lianhuan', 'huadi'], capstone: 'samadhi', scales: ['elem'], flagship: ['taoist'] },
+  qinxin: { id: 'qinxin', weapons: ['qin', 'flute'], keys: ['lingering', 'boya', 'atease', 'chuge'], capstone: 'ambush', scales: ['elem', 'area'], flagship: ['musician'] },
+  zuixian: { id: 'zuixian', weapons: ['gourd', 'drunkfist', 'sunbow', 'qingfeng'], keys: ['eagle', 'dukang', 'nightcup', 'zuiwo', 'baibu', 'yiqi'], capstone: 'jiangjinjiu', scales: ['crit', 'critDmg'], flagship: ['poet'] },
+  fuyuan: { id: 'fuyuan', weapons: ['hoe', 'rod', 'coindart'], keys: ['basket', 'coinstring', 'luckycat', 'miser', 'abacus', 'lots', 'huobi', 'dianshi', 'sanjin', 'qihuo', 'jianxue'], capstone: 'treasurebowl', scales: ['harvest', 'luck'], flagship: ['fisher', 'gardener'] },
   huichun: { id: 'huichun', weapons: ['pestle', 'hoe'], keys: ['tea', 'ginseng', 'cushion', 'physician'], capstone: 'penglai', scales: ['regen', 'heal'], flagship: ['rabbit', 'gardener'] },
-  qizhen: { id: 'qizhen', weapons: ['gobowl'], keys: ['gomanual', 'capture', 'atease', 'xuan'], capstone: 'capture', scales: ['spirit', 'stones'], flagship: ['player'] },
-  yueying: { id: 'yueying', weapons: ['moonwheel', 'moonmirror'], keys: ['amulet', 'moonsoul', 'osmanthus'], capstone: 'watermoon', scales: ['dodge'], flagship: ['change', 'cat'] },
-  jifeng: { id: 'jifeng', weapons: ['longquan', 'claw', 'moonwheel'], keys: ['sandals', 'chasewind', 'lingbo'], capstone: 'watermoon', scales: ['speed'], flagship: ['swordsman', 'cat'] },
-  jiehuo: { id: 'jiehuo', weapons: [], keys: ['cuthair', 'burnboats', 'yanwang', 'delusion', 'innerdemon', 'crackedmirror'], capstone: null, scales: ['curse', 'dmg'], flagship: ['scholar'] },
+  qizhen: { id: 'qizhen', weapons: ['gobowl'], keys: ['gomanual', 'capture', 'atease', 'xuan', 'houji', 'jingru'], capstone: 'capture', scales: ['spirit', 'stones'], flagship: ['player'] },
+  yueying: { id: 'yueying', weapons: ['moonwheel', 'moonmirror'], keys: ['amulet', 'moonsoul', 'osmanthus', 'xianzhi', 'pengyue', 'rulian'], capstone: 'watermoon', scales: ['dodge'], flagship: ['change', 'cat'] },
+  jifeng: { id: 'jifeng', weapons: ['longquan', 'claw', 'moonwheel'], keys: ['sandals', 'chasewind', 'lingbo', 'dongru', 'yiqi'], capstone: 'watermoon', scales: ['speed'], flagship: ['swordsman', 'cat'] },
+  jiehuo: { id: 'jiehuo', weapons: [], keys: ['cuthair', 'burnboats', 'yanwang', 'delusion', 'innerdemon', 'crackedmirror', 'zhenjiu', 'mouhu'], capstone: null, scales: ['curse', 'dmg'], flagship: ['scholar'] },
   dugubaijia: { id: 'dugubaijia', weapons: [], keys: ['versatile', 'dugu', 'cushion'], capstone: 'dugu', scales: ['dmg'], flagship: ['scholar'] },
 };
 
@@ -99,6 +99,8 @@ export const PAY = {
   /** 七日镜: wave 10 of 今日镜 on 4 of the last 7 days → +100 镜屑 once a week. */
   weekDust: 100,
   weekNeed: 4,
+  /** m8 ask B (PLAN D27): an item deed pays 镜屑 once on first completion, by the item's tier (凡 · 灵 · 仙 · 神). */
+  deedDust: [0, 20, 30, 60] as readonly [number, number, number, number],
   rest: 3,
 } as const;
 /** Rate by the day's run index n (the free run is n = 1). */

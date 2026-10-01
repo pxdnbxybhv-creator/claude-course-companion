@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../app/i18n';
 import { mirror, saveMetaNow } from '../../app/mirror';
 import { toast } from '../../ui/kit';
-import { abandon, enter, lobbyVisit, resumeCheck, setTutor } from './logic/session';
+import { abandon, codeOn, enter, lobbyVisit, resumeCheck, setTutor } from './logic/session';
+import { endTuning, tuningActive } from './logic/tuning';
+import type { SandSession } from './ui/sand/session';
 import { todayKey } from '../../core/date';
 import { createTutorSession, type TutorSession } from './tutor/session';
 import { tutorRun } from './tutor/run';
@@ -16,7 +18,7 @@ import { decideTutorOffer } from './tutor/offer';
 import { TutorOffer } from './ui/Tutorial';
 import { createMirrorAudio } from './audio/sfx';
 import type { MirrorAudio, RunReport, RunSave } from './types';
-import type { CharacterId } from '../../data/characters';
+import type { CharacterId } from './types';
 import { Lobby, type LobbyPage } from './ui/Lobby';
 import { RunView } from './ui/Run';
 import { Results } from './ui/Results';
@@ -31,7 +33,14 @@ type Scene =
   | { kind: 'page'; page: LobbyPage }
   | { kind: 'run'; run: RunSave; ritual: 'paid' | 'free' | null; key: number }
   | { kind: 'tutor'; sess: TutorSession; key: number }
-  | { kind: 'results'; report: RunReport; snap: HTMLCanvasElement | null };
+  | { kind: 'results'; report: RunReport; snap: HTMLCanvasElement | null }
+  // m8 模拟场 (sandbox.md §2): the setup page (sess null), then a run in memory; only while the code is on
+  | { kind: 'sand'; key: number; sess: SandSession | null };
+
+/** The 模拟场's chunk (its screens and session), loaded the first time it opens. */
+type SandMod = typeof import('./ui/sand/Sand') & typeof import('./ui/sand/session');
+let sandChunk: Promise<SandMod> | null = null;
+const loadSand = () => (sandChunk ??= Promise.all([import('./ui/sand/Sand'), import('./ui/sand/session')]).then(([a, b]) => ({ ...a, ...b })));
 
 /** `?tutor=0|1` (read once on the 镜 route, then taken out of the address). */
 function tutorParam(): string | null {
@@ -74,6 +83,8 @@ export default function MirrorView() {
     return () => {
       audio.current?.dispose();
       audio.current = null;
+      // m8: leaving the 镜 tab from the 模拟场 keeps the edits as this device's draft, then puts every table back
+      if (tuningActive()) { try { sandRef.current?.keepDraft(); } catch { /* no storage */ } endTuning(); }
       saveMetaNow();
     };
   }, []);
@@ -120,10 +131,47 @@ export default function MirrorView() {
     setScene({ kind: 'tutor', sess: createTutorSession(tutorRun(todayKey())), key: Date.now() });
   };
   const toLobby = () => { lobbyVisit(); setScene({ kind: 'lobby' }); };
+  // ── m8 模拟场: in through the lobby while the code is on; out through one path that restores the tables
+  const [sandMod, setSandMod] = useState<SandMod | null>(null);
+  /** The loaded sandbox module for the unmount cleanup (which sees only the first render's state). */
+  const sandRef = useRef<SandMod | null>(null);
+  sandRef.current = sandMod;
+  // while the tables are tuned: a hidden page or a closing tab keeps the draft (a reload offers it back, never applies it)
+  useEffect(() => {
+    if (scene.kind !== 'sand' || !sandMod) return;
+    const keep = () => { if (tuningActive()) { try { sandMod.keepDraft(); } catch { /* no storage */ } } };
+    const vis = () => { if (document.visibilityState === 'hidden') keep(); };
+    window.addEventListener('pagehide', keep);
+    document.addEventListener('visibilitychange', vis);
+    return () => { window.removeEventListener('pagehide', keep); document.removeEventListener('visibilitychange', vis); };
+  }, [scene.kind, sandMod]);
+  const openSandbox = () => {
+    if (!codeOn()) return;
+    void loadSand().then((mod) => {
+      if (!codeOn()) return;
+      mod.openSand();
+      setSandMod(mod);
+      setScene({ kind: 'sand', key: Date.now(), sess: null });
+    }).catch((e) => { console.warn('[mirror] sandbox', e); toast(t('模拟场没能打开。', 'The sandbox could not open.'), 3200); });
+  };
+  const leaveSandbox = (note?: string) => {
+    if (sandMod) { sandMod.keepDraft(); sandMod.leaveSand(); } else if (tuningActive()) endTuning();
+    if (note) toast(note, 3600);
+    toLobby();
+  };
+  const sandSetup = () => {
+    if (scene.kind === 'sand' && scene.sess) sandMod?.rememberBuild(scene.sess.run());
+    setScene({ kind: 'sand', key: Date.now(), sess: null });
+  };
+  // revoking the code closes the sandbox: tables restored, back to the lobby
+  const coded = codeOn();
+  useEffect(() => {
+    if (scene.kind === 'sand' && !coded) leaveSandbox(t('测试码已取消，模拟场已关闭。', 'The test code was removed; the sandbox has closed.'));
+  }, [coded, scene.kind]);
 
-  const live = scene.kind === 'run' || scene.kind === 'tutor';
+  const live = scene.kind === 'run' || scene.kind === 'tutor' || (scene.kind === 'sand' && !!scene.sess);
   return (
-    <div class={'mirror' + (live ? ' mirror-live' : '') + (calmPref.value ? ' mj-calm' : '')}>
+    <div class={'mirror' + (live ? ' mirror-live' : '') + (calmPref.value ? ' mj-calm' : '') + (scene.kind === 'sand' ? ' mj-sand-on' : '')}>
       {scene.kind === 'lobby' && (
         <Lobby
           onEnter={startRun}
@@ -135,6 +183,7 @@ export default function MirrorView() {
           onRibbonClose={() => setOffer(null)}
           ring={ring}
           onRung={() => setRing(false)}
+          onSand={openSandbox}
         />
       )}
       {scene.kind === 'lobby' && <TutorOffer open={offer === 'sheet'} onYes={startTutor} onNo={() => setOffer(null)} />}
@@ -171,6 +220,21 @@ export default function MirrorView() {
           onEnd={() => toLobby()}
           onLeave={(note) => { if (note) toast(note, 3200); toLobby(); }}
           onTutorEnd={(go) => { toLobby(); if (go) setRing(true); }}
+        />
+      )}
+      {scene.kind === 'sand' && sandMod && !scene.sess && (
+        <sandMod.Setup key={scene.key} onBack={() => leaveSandbox()} onStart={(st) => setScene({ kind: 'sand', key: Date.now(), sess: sandMod.createSandSession(st) })} />
+      )}
+      {scene.kind === 'sand' && sandMod && scene.sess && (
+        <RunView
+          key={scene.key}
+          initial={scene.sess.run()}
+          ritual={null}
+          audio={aud()}
+          sess={scene.sess}
+          sand={sandMod.SAND_UI}
+          onEnd={() => sandSetup()}
+          onLeave={(note) => { if (note) toast(note, 3200); sandSetup(); }}
         />
       )}
       {scene.kind === 'results' && (

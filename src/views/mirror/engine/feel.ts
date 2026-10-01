@@ -281,6 +281,9 @@ export interface FeelStats {
   camFrames: number; camOff: number; camZoom: number;
 }
 
+/** m8 · the 月华 pickup's glints (art §5.4): the moon glint's size (was 0.8) and the second, white one's. */
+export const PICK_GLINT: readonly [number, number] = [1.25, 1.0];
+
 export class Feel {
   readonly sp: Sparks;
   readonly mk: Marks;
@@ -1015,7 +1018,9 @@ export class Feel {
   pickup(x: number, y: number, gold: boolean): void {
     if (!this.room(0)) return;
     const a = this.rnd() * 6.28;
-    this.emit(SH.glint, gold ? TN.gold : TN.moon, x + Math.cos(a) * 8, y + Math.sin(a) * 8, Math.cos(a) * 40, Math.sin(a) * 40 - 30, 0.28, gold ? 1.1 : 0.8, 0.2, this.rnd() * 6.28, 6, 3, 0, 1);
+    this.emit(SH.glint, gold ? TN.gold : TN.moon, x + Math.cos(a) * 8, y + Math.sin(a) * 8, Math.cos(a) * 40, Math.sin(a) * 40 - 30, 0.28, gold ? 1.1 : PICK_GLINT[0], 0.2, this.rnd() * 6.28, 6, 3, 0, 1);
+    // m8 (art §5.4): 月华 throws a second, whiter glint the other way (a burst, not a blink), if the spark budget has room
+    if (!gold && this.room(1)) this.emit(SH.glint, TN.white, x - Math.cos(a) * 6, y - Math.sin(a) * 6, -Math.cos(a) * 55, -Math.sin(a) * 55 - 40, 0.34, PICK_GLINT[1], 0.2, this.rnd() * 6.28, 6, 3, 0, 1);
   }
   /** Drops began streaming to you: a zip (rate-limited). */
   zip(): void {

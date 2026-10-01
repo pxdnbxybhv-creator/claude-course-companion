@@ -4,13 +4,26 @@
 import type { RunSave, ShopState, SpawnPlan, WaveSetup } from '../types';
 import type { DateKey } from '../../../core/types';
 import { TUT } from '../data/tutorial';
-import { computeStats, freeRerolls, newRun, starterUnlocks } from '../logic';
+import type { ItemId } from '../ids';
+import type { Unlocks } from '../types';
+import { STARTER_WEAPONS } from '../ids';
+import { computeStats, freeRerolls, newRun } from '../logic';
 import type { TutorScriptId } from '../engine/tutor';
 
 /** The practice run's seed: a constant, unrelated to real seeds (fresh crypto values) and the daily seed. */
 export const TUTOR_SEED = TUT.seed >>> 0;
-/** The practice run's pool: a fresh account's (every player sees the same shops). */
-export const tutorUnlocks = starterUnlocks;
+/**
+ * The practice run's item pool, pinned (m8, PLAN D27): a fresh account's 55 items before ask B opened every item,
+ * so the scripted lessons roll what they always rolled (every player sees the same shops). Weapons: the 18 starters.
+ */
+export const TUTOR_ITEMS: readonly ItemId[] = [
+  'songzi', 'tea', 'sandals', 'whetstone', 'fletch', 'cinnabar', 'pineink', 'guardmirror', 'bell', 'eagle', 'redstring',
+  'ginseng', 'tigertally', 'amulet', 'balm', 'elixir', 'drumroll', 'gall', 'backwater', 'atease', 'versatile', 'chasewind',
+  'ironbone', 'basket', 'coinstring', 'lots', 'pawn', 'luckycat', 'miser', 'abacus', 'xuan', 'duanyan', 'splash', 'inkbamboo',
+  'inkcrane', 'tassel', 'swordqi', 'swordheart', 'washpool', 'yujian', 'yellowpaper', 'fivethunder', 'lingering', 'dukang',
+  'dragblade', 'thorns', 'gomanual', 'moonsoul', 'cushion', 'cuthair', 'burnboats', 'yanwang', 'delusion', 'wangchen', 'longyuan',
+];
+export const tutorUnlocks = (): Unlocks => ({ weapons: new Set(STARTER_WEAPONS), items: new Set(TUTOR_ITEMS) });
 
 /** A fresh practice run. `today` only stamps it; nothing is paid, counted or saved. */
 export function tutorRun(today: DateKey = '2026-01-01'): RunSave {

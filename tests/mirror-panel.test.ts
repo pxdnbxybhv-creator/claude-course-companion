@@ -4,7 +4,8 @@
 // through computeStats (大橘 and 嫦娥 gain less); the change strip compares with the sheet kept before the
 // wave just won, and nothing else; English carries no hanzi and no bare 「u」.
 import { afterEach, describe, expect, it } from 'vitest';
-import { COMPANIONS, SETS, WCLASSES, WEAPONS } from '../src/views/mirror/data';
+import { COMPANIONS, F, ITEMS, SETS, WCLASSES, WEAPONS } from '../src/views/mirror/data';
+import { num } from '../src/views/mirror/ui/describe';
 import { CARD_HINT, termOf } from '../src/views/mirror/data/glossary';
 import { STAT_IDS } from '../src/views/mirror/data';
 import { armorReduction, computeStats, cooldown, maxHp, tierCd, weaponHit } from '../src/views/mirror/logic';
@@ -184,11 +185,11 @@ describe('人物 panel · sets', () => {
 });
 
 describe('人物 panel · level-card preview', () => {
-  it('goes through computeStats: 大橘 gains half the 气血', () => {
+  it('goes through computeStats: 大橘 gains 70% of the 气血 (m8 BALANCE: was half)', () => {
     const r = run('cat');
     const hp = maxHp(computeStats(r));
     const p = levelPreview(r, 'hp', 6, zh);
-    expect(p.line).toBe(`现在 ${hp} → ${hp + 3}`);
+    expect(p.line).toBe(`现在 ${hp} → ${hp + 4}`);
   });
   it('shows armour as 少受 x% → y%, 嫦娥 gaining three quarters', () => {
     const r = run('change');
@@ -316,5 +317,18 @@ describe('人物 panel · what a card does for your weapons (mirror3 fix round)'
       expect([...h.zh].length, id).toBeLessThanOrEqual(10);
       expect(h.en).not.toMatch(/[\u3400-\u9fff]/);
     }
+  });
+});
+
+describe('人物 panel · m8 画地为牢 speed sub-line (ITEMS)', () => {
+  it('names the walking cap under 移速 only while it holds you below your own pace', () => {
+    const cap = num(ITEMS.huadi.fx![0].do === 'moveCap' ? (ITEMS.huadi.fx![0] as { x: number }).x * F.baseSpeed : 0);
+    const fast = run('scholar', { items: { huadi: 1 } as RunSave['items'], stats: { speed: 40 } });
+    expect(tile(fast, 'speed').sub).toBe(`最快每秒 ${cap}（画地为牢）`);
+    expect(tile(fast, 'speed', en).sub).toBe(`At most ${cap} a second (Circle on the Ground)`);
+    // without the item, or slow enough that the cap never bites, the usual words
+    expect(tile(run('scholar', { stats: { speed: 40 } }), 'speed').sub).not.toMatch(/最快每秒/);
+    const slow = run('scholar', { items: { huadi: 1 } as RunSave['items'], stats: { speed: -60 } });
+    expect(tile(slow, 'speed').sub).not.toMatch(/最快每秒/);
   });
 });

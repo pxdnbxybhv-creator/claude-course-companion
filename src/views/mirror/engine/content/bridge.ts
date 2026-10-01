@@ -291,7 +291,7 @@ export function eatMoon(w: WorldApi, x: number, y: number, r: number): number {
   for (let i = 0; i < D.n; i++) {
     if (!D.alive[i] || D.age[i] < 0.25) continue;
     const k = D.kind[i];
-    if (k !== DK.moonDrop && k !== DK.moonThick && k !== DK.goldShard) continue;
+    if (k !== DK.moonDrop && k !== DK.moonThick && k !== DK.moonFull && k !== DK.goldShard) continue;
     const dx = D.x[i] - x, dy = D.y[i] - y;
     if (dx * dx + dy * dy > r2) continue;
     got += D.worth[i];
@@ -311,3 +311,7 @@ export function addCrate(w: WorldApi, x: number, y: number): void {
   W.hooks.crate(W.crates);
   W.sfx('crate');
 }
+
+// ─────────────────────────────────────────────── m8 · lane blocks (PLAN §3.5 U2): append-only, each lane under its own anchor
+// ── m8:items ──
+// ── m8:hidden ──

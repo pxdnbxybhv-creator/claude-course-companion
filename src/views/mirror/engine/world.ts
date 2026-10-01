@@ -1,7 +1,7 @@
 // 水月幻镜 · the world: one wave's simulation in pooled typed arrays (GDD §24.3), the damage pipeline
 // both ways (§4.2, §4.3), statuses (§4.4), drops and 蓄月 (§6), coins (§16.3), and the WorldApi
 // façade engine/content codes against (API.md §5). DOM-free; engine/index.ts owns the canvas and loop.
-import type { BossId, DropKind, EliteId, FxName, HazardId, MonsterId, SummonKind, TreasureId, WeaponId } from '../ids';
+import type { BossId, DropKind, EliteId, FxName, HazardId, ItemId, MonsterId, SummonKind, TreasureId, WeaponId } from '../ids';
 import { BOSS_REG, named } from '../ids';
 import type {
   ActiveMutator, ArenaGeom, Behaviour, Bilingual, Camera, CoinDrop, ContentRegistry, DamageSrc, DifficultyDef, EngineHooks,
@@ -10,12 +10,13 @@ import type {
   StatMods, StatusKind, TeleSpec, Vec, WaveResult, WaveSetup, WorldApi, ZoneSpec, DeathResult, ActorImpl, DownInfo,
 } from '../types';
 import {
-  BOSSES, COMPANIONS, DIFFS, ELITES, ENDLESS_BOSS, F, HAZARDS, MAPS, MONSTERS, PASSIVES, SKILLS, STAT_IDS, TREASURES, WEAPONS,
+  BOSSES, CLAMP, COMPANIONS, DIFFS, ELITES, ENDLESS_BOSS, F, HAZARDS, MAPS, MONSTERS, PASSIVES, SKILLS, STAT_IDS, TREASURES, WEAPONS,
 } from '../data';
 import {
   clamp, computeStats, dodgeCapOf, dodgeChance, dmgMul, dottingX, enemyArmorAdd, enemyHit, healMult, knockback, luckMult, maxHp,
-  pickupRadius, playerHit, reachPct, regenPerSec, relicFor, xpNext, REVIVE, canRevive,
+  pickupRadius, playerHit, reachPct, regenPerSec, relicFor, xpNext, REVIVE, canRevive, moveSpeedOf, critOverflowOf,
 } from '../logic/formulas';
+import { moveCapOf } from '../logic/items';
 import { arenaGeom, insideShape } from '../logic/arena';
 import { rngFor, type Rng } from '../logic/rng';
 import {
@@ -25,11 +26,16 @@ import { SpatialHash } from './hash';
 import {
   CAPS, DK, ENEMY_SHOTS, DROPS_CAP, HF, PK, ROLE, SK, SRC, SRCI, STI, TAU, ZC, angDiff, segDist2, tagBits, TAG_BIT,
 } from './consts';
-import { hasDrunk, hitboxOf, liveStats, readMods, type Live, type Mods } from './effects';
+import { hasDrunk, hitboxOf, liveStats, readMods, type EvBuff, type Live, type Mods } from './effects';
 import { initEnemy, tickEnemies, onEnemyDeath, strikeTele } from './enemies';
 import { fireWeapons, initWeapons, onWeaponKill, tickPlayerShots, tickSummons, tickStones, tickSwords, type WeaponSlot } from './weapons';
 import { FC, Feel } from './feel';
 import { DOWN_ANIM, reviveFx, reviveShimmer } from './down';
+// m8 (PLAN E2, E6): the lanes' world hooks and the 技 verbs (stubs until ITEMS / HIDDEN fill them)
+import { registerItemHooks } from './content/items';
+import { registerHiddenHooks } from './content/hidden';
+import { pressSkill, releaseSkill } from './verbs';
+import { isMoonKind, isMoonWorth, moonDraws, moonKindOf, splitMoon } from './moon';
 
 /** 'down': fallen with the revive on offer (破镜重圆): nothing steps until revive() or giveUp(). */
 export type Phase = 'idle' | 'wave' | 'ending' | 'down' | 'dead';
@@ -350,6 +356,8 @@ export class World implements WorldApi {
     this.stats = { ...setup.stats };
     this.reachPct = reachPct(run);
     this.mods = readMods(run);
+    // m8 画地为牢: the walking-speed cap (× F.baseSpeed; Infinity = none) that moveSpeedOf applies
+    this.moveCap = moveCapOf(run);
     // the player: full 气血 at every wave start (GDD §3 step 11)
     this.pr = hitboxOf(run);
     // you enter at the centre (广寒: south of the 桂树, 200 u clear of it — 0.7 s of walking up; it used
@@ -392,9 +400,17 @@ export class World implements WorldApi {
     this.skillRun = null;
     this.skillCdMax = this.skillDef?.cd ?? 10;
     this.skillCd = 0;
+    // m8 (PLAN E2–E4, E7): the per-wave seams start empty, then the held items and the hidden companions register theirs
+    this.guardHook = null; this.hurtScalers.length = 0; this.afterHurt.length = 0; this.onStream = null; this.playerHooks.length = 0;
+    this.teleOwner = -1; this.cdX = 1; this.ownLost = 0;
+    registerItemHooks(this);
+    registerHiddenHooks(this);
     // content behaviours: the passive, the map's hazards, 镜蚀, 节气
     this.running.length = 0;
     this.startBehaviour(this.content.passives[C.passive], undefined);
+    // m8 (PLAN E5): one Behaviour per held item that has one (engine/content/items.ts), arg = the count held
+    const IB = this.content.items;
+    if (IB) for (const id in run.items) { const n = run.items[id as ItemId] ?? 0; if (n > 0) this.startBehaviour(IB[id as ItemId], n); }
     for (const hz of this.map.hazards) {
       const def = this.hazardFrom(hz);
       if (def <= this.wave) this.startBehaviour(this.content.hazards[hz], undefined);
@@ -505,16 +521,26 @@ export class World implements WorldApi {
       if (!go) {
         try { this.skillRun.end?.(this); } catch { /* ignore */ }
         this.skillRun = null;
-        this.skillCd = this.skillCdMax;
+        // m8:hidden: a run may set its own next cooldown (越女's chained guards, 山鬼's cooldown from the bind)
+        this.skillCd = (this.cdNext >= 0 ? this.cdNext : this.skillCdMax) * this.cdX;
+        this.cdNext = -1;
       }
     } else if (this.skillCd > 0) this.skillCd = Math.max(0, this.skillCd - dt);
   }
 
-  /** Cast the 镜技 toward a world point (null: auto-target). */
-  castSkill(at: Vec | null, dir: Vec | null): boolean {
+  /** Cast the 镜技 toward a world point (null: auto-target). m8: `t` is the press's world time (engine/verbs.ts). */
+  castSkill(at: Vec | null, dir: Vec | null, t = this.t): boolean {
+    // m8:hidden: a press while a 'recast' run lives goes to its recast (山鬼's snap; hidden.md §2.5)
+    if (this.phase === 'wave' && this.skillRun?.recast) {
+      this.curWhat = 'skill';
+      try { this.skillRun.recast(this, t, dir); } catch (e) { this.hooks.error(e, false); }
+      this.curWhat = 'none';
+      return true;
+    }
     if (this.phase !== 'wave' || this.skillRun || this.skillCd > 0 || !this.skillDef || !this.skillImpl) return false;
     const def = this.skillDef;
     let target: Vec | null = at;
+    this.castT = t; this.castAimed = at !== null; this.cdNext = -1;
     this.curWhat = 'skill';
     try {
       if (!target) target = this.skillImpl.target(this, def);
@@ -526,6 +552,9 @@ export class World implements WorldApi {
       }
       this.skillRun = this.skillImpl.cast(this, def, { x: aim.x, y: aim.y }, d);
       this.emit('cast', -1, 0, false, 'skill', this.px, this.py, -1);
+      // m8:hidden: a 'hold' skill cast in one call (engine.skill(), the bot, the tutorial) is a press and an
+      // instant release: 后羿's tap shot (a zero dir = aim at the release; engine/verbs.ts)
+      if (!this.verbPress && def.input === 'hold' && this.skillRun?.release) this.skillRun.release(this, 0, this.castAimed ? d : { x: 0, y: 0 });
     } catch (e) {
       this.skillRun = null;
       this.hooks.error(e, false);
@@ -574,7 +603,8 @@ export class World implements WorldApi {
     this.collidePoint(true, oldX, oldY);
     const moved = Math.hypot(this.px - oldX, this.py - oldY);
     this.moving = moved > 0.5 * dt * 60 * 0.05;
-    if (this.moving) this.stillFor = 0; else this.stillFor += dt;
+    // m8 (I2): starting to move after standing still is the `go` event (动如脱兔)
+    if (this.moving) { if (this.stillFor > 0 && this.mods.evBuffs.length) this.itemBuffs('onGo', -1, this.stillFor); this.stillFor = 0; } else this.stillFor += dt;
     this.live.still = this.stillFor;
   }
 
@@ -617,6 +647,8 @@ export class World implements WorldApi {
     lv.hpFrac = this.hpMax > 0 ? this.hp / this.hpMax : 1;
     lv.swordsAir = this.swordsAir;
     lv.weapons = this.run.weapons.length;
+    // m8 (I1): the readings of the live converts that need the world (foes near you, unpulled 月华 near you)
+    if (this.mods.conv.length) this.itemConvReadings();
     liveStats(this.stats, this.base, this.mods, lv, {
       moonHeld: this.moonHeld, summons: this.summonsAlive, drunk: this.drunk, drunkActive: this.drunkOn,
       drunkFull: this.drunkOn && this.drunk >= 100, moonPhase: this.moonPhase, change: this.run.char === 'change',
@@ -629,7 +661,7 @@ export class World implements WorldApi {
       if (this.hp > hm) this.hp = hm;
     }
     this.pickupR = pickupRadius(this.stats);
-    this.moveSpd = F.baseSpeed * (1 + clamp(this.stats.speed, -60, 100) / 100);
+    this.moveSpd = moveSpeedOf(this.stats, this.moveCap);
   }
 
   private tickVitals(dt: number): void {
@@ -782,7 +814,7 @@ export class World implements WorldApi {
     }
     if (pick < 0) {
       // nothing can carry it: the 月华 goes to 蓄月 rather than vanishing
-      if (cost > 0) this.store += cost * (1 + 0.03 * Math.max(0, this.stats.curse) + this.mods.moonPct / 100);
+      if (cost > 0) this.store += cost * (1 + F.curseMoon * Math.max(0, this.stats.curse) + this.mods.moonPct / 100);
       return false;
     }
     // ⚖5 ceiling: a fed body never passes F.heavyInk.hpCap × its own HP (the 月华 and drops still move)
@@ -1047,7 +1079,7 @@ export class World implements WorldApi {
   }
 
   tele(t: TeleSpec): number {
-    return this.coreTele(t.shape, t.dur, 0, -1, 0, t.then ?? null);
+    return this.coreTele(t.shape, t.dur, 0, t.owner ?? -1, 0, t.then ?? null);
   }
   /** A telegraph; `code` > 0 runs a core strike when it fills (see strikeTele). */
   coreTele(shape: TeleSpec['shape'], dur: number, code: number, owner: number, v: number, fn: ((w: WorldApi) => void) | null): number {
@@ -1063,7 +1095,7 @@ export class World implements WorldApi {
   }
 
   drop(kind: DropKind, x: number, y: number, n = 1): void {
-    for (let k = 0; k < n; k++) this.dropOne(DK[kind], x, y, kind === 'moonThick' ? F.thickWorth : kind === 'goldShard' ? 4 : kind === 'carpGold' ? 5 : 1, -1);
+    for (let k = 0; k < n; k++) this.dropOne(DK[kind], x, y, kind === 'moonFull' ? F.moonTiers[0] : kind === 'moonThick' ? F.thickWorth : kind === 'goldShard' ? 4 : kind === 'carpGold' ? 5 : 1, -1);
   }
 
   attract(x: number, y: number, r: number): void {
@@ -1199,7 +1231,8 @@ export class World implements WorldApi {
     if (pk.scale) for (const k in pk.scale) r += (pk.scale[k as keyof Stats] ?? 0) * this.stats[k as keyof Stats];
     return Math.max(1, r);
   }
-  dmgMultNow(): number { return Math.max(0.1, 1 + Math.max(-90, this.stats.dmg) / 100); }
+  // m8 (PLAN L3): the 伤害 floor is CLAMP.dmgMin, read live (the 模拟场 may edit it)
+  dmgMultNow(): number { return Math.max(0.1, 1 + Math.max(CLAMP.dmgMin, this.stats.dmg) / 100); }
 
   /**
    * One player-side hit on slot i: crit roll, armour (+ shred), front shields, vulnerability, paper
@@ -1231,6 +1264,8 @@ export class World implements WorldApi {
     }
     let vuln = 1 + (E.vulnT[i] > 0 ? E.vulnV[i] / 100 : 0);
     if ((flags & HF.fire) && (tg & TAG_BIT.paper)) vuln *= 2;
+    // m8 斩草除根 / 百步穿杨 (items.md P6): weapon hits of their class, beside vulnerability
+    if (src === SRCI.weapon && slot >= 0 && !(flags & HF.dot) && (this.mods.execute.length || this.mods.far.length)) vuln *= this.itemHitX(i, slot);
     const shred = E.shredT[i] > 0 ? E.shredN[i] : 0;
     // DoT (burn, bleed, zones) is fractional per step: no armour, no rounding, no 1-point floor
     const d = flags & HF.dot ? dmg * front * vuln : playerHit(dmg, 1, crit, critM, { armor: E.armor[i], shred, noArmor, front, vuln });
@@ -1252,8 +1287,10 @@ export class World implements WorldApi {
       const b = this.byWeapon[id] ?? (this.byWeapon[id] = { dmg: 0, kills: 0 });
       b.dmg += d;
     }
-    // knockback (§4.2): impulse over 0.12 s; bosses resist fully
-    if (knock > 0 && E.resist[i] < 1 && E.kind[i] !== EKind.Boss) {
+    // knockback (§4.2): impulse over 0.12 s; bosses resist fully. m8 泰山压顶 (P7): its class pins instead of pushing
+    const pinD = this.mods.pin.length && src === SRCI.weapon && slot >= 0 && !(flags & HF.dot) ? this.itemPin(slot) : 0;
+    if (pinD > 0) this.statusSlot(i, 'root', pinD);
+    else if (knock > 0 && E.resist[i] < 1 && E.kind[i] !== EKind.Boss) {
       const dist = knockback(knock, this.stats.knock, E.resist[i], this.map.knockX);
       if (dist > 0) {
         let dx = E.x[i] - fx, dy = E.y[i] - fy;
@@ -1277,6 +1314,8 @@ export class World implements WorldApi {
         if (this.mods.critDrunk) this.addDrunk(this.mods.critDrunk * proc);
       }
       if (this.mods.hitHeal && this.erng() < this.mods.hitHeal.p * proc) this.capHeal(2, this.mods.hitHeal.v, this.mods.hitHeal.cap);
+      // m8: the items' on-hit buffs and statuses (weapon hits only; items.md P4, P5)
+      if (src === SRCI.weapon && slot >= 0 && (this.mods.evBuffs.length || this.mods.hitStatus.length)) this.itemOnHit(i, slot, d, crit, proc);
     }
     const h = E.handle(i);
     const act = E.actor[i];
@@ -1312,7 +1351,7 @@ export class World implements WorldApi {
   hitSlot(i: number, pk: HitPacket, fx: number, fy: number): number {
     const dmg = this.packetRaw(pk) * (pk.mult ?? 1) * this.dmgMultNow();
     const critP = pk.crit === true ? 1 : pk.crit === false ? 0 : clamp(this.stats.crit / 100, 0, 1);
-    const critM = F.critXDefault + this.stats.critDmg / 100 + Math.max(0, this.stats.crit - 100) / 100;
+    const critM = F.critXDefault + this.stats.critDmg / 100 + (Math.max(0, this.stats.crit - 100) / 100) * critOverflowOf(this.run);
     let flags = pk.noArmor ? HF.noArmor : 0;
     if (pk.crit === true) flags |= HF.forceCrit;
     if (pk.crit === false) flags |= HF.noCrit;
@@ -1404,9 +1443,15 @@ export class World implements WorldApi {
         // 3/s + 30% 近战 for 3 s, up to 5 stacks (猫爪 IV: 15)
         const cap = Math.min(BLEED_MAX, cap0 || 5);
         const dps = 3 + 0.3 * Math.max(0, this.stats.melee);
+        // m8 见血封喉 (P5): v > 0 is the stack's own damage a second (a share of the hit); 猫爪 passes 0
+        const per = v > 0 ? v : dps;
         const o = i * BLEED_MAX;
-        if (E.bleedN[i] < cap) { E.bleedT[o + E.bleedN[i]] = dur; E.bleedD[o + E.bleedN[i]] = dps; E.bleedN[i]++; }
-        else { let lo = 0; for (let s = 1; s < E.bleedN[i]; s++) if (E.bleedT[o + s] < E.bleedT[o + lo]) lo = s; E.bleedT[o + lo] = dur; }
+        if (E.bleedN[i] < cap) { E.bleedT[o + E.bleedN[i]] = dur; E.bleedD[o + E.bleedN[i]] = per; E.bleedN[i]++; }
+        else {
+          let lo = 0; for (let s = 1; s < E.bleedN[i]; s++) if (E.bleedT[o + s] < E.bleedT[o + lo]) lo = s; E.bleedT[o + lo] = dur;
+          // a refresh at the cap keeps the larger damage a second (items.md §R.4 ⑮)
+          if (v > 0) E.bleedD[o + lo] = Math.max(E.bleedD[o + lo], per);
+        }
         break;
       }
       case 'slow': {
@@ -1478,6 +1523,10 @@ export class World implements WorldApi {
     const k = E.kind[i], id = E.id[i], x = E.x[i], y = E.y[i];
     // everything read after release is taken now: a splitter's first child reuses slot i
     const lastSlot = E.lastSlot[i], lastSrc = E.lastSrc[i], r = E.r[i], burning = E.burnN[i] > 0, hitA = E.hitA[i];
+    // m8 连环计 / 星火燎原 (P8): the victim's max HP and its strongest burn, read before the release
+    const hpMax0 = E.hpMax[i];
+    let burnD0 = 0;
+    if (burning && this.mods.spread.length) for (let s = 0; s < E.burnN[i]; s++) burnD0 = Math.max(burnD0, E.burnD[i * BURN_MAX + s]);
     // 打击感: the look its death burst breaks apart (the slot may be reused before feel.kill)
     const look = E.atlas[i], lookFace = E.face[i], lookK = E.r[i] / Math.max(1, E.r0[i]);
     E.hp[i] = Math.min(E.hp[i], 0);
@@ -1515,9 +1564,11 @@ export class World implements WorldApi {
     }
     if (drops && !E.noDrops[i] && !ally && k !== EKind.Demon) this.killDrops(i, k, id, x, y);
     if (!ally) onWeaponKill(this, lastSlot, x, y, crit, burning);
-    if (k === EKind.Demon && drops) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
+    if (k === EKind.Demon && drops && this.erng() * 100 < this.mods.demonCrate) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
     onEnemyDeath(this, i, k, id, x, y, crit);
     this.emit('kill', h, 0, crit, SRC[lastSrc] ?? 'weapon', x, y, lastSlot);
+    // m8: the items' on-kill buffs, bursts and spreads (items.md P4, P8)
+    if (!ally && (this.mods.evBuffs.length || this.mods.blast.length || this.mods.spread.length)) this.itemOnKill(k, x, y, hpMax0, burnD0, lastSlot);
     // ink (打击感): the body breaks into its pieces over a splash on the ground, a wet crown and flung
     // drops, then a stain stamped into the paper. The dark ink burst (drawn in the effects layer, over
     // the pieces) only when nothing breaks: an ally, a degraded frame, a crowd's fifth death in a step.
@@ -1539,7 +1590,8 @@ export class World implements WorldApi {
   private killDrops(i: number, k: number, id: string, x: number, y: number): void {
     const E = this.E;
     const luck = luckMult(this.stats.luck);
-    const vx = 1 + 0.03 * Math.max(0, this.stats.curse) + this.mods.moonPct / 100;
+    // 劫's 月华 (m8: F.curseMoon, not a literal)
+    const vx = 1 + F.curseMoon * Math.max(0, this.stats.curse) + this.mods.moonPct / 100;
     let cost = E.cost[i];
     if (k === EKind.Mon) {
       const whole = Math.floor(cost), frac = cost - whole;
@@ -1554,8 +1606,10 @@ export class World implements WorldApi {
       // the k-th kill carries the wave's 铜钱 (§16.3)
       this.coinFor('wave', x, y, this.kills);
     } else if (k === EKind.Elite) {
-      this.dropMoon(x, y, cost * vx);
+      // m8 与虎谋皮 (P14): the elite's 月华 + eliteMoonPct %, and eliteCrates more 镜奁
+      this.dropMoon(x, y, cost * vx * (1 + this.mods.eliteMoonPct / 100));
       this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); this.sfx('crate');
+      for (let c = 0; c < this.mods.eliteCrates; c++) { this.crates++; this.dropOne(DK.crateBox, x, y, 1, -1); this.hooks.crate(this.crates); }
       this.coinFor('elite', x, y, this.eliteKills);
     } else if (k === EKind.Treasure) {
       if (id === 'pixiu') {
@@ -1646,9 +1700,13 @@ export class World implements WorldApi {
   hurt(n: number, o?: { undodgeable?: boolean; noArmor?: boolean; src?: string }): void {
     this.hurtFrom(n, -1, !!o?.undodgeable, !!o?.noArmor, o?.src ?? 'hazard', !!(o as { dot?: boolean } | undefined)?.dot, false);
   }
-  hurtFrom(n: number, attacker: number, undodgeable: boolean, noArmor: boolean, src: string, dot: boolean, melee: boolean): number {
+  hurtFrom(n: number, attacker: number, undodgeable: boolean, noArmor: boolean, src: string, dot: boolean, melee: boolean, shot = -1): number {
     if (this.phase !== 'wave' || n <= 0) return 0;
-    if (!dot && (this.iframes > 0 || this.invulnT > 0 || this.untargT > 0 || this.leapT > 0)) return 0;
+    // m8 (PLAN C9): invulnerable, untargetable or mid-leap first; then the guard (越女: a caught blow never lands,
+    // never scatters and never reaches the items); then the i-frames
+    if (!dot && (this.invulnT > 0 || this.untargT > 0 || this.leapT > 0)) return 0;
+    if (!dot && this.guardHook !== null && this.guardHook(n, attacker, shot, src, melee)) return 0;
+    if (!dot && this.iframes > 0) return 0;
     if (dot && (this.invulnT > 0 || this.untargT > 0)) return 0;
     if (this.godmode) return 0;
     if (!undodgeable && !dot && this.erng() < dodgeChance(this.stats.dodge, this.dodgeCap)) {
@@ -1667,6 +1725,8 @@ export class World implements WorldApi {
       const E = this.E;
       if (Math.hypot(E.x[attacker] - this.px, E.y[attacker] - this.py) <= PASSIVES.yibo.p.auraR) n *= 1 - PASSIVES.yibo.p.aura / 100;
     }
+    // m8 (PLAN C9): the blow's scalers before armour (醉卧沙场, 露), each a factor
+    for (let k = 0; k < this.hurtScalers.length; k++) n *= this.hurtScalers[k](n, attacker, shot, src, dot, melee);
     let d = enemyHit(n, this.stats.armor, { maxHp: this.hpMax, guan: this.run.char === 'guan', noArmor: noArmor || dot });
     if (this.shieldV > 0) {
       const a = Math.min(this.shieldV, d);
@@ -1689,6 +1749,8 @@ export class World implements WorldApi {
       this.feel.hurt(sx, sy, attacker >= 0 && this.E.kind[attacker] === EKind.Boss, this.hpMax > 0 ? d / this.hpMax : 0);
       this.emit('hurt', attacker >= 0 ? this.E.handle(attacker) : -1, d, false, 'enemy', this.px, this.py, -1);
       if (attacker >= 0) this.thorns(attacker, n, melee);
+      // m8 (PLAN C9): after the blow landed (千金散尽)
+      for (let k = 0; k < this.afterHurt.length; k++) this.afterHurt[k](d, n, attacker, shot, src, melee);
     }
     if (this.hp <= 0) this.lethal();
     return d;
@@ -1701,11 +1763,13 @@ export class World implements WorldApi {
     this.sfx('dodge');
     this.dodgeWin = 2;
     const m = this.mods;
-    if (m.dodgeBuff) this.buff('dodgeBuff', m.dodgeBuff.stats, m.dodgeBuff.dur);
-    if (m.shards) {
-      const raw = m.shards.base + this.scaleSum(m.shards.scale);
-      for (let k = 0; k < m.shards.n; k++) {
-        const a = this.face + (k - (m.shards.n - 1) / 2) * 0.6 + Math.PI;
+    // m8 (I2): every onDodge buff (广寒桂 …), keyed per effect; 后发先至 primes the weapons
+    if (m.evBuffs.length) this.itemBuffs('onDodge', -1);
+    if (m.prime) this.itemPrime();
+    for (const sh of m.shards) {
+      const raw = sh.base + this.scaleSum(sh.scale);
+      for (let k = 0; k < sh.n; k++) {
+        const a = this.face + (k - (sh.n - 1) / 2) * 0.6 + Math.PI;
         const i = this.PS.spawnSlot();
         if (i < 0) break;
         const PS = this.PS;
@@ -2005,40 +2069,46 @@ export class World implements WorldApi {
   // ═══════════════════════════════════════════════════════════ drops (§6, §16.3)
 
   dropMoon(x: number, y: number, worth: number): void {
-    // one pickup per whole point; a fractional remainder rides on the last
-    let left = worth;
-    while (left > 0.001) {
-      const w = left >= 2 ? 1 : left;
-      this.dropOne(DK.moonDrop, x, y, w, -1);
-      left -= w;
-    }
+    // m8 (PLAN D20): 满月 25 / 月华珠 5 / 月华 1, greedily; one 月华 per whole point below 5 and a fractional
+    // remainder rides on the last piece, so an ordinary 1–3 kill drops exactly as before
+    const P = splitMoon(worth, this.moonPieces);
+    for (let k = 0; k < P.length; k++) this.dropOne(moonKindOf(P[k]), x, y, P[k], -1);
   }
-  dropOne(kind: number, x: number, y: number, worth: number, coin: number): void {
+  /**
+   * One pickup. m8 (PLAN E4) `o`: `own` = your own scattered 月华 (千金散尽: picked up, it only comes back; left
+   * lying at the wave's end, it is result().lost); `hold` = seconds before it can be pulled or taken; `noFuse` =
+   * never joins a 浓墨 fusion.
+   */
+  dropOne(kind: number, x: number, y: number, worth: number, coin: number, o?: { own?: boolean; hold?: number; noFuse?: boolean }): void {
     const D = this.D;
-    // 浓墨: past 300 on the ground, drops fuse (a moon drop joins an existing one)
-    if ((kind === DK.moonDrop || kind === DK.moonThick) && D.count >= F.thickAbove) {
+    // 浓墨: past 300 on the ground, drops fuse (a moon drop joins an existing one; m8: never an own piece)
+    if (!o?.noFuse && isMoonKind(kind) && D.count >= F.thickAbove) {
       let pick = -1;
       for (let tries = 0; tries < 6; tries++) {
         const j = Math.floor(this.erng() * D.n);
-        if (D.alive[j] && (D.kind[j] === DK.moonDrop || D.kind[j] === DK.moonThick)) { pick = j; break; }
+        if (D.alive[j] && !D.own[j] && isMoonKind(D.kind[j])) { pick = j; break; }
       }
       if (pick >= 0) {
         D.worth[pick] += worth;
-        if (D.worth[pick] >= F.thickWorth) D.kind[pick] = DK.moonThick;
+        // m8: the fused piece wears the pearl of its worth (月华珠 from 5, 满月 from 25; never smaller)
+        const fk = moonKindOf(D.worth[pick]);
+        if (fk === DK.moonFull || (fk === DK.moonThick && D.kind[pick] === DK.moonDrop)) D.kind[pick] = fk;
         return;
       }
     }
     let i = D.take();
     if (i < 0) {
+      // m8: an own piece with nowhere to land simply stays yours
+      if (o?.own) { this.moonHeld += worth; return; }
       // the pool is full: 月华 (and gold that is only 月华) is collected at once …
-      if (kind === DK.moonDrop || kind === DK.moonThick || kind === DK.goldShard || kind === DK.carpGold) { this.collectMoon(worth); return; }
+      if (isMoonWorth(kind)) { this.collectPiece(kind, worth); return; }
       // … and anything else takes the slot of the oldest 月华 on the ground, which is collected
       // (a planned 铜钱 is real money and must never be lost)
       let old = -1, oa = -1;
       for (let j = 0; j < D.n; j++) {
         if (!D.alive[j]) continue;
         const kj = D.kind[j];
-        if ((kj === DK.moonDrop || kj === DK.moonThick || kj === DK.goldShard || kj === DK.carpGold) && D.age[j] > oa) { oa = D.age[j]; old = j; }
+        if (isMoonWorth(kj) && D.age[j] > oa) { oa = D.age[j]; old = j; }
       }
       if (old < 0) {
         // nothing to evict (the ground is all coins, seeds and crates): a coin goes straight to the sleeve
@@ -2047,13 +2117,15 @@ export class World implements WorldApi {
       }
       const w = D.worth[old];
       D.release(old);
-      this.collectMoon(w);
+      // m8: an own piece only comes back (no XP, no 蓄月 draw, no tally)
+      if (D.own[old]) this.moonHeld += w; else this.collectPiece(D.kind[old], w);
       i = D.take();
       if (i < 0) return;
     }
     const a = this.erng() * TAU, s = 60 + 80 * this.erng();
     D.kind[i] = kind; D.x[i] = x; D.y[i] = y; D.vx[i] = Math.cos(a) * s; D.vy[i] = Math.sin(a) * s;
     D.worth[i] = worth; D.age[i] = 0; D.magnet[i] = kind === DK.crateBox || kind === DK.heartDrop || kind === DK.relicMirror || kind === DK.relicSword ? 1 : 0; D.coin[i] = coin;
+    D.own[i] = o?.own ? 1 : 0; D.hold[i] = o?.hold ?? 0;
     // a 镜宝 rises from the fallen boss and hangs there ~0.75 s (the pop arc runs while age < 0.25) before it
     // flies to you, so the moment reads; same RNG draws as any drop
     if (kind === DK.relicMirror || kind === DK.relicSword) { D.vx[i] = 0; D.vy[i] = -150; D.age[i] = -0.5; }
@@ -2068,14 +2140,18 @@ export class World implements WorldApi {
       D.age[i] += dt;
       // the 0.25 s pop arc
       if (D.age[i] < 0.25) { D.x[i] += D.vx[i] * dt; D.y[i] += D.vy[i] * dt; D.vx[i] *= 0.88; D.vy[i] *= 0.88; continue; }
+      // m8 (E4): a held piece (千金散尽's landing) can't be pulled or taken yet
+      if (D.hold[i] > 0) { D.hold[i] -= dt; continue; }
       const dx = this.px - D.x[i], dy = this.py - D.y[i], d2 = dx * dx + dy * dy;
       const k = D.kind[i];
       if (!D.magnet[i] && d2 < pr2) { D.magnet[i] = 1; this.feel.zip(); }
-      if (!D.magnet[i] && fetch > 0 && d2 < fetch * fetch && this.summonsAlive >= 0 && (k === DK.moonDrop || k === DK.moonThick)) D.magnet[i] = 1;
+      if (!D.magnet[i] && fetch > 0 && d2 < fetch * fetch && this.summonsAlive >= 0 && isMoonKind(k)) D.magnet[i] = 1;
       if (D.magnet[i]) {
         const d = Math.sqrt(d2) || 1;
         const sp = Math.min(F.pickupMaxSpeed, 260 + D.age[i] * 900) * (D.magnet[i] === 2 ? 1.4 : 1);
         D.x[i] += (dx / d) * sp * dt; D.y[i] += (dy / d) * sp * dt;
+        // m8 月华如练: a streaming piece (engine/content/items.ts sets onStream)
+        if (this.onStream !== null) this.onStream(i);
       }
       if (d2 <= take * take) this.pickup(i);
     }
@@ -2086,9 +2162,11 @@ export class World implements WorldApi {
     const k = D.kind[i], worth = D.worth[i];
     this.feel.pickup(D.x[i], D.y[i], k === DK.cashCoin || k === DK.cashString || k === DK.cashTen || k === DK.goldShard);
     D.release(i);
+    // m8 (E4): your own scattered 月华 comes back as it was: no XP, no 蓄月 draw, no tally, no pickup event
+    if (D.own[i]) { this.moonHeld += worth; return; }
     switch (k) {
-      case DK.moonDrop: case DK.moonThick: case DK.goldShard: case DK.carpGold:
-        this.collectMoon(worth);
+      case DK.moonDrop: case DK.moonThick: case DK.moonFull: case DK.goldShard: case DK.carpGold:
+        this.collectPiece(k, worth);
         break;
       case DK.crateBox: this.sfx('crate'); break;
       case DK.lotusSeed: this.heal(F.lotusHeal); this.sfx('pickup'); break;
@@ -2114,10 +2192,11 @@ export class World implements WorldApi {
   }
   private pickCombo = 0;
   private pickT = 0;
-  collectMoon(worth: number): void {
+  collectMoon(worth: number, draws = 1, big = 0): void {
     let w = worth;
-    // 蓄月: each pickup draws one extra from the store until it is empty
-    if (this.store > 0) { const s = Math.min(this.store, 1); this.store -= s; this.storeUsed += s; w += s; }
+    // 蓄月: each pickup draws one extra from the store until it is empty (m8, PLAN D21: a pearl draws one per
+    // whole point of its worth, `draws`, so the tiers leave the income as it was)
+    if (this.store > 0) { const s = Math.min(this.store, draws); this.store -= s; this.storeUsed += s; w += s; }
     this.moonGot += w;
     this.moonHeld += w;
     this.addStat('moonCollected', w);
@@ -2134,7 +2213,12 @@ export class World implements WorldApi {
     if (this.t - this.pickT > 0.6) this.pickCombo = 0;
     this.pickT = this.t;
     this.pickCombo++;
-    if ((this.pickCombo & 1) === 1) { try { this.audio?.pickup(this.pickCombo >> 1); } catch { /* optional */ } }
+    // the chime climbs 宫商角徵羽 on every other pickup; m8: a 月华珠 / 满月 always sounds, an octave up, and a
+    // 满月 adds a soft bell (big: 1 月华珠, 2 满月)
+    try {
+      if (big > 0) { this.audio?.pickup(((this.pickCombo >> 1) % 10) + 5); if (big >= 2) this.audio?.sfx('bell', { gain: 0.5 }); }
+      else if ((this.pickCombo & 1) === 1) this.audio?.pickup((this.pickCombo >> 1) % 10);
+    } catch { /* optional */ }
   }
   /** Mid-wave level: +1 气血 and heal 1, a 120 u knockback ring and the chime (GDD §6, §20). */
   private levelUp(): void {
@@ -2207,7 +2291,7 @@ export class World implements WorldApi {
     if (this.untargT > 0 || this.leapT > 0) return false;
     const sp = Math.hypot(ES.vx[i], ES.vy[i]) || 1;
     this.hurtSrcX = ES.x[i] - (ES.vx[i] / sp) * 40; this.hurtSrcY = ES.y[i] - (ES.vy[i] / sp) * 40;
-    const dealt = this.hurtFrom(ES.dmg[i], -1, false, false, ES.owner[i] >= 0 ? this.E.id[ES.owner[i]] : 'shot', false, false);
+    const dealt = this.hurtFrom(ES.dmg[i], -1, false, false, ES.owner[i] >= 0 ? this.E.id[ES.owner[i]] : 'shot', false, false, i);
     this.hurtSrcX = NaN; this.hurtSrcY = NaN;
     if (dealt > 0 && ES.status[i]) {
       const kind = ES.status[i] - 1;
@@ -2284,8 +2368,12 @@ export class World implements WorldApi {
       const shape = T.shape[i];
       T.release(i);
       T.fn[i] = null;
-      if (code) strikeTele(this, code, shape, owner, v);
-      if (fn) { try { fn(this); } catch (e) { this.hooks.error(e, false); } }
+      // m8: the telegraph striking now, for the guard's 破招 (WorldApi.underTele)
+      this.teleOwner = owner;
+      try {
+        if (code) strikeTele(this, code, shape, owner, v);
+        if (fn) { try { fn(this); } catch (e) { this.hooks.error(e, false); } }
+      } finally { this.teleOwner = -1; }
     }
   }
 
@@ -2421,7 +2509,9 @@ export class World implements WorldApi {
     for (let i = 0; i < D.n; i++) {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
-      if (k === DK.moonDrop || k === DK.moonThick || k === DK.goldShard || k === DK.carpGold) { field += D.worth[i]; this.fx('petalBurst', D.x[i], D.y[i], { r: 8, life: 0.4 }); D.release(i); }
+      // m8 (E4): your own 月华 left lying is lost (result().lost), never 蓄月
+      if (D.own[i]) { this.ownLost += D.worth[i]; this.fx('petalBurst', D.x[i], D.y[i], { r: 8, life: 0.4 }); D.release(i); continue; }
+      if (isMoonWorth(k)) { field += D.worth[i]; this.fx('petalBurst', D.x[i], D.y[i], { r: 8, life: 0.4 }); D.release(i); }
       else if (k !== DK.relicMirror && k !== DK.relicSword) D.magnet[i] = 2; // a 镜宝 keeps its own rise and flight
     }
     this.fieldMoon = field;
@@ -2457,6 +2547,8 @@ export class World implements WorldApi {
     const vx = 1;
     void vx;
     const stats: RunStats = { ...this.rs, ms: Math.round(this.tWave * 1000) };
+    // m8 (E4): own 月华 left on the ground (千金散尽); present only when some was lost
+    const lost = Math.round(this.ownLost);
     return {
       wave: this.wave,
       moon: Math.round(this.moonGot),
@@ -2476,6 +2568,7 @@ export class World implements WorldApi {
       bosses: this.bossesKilled.slice() as WaveResult['bosses'],
       relics: this.relicsGot.slice(),
       ms: Math.round(this.tWave * 1000),
+      ...(lost > 0 ? { lost } : {}),
     };
   }
 
@@ -2500,8 +2593,9 @@ export class World implements WorldApi {
       }
       h.boss = max > 0 ? { id: this.bossHudId(id), hp: hp / max, phase } : null;
     } else h.boss = null;
-    h.skillCd = this.skillRun ? 1 : this.skillCdMax > 0 ? this.skillCd / this.skillCdMax : 0;
+    h.skillCd = this.skillRun ? 1 : this.skillCdMax > 0 ? this.skillCd / (this.skillCdMax * this.cdX) : 0;
     h.skillActive = !!this.skillRun;
+    this.hiddenHud(h); // m8:hidden (skillHeld, skillRecast, ring)
     h.drunk = this.drunkOn ? Math.round(this.drunk) : null;
     h.moonPhase = this.run?.char === 'change' ? this.moonPhase : null;
     h.lives = this.run?.char === 'cat' ? this.lives : null;
@@ -2526,7 +2620,7 @@ export class World implements WorldApi {
     this.qd = 0;
     if (this.curWhat === 'enemy' && this.cur >= 0 && this.E.alive[this.cur]) { this.E.actor[this.cur] = null; this.E.release(this.cur); }
     else if (this.curWhat === 'summon' && this.cur >= 0) this.S.release(this.cur);
-    else if (this.curWhat === 'skill') { this.skillRun = null; this.skillCd = this.skillCdMax; }
+    else if (this.curWhat === 'skill') { this.skillRun = null; this.skillCd = this.skillCdMax * this.cdX; }
     this.cur = -1;
     this.curWhat = 'none';
   }
@@ -2549,6 +2643,431 @@ export class World implements WorldApi {
     E.speed[i] = this.moveSpd * 0.6;
     E.cost[i] = 0;
     E.noDrops[i] = 0;
+  }
+
+  // ═══════════════════════════════════════════════════════════ m8 · the seams (Lane 0, PLAN §3.5; frozen)
+  // Each is empty or 1 unless a lane fills it, and begin resets it every wave before registerItemHooks /
+  // registerHiddenHooks run. Lanes add their own World members only inside their block below.
+
+  /** 越女's guard window (HIDDEN): asked first for every blow that is not a DoT and reaches the player past
+   *  invuln / untargetable / leap, before the i-frames; true = caught (no damage, no dodge roll, no items). */
+  guardHook: ((n: number, attacker: number, shot: number, src: string, melee: boolean) => boolean) | null = null;
+  /** Factors on a blow before armour (ITEMS 醉卧沙场, HIDDEN 露); DoTs pass through too (`dot`). */
+  readonly hurtScalers: ((n: number, attacker: number, shot: number, src: string, dot: boolean, melee: boolean) => number)[] = [];
+  /** After a blow (not a DoT) landed: d = dealt after armour and shield, n = before armour (ITEMS 千金散尽). */
+  readonly afterHurt: ((d: number, n: number, attacker: number, shot: number, src: string, melee: boolean) => void)[] = [];
+  /** The owner of the telegraph striking now (T.owner: an enemy handle, or −1); set around tickTeles' strike. */
+  teleOwner = -1;
+  /** 模拟场: the 镜技 cooldown multiplier (1 = normal). */
+  cdX = 1;
+  /** 月华如练 (ITEMS): called each step for each magnetised drop slot, after it moved. */
+  onStream: ((i: number) => void) | null = null;
+  /** Drawn at the figure layer just before your figure (engine/render.ts); true = skip the default figure
+   *  (越女's guard pose, 后羿's draw). Rings and tethers draw here too. */
+  readonly playerHooks: ((ctx: CanvasRenderingContext2D, cam: Camera, W: World) => boolean)[] = [];
+  /** Own 月华 left lying at this wave's end (千金散尽): result().lost. */
+  ownLost = 0;
+  /** 画地为牢: the walking-speed cap as × F.baseSpeed (Infinity = none), from moveCapOf(run) at begin. */
+  moveCap = Infinity;
+  /** The 技 button down at `at` s (engine/verbs.ts; a 'tap' skill casts as today). */
+  press(at: number): void { pressSkill(this, at); }
+  /** The 技 button up at `at` s; dir null = cancel (engine/verbs.ts). */
+  release(dir: Vec | null, at: number): void { releaseSkill(this, dir, at); }
+
+  // ── m8:items ──
+  // The new items' engine readers (items.md §5, PLAN §4.I). Every number comes from the item's fx (Mods); the
+  // call sites in strikeIn / killIn / onDodge / tickPlayer / recomputeStats are one guarded line each.
+
+  /** I2: the stacks of each keyed event buff now running. */
+  private itemStack = new Map<string, number>();
+  /** 后发先至: the slots in primeMask are primed until primeT; it can prime again from primeReady. */
+  primeT = -1;
+  primeMask = 0;
+  private primeReady = 0;
+  /** 连环计: pending bursts (x, y, victim max HP), the per-second window, each boss's last burst. */
+  private blastQ: number[] = [];
+  private blasting = false;
+  private blastTimes: number[] = [];
+  private blastBoss = new Map<number, number>();
+  /** 星火燎原's recent spread times; 倒戈相向's own turned foes (handles). */
+  private spreadTimes: number[] = [];
+  private turned: number[] = [];
+  /** This wave's item-op tallies (tests, the 模拟场). */
+  itemTally = { blasts: 0, bossBlasts: 0, spreads: 0, turned: 0, primed: 0, scattered: 0, streamHits: 0 };
+
+  /** Every wave (registerItemHooks, from begin): the item ops start clean. */
+  itemBegin(): void {
+    this.itemStack.clear();
+    this.primeT = -1; this.primeMask = 0; this.primeReady = 0;
+    this.blastQ.length = 0; this.blasting = false; this.blastTimes.length = 0; this.blastBoss.clear();
+    this.spreadTimes.length = 0; this.turned.length = 0;
+    if (this.stoneBorn.length !== this.ST.cap) this.stoneBorn = new Float64Array(this.ST.cap);
+    this.streamAt.fill(-1);
+    this.itemTally = { blasts: 0, bossBlasts: 0, spreads: 0, turned: 0, primed: 0, scattered: 0, streamHits: 0 };
+  }
+
+  /** A per-second budget over any 1 s window: true (and counted) while fewer than `per` happened in the last second. */
+  private itemRate(times: number[], per: number): boolean {
+    while (times.length && this.t - times[0] >= 1) times.shift();
+    if (times.length >= per) return false;
+    times.push(this.t);
+    return true;
+  }
+  /** I2: one event buff fires: a stack more (up to its `stack`), `dur` refreshed, all stacks end together. */
+  itemBuff(b: EvBuff): void {
+    let cur = 0;
+    for (let j = 0; j < this.buffs.length; j++) if (this.buffs[j].key === b.key) { cur = this.itemStack.get(b.key) ?? 0; break; }
+    const n = Math.min(b.stack, cur + 1);
+    this.itemStack.set(b.key, n);
+    this.buff(b.key, b.lv[n - 1], b.dur, b.moveX);
+  }
+  /** I2: fire the event buffs of `hook`. `slot` ≥ 0 filters by the weapon's class; `still` is the stand-still time
+   *  an `onGo` ends (each needs ≥ its `after`). */
+  itemBuffs(hook: EvBuff['hook'], slot: number, still = 0): void {
+    const L = this.mods.evBuffs;
+    for (let q = 0; q < L.length; q++) {
+      const b = L[q];
+      if (b.hook !== hook) continue;
+      if (b.cls && !(slot >= 0 && slot < this.slots.length && this.slots[slot].cls.includes(b.cls))) continue;
+      if (hook === 'onGo' && still < b.after) continue;
+      this.itemBuff(b);
+    }
+  }
+
+  /** P6 (斩草除根, 百步穿杨): the factor on a weapon hit of slot `slot` on enemy slot `i` (1 when none applies). */
+  itemHitX(i: number, slot: number): number {
+    const sl = this.slots[slot];
+    if (!sl) return 1;
+    const E = this.E;
+    let x = 1;
+    for (const e of this.mods.execute) {
+      if (!sl.cls.includes(e.cls) || E.hp[i] >= e.below * E.hpMax[i]) continue;
+      x *= E.kind[i] === EKind.Elite || E.kind[i] === EKind.Boss ? e.bigX : e.x;
+    }
+    for (const f of this.mods.far) {
+      if (!sl.cls.includes(f.cls)) continue;
+      const d = Math.hypot(E.x[i] - this.px, E.y[i] - this.py);
+      x *= 1 + Math.min(f.max, (f.pct * d) / f.per) / 100;
+    }
+    return x;
+  }
+  /** P7 (泰山压顶): the root a weapon hit of slot `slot` gives instead of its push (0 = push as usual). */
+  itemPin(slot: number): number {
+    const sl = this.slots[slot];
+    if (!sl) return 0;
+    let d = 0;
+    for (const p of this.mods.pin) if (sl.cls.includes(p.cls)) d = Math.max(d, p.dur);
+    return d;
+  }
+  /** P4 + P5: a weapon hit (not noProc) of slot `slot` dealt `d` to enemy slot `i`. */
+  itemOnHit(i: number, slot: number, d: number, crit: boolean, proc: number): void {
+    const sl = this.slots[slot];
+    if (!sl) return;
+    const L = this.mods.evBuffs;
+    for (let q = 0; q < L.length; q++) {
+      const b = L[q];
+      if (b.hook !== 'onHit' && !(crit && b.hook === 'onCrit')) continue;
+      if (b.cls && !sl.cls.includes(b.cls)) continue;
+      this.itemBuff(b);
+    }
+    const E = this.E;
+    for (const st of this.mods.hitStatus) {
+      if (!E.alive[i]) return;
+      if (st.cls && !sl.cls.includes(st.cls)) continue;
+      // a chance below 100 % is a proc: × the weapon's proc coefficient, × 福缘 when `luck`
+      if (st.p < 100 && this.erng() >= (st.p / 100) * proc * (st.luck ? luckMult(this.stats.luck) : 1)) continue;
+      if (st.kind === 'convert') { this.itemTurn(i, st.dur, st.cap); continue; }
+      const boss = E.kind[i] === EKind.Boss;
+      const v = st.ofHit > 0 ? ((d * st.ofHit) / 100) * st.n : boss ? st.bossV : st.v;
+      this.statusSlot(i, st.kind, st.dur, v, st.cap);
+    }
+  }
+  /** 倒戈相向: turn an ordinary foe still standing for `dur`, while fewer than `cap` it turned are still on your side. */
+  private itemTurn(i: number, dur: number, cap: number): void {
+    const E = this.E;
+    if (E.kind[i] !== EKind.Mon || E.hp[i] <= 0) return;
+    let live = 0;
+    for (let q = this.turned.length - 1; q >= 0; q--) {
+      const j = E.slotOf(this.turned[q]);
+      if (j < 0 || !E.alive[j] || E.kind[j] !== EKind.Ally) this.turned.splice(q, 1); else live++;
+    }
+    if (cap > 0 && live >= cap) return;
+    const h = E.handle(i);
+    this.convert(h, dur);
+    this.turned.push(h);
+    this.itemTally.turned++;
+    this.fx('charmMark', E.x[i], E.y[i], { r: E.r[i] * 1.4, life: 0.5 });
+  }
+  /** P4 + P8: a kill (not an ally) of kind `k` at (x, y), with the victim's max HP, strongest burn and last weapon slot. */
+  itemOnKill(k: number, x: number, y: number, hpMax: number, burnD: number, slot = -1): void {
+    const L = this.mods.evBuffs;
+    for (let q = 0; q < L.length; q++) {
+      const b = L[q];
+      if (b.hook !== 'onKill') continue;
+      if (b.cls && !(slot >= 0 && slot < this.slots.length && this.slots[slot].cls.includes(b.cls))) continue;
+      this.itemBuff(b);
+    }
+    if (this.mods.blast.length && (k === EKind.Mon || k === EKind.Elite)) {
+      this.blastQ.push(x, y, hpMax);
+      if (!this.blasting) this.itemBlastDrain();
+    }
+    if (burnD > 0 && this.mods.spread.length) this.itemSpread(x, y, burnD);
+  }
+  /**
+   * 连环计: burst the queued kills, oldest first. A burst strikes every foe within r for pct % of the victim's max HP,
+   * raw (no 伤害, no crit, no procs; armour applies); a boss takes at most bossPct % of its own max HP from one burst
+   * and is touched by at most bossPerSec bursts a second; at most perSec bursts a second. A burst's kills queue
+   * their own bursts here (no recursion).
+   */
+  private itemBlastDrain(): void {
+    this.blasting = true;
+    try {
+      const E = this.E, Q = this.blastQ;
+      for (let q = 0; q < Q.length; q += 3) {
+        const x = Q[q], y = Q[q + 1], hpMax = Q[q + 2];
+        for (const b of this.mods.blast) {
+          if (!this.itemRate(this.blastTimes, b.perSec)) continue;
+          this.itemTally.blasts++;
+          this.fx('shockRing', x, y, { r: b.r, life: 0.3 });
+          const buf = this.q1;
+          const cnt = this.hash.gather(x, y, b.r + 64, buf);
+          for (let t = 0; t < cnt; t++) {
+            const j = buf[t];
+            if (!this.targetable(j)) continue;
+            const dx = E.x[j] - x, dy = E.y[j] - y, rr = b.r + E.r[j];
+            if (dx * dx + dy * dy > rr * rr) continue;
+            let dmg = (b.pct / 100) * hpMax;
+            if (E.kind[j] === EKind.Boss) {
+              const h = E.handle(j), last = this.blastBoss.get(h) ?? -Infinity;
+              if (this.t - last < 1 / b.bossPerSec) continue;
+              this.blastBoss.set(h, this.t);
+              // the cap holds after the boss's vulnerability, too
+              const vuln = 1 + (E.vulnT[j] > 0 ? E.vulnV[j] / 100 : 0);
+              dmg = Math.min(dmg, ((b.bossPct / 100) * E.hpMax[j]) / vuln);
+              this.itemTally.bossBlasts++;
+            }
+            this.strike(j, dmg, 0, 1, 0, x, y, -1, SRCI.item, HF.noCrit | HF.noProc);
+          }
+        }
+      }
+      Q.length = 0;
+    } finally { this.blasting = false; }
+  }
+  /** 星火燎原: a burning kill passes its strongest burn (dps) to the n nearest foes within r, at most perSec a second. */
+  private itemSpread(x: number, y: number, dps: number): void {
+    const E = this.E;
+    for (const sp of this.mods.spread) {
+      // (the budget is spent only when a fire actually jumps: see below)
+      while (this.spreadTimes.length && this.t - this.spreadTimes[0] >= 1) this.spreadTimes.shift();
+      if (this.spreadTimes.length >= sp.perSec) continue;
+      const buf = this.q2;
+      const cnt = this.hash.gather(x, y, sp.r + 64, buf);
+      let took = 0;
+      for (let pick = 0; pick < sp.n; pick++) {
+        let best = -1, bd = Infinity;
+        for (let t = 0; t < cnt; t++) {
+          const j = buf[t];
+          if (j < 0 || !this.targetable(j)) continue;
+          const dx = E.x[j] - x, dy = E.y[j] - y, d2 = dx * dx + dy * dy, rr = sp.r + E.r[j];
+          if (d2 <= rr * rr && d2 < bd) { bd = d2; best = t; }
+        }
+        if (best < 0) break;
+        const j = buf[best];
+        buf[best] = -1;
+        this.statusSlot(j, sp.kind, sp.dur, dps);
+        this.fx('burnMark', E.x[j], E.y[j], { r: E.r[j], life: 0.4 });
+        took++;
+      }
+      if (took) { this.spreadTimes.push(this.t); this.itemTally.spreads++; }
+    }
+  }
+  /** 后发先至: a dodge primes every weapon (see engine/weapons.ts fireWeapons), at most once per cd. */
+  itemPrime(): void {
+    const p = this.mods.prime;
+    if (!p || this.t < this.primeReady) return;
+    this.primeT = this.t + p.dur;
+    this.primeMask = (1 << this.slots.length) - 1;
+    this.primeReady = this.t + p.cd;
+    this.itemTally.primed++;
+    this.fx('critSpark', this.px, this.py, { r: 22, life: 0.35 });
+  }
+  /** I1 / P3: the live converts' world readings — foes within r of you; unpulled moon-kind 月华 within pickupR + r. */
+  itemConvReadings(): void {
+    const D = this.D;
+    for (const c of this.mods.conv) {
+      if (c.from === 'near') c.v = this.countNear(this.px, this.py, c.r);
+      else if (c.from === 'moonNear') {
+        const R = this.pickupR + c.r, R2 = R * R;
+        let v = 0;
+        for (let i = 0; i < D.n; i++) {
+          if (!D.alive[i] || D.magnet[i]) continue;
+          const kd = D.kind[i];
+          if (kd !== DK.moonDrop && kd !== DK.moonThick && kd !== DK.moonFull) continue;
+          const dx = D.x[i] - this.px, dy = D.y[i] - this.py;
+          if (dx * dx + dy * dy <= R2) v += D.worth[i];
+        }
+        c.v = v;
+      }
+    }
+  }
+  /** 厚积薄发 (P15): when each stone slot was placed (engine/weapons.ts placeStone writes, blast / capture read). */
+  stoneBorn = new Float64Array(0);
+  /** 千金散尽's reused piece buffer and 月华如练's per-drop lists (the foes each piece struck, at most F.itemStream.ring). */
+  private readonly scatterPieces: number[] = [];
+  private streamRing = new Int32Array(0);
+  private streamAt = new Float64Array(0);
+  private streamPos = new Uint8Array(0);
+  /**
+   * 千金散尽 (P11, afterHurt): a blow landed, so pct % of the 月华 in hand (at most max) leaves it and lands beyond
+   * your pickup range (pickupR + F.itemScatter.near … far), split into pearls (splitMoon). The pieces are your own:
+   * held F.itemScatter.hold s, never fused; taken back they only return (no XP, no 蓄月, no tally); still lying at the
+   * wave's end they are lost (beginEnding → result().lost).
+   */
+  itemScatter(): void {
+    const s = this.mods.scatter;
+    if (!s || this.phase !== 'wave') return;
+    const k = Math.min(s.max, Math.floor((Math.max(0, this.moonHeld) * s.pct) / 100));
+    if (k <= 0) return;
+    this.moonHeld -= k;
+    this.itemTally.scattered += k;
+    const C = F.itemScatter, P = splitMoon(k, this.scatterPieces), p = this.pt2;
+    for (let q = 0; q < P.length; q++) {
+      // a random bearing; at a wall, the first quarter turn that still lands beyond your reach (else the farthest)
+      const a0 = this.erng() * TAU, r = this.pickupR + C.near + (C.far - C.near) * this.erng();
+      let bx = this.px, by = this.py, bd = -1;
+      for (let t = 0; t < 4; t++) {
+        const a = a0 + (t * TAU) / 4;
+        p.x = this.px + Math.cos(a) * r; p.y = this.py + Math.sin(a) * r;
+        this.clampToArena(p, 8);
+        const d = Math.hypot(p.x - this.px, p.y - this.py);
+        if (d > bd) { bd = d; bx = p.x; by = p.y; }
+        if (d >= this.pickupR + C.near) break;
+      }
+      this.dropOne(moonKindOf(P[q]), bx, by, P[q], -1, { own: true, hold: C.hold, noFuse: true });
+    }
+    this.fx('petalBurst', this.px, this.py, { r: 26, life: 0.4 });
+  }
+  /**
+   * 月华如练 (P12, onStream): a 月华 pearl flying to you (drop slot i) strikes each foe within F.itemStream.r of it once
+   * (it remembers every foe it struck, and stops after F.itemStream.ring of them): (base + Σ scale·stat) × 伤害 × min(maxX, 1 + worth × perWorth / 100),
+   * crits roll, no procs, src item.
+   */
+  itemStream(i: number): void {
+    const st = this.mods.stream, D = this.D, E = this.E;
+    if (!st || !isMoonKind(D.kind[i])) return;
+    const R = F.itemStream.ring;
+    if (this.streamAt.length !== D.cap) {
+      this.streamRing = new Int32Array(D.cap * R).fill(-1); this.streamAt = new Float64Array(D.cap).fill(-1); this.streamPos = new Uint8Array(D.cap);
+    }
+    // a piece streams every step until it is taken: a gap means a new piece in this slot (and a clean ring)
+    if (this.t - this.streamAt[i] > 0.1) { this.streamRing.fill(-1, i * R, i * R + R); this.streamPos[i] = 0; }
+    this.streamAt[i] = this.t;
+    // q1: this loop strikes, and a kill may query again one level deeper (q2 is for leaf queries only)
+    const buf = this.q1;
+    const cnt = this.hash.gather(D.x[i], D.y[i], F.itemStream.r + 64, buf);
+    if (!cnt) return;
+    let dmg = -1;
+    for (let t = 0; t < cnt; t++) {
+      const j = buf[t];
+      if (!this.targetable(j)) continue;
+      const dx = E.x[j] - D.x[i], dy = E.y[j] - D.y[i], rr = F.itemStream.r + E.r[j];
+      if (dx * dx + dy * dy > rr * rr) continue;
+      const h = E.handle(j);
+      let seen = false;
+      for (let q = 0; q < this.streamPos[i]; q++) if (this.streamRing[i * R + q] === h) { seen = true; break; }
+      if (seen) continue;
+      // once per foe, never by eviction: a piece that has struck F.itemStream.ring foes strikes no more
+      if (this.streamPos[i] >= R) return;
+      this.streamRing[i * R + this.streamPos[i]] = h;
+      this.streamPos[i]++;
+      if (dmg < 0) dmg = Math.max(1, st.base + this.scaleSum(st.scale)) * this.dmgMultNow() * Math.min(st.maxX, 1 + (D.worth[i] * st.perWorth) / 100);
+      this.strike(j, dmg, clamp(this.stats.crit / 100, 0, 1), F.critXDefault + this.stats.critDmg / 100, 0, D.x[i], D.y[i], -1, SRCI.item, HF.noProc);
+      this.itemTally.streamHits++;
+      if (!D.alive[i]) return;
+    }
+  }
+  // ── m8:hidden ──
+  // The hidden companions' World side (hidden.md §2.5, §2.7, §3.4; PLAN §4.H): the 技 button's verb state
+  // (engine/verbs.ts), the next cooldown a run asks for, the ring at the figure, the guard window, 露, the
+  // telegraph owner and the vines. Content reaches these through WorldApi's optional m8 members or core(w).
+  /** The 技 button is down (engine/verbs.ts): since verbT0 (world s); verbMode says what its release does. */
+  verbDown = false;
+  verbT0 = 0;
+  verbMode = 0;
+  /** engine/verbs.ts is casting from a press: castSkill leaves a 'hold' run drawing instead of releasing it. */
+  verbPress = false;
+  /** The press time (world s) of the current cast, and whether it was aimed (a point or drag was given). */
+  castT = 0;
+  castAimed = false;
+  /** The cooldown the current run asks for when it ends (s, before cdX); −1 = the skill's own. */
+  cdNext = -1;
+  /** 越女's 剑意 (0 … houqi p.blades): it never fades, so it carries into the run's next wave (hiddenReset). */
+  hidBlades = 0;
+  /** Which run and wave hidBlades belongs to: only the very next wave of the same run keeps it (a retry or a new run starts at 0). */
+  private hidOf = '';
+  private hidWave = -1;
+  /** The ring at the figure (WorldApi.ring): drawn while ringAt is this step's time. */
+  readonly ringNow: { key: string; v: number; marks?: readonly number[]; pips?: number; of?: number; tone?: 'lake' | 'vine' | 'sun'; flash?: boolean } = { key: '', v: 0 };
+  ringAt = -1;
+  /** The guard window (WorldApi.guard): open until guardUntil; guardFn answers each blow that reaches it. */
+  guardUntil = -1;
+  guardFn: ((w: WorldApi, attacker: number, shot: number, src: string, melee: boolean) => boolean) | null = null;
+  /** 露: +exposePct % damage taken until exposeUntil (a hurtScalers factor). */
+  exposePct = 0;
+  exposeUntil = -1;
+  /** The vines asked for this step (WorldApi.tether): enemy handle, sag 0..1 (1 = slack), tint. */
+  readonly tethers: { h: number; sag: number; tint: string }[] = [];
+  tetherAt = -1;
+  /** 后羿's aim line while drawing (a unit vector; x = y = 0: none). */
+  readonly aimLine = { x: 0, y: 0 };
+  aimAt = -1;
+
+  ring(key: string, v01: number, o?: { marks?: readonly number[]; pips?: number; of?: number; tone?: 'lake' | 'vine' | 'sun'; flash?: boolean }): void {
+    const r = this.ringNow;
+    r.key = key; r.v = v01 < 0 ? 0 : v01 > 1 ? 1 : v01;
+    r.marks = o?.marks; r.pips = o?.pips; r.of = o?.of; r.tone = o?.tone; r.flash = o?.flash;
+    this.ringAt = this.t;
+  }
+  guard(dur: number, onCatch: (w: WorldApi, attacker: number, shot: number, src: string, melee: boolean) => boolean): void {
+    this.guardUntil = this.t + Math.max(0, dur);
+    this.guardFn = onCatch;
+  }
+  expose(pct: number, dur: number): void { this.exposePct = pct; this.exposeUntil = this.t + dur; }
+  underTele(): number { return this.E.slotOf(this.teleOwner) >= 0 ? this.teleOwner : -1; }
+  tether(h: number, sag01: number, tint = '#c9d98a'): void {
+    if (this.tetherAt !== this.t) { this.tethers.length = 0; this.tetherAt = this.t; }
+    if (this.tethers.length < 8) this.tethers.push({ h, sag: sag01 < 0 ? 0 : sag01 > 1 ? 1 : sag01, tint });
+  }
+  /** World.guardHook for a 'guard' skill (registerHiddenHooks): the open window answers with a handle. */
+  guardCatch(_n: number, attacker: number, shot: number, src: string, melee: boolean): boolean {
+    if (this.guardFn === null || this.t > this.guardUntil) return false;
+    return this.guardFn(this, attacker >= 0 ? this.E.handle(attacker) : -1, shot, src, melee);
+  }
+  /** 露 as a hurtScalers factor. */
+  exposeX(): number { return this.t <= this.exposeUntil ? 1 + this.exposePct / 100 : 1; }
+  /** Every wave starts clean (registerHiddenHooks calls it from begin), except 剑意, which carries into the run's next wave. */
+  hiddenReset(): void {
+    this.verbDown = false; this.verbMode = 0; this.verbPress = false; this.castT = 0; this.castAimed = false; this.cdNext = -1;
+    const of = this.run.seed + '|' + this.run.runIndex + '|' + this.run.char;
+    this.hidBlades = of === this.hidOf && this.wave === this.hidWave + 1 ? this.hidBlades : 0;
+    this.hidOf = of; this.hidWave = this.wave;
+    this.ringAt = -1; this.guardUntil = -1; this.guardFn = null; this.exposePct = 0; this.exposeUntil = -1;
+    this.tethers.length = 0; this.tetherAt = -1; this.aimAt = -1;
+  }
+  /** HudState's m8 skill fields (pushHud). */
+  hiddenHud(h: HudState): void {
+    const input = this.skillDef?.input;
+    if (!input || input === 'tap') { h.skillHeld = undefined; h.skillRecast = undefined; h.ring = undefined; return; }
+    h.skillHeld = input === 'hold' && this.verbDown && !!this.skillRun;
+    h.skillRecast = input === 'recast' && !!this.skillRun?.recast;
+    h.ring = this.t - this.ringAt <= 0.1 ? { ...this.ringNow } : null;
+  }
+  // ── m8:art ──
+  /** splitMoon's reused buffer (dropMoon allocates nothing). */
+  private readonly moonPieces: number[] = [];
+  /** A 月华 piece (a pearl, 金月华 or 金鲤) reaches you: 蓄月 per whole point of a pearl, the big-piece chime. */
+  private collectPiece(k: number, worth: number): void {
+    this.collectMoon(worth, moonDraws(k, worth), k === DK.moonFull ? 2 : k === DK.moonThick ? 1 : 0);
   }
 }
 

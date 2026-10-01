@@ -1,0 +1,167 @@
+[
+ {
+  "path": "TREASURES.pixiu.chance",
+  "src": "monsters.ts:62",
+  "text": "1 / 6"
+ },
+ {
+  "path": "BOSSES.mirage.phases[0].script[0].dmg",
+  "src": "bosses.ts:43",
+  "text": "r1(10 * W20)"
+ },
+ {
+  "path": "BOSSES.mirage.phases[1].script[0].dmg",
+  "src": "bosses.ts:47",
+  "text": "r1(10 * W20)"
+ },
+ {
+  "path": "BOSSES.mirage.phases[1].script[1].dmg",
+  "src": "bosses.ts:48",
+  "text": "r1(9 * W20)"
+ },
+ {
+  "path": "BOSSES.mirage.phases[2].script[0].dmg",
+  "src": "bosses.ts:51",
+  "text": "r1(8 * W20)"
+ },
+ {
+  "path": "BOSSES.mirage.phases[2].script[1].dmg",
+  "src": "bosses.ts:52",
+  "text": "r1(10 * W20)"
+ },
+ {
+  "path": "BOSSES.moonwater.phases[0].script[0].dmg",
+  "src": "bosses.ts:61",
+  "text": "r1(14 * W30)"
+ },
+ {
+  "path": "BOSSES.moonwater.phases[1].script[0].dmg",
+  "src": "bosses.ts:64",
+  "text": "r1(10 * W30)"
+ },
+ {
+  "path": "BOSSES.moonwater.phases[1].script[1].dmg",
+  "src": "bosses.ts:65",
+  "text": "r1(14 * W30)"
+ },
+ {
+  "path": "BOSSES.moonwater.phases[2].script[0].dmg",
+  "src": "bosses.ts:68",
+  "text": "r1(10 * W30)"
+ },
+ {
+  "path": "BOSSES.moonwater.phases[2].script[1].dmg",
+  "src": "bosses.ts:69",
+  "text": "r1(8 * W30)"
+ },
+ {
+  "path": "BOSSES.fox.phases[0].script[0].dmg",
+  "src": "bosses.ts:96",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.fox.phases[0].script[1].dmg",
+  "src": "bosses.ts:97",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.fox.phases[1].script[0].dmg",
+  "src": "bosses.ts:101",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.fox.phases[1].script[1].dmg",
+  "src": "bosses.ts:102",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.fox.phases[2].script[0].dmg",
+  "src": "bosses.ts:105",
+  "text": "r1(14 * W20)"
+ },
+ {
+  "path": "BOSSES.xingtian.phases[0].script[0].dmg",
+  "src": "bosses.ts:115",
+  "text": "r1(22 * W30)"
+ },
+ {
+  "path": "BOSSES.xingtian.phases[1].script[0].dmg",
+  "src": "bosses.ts:118",
+  "text": "r1(18 * W30)"
+ },
+ {
+  "path": "BOSSES.xingtian.phases[1].script[1].dmg",
+  "src": "bosses.ts:119",
+  "text": "r1(22 * W30)"
+ },
+ {
+  "path": "BOSSES.xingtian.phases[2].script[0].dmg",
+  "src": "bosses.ts:122",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "BOSSES.xingtian.phases[2].script[1].dmg",
+  "src": "bosses.ts:123",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "BOSSES.goldtoad.phases[0].script[0].dmg",
+  "src": "bosses.ts:151",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.goldtoad.phases[1].script[0].dmg",
+  "src": "bosses.ts:155",
+  "text": "r1(8 * W20)"
+ },
+ {
+  "path": "BOSSES.goldtoad.phases[1].script[1].dmg",
+  "src": "bosses.ts:156",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.goldtoad.phases[2].script[0].dmg",
+  "src": "bosses.ts:159",
+  "text": "r1(12 * W20)"
+ },
+ {
+  "path": "BOSSES.goldtoad.phases[2].script[1].dmg",
+  "src": "bosses.ts:160",
+  "text": "r1(8 * W20)"
+ },
+ {
+  "path": "BOSSES.eclipse.phases[0].script[0].dmg",
+  "src": "bosses.ts:169",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "BOSSES.eclipse.phases[0].script[1].dmg",
+  "src": "bosses.ts:170",
+  "text": "r1(24 * W30)"
+ },
+ {
+  "path": "BOSSES.eclipse.phases[1].script[1].dmg",
+  "src": "bosses.ts:174",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "BOSSES.eclipse.phases[2].script[0].dmg",
+  "src": "bosses.ts:177",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "BOSSES.eclipse.phases[2].script[1].dmg",
+  "src": "bosses.ts:178",
+  "text": "r1(20 * W30)"
+ },
+ {
+  "path": "F.groupEvery[2][0]",
+  "src": "stats.ts:69",
+  "text": "Infinity"
+ },
+ {
+  "path": "F.treasure.pixiuChance",
+  "src": "stats.ts:152",
+  "text": "1 / 6"
+ }
+]

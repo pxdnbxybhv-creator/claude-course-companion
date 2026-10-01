@@ -1,32 +1,88 @@
 // 水月幻镜 · the session: the one logic module that writes the store and the purse (API.md §2.6).
 // Every other logic module is pure; the UI calls these at the moments GDD §16 and §23 name, and each
 // money move is one batch with its counter, then meta is written, then payOwed() settles the purse.
-import { batch } from '@preact/signals';
+import { batch, signal } from '@preact/signals';
 import { flushPlay, mirror, payOwed, saveMetaNow, updateMeta } from '../../../app/mirror';
 import { codeActive, play, record, recordMax, refund, spend, unlocked } from '../../../app/play';
 import { hashString } from '../../../core/rng';
 import { todayKey } from '../../../core/date';
-import { DIFF_REG, type HeartFaceId, type MapId, type RimId, type VowId } from '../ids';
+import { COMPANION_REG, DIFF_REG, type HeartFaceId, type MapId, type RimId, type VowId } from '../ids';
 import type {
   CharacterId, CodexKey, DeathResult, DiffIndex, EndCause, MirrorMeta, MirrorSettings, RunReport, RunSave, TitleId, TutorFlags, Unlocks,
   VowRanks, WaveResult, WaveSetup,
 } from '../types';
-import { RUN_VER } from '../types';
+import { isHidden, RUN_VER } from '../types';
 import { PAY, VOWS, HEAT_MAX, rateOf } from '../data';
 import { heatOf, REVIVE } from './formulas';
 import { bankSleeve, nextRun, reconcileTicket, releaseHeld, rollDay, settlePay, withDay } from './economy';
-import { activeHeart, buyHeart, dailySpec, foldKills, masteryLevel, pickHeartFace, settleMeta, unlocksOf } from './meta';
+import { buyHeart, dailySpec, foldKills, masteryLevel, pickHeartFace, settleMeta, unlocksOf } from './meta';
 import { beginWave, endWave, foldPartial, newRun, waveSetup } from './run';
 import { migrateRun, validateRun } from './save';
+import { hiddenOpen } from './hidden';
+import { fullRanks, heartFor, lentOf, masteryFor, MASTERY_MAX, NEVER_LENT } from './lend';
+import { endTuning, tuningActive } from './tuning';
 
 /**
  * The difficulties and maps the lobby may offer: those earned, or every one of them while the
  * owner's code is active (for testing). It opens choices only — pay, bonuses and records follow
  * the ordinary rules.
  */
-export function openOf(m: Pick<MirrorMeta, 'diffMax' | 'mapsOpen'>): { diffMax: DiffIndex; mapsOpen: 1 | 2 | 3 } {
-  if (codeActive.value) return { diffMax: (DIFF_REG.length - 1) as DiffIndex, mapsOpen: 3 };
-  return { diffMax: m.diffMax, mapsOpen: m.mapsOpen };
+export function openOf(m: Pick<MirrorMeta, 'diffMax' | 'mapsOpen'> & Partial<Pick<MirrorMeta, 'bests'>>): {
+  diffMax: DiffIndex; mapsOpen: 1 | 2 | 3;
+  /** m8 (chars.md §3.4): the companions the mirror may take in — every one while the code is on (the 13 and
+   *  the hidden three, in the mirror only: no char:* flag, nothing app-wide); otherwise the app's unlocked
+   *  ones plus the hidden ones earned at 40重 (logic/hidden.ts). 今日镜 stays on `unlocked` (dailySpec). */
+  chars: readonly CharacterId[];
+} {
+  if (codeActive.value) return { diffMax: (DIFF_REG.length - 1) as DiffIndex, mapsOpen: 3, chars: COMPANION_REG.map((c) => c.id) };
+  return { diffMax: m.diffMax, mapsOpen: m.mapsOpen, chars: [...unlocked.value.filter((id) => !isHidden(id)), ...hiddenOpen({ bests: m.bests ?? {} })] };
+}
+/**
+ * m8 (PLAN T1): is this mirror companion open in the main game? An app id in `unlocked`; never a hidden id
+ * (the app's tables don't know them). The mirror's own sites read openOf(m).chars (SANDBOX S1).
+ */
+export function appOpen(id: CharacterId): boolean {
+  return !isHidden(id) && unlocked.value.includes(id);
+}
+
+// ───────────────────────────────────────────── m8 · the code's overlays (chars.md §4.3, sandbox.md §8)
+/**
+ * 「按满阶 / 按自有」: while the code is on, does the next 入镜 take 心镜 at full rank and 心得 10 (true, the
+ * default) or the earned values? A session signal: never saved, a reload turns it back on.
+ */
+export const lendOn = signal(true);
+export function setLendOn(on: boolean): void { lendOn.value = on; }
+/** Does the next 入镜 get the code's lent 心镜 and 心得? (the code on, and the toggle on). */
+export const lent = (): boolean => codeActive.value && lendOn.value;
+/** Is the owner's code on? For screens that must say so (the lobby's 「试 · 模拟场」 button, the 心镜 ribbon). */
+export const codeOn = (): boolean => codeActive.value;
+
+/** The 心镜 page's numbers: the ranks the next run gets per face, and the earned ones. `lent` when they differ by the code. */
+export function heartView(m: Pick<MirrorMeta, 'heart'>): {
+  ranks: Partial<Record<HeartFaceId, number>>; own: Partial<Record<HeartFaceId, number>>; lent: boolean; code: boolean;
+} {
+  const own: Partial<Record<HeartFaceId, number>> = { ...m.heart.ranks };
+  if (!lent()) return { ranks: own, own, lent: false, code: codeActive.value };
+  const ranks = { ...own };
+  const full = fullRanks();
+  for (const id in full) if (!NEVER_LENT.includes(id as HeartFaceId)) ranks[id as HeartFaceId] = full[id as HeartFaceId];
+  return { ranks, own, lent: true, code: true };
+}
+/** A companion's 心得 as the screens show it: the level the next run gets, the earned level and xp. */
+export function masteryView(m: Pick<MirrorMeta, 'mastery'>, char: CharacterId): { level: number; own: number; xp: number; lent: boolean } {
+  const xp = m.mastery[char] ?? 0;
+  const own = masteryLevel(xp);
+  const on = lent();
+  return { level: masteryFor(m, char, on), own, xp, lent: on && own < MASTERY_MAX };
+}
+/**
+ * 'code' when a hidden companion is open only because the code is on (its tile says 「测试码开启」); else
+ * null. The 13 are the app's (入画 opens them, and the app's own roster already follows the code), so they
+ * carry no tag.
+ */
+export function charTag(m: Partial<Pick<MirrorMeta, 'bests'>>, id: CharacterId): 'code' | null {
+  if (!codeActive.value || !isHidden(id)) return null;
+  return hiddenOpen({ bests: m.bests ?? {} }).includes(id) ? null : 'code';
 }
 
 /** A fresh run seed (crypto when available; never Math.random). */
@@ -65,6 +121,7 @@ export interface EnterOpts { char: CharacterId; map: MapId; diff: DiffIndex; vow
  * index and rate fixed, and meta is saved at once.
  */
 export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; reason: 'short' | 'paused' } {
+  realGuard();
   const today = todayKey();
   let m = withDay(mirror.value, today);
   if (m.active) return { ok: false, reason: 'paused' };
@@ -89,8 +146,8 @@ export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; r
   }
   const unlocks = unlocksOf(m);
   let { char, map, diff, vows } = o;
-  // a companion still locked in the main game (a stale lobby, an older backup) can't be taken in (§11)
-  if (!unlocked.value.includes(char)) char = 'scholar';
+  // a companion still locked (a stale lobby, an older backup, the code revoked) can't be taken in (§11)
+  if (!openOf(m).chars.includes(char)) char = 'scholar';
   let term = null, mutator = null, boon = null, seed = freshSeed();
   if (o.daily) {
     const spec = dailySpec(today, m, unlocked.value);
@@ -103,11 +160,14 @@ export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; r
     if (['lake', 'forest', 'palace'].indexOf(map) >= open.mapsOpen) map = 'lake';
     vows = cleanVows(vows);
   }
-  const run = newRun({
-    seed, char, map, diff, vows, daily: o.daily, plain: o.plain, heart: o.plain ? {} : activeHeart(m),
+  // m8: the code lends 心镜 at full rank (never 回魂) and 心得 10 while 「按满阶」 is on; meta is never written
+  const lend = lent();
+  const run0 = newRun({
+    seed, char, map, diff, vows, daily: o.daily, plain: o.plain, heart: o.plain ? {} : heartFor(m, lend),
     ticket, free, runIndex, rate: rateOf(runIndex),
-    startedDay: d.day, term, mutator, boon, unlocks, mastery: masteryLevel(m.mastery[char] ?? 0),
+    startedDay: d.day, term, mutator, boon, unlocks, mastery: masteryFor(m, char, lend),
   });
+  const run: RunSave = lend ? { ...run0, lent: lentOf(m, char, o.plain) } : run0;
   const codex = { ...m.codex };
   for (const k of [`char:${char}`, `map:${map}`] as CodexKey[]) if (!codex[k]) codex[k] = 1;
   m = {
@@ -119,6 +179,16 @@ export function enter(o: EnterOpts): { ok: true; run: RunSave } | { ok: false; r
   return { ok: true, run };
 }
 
+/**
+ * m8 (sandbox.md §5.3): real play never sees a 模拟场 override. Leaving the sandbox always restores the tables
+ * (ui/sand/session.ts leaveSand), so this should never fire; if it does, the tables are restored first.
+ */
+function realGuard(): void {
+  if (!tuningActive()) return;
+  const r = endTuning();
+  try { console.warn('[mirror] tuning was still on at a real run: restored', r.restored); } catch { /* no console */ }
+}
+
 /** Save the run as it is (after every purchase, reroll, lock, sell, merge or pick). */
 export function commit(run: RunSave): void {
   set({ ...mirror.value, active: run });
@@ -128,7 +198,7 @@ export function commit(run: RunSave): void {
 export function lobbyVisit(): void {
   const today = todayKey();
   const m = releaseHeld(withDay(mirror.value, today), today);
-  set(unlocked.value.includes(m.lobby.char) ? m : { ...m, lobby: { ...m.lobby, char: 'scholar' } });
+  set(openOf(m).chars.includes(m.lobby.char) ? m : { ...m, lobby: { ...m.lobby, char: 'scholar' } });
   payOwed();
 }
 
@@ -175,6 +245,7 @@ export function newerSave(): boolean {
 
 /** Start the next wave: inWave is saved before the engine runs. */
 export function startWave(run: RunSave): { run: RunSave; setup: WaveSetup } {
+  realGuard();
   const r = beginWave(run);
   const setup = waveSetup(r, mirror.value, new Date());
   commit(r);
@@ -355,6 +426,8 @@ export function markSeen(keys: readonly CodexKey[]): void {
  */
 export interface RunSession {
   readonly practice: boolean;
+  /** m8: the 模拟场's session (ui/sand/session.ts): no meta, no purse, no counters (sandbox.md §6.1). */
+  readonly sandbox?: true;
   commit(run: RunSave): void;
   startWave(run: RunSave): { run: RunSave; setup: WaveSetup };
   waveWon(res: WaveResult): RunSave | null;

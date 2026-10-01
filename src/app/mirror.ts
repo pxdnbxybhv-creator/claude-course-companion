@@ -3,12 +3,11 @@
 // through a debounced effect (plus saveMetaNow for the moments that matter), follows other tabs, and
 // is the one door from the mirror to the purse (payOwed). The owner's code never touches any of it.
 import { batch, effect, signal } from '@preact/signals';
-import type { CharacterId } from '../data/characters';
 import { CHARACTERS } from '../data/characters';
 import type { DateKey } from '../core/types';
 import { todayKey } from '../core/date';
-import type { Best, MirrorMeta, MirrorSettings, PayDay, RunSave, TutorFlags } from '../views/mirror/types';
-import { RUN_VER } from '../views/mirror/types';
+import type { Best, CharacterId, MirrorMeta, MirrorSettings, PayDay, RunSave, TutorFlags } from '../views/mirror/types';
+import { HIDDEN_CHARS, RUN_VER } from '../views/mirror/types';
 import { backupExtras } from './store';
 import { earnFrom, play, record } from './play';
 
@@ -27,7 +26,8 @@ declare module '../views/mirror/types' {
   }
 }
 
-const CHAR_IDS = new Set<string>(CHARACTERS.map((c) => c.id));
+// the app's 13 plus the mirror-only hidden three (m8), so a chosen hidden companion survives a reload
+const CHAR_IDS = new Set<string>([...CHARACTERS.map((c) => c.id), ...HIDDEN_CHARS]);
 const MAP_IDS = ['lake', 'forest', 'palace'] as const;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 

@@ -17,7 +17,8 @@ export interface ContentDev {
   /** Restart as wave `wave` on `map` (its roster baked first), optionally as another companion. */
   play(map: MapId, wave: number, o?: { char?: RunSave['char']; term?: TermModId | null; mutators?: { id: MutatorId; x: number }[] }): Promise<void>;
   /** Restart as the fight with boss `id` (its map and wave; 'twins' = wave 40, 'mirrorself' = 50), then force `phase`. */
-  boss(id: BossId | 'twins' | 'mirrorself', phase?: number, o?: { daoxuan?: boolean; diff?: number }): Promise<void>;
+  /** Resolves true once the fight starts; false (nothing started) if the wave ended or you fell while the boss was baking. */
+  boss(id: BossId | 'twins' | 'mirrorself', phase?: number, o?: { daoxuan?: boolean; diff?: number }): Promise<boolean>;
   /** Push every live boss into phase p (0–3). */
   phase(p: number): void;
   /** The live bosses: id, phase, HP fraction, enrage level, running patterns. */
@@ -58,8 +59,8 @@ export function contentDev(getEngine: () => MirrorEngine | null = engine): Conte
     async boss(id, phase = 0, o = {}) {
       const eng = getEngine();
       const world = W();
-      if (!eng || !world) return;
-      const run = world.run;
+      if (!eng || !world) return false;
+      const run = world.run, wave0 = world.wave, t0 = world.t;
       const def = id === 'twins' || id === 'mirrorself' ? null : BOSSES[id];
       const wave = def ? def.wave : id === 'twins' ? 40 : 50;
       const map: MapId = def ? def.map : run.map;
@@ -72,11 +73,14 @@ export function contentDev(getEngine: () => MirrorEngine | null = engine): Conte
         const P = world.painter;
         if (P) await P.bake([...(map !== run.map ? P.plan(next, 'start') : []), ...P.plan(next, 'boss'), ...(wave > 30 ? P.plan(next, 'endless') : [])]);
       } catch { /* placeholder circles then */ }
+      // the wave ended, or you fell, while it baked: never start a fight behind the card
+      if (getEngine() !== eng || world.phase !== 'wave' || world.wave !== wave0 || world.t < t0) return false;
       eng.start(next, setup);
       // the intro card would resume the engine; the dev hook does it after the first step
       eng.stepN(1);
       if (eng.paused) eng.resume();
       if (phase > 0) this.phase(phase);
+      return true;
     },
     phase(p) {
       const world = W();

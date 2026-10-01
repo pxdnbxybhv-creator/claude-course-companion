@@ -803,3 +803,59 @@ button.mj-card[disabled] { opacity: 0.55; }
 /* 镜宝: the shop's line before a boss wave, and the relic in the pack */
 .mj-relic-next { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, var(--mj-gold) 12%, var(--paper)); border: 1px solid color-mix(in srgb, var(--mj-gold) 45%, transparent); font-size: 13.5px; color: var(--ink); }
 .mj-bagitem.is-relic { border-color: color-mix(in srgb, var(--mj-gold) 70%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mj-gold) 40%, transparent); }
+
+/* ── m8 · lane blocks (PLAN §3.5 U2): append-only, each lane under its own anchor ── */
+/* ── m8:items ── */
+/* 货比三家's running discount beside the reroll button; 点石成金's button in the weapon detail */
+.mj-off-chip { display: inline-block; padding: 0 8px; border-radius: 10px; border: 1px solid var(--mj-up); color: var(--mj-up); font-size: 13px; line-height: 22px; white-space: nowrap; }
+.mj-gild { border-color: #b08a2e; }
+/* ── m8:hidden ── */
+/* the 技 button's verbs (hidden.md §2.5): 后羿 drawing (gold rim, the notch flashes white), 山鬼's live vines (green
+   rim, 「断」), 越女's full 剑意 (「夺」) */
+.mj-skill.is-drawing .mj-skill-ring { stroke: #d9a62e; transition: none; }
+.mj-skill.is-drawing.is-notch { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.75); }
+.mj-skill.is-recast .mj-skill-ring { stroke: #9fb86a; transition: none; }
+.mj-skill.is-recast, .mj-run.is-inverted .mj-skill.is-recast { box-shadow: 0 0 0 4px rgba(159, 184, 106, 0.55); }
+.mj-skill.is-seize, .mj-run.is-inverted .mj-skill.is-seize { box-shadow: 0 0 0 4px rgba(127, 196, 200, 0.7); }
+.mj-skill.is-seize span, .mj-skill.is-recast span { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .mj-skill.is-drawing.is-notch { box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.6); } }
+/* the HUD 月华 pulse (art §5.4): 1.15× for 120 ms on a change (the push caps it at 4 a second); none under 减少动态 */
+.mj-moon b { display: inline-block; transition: transform 0.06s ease-out; transform-origin: 50% 60%; }
+.mj-moon.is-pulse b { transform: scale(1.15); }
+@media (prefers-reduced-motion: reduce) { .mj-moon b { transition: none; } .mj-moon.is-pulse b { transform: none; } }
+.mirror.mj-calm .mj-moon.is-pulse b { transform: none; }
+/* H5 · the sealed 「？」 tiles and pane (hidden.md §2.3) */
+.mj-select-tile.is-sealed .mj-select-name { font-family: var(--font-brush, inherit); font-size: 15px; opacity: 0.8; }
+.mj-hid-pane .mj-howto { margin-top: 10px; }
+.mj-hid-flavour { font-style: italic; color: var(--ink-soft, #5b554c); margin: 8px 0; }
+.mj-page.is-sealed { border-style: dashed; background: transparent; }
+/* H5 · the reveal page (hidden.md §2.4): the glass ripples, the figure steps out of its ink outline, the verse
+   types, then the title; under 减少动态 the finished card at once */
+.mj-hid-reveals { display: flex; flex-direction: column; gap: 14px; margin: 14px 0; }
+.mj-hid-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 18px 12px 14px;
+  border-radius: 14px; background: radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.75), rgba(214, 226, 232, 0.35) 70%);
+  border: 1px solid rgba(43, 42, 40, 0.14); overflow: hidden; animation: mj-hid-glass 0.4s var(--ease) both; }
+.mj-hid-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+  background: radial-gradient(circle at 50% 38%, transparent 30%, rgba(111, 159, 184, 0.28) 46%, transparent 62%);
+  animation: mj-hid-ripple 1.1s var(--ease) 0.1s both; }
+.mj-hid-fig { position: relative; width: 120px; height: 120px; }
+.mj-hid-fig > canvas { position: absolute; inset: 0; }
+.mj-hid-fig .is-ink { animation: mj-hid-out 1.2s ease-in 0.4s both; }
+.mj-hid-fig .is-colour { animation: mj-hid-in 1.2s ease-out 0.4s both; }
+.mj-hid-verse { margin: 0; text-align: center; font-size: 15px; line-height: 1.6; animation: mj-hid-type 1.8s steps(var(--n, 18)) 1.5s both; }
+.mj-hid-title { margin: 0; font-size: 20px; animation: mj-reveal 0.9s var(--ease) 3.2s both; }
+.mj-hid-moon { margin: 0; font-size: 13px; animation: mj-reveal 0.9s var(--ease) 3.6s both; }
+.mj-hid-card .btn { animation: mj-reveal 0.6s var(--ease) 3.4s both; }
+@keyframes mj-hid-glass { from { opacity: 0; transform: scale(0.97); } }
+@keyframes mj-hid-ripple { from { transform: scale(0.4); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+@keyframes mj-hid-out { to { opacity: 0; } }
+@keyframes mj-hid-in { from { opacity: 0; filter: grayscale(1) contrast(0.6); } }
+@keyframes mj-hid-type { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .mj-hid-card, .mj-hid-card::after, .mj-hid-fig .is-ink, .mj-hid-fig .is-colour, .mj-hid-verse, .mj-hid-title, .mj-hid-moon, .mj-hid-card .btn { animation: none; }
+  .mj-hid-fig .is-ink { opacity: 0; }
+}
+.mirror.mj-calm .mj-hid-card, .mirror.mj-calm .mj-hid-card::after, .mirror.mj-calm .mj-hid-fig .is-colour, .mirror.mj-calm .mj-hid-verse,
+.mirror.mj-calm .mj-hid-title, .mirror.mj-calm .mj-hid-moon, .mirror.mj-calm .mj-hid-card .btn { animation: none; }
+.mirror.mj-calm .mj-hid-fig .is-ink { animation: none; opacity: 0; }
+/* ── m8:art ── */

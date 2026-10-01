@@ -8,18 +8,19 @@ import { useT } from '../../../app/i18n';
 import { mirror, storageOk } from '../../../app/mirror';
 import { coins, play, unlocked } from '../../../app/play';
 import { todayKey } from '../../../core/date';
-import type { CharacterId } from '../../../data/characters';
+import type { CharacterId } from '../types';
 import { Sheet } from '../../../ui/kit';
 import { CoinBadge } from '../../../ui/coins';
 import { DIFF_REG, MAP_REG, MUTATOR_REG, TERM_MOD_REG, VOW_REG, type MapId, type VowId } from '../ids';
 import type { DiffIndex, MirrorMeta, VowRanks } from '../types';
-import { DIFFS, HEAT_MAX, MAPS, PAY, VOWS } from '../data';
+import { DIFFS, HEAT_MAX, MAPS, MASTERY, PAY, VOWS } from '../data';
 import { dailySpec, endlessBossesOf, entryQuote, gross, heatOf, lobbyStatus, masteryLevel, quoteNow, strengthOf } from '../logic';
 import { termName } from '../data/glossary';
 import { diffLine, mutatorLine, vowLine } from './describe';
 import { TutorRibbon } from './Tutorial';
 import { tutorOf } from './tips';
-import { newerSave, openOf, setLobby } from '../logic/session';
+import { codeOn, masteryView, newerSave, openOf, setLobby } from '../logic/session';
+import { LendSeal } from './sand/overlay';
 import { Icon, Portrait, Seal } from './icons';
 import { CompanionSheet } from './Select';
 import { Confirm } from './Pause';
@@ -39,6 +40,8 @@ export function Lobby(props: {
   /** After the tutorial's 「去入镜」: the entry button rings once (it never enters by itself). */
   ring?: boolean;
   onRung?: () => void;
+  /** m8: 「试 · 模拟场」 (shown only while the owner's code is on). */
+  onSand?: () => void;
 }) {
   const t = useT();
   const m = mirror.value;
@@ -55,7 +58,10 @@ export function Lobby(props: {
   const char = run ? run.char : m.lobby.char;
   const map = run ? run.map : m.lobby.map;
   const rim = m.rim ?? MAPS[map].rim;
-  const lvl = masteryLevel(m.mastery[char] ?? 0);
+  // m8: the 心得 the next run takes (10 while the code lends, with a small 「测」 seal); a paused run shows what it was lent
+  const mv = masteryView(m, char);
+  const lentLvl = run ? (run.lent ? Math.min(MASTERY.length, masteryLevel(m.mastery[char] ?? 0) + run.lent.mastery) : null) : mv.lent ? mv.level : null;
+  const lvl = lentLvl ?? masteryLevel(m.mastery[char] ?? 0);
   const heat = heatOf(m.lobby.vows);
 
   return (
@@ -74,7 +80,7 @@ export function Lobby(props: {
         <span class="mj-glass-ripple" aria-hidden="true" /><span class="mj-glass-ripple is-2" aria-hidden="true" />
         <Portrait id={char} size={148} class="mj-glass-portrait" />
         <span class="mj-glass-name brush">{nameOf(char, t)}</span>
-        <span class="mj-glass-sub">{t(`心得 ${lvl} 级`, `Mastery ${lvl}`)}</span>
+        <span class="mj-glass-sub">{t(`心得 ${lvl} 级`, `Mastery ${lvl}`)}{lentLvl !== null && <LendSeal size={14} />}</span>
       </button>
 
       {newer ? (
@@ -144,7 +150,7 @@ export function Lobby(props: {
 
       {!run && !newer && <DailyCard m={m} t={t} onOpen={() => setDaily(true)} canEnter={!q.paused && (q.free || q.unusedTicket || q.short === 0)} />}
 
-      <nav class={'mj-footer' + (props.onTutorial ? ' has-tut' : '')} aria-label={t('镜中诸物', 'Mirror pages')}>
+      <nav class={'mj-footer' + (props.onTutorial ? ' has-tut' : '') + (props.onSand && codeOn() ? ' has-sand' : '')} aria-label={t('镜中诸物', 'Mirror pages')}>
         {([['codex', '镜鉴', 'Codex', '鉴'], ['records', '镜碑', 'Records', '碑'], ['heart', '心镜', 'Heart', '心'], ['mastery', '心得', 'Mastery', '得'], ['settings', '设置', 'Settings', '设']] as const).map(([id, zh, en, g]) => (
           <button type="button" class="mj-footer-btn" onClick={() => props.onPage(id)}><span class="brush" aria-hidden="true">{g}</span>{t(zh, en)}</button>
         ))}
@@ -153,6 +159,9 @@ export function Lobby(props: {
             <span class="brush" aria-hidden="true">初</span>{termName('tutorial', t)}
             {!tutorOf(m).offered && <i class="mj-tut-dot" aria-hidden="true" />}
           </button>
+        )}
+        {props.onSand && codeOn() && (
+          <button type="button" class="mj-footer-btn mj-lend-sandbtn" onClick={props.onSand}><span class="brush" aria-hidden="true">试</span>{t('模拟场', 'Sandbox')}</button>
         )}
       </nav>
 

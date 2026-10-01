@@ -6,9 +6,9 @@
 //   · ids never change once shipped (saves, codex keys, atlas keys and deeds refer to them);
 //   · data tables (data/*.ts) key their defs by these ids and never repeat zh/en names;
 //   · the order of each list is the display order (codex, lobby, shop sort).
-// Companions reuse the app's CharacterId. Pure data, no imports beyond types: safe for node tests.
-import type { CharacterId } from '../../data/characters';
-import type { RunStatKey } from './types';
+// Companions use the mirror's CharacterId (the app's 13 plus the hidden three, types.ts). Pure data, no
+// imports beyond types: safe for node tests.
+import type { CharacterId, RunStatKey } from './types';
 
 /** One registry row. `look` is a one-line brief for the painter (and the codex's alt text). */
 export interface Named {
@@ -148,6 +148,34 @@ export const ITEM_REG = [
   // 9.9 镜宝: boss relics (one per boss felled; never in the shop, a 镜奁 or 镜心)
   { id: 'wangchen', zh: '忘尘镜', en: 'Dustless Mirror', group: 'relic', look: 'bronze hand mirror wiped clean, a streak of dust lifting off its face' },
   { id: 'longyuan', zh: '龙渊剑', en: 'Longyuan Sword', group: 'relic', look: 'long straight sword with a dragon-scale ridge rising out of dark water' },
+  // ── m8:items ── the 26 new items (items.md §R.5; ITEMS owns these rows' text)
+  { id: 'huadi', zh: '画地为牢', en: 'Circle on the Ground', group: 'legend', look: 'a brush-drawn ink circle on the ground, a war drum inside it; gold leaf' },
+  { id: 'zhancao', zh: '斩草除根', en: 'Pull Up the Roots', group: 'arch', look: 'a sickle across a pulled-up tuft, roots and all' },
+  { id: 'taishan', zh: '泰山压顶', en: 'Mount Tai Bears Down', group: 'arch', look: 'a mountain peak pressing down on a stone seal' },
+  { id: 'yiqi', zh: '一气呵成', en: 'In One Breath', group: 'arch', look: 'one unbroken brush stroke looping into a fist' },
+  { id: 'jianxue', zh: '见血封喉', en: 'Blood-Sealing Poison', group: 'arch', look: 'a dart dipped in dark sap beside a leaf of the upas tree' },
+  { id: 'baibu', zh: '百步穿杨', en: 'A Hundred Paces', group: 'arch', look: 'an arrow through a single willow leaf far down a line' },
+  { id: 'chuge', zh: '四面楚歌', en: 'Songs of Chu on Every Side', group: 'arch', look: 'a ring of small singing mouths around a lone banner' },
+  { id: 'liaoyuan', zh: '星火燎原', en: 'A Spark Sets the Plain Alight', group: 'arch', look: 'one spark leaping across a dry grass plain' },
+  { id: 'jibai', zh: '计白当黑', en: 'Count the White as Black', group: 'ink', look: 'a mostly empty page with three sure strokes' },
+  { id: 'houji', zh: '厚积薄发', en: 'Store Deep, Release Late', group: 'arch', look: 'a go stone half sunk into moss' },
+  { id: 'zuiwo', zh: '醉卧沙场', en: 'Drunk on the Battlefield', group: 'arch', look: 'a tipped wine cup on a battle banner laid on sand' },
+  { id: 'chulei', zh: '触类旁通', en: 'Learn One, Know the Kind', group: 'arch', look: 'one brush stroke branching into three' },
+  { id: 'pengyue', zh: '众星捧月', en: 'Stars Around the Moon', group: 'arch', look: 'a full moon ringed by small pearls of moonlight' },
+  { id: 'rulian', zh: '月华如练', en: 'Moonlight Like Silk', group: 'econ', look: 'a long ribbon of moonlight curling through the air' },
+  { id: 'sanjin', zh: '千金散尽', en: 'A Thousand in Gold, Scattered', group: 'econ', look: 'an open purse flinging pearls of moonlight in an arc' },
+  { id: 'huobi', zh: '货比三家', en: 'Shop Around', group: 'econ', look: 'three little shop banners in a row' },
+  { id: 'qihuo', zh: '奇货可居', en: 'Rare Goods to Hoard', group: 'econ', look: 'a sealed lacquer box on a merchant\'s shelf' },
+  { id: 'dianshi', zh: '点石成金', en: 'Iron into Gold', group: 'econ', look: 'a fingertip touching a grey stone that turns gold' },
+  { id: 'zhenjiu', zh: '饮鸩止渴', en: 'Poison to Quench Thirst', group: 'curse', look: 'a cup of dark wine with a single feather in it; purple border' },
+  { id: 'mouhu', zh: '与虎谋皮', en: 'Bargaining with the Tiger', group: 'curse', look: 'a striped pelt and a contract with a paw print; purple border' },
+  { id: 'lianhuan', zh: '连环计', en: 'Chained Stratagems', group: 'legend', look: 'warships chained together, one catching fire; gold leaf' },
+  { id: 'xianzhi', zh: '后发先至', en: 'Move Second, Arrive First', group: 'arch', look: 'a blade already past a falling leaf' },
+  { id: 'jingru', zh: '静如处子', en: 'Still as a Maiden', group: 'cond', look: 'a folded fan resting on a closed book' },
+  { id: 'dongru', zh: '动如脱兔', en: 'Swift as a Hare', group: 'cond', look: 'a hare mid-leap over tall grass' },
+  { id: 'daoge', zh: '倒戈相向', en: 'Spears Turned Around', group: 'arch', look: 'a halberd turned point-backward in a soldier\'s grip' },
+  { id: 'duanbing', zh: '短兵相接', en: 'Blades at Close Quarters', group: 'arch', look: 'two short swords crossed at the hilts' },
+  // ── end m8:items ──
 ] as const satisfies readonly ItemNamed[];
 export type ItemId = (typeof ITEM_REG)[number]['id'];
 
@@ -170,7 +198,7 @@ export const ARCHETYPE_REG = [
 ] as const satisfies readonly Named[];
 export type ArchetypeId = (typeof ARCHETYPE_REG)[number]['id'];
 
-// ─────────────────────────────────────────────────────────────── companions (13 = the app's CharacterId)
+// ─────────────────────────────────────────────────────────────── companions (13 = the app's CharacterId, + 3 hidden)
 interface CompanionNamed extends Named { readonly id: CharacterId; readonly accent: string }
 /** `accent` is the token's one accent colour (GDD §21), '#rrggbb'; ink companions use PIGMENTS.ink. */
 export const COMPANION_REG = [
@@ -187,6 +215,11 @@ export const COMPANION_REG = [
   { id: 'poet', zh: '诗仙', en: 'Poet Immortal', accent: '#8e2b3a', look: 'loose-robed poet swaying with a wine cup, wine-red sash' },
   { id: 'guan', zh: '关公', en: 'Lord Guan', accent: '#c0412f', look: 'red face, long beard, green robe, the crescent glaive' },
   { id: 'change', zh: '嫦娥', en: 'Chang\'e', accent: '#e8eef2', look: 'moon lady in trailing moon-white sleeves' },
+  // ── m8:hidden ── mirror-only companions, opened by 40重 on their map (hidden.md; HIDDEN owns these rows' text)
+  { id: 'yuenv', zh: '越女', en: 'Maiden of Yue', accent: '#3f7686', look: 'small upright sword maiden, a bamboo cane slung across her back, a bronze sword held reversed along the forearm; lake-blue skirt' },
+  { id: 'shangui', zh: '山鬼', en: 'Mountain Spirit', accent: '#b5482e', look: 'barefoot hill goddess riding sidesaddle on a lean red leopard, pale-green lichen streaming from her sashes' },
+  { id: 'houyi', zh: '后羿', en: 'Hou Yi', accent: '#c0412f', look: 'broad-shouldered archer with a vermilion bow taller than he is and a quiver of nine sun-gold arrows' },
+  // ── end m8:hidden ──
 ] as const satisfies readonly CompanionNamed[];
 
 // ─────────────────────────────────────────────────────────────── mirror skills (镜技, 13) · passives (天性, 13) · ☆ 别传 (13)
@@ -207,23 +240,33 @@ export const SKILL_REG = [
   { id: 'yaoyue', char: 'poet', glyph: '酒', zh: '举杯邀明月', en: 'Raise a Cup to the Moon', look: 'drunk to the brim; crits launch seeking verse glyphs' },
   { id: 'tuodao', char: 'guan', glyph: '刀', zh: '拖刀计', en: 'Trailing-Blade Ruse', look: 'a feigned retreat, then a 360° sweep that stuns' },
   { id: 'qinghui', char: 'change', glyph: '奔', zh: '广寒清辉', en: 'Cold Palace Radiance', look: 'she rises untouchable, then lands in a pool of moonlight' },
+  // ── m8:hidden ──
+  { id: 'houqi', char: 'yuenv', glyph: '候', zh: '候气', en: 'Awaiting the Breath', look: 'a thin lake-blue guard ring; caught blows go back twice as hard; three sword-intents make the next press a seizing dash' },
+  { id: 'nvluo', char: 'shangui', glyph: '萝', zh: '女萝', en: 'Lichen Vines', look: 'lichen vines tie her to the nearest foes; walk them taut, press again to snap them all to her feet' },
+  { id: 'sheri', char: 'houyi', glyph: '射', zh: '射日', en: 'Shooting the Suns', look: 'hold to draw a great arrow, release in the gold notch to pierce a whole line' },
+  // ── end m8:hidden ──
 ] as const satisfies readonly SkillNamed[];
 export type SkillId = (typeof SKILL_REG)[number]['id'];
 
 export const PASSIVE_REG = [
   { id: 'bolan', char: 'scholar', zh: '博览群书', en: 'Well Read', look: 'five cards per level, a free first reroll, +10% XP, picks his starting weapon' },
-  { id: 'chunzhong', char: 'gardener', zh: '春种秋收', en: 'Sow and Reap', look: '+8 收成 that grows 8% a wave; costs 15% 攻速' },
-  { id: 'yuanzhe', char: 'fisher', zh: '愿者上钩', en: 'Willing Fish', look: '福缘 and 拾取, golden carp kills; costs 5% 伤害' },
+  { id: 'chunzhong', char: 'gardener', zh: '春种秋收', en: 'Sow and Reap', look: '+8 收成 that grows 8% a wave; costs 10% 攻速' },
+  { id: 'yuanzhe', char: 'fisher', zh: '愿者上钩', en: 'Willing Fish', look: '福缘 and 拾取, golden carp kills; 老渔: +1% 伤害 per 3 福缘' },
   { id: 'zhiyin', char: 'musician', zh: '知音', en: 'Kindred Ear', look: '乐器 fire on the beat, stronger and wider; melee weapons −25%' },
-  { id: 'jianyi', char: 'swordsman', zh: '剑意', en: 'Sword Intent', look: '+1 剑数 and 仙剑 crit; melee weapons −25%' },
+  { id: 'jianyi', char: 'swordsman', zh: '剑意', en: 'Sword Intent', look: '+2 剑数, 仙剑 crit and 攻速, 剑归 heals on return; melee weapons −25%' },
   { id: 'tongzi', char: 'taoist', zh: '童子功', en: 'Child\'s Discipline', look: 'statuses last longer, a smaller hitbox; melee weapons −25%' },
   { id: 'chengzhu', char: 'painter', zh: '胸有成竹', en: 'Bamboo in the Heart', look: 'more, longer-lived, stronger 墨宝; other weapons −25%' },
   { id: 'luozi', char: 'player', zh: '落子无悔', en: 'No Take-backs', look: 'more stones that last the wave, a free reroll, a peek at the next wave; −10% 攻速' },
   { id: 'jiuming', char: 'cat', zh: '九命', en: 'Nine Lives', look: 'eight lethal hits shrugged off, paw prints on the HUD; half HP gains, no heavy arms or bows' },
-  { id: 'yaoxiang', char: 'rabbit', zh: '月宫药香', en: 'Moon-Palace Herbs', look: 'overheal becomes a moon shield, healing +15%; −15% 射程' },
+  { id: 'yaoxiang', char: 'rabbit', zh: '月宫药香', en: 'Moon-Palace Herbs', look: 'overheal becomes a moon shield, healing +15%; 药力: 回气 → 伤害' },
   { id: 'baipian', char: 'poet', zh: '斗酒百篇', en: 'A Hundred Poems a Jug', look: 'the 醉 meter without wine, twice as fast; his aim sways' },
   { id: 'yibo', char: 'guan', zh: '义薄云天', en: 'Righteous as the Clouds', look: 'no hit takes over 20% of max HP, grows 近战; five weapon slots, no hidden weapons' },
   { id: 'yinqing', char: 'change', zh: '阴晴圆缺', en: 'Waxing and Waning', look: 'a 16 s moon cycle from full-moon damage to new-moon dodge; ground hazards hurt her half and never slow her' },
+  // ── m8:hidden ──
+  { id: 'jingshen', char: 'yuenv', zh: '内实精神', en: 'Calm Without, Ready Within', look: 'dodge counts half and the rest becomes melee; after a catch the next hits crit' },
+  { id: 'youhuang', char: 'shangui', zh: '幽篁', en: 'Deep in the Bamboo', look: 'more damage for each foe close by; snapped foes take more damage' },
+  { id: 'mangong', char: 'houyi', zh: '满弓', en: 'Full Draw', look: 'bows hit harder and pierce more while he stands still, fire slower while he moves' },
+  // ── end m8:hidden ──
 ] as const satisfies readonly CharNamed[];
 export type PassiveId = (typeof PASSIVE_REG)[number]['id'];
 
@@ -242,6 +285,11 @@ export const ALT_SKILL_REG = [
   { id: 'doujiu', char: 'poet', glyph: '酒', zh: '斗酒', en: 'A Jug of Wine', look: '醉 and 攻速 surge; crits burst into verse characters' },
   { id: 'chitu', char: 'guan', glyph: '马', zh: '赤兔', en: 'Red Hare', look: 'he rides Red Hare through the crowd' },
   { id: 'benyue', char: 'change', glyph: '奔', zh: '奔月', en: 'To the Moon', look: 'she floats untouchable while moonbeams strike' },
+  // ── m8:hidden ──
+  { id: 'lunjian', char: 'yuenv', glyph: '候', zh: '越女论剑', en: 'The Maiden on the Sword', look: 'hold a stance that catches only shots, each turning into a flying sword loosed on release' },
+  { id: 'chibao', char: 'shangui', glyph: '萝', zh: '赤豹', en: 'The Red Leopard', look: 'the leopard pounces and holds a spot, vines tied to it; called back, it snaps them all' },
+  { id: 'lianzhu', char: 'houyi', glyph: '射', zh: '连珠', en: 'Strung Pearls', look: 'nock up to three arrows and loose them as a fan, or as one line if released on the third' },
+  // ── end m8:hidden ──
 ] as const satisfies readonly SkillNamed[];
 export type AltSkillId = (typeof ALT_SKILL_REG)[number]['id'];
 
@@ -622,8 +670,8 @@ export type ProjKind = (typeof PROJ_REG)[number]['id'];
 
 /** Pickups: atlas `drop:<id>`. Only the three cash kinds are round with a square hole (GDD §16.3). */
 export const DROP_REG = [
-  { id: 'moonDrop', zh: '月华', en: 'Moonlight', look: 'moon-white shard or pearl with a silver glint; drawn on top' },
-  { id: 'moonThick', zh: '浓墨', en: 'Thick Moonlight', look: 'fused, larger moon pearl worth 5' },
+  { id: 'moonDrop', zh: '月华', en: 'Moonlight', look: 'moon-white pearl made by the indigo wash around it (烘云托月), a crescent shade and a glint; floats and twinkles; worth 1' },
+  { id: 'moonThick', zh: '月华珠', en: 'Moon Pearl', look: 'larger moon pearl in its indigo wash with a second ring; worth 5 (a haul split into pearls, or 浓墨 fusion)' },
   { id: 'goldShard', zh: '金月华', en: 'Gold Moonlight', look: '招财猫 gold shard worth 4 月华; a shard, not a coin' },
   { id: 'carpGold', zh: '金鲤', en: 'Golden Carp', look: '渔翁 golden carp flopping, worth +5 月华' },
   { id: 'crateBox', zh: '镜奁', en: 'Mirror Case', look: 'small lacquered mirror case with a gold clasp' },
@@ -635,6 +683,8 @@ export const DROP_REG = [
   // 镜宝 fly-ins (cosmetic: the relic is already yours at the kill); the item icons at drop size
   { id: 'relicMirror', zh: '忘尘镜', en: 'Dustless Mirror', look: 'the 忘尘镜 item icon in a jade ring, flying from the fallen boss to you' },
   { id: 'relicSword', zh: '龙渊剑', en: 'Longyuan Sword', look: 'the 龙渊剑 item icon in a jade ring, flying from the fallen boss to you' },
+  // ── m8:art ── (appended last so the engine's drop indices, DK, stay as they were)
+  { id: 'moonFull', zh: '满月', en: 'Full Moon', look: 'large moon-white pearl in a wash of indigo, circled by motes; worth 25' },
 ] as const satisfies readonly Named[];
 export type DropKind = (typeof DROP_REG)[number]['id'];
 
@@ -709,11 +759,19 @@ export function named(id: string): Named | undefined {
   return index.get(id);
 }
 
-/** The deed that unlocks a weapon or item, if it is locked at the start. */
+/**
+ * The deed that unlocks a weapon, if it is locked at the start. m8 ask B (「直接开放」, PLAN D27): no item is
+ * locked any more; the 22 item deeds stay deeds (progress, seal, codex) and pay 镜屑 once instead (deedOf).
+ */
 export function lockOf(id: WeaponId | ItemId): DeedId | undefined {
+  for (const d of DEED_REG) if (d.unlocks === id && WEAPON_REG.some((w) => w.id === id)) return d.id;
+  return undefined;
+}
+/** The deed whose name an item or weapon carries (weapons: the lock; items: the 镜屑 deed), if any. */
+export function deedOf(id: WeaponId | ItemId): DeedId | undefined {
   for (const d of DEED_REG) if (d.unlocks === id) return d.id;
   return undefined;
 }
 
-/** Items open from the start (53): every item no deed unlocks. */
-export const STARTER_ITEMS: readonly ItemId[] = ITEM_REG.map((i) => i.id).filter((id) => !lockOf(id));
+/** Items open from the start (m8 ask B: every item). */
+export const STARTER_ITEMS: readonly ItemId[] = ITEM_REG.map((i) => i.id);

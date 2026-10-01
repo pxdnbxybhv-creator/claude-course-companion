@@ -9,16 +9,21 @@ import { Sheet } from '../../../ui/kit';
 import { pentadText } from '../../../data/terms';
 import { TERMS } from '../../../data/terms';
 import {
-  BOSS_REG, HAZARD_REG, MAP_REG, lockOf, DEED_REG,
+  BOSS_REG, HAZARD_REG, MAP_REG, lockOf, deedOf, DEED_REG,
   type ArchetypeId, type BossId, type ItemId, type MapId, type MonsterId, type WeaponId,
 } from '../ids';
 import type { CharacterId, CodexKey, CodexStage } from '../types';
+import { isHidden, type HiddenId } from '../types';
+import { openOf } from '../logic/session';
+import { hiddenTease } from '../logic/hidden';
+import { HIDDEN_SAY, HIDDEN_UI, hiddenLine } from './hiddenText';
 import { ARCHETYPES, COMPANIONS, ITEMS, MAPS, MONSTERS, WEAPONS, SKILLS } from '../data';
 import { termName } from '../data/glossary';
-import { deedProgress, unlocksOf } from '../logic';
+import { deedDust, deedProgress, unlocksOf } from '../logic';
+import { DEED_REWARD_SAY } from '../data/say';
 import { Icon, Portrait } from './icons';
 import { className, CODEX_TABS, codexKeys, fmtInt, nameOf, pageAtlas, pageId, STAGE_EN, STAGE_ZH, tierWord, type CodexTab, type T } from './text';
-import { archLine, companionGist, deedLine, describeItem, describePassive, describeSkill, describeWeapon, foeTip, hazardTip } from './describe';
+import { archLine, companionGist, deedLine, describeItem, describePassive, describeSkill, describeWeapon, fill, foeTip, hazardTip } from './describe';
 import './text.css';
 import { codexTab, rememberCodexTab } from './prefs';
 
@@ -28,7 +33,12 @@ export function Codex() {
   const [tab, setTabState] = useState<CodexTab>(() => (CODEX_TABS.some((x) => x.id === codexTab()) ? (codexTab() as CodexTab) : 'wpn'));
   const setTab = (x: CodexTab) => { setTabState(x); rememberCodexTab(x); };
   const [open, setOpen] = useState<CodexKey | null>(null);
-  const keys = codexKeys(tab);
+  // m8:hidden · the hidden three's pages: off the grid until a map's deepest reaches 30 (or the code), then sealed
+  // (the silhouette and the hint) until earned (hidden.md §2.3); they always count toward the total
+  const opened = openOf(m).chars;
+  const tease = hiddenTease(m);
+  const sealedPage = (k: CodexKey) => k.startsWith('char:') && isHidden(pageId(k)) && !opened.includes(pageId(k) as HiddenId);
+  const keys = codexKeys(tab).filter((k) => !(k.startsWith('char:') && isHidden(pageId(k))) || opened.includes(pageId(k) as HiddenId) || tease);
   const stageOf = (k: CodexKey): CodexStage => (m.codex[k] ?? 0) as CodexStage;
   const allKeys = CODEX_TABS.filter((x) => x.id !== 'slip').flatMap((x) => codexKeys(x.id));
   const seen = allKeys.filter((k) => stageOf(k) >= 1).length;
@@ -51,6 +61,12 @@ export function Codex() {
             const s = stageOf(k);
             const atlas = pageAtlas(k);
             const id = pageId(k);
+            if (sealedPage(k)) return (
+              <button type="button" role="listitem" class="mj-page is-sealed" onClick={() => setOpen(k)} aria-label={t(HIDDEN_UI.label.zh, HIDDEN_UI.label.en)}>
+                <span class="mj-page-art"><Portrait id={id} size={52} veiled /></span>
+                <span class="mj-page-name">{t(HIDDEN_UI.name.zh, HIDDEN_UI.name.en)}</span>
+              </button>
+            );
             return (
               <button type="button" role="listitem" class={`mj-page stage-${s}`} onClick={() => setOpen(k)} aria-label={s ? `${nameOf(id, t)} · ${t(STAGE_ZH[s], STAGE_EN[s])}` : t('未见', 'unseen')}>
                 <span class="mj-page-art">
@@ -63,8 +79,8 @@ export function Codex() {
           })}
         </div>
       )}
-      <Sheet open={open !== null} onClose={() => setOpen(null)} title={open ? (stageOf(open) ? nameOf(pageId(open), t) : t('还没见过的一页', 'An unseen page')) : ''}>
-        {open && <PageView k={open} stage={stageOf(open)} t={t} />}
+      <Sheet open={open !== null} onClose={() => setOpen(null)} title={open ? (sealedPage(open) ? t(HIDDEN_UI.head.zh, HIDDEN_UI.head.en) : stageOf(open) ? nameOf(pageId(open), t) : t('还没见过的一页', 'An unseen page')) : ''}>
+        {open && (sealedPage(open) ? <SealedPage id={pageId(open) as HiddenId} t={t} /> : <PageView k={open} stage={stageOf(open)} t={t} />)}
       </Sheet>
     </section>
   );
@@ -82,6 +98,11 @@ function PageView(props: { k: CodexKey; stage: CodexStage; t: T }) {
   const locked = deed && !(kind === 'wpn' ? u.weapons.has(id as WeaponId) : u.items.has(id as ItemId));
   const d = deed ? DEED_REG.find((x) => x.id === deed)! : null;
   const prog = deed ? deedProgress(m, deed) : null;
+  // m8 ask B: an item is open from the start; its deed (if any) stays, with the 镜屑 it pays once
+  const itemDeed = kind === 'item' ? deedOf(id as ItemId) : undefined;
+  const iD = itemDeed ? DEED_REG.find((x) => x.id === itemDeed)! : null;
+  const iProg = itemDeed ? deedProgress(m, itemDeed) : null;
+  const reward = (n: number) => t(fill(DEED_REWARD_SAY.zh, (p) => (p === 'n' ? n : undefined), 'zh'), fill(DEED_REWARD_SAY.en, (p) => (p === 'n' ? n : undefined), 'en'));
   return (
     <div class={`mj-pageview stage-${stage}`}>
       <div class="mj-pageview-art">
@@ -91,12 +112,28 @@ function PageView(props: { k: CodexKey; stage: CodexStage; t: T }) {
       {locked && d && prog && (
         <p class="mj-howto"><span class="mj-tag">{t('镜缘', 'Deed')}</span>{t(d.zh, d.en)} · {deedLine(d.id, t)} <span class="num">({fmtInt(prog.value)}/{fmtInt(prog.goal)})</span></p>
       )}
+      {iD && iProg && (
+        <p class="mj-howto"><span class="mj-tag">{t('镜缘', 'Deed')}</span>{t(iD.zh, iD.en)} · {deedLine(iD.id, t)} <span class="num">({fmtInt(iProg.value)}/{fmtInt(iProg.goal)})</span> · {reward(deedDust(iD.id))}</p>
+      )}
       {stage === 0 ? (
         <p class="muted">{t('此页尚在雾中。遇见它，页上才有墨。', 'This page is still in mist: meet it and the ink comes.')}</p>
       ) : (
         <PageBody kind={kind} id={id} stage={stage} t={t} tally={tally} />
       )}
       <p class="muted mj-small">{t('见：遇到过。识：打倒 10 次，或买过、用过。精：打倒 100 次，或带着它、用它照破。', 'Seen: met. Known: 10 kills, bought or played. Mastered: 100 kills, or a clear holding it or as them.')}</p>
+    </div>
+  );
+}
+
+/** m8:hidden · a sealed hidden companion's page: the silhouette, the hint and the flavour line (hidden.md §2.3). */
+function SealedPage(props: { id: HiddenId; t: T }) {
+  const { id, t } = props;
+  const s = HIDDEN_SAY[id];
+  return (
+    <div class="mj-pageview mj-hid-pane">
+      <div class="mj-pageview-art"><Portrait id={id} size={120} veiled /></div>
+      <p class="mj-howto"><span class="mj-tag">{t(HIDDEN_UI.notYet.zh, HIDDEN_UI.notYet.en)}</span>{hiddenLine(HIDDEN_UI.hint, id, t)}</p>
+      <p class="mj-hid-flavour">{t(s.flavour.zh, s.flavour.en)}</p>
     </div>
   );
 }

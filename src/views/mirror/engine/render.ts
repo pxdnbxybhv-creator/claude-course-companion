@@ -69,9 +69,36 @@ const HURT_KNOCK = 2;
 const HURT_RIM_A = 0.2;
 /** Orbiting blades drawn with an arc ribbon, per quality (the frame guard halves it). */
 const ARC_CAP = { low: 8, mid: 16, high: 24 } as const;
-/** Drops that always glow (moon pearls, gold, hearts, cases), by kind index; −1 only while streaming in. */
-const DROP_GLOW_OF: Readonly<Record<string, number>> = { moonThick: VT.moon, goldShard: VT.gold, carpGold: VT.gold, heartDrop: VT.moon, crateBox: VT.gold, cashTen: VT.gold, relicMirror: VT.moon, relicSword: VT.moon };
+/** Drops that always glow (gold, hearts, cases), by kind index; −1 only while streaming in. m8: the 月华 pearls
+ *  carry their glow baked in (the indigo bleed), so they never take a glow from the frame's budget. */
+const DROP_GLOW_OF: Readonly<Record<string, number>> = { goldShard: VT.gold, carpGold: VT.gold, heartDrop: VT.moon, crateBox: VT.gold, cashTen: VT.gold, relicMirror: VT.moon, relicSword: VT.moon };
 const DROP_GLOW = Int8Array.from(DROP_IDS, (id) => DROP_GLOW_OF[id] ?? -1);
+/** m8 · held weapons (art.md §4.3, PLAN D22): drawn at 0.8× (was 0.55) and alpha 1 (was 0.9) on an orbit of
+ *  30 × 22 u (was 24 × 18) so a 40 u sword does not cover the figure. The fallback the owner may pick is 0.7×
+ *  (art §9 Q1): change `size` here only (paint/index.ts kindScale('wpn:') bakes at 0.85 either way). */
+export const HELD = { size: 0.8, alpha: 1, orbitX: 30, orbitY: 22 } as const;
+/** m8 · the 月华 pearls (月华, 月华珠, 满月) by kind index: they float, twinkle and stream in over the bodies. */
+const DROP_MOON = Uint8Array.from(DROP_IDS, (id) => (id === 'moonDrop' || id === 'moonThick' || id === 'moonFull' ? 1 : 0));
+/** 月华 on the ground (art.md §5.2): a float of ±MOON_BOB u at MOON_BOB_W rad/s, phase MOON_BOB_PH per drop; the
+ *  twinkle frame shows while (MOON_TW_RATE t + MOON_TW_PH i) mod 1 < MOON_TW_ON (12 % of a 1.43 s cycle, a
+ *  golden-ratio stagger). None of it under 减少动态 (the static v0 frame). */
+const MOON_BOB = 1.8, MOON_BOB_W = 3.2, MOON_BOB_PH = 1.7, MOON_TW_RATE = 0.7, MOON_TW_PH = 0.618, MOON_TW_ON = 0.12;
+/** The comet tail of a streaming pearl (art §5.3): length, width and alpha of SH.streak (was 0.55 each). */
+const MOON_TAIL: readonly [number, number, number] = [1.4, 0.9, 0.85];
+/** The pickup ping (art §5.4): ring r and life, motes r / count / life. */
+const MOON_PING = { r: 30, life: 0.32, moteR: 16, motes: 3, moteLife: 0.55 } as const;
+/** A 月华 pearl's float offset (u, up) at time t for drop i (0 under 减少动态 or while pulled). */
+export function moonBob(t: number, i: number, calm: boolean, pulled: boolean): number {
+  return calm || pulled ? 0 : MOON_BOB * Math.sin(t * MOON_BOB_W + i * MOON_BOB_PH);
+}
+/** A 月华 pearl's frame at time t for drop i: 1 (the twinkle) 12 % of the time, staggered; 0 under 减少动态. */
+export function moonFrame(t: number, i: number, calm: boolean): number {
+  return !calm && ((t * MOON_TW_RATE + i * MOON_TW_PH) % 1) < MOON_TW_ON ? 1 : 0;
+}
+/** Both at once (the tests). */
+export function moonIdle(t: number, i: number, calm: boolean, pulled: boolean): { bob: number; v: number } {
+  return { bob: moonBob(t, i, calm, pulled), v: moonFrame(t, i, calm) };
+}
 /** A drawNumber that also takes a scale (the painter's implementation accepts it). */
 type DrawNum = (ctx: CanvasRenderingContext2D, value: number, sx: number, sy: number, style: NumStyle, a: number, lang: 'zh' | 'en', scale?: number) => void;
 
@@ -175,7 +202,7 @@ export class Renderer {
       case 'dangerZones': this.drawZones(W, ctx, cam, 0); break;
       case 'ground': this.drawGround(W, ctx, cam); break;
       case 'drops': this.drawDrops(W, ctx, cam); break;
-      case 'enemies': this.drawEnemies(W, ctx, cam); break;
+      case 'enemies': this.drawEnemies(W, ctx, cam); if (this.streaming > 0) this.drawStream(W, ctx, cam); break;
       case 'summons': this.drawSummons(W, ctx, cam); break;
       case 'player': vfxOf(W).drawUnder(ctx, cam, this.spr); this.drawSwords(W, ctx, cam); this.drawPlayer(W, ctx, cam); break;
       case 'effects': this.drawEffects(W, ctx, cam); break;
@@ -264,11 +291,16 @@ export class Renderer {
     dsp.fill(undefined);
     let ident = false, al = 1;
     ctx.globalAlpha = 1;
+    const calm = !!W.settings.reduceMotion, td = W.tDraw;
+    this.streaming = 0;
     for (let i = 0; i < D.n; i++) {
       if (!D.alive[i]) continue;
       const k = D.kind[i];
       const id = DROP_ATLAS[k];
-      if (glows > 0) {
+      const moon = DROP_MOON[k] === 1;
+      // m8: a pearl streaming in is drawn after the enemies (drawStream), so it never vanishes under a body
+      if (moon && D.magnet[i] && D.age[i] >= 0.25) { this.streaming++; continue; }
+      if (glows > 0 && !moon) {
         const gt = DROP_GLOW[k];
         const gt2 = gt >= 0 ? gt : D.magnet[i] && D.age[i] >= 0.25 ? VT.moon : -1;
         const g = gt2 >= 0 ? VS.glow(gt2) : null;
@@ -280,11 +312,11 @@ export class Renderer {
           blitAt(ctx, cam, g, D.x[i], D.y[i], gt >= 0 ? 0.9 : 0.55);
         }
       }
-      const v = id === 'drop:cashCoin' ? Math.floor(tt * 8 + i) & 3 : 0;
+      const v = id === 'drop:cashCoin' ? Math.floor(tt * 8 + i) & 3 : moon ? moonFrame(td, i, calm) : 0;
       const si = k * 4 + v;
       let s = dsp[si];
       if (s === undefined) s = dsp[si] = this.sprite(id, v);
-      const bob = D.age[i] < 0.25 ? Math.sin((D.age[i] / 0.25) * Math.PI) * 10 : 0;
+      const bob = D.age[i] < 0.25 ? Math.sin((D.age[i] / 0.25) * Math.PI) * 10 : moon ? moonBob(td, i, calm, false) : 0;
       if (zip && D.magnet[i] && D.age[i] >= 0.25) {
         // 月华 streaming in leaves a thin moon-white streak
         const dx = W.px - D.x[i], dy = W.py - D.y[i];
@@ -297,6 +329,35 @@ export class Renderer {
       } else { circle(ctx, cam, D.x[i], D.y[i] - bob, k <= 1 ? 4 : 7, k >= 7 ? '#b8862b' : '#e8eef2'); ident = true; }
     }
     if (al !== 1) ctx.globalAlpha = 1;
+  }
+
+  /** Pearls streaming in counted by the last drawDrops (drawStream runs only when there are some). */
+  private streaming = 0;
+  /** m8 (art §5.2–5.3): the 月华 pearls streaming in, after the enemies: a comet tail (MOON_TAIL) while more
+   *  than 30 u out, then the pearl (no bob, no twinkle while pulled). The draws move here; none are added. */
+  private drawStream(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
+    const D = W.D;
+    const zip = W.feel.sprites.ok && !W.degrade && D.count < 160 ? W.feel.sprites.get(SH.streak, TN.moon) : null;
+    const dsp = this.dropSpr;
+    let ident = false;
+    ctx.globalAlpha = 1;
+    for (let i = 0; i < D.n; i++) {
+      if (!D.alive[i]) continue;
+      const k = D.kind[i];
+      if (DROP_MOON[k] !== 1 || !D.magnet[i] || D.age[i] < 0.25) continue;
+      if (zip) {
+        const dx = W.px - D.x[i], dy = W.py - D.y[i];
+        if (dx * dx + dy * dy > 900 && blitAff(ctx, cam, zip, D.x[i], D.y[i], Math.atan2(dy, dx), MOON_TAIL[0], MOON_TAIL[1], MOON_TAIL[2])) ident = false;
+      }
+      const si = k * 4;
+      let s = dsp[si];
+      if (s === undefined) s = dsp[si] = this.sprite(DROP_ATLAS[k], 0);
+      if (s) {
+        if (!ident) { ctx.setTransform(1, 0, 0, 1, 0, 0); ident = true; }
+        blitAt(ctx, cam, s, D.x[i], D.y[i], D.worth[i] >= 5 && k === 0 ? 1.4 : 1);
+      } else { circle(ctx, cam, D.x[i], D.y[i], 4, '#e8eef2'); ident = true; }
+    }
+    ctx.globalAlpha = 1;
   }
 
   private drawEnemies(W: World, ctx: CanvasRenderingContext2D, cam: Camera): void {
@@ -382,9 +443,9 @@ export class Renderer {
       this.seenXp = W.xpGot;
       if (W.phase === 'wave' && (W.t - this.lastPing >= 1 / 6 || W.t < this.lastPing)) {
         this.lastPing = W.t;
-        V.ring(W.px, W.py, 22, VT.moon, 0.3, VF.thin);
-        // and a glint of it rising off you (sparkle)
-        V.motes(W.px, W.py - 12, 12, 1, VT.moon, 0.45);
+        V.ring(W.px, W.py, MOON_PING.r, VT.moon, MOON_PING.life, VF.thin);
+        // and glints of it rising off you (sparkle): m8, three
+        V.motes(W.px, W.py - 12, MOON_PING.moteR, MOON_PING.motes, VT.moon, MOON_PING.moteLife);
       }
     }
   }
@@ -917,19 +978,36 @@ export class Renderer {
     // was 3–10 px, and read as the screen jolting)
     const kb = HURT_KNOCK * hs;
     this.youS = s; this.youLift = lift;
-    if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.064 * hs, 1 - 0.056 * hs);
+    // m8 (ART, QA fix): every held weapon is drawn behind the figure; at 0.8× the near half drawn in front covered
+    // about half of a thickened figure with four to six weapons
+    this.drawHeld(W, ctx, cam, lift, !!calm);
+    // m8 (PLAN E7): the lanes' figure-layer hooks (rings, tethers, poses); one returning true draws the figure itself
+    let posed = false;
+    for (let k = 0; k < W.playerHooks.length; k++) if (W.playerHooks[k](ctx, cam, W)) posed = true;
+    if (posed) { /* a pose drew the figure */ }
+    else if (s) blit(ctx, cam, s, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 1, flip, a, 1 + 0.064 * hs, 1 - 0.056 * hs);
     else circle(ctx, cam, W.px + F.hurtUx * kb, W.py - lift + F.hurtUy * kb, 14, '#f4f1e8', a);
+    if (W.shieldV > 0) this.mark(ctx, cam, 'fx:shieldBubble', W.px, W.py - lift, 0.9);
+    // the hitbox: a small vermilion dot at the centre (GDD §20)
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const sx = (W.px - cam.x) * cam.scale + cam.w / 2, sy = (W.py - lift - cam.y) * cam.scale + cam.h / 2;
+    ctx.fillStyle = '#d63a22';
+    ctx.fillRect(sx - 1.5 * cam.dpr, sy - 1.5 * cam.dpr, 3 * cam.dpr, 3 * cam.dpr);
+  }
+
+  /** Held weapons, all under the figure, pointing at the last attack. */
+  private drawHeld(W: World, ctx: CanvasRenderingContext2D, cam: Camera, lift: number, calm: boolean): void {
     // weapons held around you, pointing at the last attack: a wind-up as the cooldown ends
     // (anticipation), a swing through the blow (follow-through), a kick back on a shot (recoil)
-    const n = W.slots.length;
+    const n = W.slots.length, F = W.feel;
     const dir = W.lastDir < 1e8 ? W.lastDir : W.face;
     for (let k = 0; k < n; k++) {
       const sl = W.slots[k];
       if (sl.kind === 'orbit' || sl.kind === 'familiar') continue;
+      const a0 = (k / n) * TAU + W.tDraw * 0.4;
       const ws = this.sprite(`wpn:${sl.id}` as AtlasId);
       if (!ws) continue;
-      const a0 = (k / n) * TAU + W.tDraw * 0.4;
-      let wx = W.px + Math.cos(a0) * 24, wy = W.py - lift + Math.sin(a0) * 18;
+      let wx = W.px + Math.cos(a0) * HELD.orbitX, wy = W.py - lift + Math.sin(a0) * HELD.orbitY;
       const ft = k < 8 ? F.slotT[k] : 9;
       let wd = ft < 0.6 ? F.slotDir[k] : dir;
       if (!calm && k < 8) {
@@ -952,14 +1030,8 @@ export class Renderer {
           wx -= Math.cos(wd) * 5 * u; wy -= Math.sin(wd) * 5 * u;
         }
       }
-      blitRot(ctx, cam, ws, wx, wy, wd, 0.55, 0.9);
+      blitRot(ctx, cam, ws, wx, wy, wd, HELD.size, HELD.alpha);
     }
-    if (W.shieldV > 0) this.mark(ctx, cam, 'fx:shieldBubble', W.px, W.py - lift, 0.9);
-    // the hitbox: a small vermilion dot at the centre (GDD §20)
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    const sx = (W.px - cam.x) * cam.scale + cam.w / 2, sy = (W.py - lift - cam.y) * cam.scale + cam.h / 2;
-    ctx.fillStyle = '#d63a22';
-    ctx.fillRect(sx - 1.5 * cam.dpr, sy - 1.5 * cam.dpr, 3 * cam.dpr, 3 * cam.dpr);
   }
 
   /**

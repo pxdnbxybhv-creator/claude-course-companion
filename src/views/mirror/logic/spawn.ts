@@ -6,6 +6,7 @@ import {
   affixCount, bossHp, budget, computeStats, dmgX, eliteCount, hpX, isBossWave, isHordeWave, luckMult, mutatorValue, spdX, termP, waveLen,
 } from './formulas';
 import { pickDistinct, rngFor, weighted } from './rng';
+import { eliteAffixOf } from './items';
 
 /** Monsters that may spawn at wave w: the map's roster (every roster from wave 31), `from ≤ w`. */
 export function rosterAt(run: Pick<RunSave, 'map'>, w: number): MonsterId[] {
@@ -88,7 +89,9 @@ export function wavePlan(run: RunSave, w: number): SpawnPlan {
   // elites
   const pairs = Math.max(1, Math.round(mutatorValue(run, 'shuangjing', w)));
   const nElite = boss ? 0 : eliteCount(w, run.diff) * (pairs > 1 ? pairs : 1);
-  const nAffix = affixCount(w, run.diff);
+  // m8 与虎谋皮 (P14): eliteAffix more 镜印 an elite (at most F.eliteAffixMax); none held → as before
+  const xAffix = eliteAffixOf(run);
+  const nAffix = xAffix > 0 ? Math.min(F.eliteAffixMax, affixCount(w, run.diff) + xAffix) : affixCount(w, run.diff);
   const pool = elitePool(run, w);
   const elites: { t: number; id: EliteId; affixes: AffixId[] }[] = [];
   for (let i = 0; i < nElite; i++) {

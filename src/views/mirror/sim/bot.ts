@@ -10,9 +10,10 @@ import {
   allUnlocked, armorMult, beginWave, buy, cardsView, computeStats, cooldown, crateItem, dodgeCapOf, dodgeChance, endWave,
   heartOffer, luckMult, merge, meltValue, openShop, perTier, pickCard, pickHeart, pickStart, planHp, planMoon, procCoef,
   regenPerSec, rerollCost, reroll, resolveCrate, rngFor, screenOf, shopView, tierCd, waveLen, wavePlan, weaponHit, coinPlan,
-  bankSleeve, isBossWave, xpNext,
+  bankSleeve, isBossWave, xpNext, noReroll, shopFloor,
 } from '../logic';
 import { newRun } from '../logic/run';
+import { botItemValue } from './itemvalues';
 
 export interface BotOpts {
   seed: number;
@@ -23,6 +24,8 @@ export interface BotOpts {
   maxWave?: number;
   beginner?: boolean;
   unlocks?: Unlocks;
+  /** m8 (the 模拟场's bot build, sandbox.md): the run never ends in a death, it plays on to maxWave. */
+  immortal?: boolean;
 }
 export interface BotWave { w: number; dps: number; need: number; q: number; hurt: number; hp: number; moon: number; lvl: number }
 export interface BotRun { W: number; dead: boolean; run: RunSave; log: BotWave[]; coins: number; meta: MirrorMeta }
@@ -79,6 +82,26 @@ export function prefers(arch: ArchetypeId) {
   const a = ARCHETYPES[arch];
   return { weapons: new Set<WeaponId>(a.weapons), keys: new Set<ItemId>([...a.keys, ...(a.capstone ? [a.capstone] : [])]), scales: new Set<StatId>(a.scales) };
 }
+/**
+ * m8 (PLAN D31, balance.md §12.3 #7): the costs value() cannot read off the sheet. Without them the bot bought
+ * 破釜沉舟 in 96–100% of runs and starved its own 凡 stackers (朱砂 builds read low).
+ */
+export const BOT_M8 = {
+  /** 破釜's no-reroll clause: a flat loss while rerolls are off (the bot rerolls most shops from wave ~5). */
+  rerollLoss: 0.12,
+  /** 破釜's floor: per copy of a repeatable 凡 item held (the build leans on items it can no longer buy), capped. */
+  floorPer: 0.04,
+  floorCap: 12,
+} as const;
+/** Copies of repeatable 凡 items held (朱砂, 磨刀石, 箭羽, 松烟墨, 鹰羽, 铜铃 …): what 破釜's floor takes away. */
+export function commonStackers(run: Pick<RunSave, 'items'>): number {
+  let n = 0;
+  for (const id in run.items) {
+    const it = ITEMS[id as ItemId];
+    if (it && it.tier === 1 && it.max === 0 && !it.curse) n += run.items[id as ItemId] ?? 0;
+  }
+  return n;
+}
 /** One number for how good a run is at the next wave: offence against the need, and survival. */
 export function value(run: RunSave): number {
   const s = computeStats(run);
@@ -86,8 +109,19 @@ export function value(run: RunSave): number {
   const plan = wavePlan(run, Math.min(w, 60));
   const dps = buildDps(run, s, 0.6, 1).area;
   const need = planHp(plan) / (plan.len ?? 60);
-  const ehp = Math.max(1, s.hp) / armorMult(s.armor) / (1 - dodgeChance(s.dodge, dodgeCapOf(run))) + regenPerSec(s) * 20;
-  return Math.log(1 + dps / Math.max(1, need)) * 3 + Math.log(ehp) + 0.002 * s.harvest + 0.001 * s.luck;
+  // m8: 劫's enemy side — enemy HP is already in `need` (wavePlan's hpX); their damage (×(1 + 2%·劫)) divides the EHP
+  const dmgIn = 1 + F.curseEnemy * Math.max(0, s.curse);
+  const ehp = (Math.max(1, s.hp) / armorMult(s.armor) / (1 - dodgeChance(s.dodge, dodgeCapOf(run))) + regenPerSec(s) * 20) / dmgIn;
+  let v = Math.log(1 + dps / Math.max(1, need)) * 3 + Math.log(ehp) + 0.002 * s.harvest + 0.001 * s.luck;
+  // m8: the loss of rerolls, and of the 凡 stackers under the floor (破釜沉舟)
+  if (noReroll(run)) v -= BOT_M8.rerollLoss;
+  if (shopFloor(run) >= 2) v -= BOT_M8.floorPer * Math.min(BOT_M8.floorCap, commonStackers(run));
+  // m8: rough worth of fx items the sheet cannot show (sim/itemvalues.ts, ITEMS' numbers)
+  for (const id in run.items) {
+    const n = run.items[id as ItemId] ?? 0;
+    if (n > 0) v += botItemValue(run, id as ItemId) * n;
+  }
+  return v;
 }
 
 export function doCards(run: RunSave, rng: () => number, beginner: boolean, arch: ArchetypeId): RunSave {
@@ -207,7 +241,9 @@ function fight(run: RunSave, w: number, rng: () => number, beginner: boolean): {
     }
   }
   const cleared = Math.min(1, q);
-  const moonAll = planMoon(plan) * (1 + (run.items.delusion ? 0.1 : 0)) * (1 + F.curseMoon * s.curse);
+  // 妄念's 月华 change, read from its data (−15 % since QA's 劫 pass)
+  const delu = run.items.delusion ? ((ITEMS.delusion.fx ?? []).find((e) => e.do === 'world') as { moonPct?: number } | undefined)?.moonPct ?? 0 : 0;
+  const moonAll = planMoon(plan) * Math.max(0, 1 + delu / 100) * (1 + F.curseMoon * s.curse);
   const picked = Math.round(moonAll * cleared * 0.88);
   const kills = Math.round(plan.kills * cleared) + plan.elites.length;
   let crates = plan.elites.length + plan.treasures.filter((x) => x.id === 'pixiu').length;
@@ -258,7 +294,7 @@ export function simulateRun(o: BotOpts, meta0?: MirrorMeta): BotRun {
     const coins: CoinDrop[] = coinPlan(run, w, luck, meta, '2026-09-27');
     const f = fight(run, w, rng, !!o.beginner);
     log.push(f.row);
-    if (f.dead) { dead = true; run = { ...run, inWave: null }; break; }
+    if (f.dead && !o.immortal) { dead = true; run = { ...run, inWave: null }; break; }
     run = endWave(run, { ...f.res, sleeve: coins });
     const b = bankSleeve(meta, run, coins, '2026-09-27');
     meta = { ...b.meta, owed: 0, coinsPaid: b.meta.coinsPaid + b.meta.owed };

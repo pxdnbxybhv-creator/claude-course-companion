@@ -11,6 +11,7 @@ import { coinPlan } from './economy';
 import { addItem, itemPool, weaponPool } from './items';
 import { pickDistinct, rngFor } from './rng';
 import { bossesAt, wavePlan } from './spawn';
+import { lentLuck, unlentRun } from './lend';
 
 /** 心镜 宿器: is the starting weapon tier II? (rolled once per run from the 'start' stream). */
 export function keepsakeTier(run: Pick<RunSave, 'seed' | 'heart'>): 1 | 2 {
@@ -92,7 +93,9 @@ export function waveSetup(run: RunSave, meta: MirrorMeta, now: Date): WaveSetup 
     const at = mutators.find((m) => m.id === extra);
     if (at) at.x = 2; else mutators.push({ id: extra, x: 1 });
   }
-  return { wave: w, plan, coins: coinPlan(run, w, luck, meta, today), mutators, term: run.term, sky: { fullMoonDay, lunation: mi.phase, fullWave }, stats };
+  // m8: 福缘 the test code lent is left out of the 铜钱 plan (the code never changes the mirror's pay): the
+  // plan is rolled on the run without its lent ranks, with the lent 福缘 taken off the luck
+  return { wave: w, plan, coins: coinPlan(unlentRun(run), w, luck - lentLuck(run), meta, today), mutators, term: run.term, sky: { fullMoonDay, lunation: mi.phase, fullWave }, stats };
 }
 
 // ───────────────────────────────────────────── the wave end (§3 steps 5–9 and the run's counters)
@@ -147,7 +150,8 @@ function logicStats(run: RunSave, r: WaveResult): RunStats {
 export function endWave(run: RunSave, r: WaveResult): RunSave {
   if (run.inWave === null || r.wave !== run.inWave) return run; // only the wave in play folds (never twice)
   const w = r.wave;
-  let moon = run.moon + Math.max(0, r.moon);
+  // m8: 月华 of your own scattered and not taken back (千金散尽) is subtracted once, never below 0
+  let moon = Math.max(0, run.moon + Math.max(0, r.moon) - (r.lost ?? 0));
   let xp = run.xp + Math.max(0, r.xp);
   const store = Math.max(0, r.field) + Math.max(0, r.storeLeft);
   // harvest: +H 月华 and XP, then H grows (decays past 30)
