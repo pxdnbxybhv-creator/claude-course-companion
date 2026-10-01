@@ -1,0 +1,127 @@
+/* 水月幻镜 · m8 · the 模拟场 (ui/sand/Sand.tsx): the setup page, the gold banner and edge, the 调 button and dock
+   (a bottom sheet on a phone, a 420 px side panel from 1000 px), the death card. Every selector carries .mj-sand.
+   Colours come from the app's tokens (--paper, --ink, --line …), so light and dark both hold. */
+.mirror.mj-sand-on { --mj-sand-gold: #b8892a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) .mirror.mj-sand-on { --mj-sand-gold: #e0b95a; } }
+:root[data-theme='dark'] .mirror.mj-sand-on { --mj-sand-gold: #e0b95a; }
+
+/* ── the setup page */
+.mj-sand-setup { padding-bottom: 24px; }
+.mj-sand-setup .mj-page-title { margin-bottom: 4px; }
+.mj-sand-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 10px 0; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.1)); }
+.mj-sand-label { flex: 0 0 auto; min-width: 72px; font-size: 14px; color: var(--ink-2, #3b352c); }
+.mj-sand-chips { gap: 6px; }
+.mj-sand-chips .chip { min-height: 34px; padding: 0 12px; }
+.mj-sand-strip { display: flex; gap: 6px; overflow-x: auto; max-width: 100%; padding-bottom: 4px; scrollbar-width: thin; }
+.mj-sand-pick { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px; border-radius: 10px; border: 1px solid transparent; min-width: 52px; }
+.mj-sand-pick small { font-size: 11px; white-space: nowrap; }
+.mj-sand-pick.is-on { border-color: var(--ink, #1b1916); background: var(--paper-2, #e8dec9); }
+.mj-sand-vows summary { cursor: pointer; list-style: none; display: flex; gap: 8px; align-items: center; }
+.mj-sand-vows[open] { display: block; }
+/* (in the flow, not fixed: the app's tab bar owns the foot of the screen on this page) */
+.mj-sand-go { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; padding: 16px 0 8px; }
+.mj-sand-go .btn { white-space: nowrap; }
+.mj-sand-go .btn-primary { min-width: 160px; min-height: 48px; font-size: 17px; }
+
+/* ── shared controls */
+.mj-sand-step { display: inline-flex; align-items: center; gap: 2px; }
+.mj-sand-sbtn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-strong, rgba(0, 0, 0, 0.25)); font-size: 16px; line-height: 1; color: var(--ink, #1b1916); background: var(--paper, #f3ecdc); }
+.mj-sand-num { width: 62px; height: 30px; padding: 0 6px; border-radius: 8px; border: 1px solid var(--line-strong, rgba(0, 0, 0, 0.25)); background: var(--paper, #f3ecdc); color: var(--ink, #1b1916); font-size: 14px; text-align: right; }
+.mj-sand-select { height: 32px; max-width: 100%; border-radius: 8px; border: 1px solid var(--line-strong, rgba(0, 0, 0, 0.25)); background: var(--paper, #f3ecdc); color: var(--ink, #1b1916); font-size: 14px; padding: 0 6px; }
+.mj-sand-search { width: 100%; height: 36px; padding: 0 10px; margin: 4px 0 8px; border-radius: 10px; border: 1px solid var(--line-strong, rgba(0, 0, 0, 0.25)); background: var(--paper, #f3ecdc); color: var(--ink, #1b1916); font-size: 15px; }
+.mj-sand-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 0; }
+.mj-sand-line > span:first-child { flex: 1 1 120px; min-width: 0; }
+.mj-sand-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px 0; }
+.mj-sand-badge { display: inline-block; font-size: 11px; line-height: 1; padding: 3px 6px; border-radius: 999px; border: 1px solid var(--mj-sand-gold, #b8892a); color: var(--ink-2, #3b352c); white-space: nowrap; }
+
+/* ── in the run: the banner, the gold edge, the 调 button */
+/* under the 调 button at the right: clear of the HUD's centre column (the wave, the boss bar, the shop's title) */
+.mj-sand-banner { position: absolute; z-index: 40; top: calc(114px + env(safe-area-inset-top)); right: calc(6px + env(safe-area-inset-right)); padding: 2px 10px; border-radius: 999px; font-size: 11px; color: #1b1916; background: var(--mj-sand-gold, #b8892a); pointer-events: none; white-space: nowrap; opacity: 0.92; }
+.mirror.mj-sand-on .mj-run { box-shadow: inset 0 0 0 3px var(--mj-sand-gold, #b8892a); }
+.mj-sand-tune { position: absolute; z-index: 45; top: calc(64px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--mj-sand-gold, #b8892a); background: color-mix(in srgb, var(--paper, #f3ecdc) 90%, transparent); color: var(--ink, #1b1916); font-size: 22px; display: grid; place-items: center; }
+.mj-sand-tune.is-on { background: var(--mj-sand-gold, #b8892a); color: #1b1916; }
+
+/* ── the dock: a bottom sheet (62 % of the height) on a phone */
+.mj-sand-dock { position: absolute; z-index: 44; left: 0; right: 0; bottom: 0; height: 62%; display: flex; flex-direction: column; background: var(--paper, #f3ecdc); color: var(--ink, #1b1916); border-top: 2px solid var(--mj-sand-gold, #b8892a); border-radius: 14px 14px 0 0; box-shadow: 0 -10px 24px -14px rgba(20, 15, 5, 0.6); }
+.mj-sand-tabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.1)); }
+.mj-sand-tab { flex: 1 1 0; min-height: 40px; font-size: 15px; border-radius: 10px 10px 0 0; color: var(--ink-2, #3b352c); }
+.mj-sand-tab.is-on { background: var(--paper-2, #e8dec9); color: var(--ink, #1b1916); font-weight: 600; }
+.mj-sand-close { flex: 0 0 44px; }
+.mj-sand-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 4px 12px; }
+.mj-sand-foot { display: flex; align-items: center; gap: 8px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line, rgba(0, 0, 0, 0.1)); }
+.mj-sand-foot .btn { min-height: 44px; }
+.mj-sand-foot .mj-small { margin-left: auto; }
+.mj-sand-group { padding: 6px 0 10px; border-bottom: 1px solid var(--line, rgba(0, 0, 0, 0.1)); }
+.mj-sand-h { margin: 6px 0 4px; font-size: 13px; color: var(--ink-2, #3b352c); }
+.mj-sand-stat { padding: 6px 0; }
+.mj-sand-stat-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mj-sand-stat-head b { min-width: 64px; }
+.mj-sand-mode { gap: 4px; }
+.mj-sand-mode .chip { min-height: 30px; padding: 0 10px; font-size: 13px; }
+.mj-sand-leaf { padding: 8px 0; border-bottom: 1px dashed var(--line, rgba(0, 0, 0, 0.1)); }
+.mj-sand-leaf.is-changed { background: color-mix(in srgb, var(--mj-sand-gold, #b8892a) 12%, transparent); }
+.mj-sand-leaf-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 14px; }
+.mj-sand-path { display: block; font-size: 11px; opacity: 0.75; word-break: break-all; }
+
+/* a desktop: a 420 px panel at the right; the game keeps playing beside it */
+@media (min-width: 1000px) {
+  /* (:has: the run's own class string is rewritten on every stage change, so a toggled class alone does not stick) */
+  .mj-run.mj-sand-docked, .mj-run:has(.mj-sand-dock) { right: 420px; }
+  .mj-sand-dock { position: fixed; left: auto; right: 0; top: 0; bottom: 0; width: 420px; height: auto; border-top: 0; border-left: 2px solid var(--mj-sand-gold, #b8892a); border-radius: 0; box-shadow: -10px 0 24px -14px rgba(20, 15, 5, 0.6); }
+}
+
+/* ── the death card */
+.mj-sand-death { position: absolute; z-index: 60; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(420px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; padding: 16px; border: 2px solid var(--mj-sand-gold, #b8892a); }
+.mj-sand-death-title { font-size: 22px; margin: 0 0 8px; }
+.mj-sand-top { margin: 0 0 10px; padding-left: 20px; }
+.mj-sand-top li { display: flex; justify-content: space-between; gap: 10px; }
+.mj-sand-log { margin: 8px 0 0; padding-left: 16px; font-size: 13px; }
+
+/* the run's own wrap stops touch scrolling and selection; the dock and the setup page scroll and take text */
+.mj-sand-dock { touch-action: pan-y; user-select: text; -webkit-user-select: text; }
+.mj-sand-strip { touch-action: pan-x; }
+
+/* the copy sheet and the paste box */
+.mj-sand-copy { width: 100%; min-height: 160px; margin: 8px 0; padding: 8px; border-radius: 10px; border: 1px solid var(--line-strong, rgba(0, 0, 0, 0.25)); background: var(--paper, #f3ecdc); color: var(--ink, #1b1916); font: 12px/1.4 ui-monospace, monospace; }
+.mj-sand-foot .mj-sand-export { margin-left: auto; }
+.mj-sand-browse { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 10px; }
+.mj-sand-browse > .btn { align-self: flex-start; }
+
+/* the 数值表's per-tier rows (凡 灵 仙 神 / an odds row's 5 boxes) and the entity's own text beside raw keys */
+.mj-sand-boxes { display: grid; gap: 6px; padding: 6px 0; }
+.mj-sand-box { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; font-size: 12px; }
+.mj-sand-box > small:first-child { text-align: center; color: var(--ink-2, #3b352c); }
+.mj-sand-box .mj-sand-num { width: 100%; min-width: 0; text-align: center; }
+.mj-sand-box.is-changed .mj-sand-num { border-color: var(--mj-sand-gold, #b8892a); border-width: 2px; }
+.mj-sand-box > small:last-child { min-height: 1em; text-align: center; font-size: 10px; }
+.mj-sand-desc { margin: 4px 0; padding: 6px 8px; border-left: 3px solid var(--mj-sand-gold, #b8892a); background: var(--paper-2, #e8dec9); border-radius: 0 8px 8px 0; }
+
+/* a phone: the grip (拉高 to 92 %) and 「边看边调」 (40 %, the wave keeps playing); a desktop panel needs neither */
+.mj-sand-grip { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 10px 0; }
+.mj-sand-grab { flex: 1 1 auto; height: 22px; display: grid; place-items: center; background: none; border: 0; }
+.mj-sand-grab span { display: block; width: 44px; height: 5px; border-radius: 3px; background: var(--line-strong, rgba(0, 0, 0, 0.3)); }
+.mj-sand-grab[aria-pressed='true'] span { background: var(--mj-sand-gold, #b8892a); }
+.mj-sand-watch { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; min-height: 30px; }
+.mj-sand-watch input { width: 18px; height: 18px; }
+.mj-sand-dock.is-tall { height: 92%; }
+/* 边看边调 takes the top 40 % (over the HUD, whose numbers the sheet shows live), so the stick and the 技 button at the
+   foot stay free; the 调 button and the banner step aside while it is up */
+.mj-sand-dock.is-watch { top: env(safe-area-inset-top); bottom: auto; height: 40%; border-top: 0; border-bottom: 2px solid var(--mj-sand-gold, #b8892a); border-radius: 0 0 14px 14px; box-shadow: 0 10px 24px -14px rgba(20, 15, 5, 0.6); }
+.mj-sand-dock.is-watch .mj-sand-foot { padding-bottom: 8px; }
+@media (max-width: 999px) { .mj-run:has(.mj-sand-dock.is-watch) .mj-sand-tune, .mj-run:has(.mj-sand-dock.is-watch) .mj-sand-banner { display: none; } }
+@media (min-width: 1000px) {
+  .mj-sand-grip { display: none; }
+  .mj-sand-dock.is-tall, .mj-sand-dock.is-watch { top: 0; bottom: 0; height: auto; border-bottom: 0; border-radius: 0; }
+}
+/* QA fix: the 数值表's search stays at the top of the dock (sticky), rows are compact, the file bar sits under the results */
+.mj-sand-find { position: sticky; top: -4px; z-index: 2; margin: -4px -12px 0; padding: 4px 12px 2px; background: var(--paper, #f3ecdc); box-shadow: 0 6px 8px -8px rgba(20, 15, 5, 0.45); }
+.mj-sand-find .mj-sand-search { margin: 2px 0 4px; }
+.mj-sand-tabbody .mj-sand-leaf { padding: 5px 0; }
+.mj-sand-tabbody .mj-sand-leaf .mj-sand-line { padding: 2px 0; }
+.mj-sand-leaf-head .mj-sand-path { display: inline; flex: 0 1 auto; min-width: 0; margin-left: auto; text-align: right; }
+.mj-sand-files { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line, rgba(0, 0, 0, 0.1)); }
+/* a raised dock on a phone: its own ✕ and the grab bar close or lower it; the 调 button would sit over the dock's header */
+@media (max-width: 999px) { .mj-run:has(.mj-sand-dock.is-tall) .mj-sand-tune { display: none; } }
+/* between waves: a gap under the shop's header holds the 调 button and the banner, so neither covers the boss line or a slot's seal */
+.mj-run:has(.mj-sand-tune):has(.mj-shop) .mj-shop-top { margin-bottom: 46px; }
+.mj-run:has(.mj-shop) .mj-sand-banner { top: calc(78px + env(safe-area-inset-top)); right: calc(64px + env(safe-area-inset-right)); }

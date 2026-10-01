@@ -29,6 +29,9 @@ export type TermId =
   | 'shield' | 'taunt' | 'bounce' | 'invuln'
   // between waves
   | 'crate' | 'keep' | 'melt' | 'heart'
+  // ── m8:items ── (new term ids: one `| 'id'` line each, under your anchor)
+  | 'gild'
+  // ── m8:hidden ──
   // a run and the account
   | 'run' | 'down' | 'clear' | 'diff' | 'vow' | 'heat' | 'mutator' | 'affix' | 'dust' | 'heartMirror' | 'tutorial';
 
@@ -383,6 +386,11 @@ const TERMS: Record<TermId, Term> = {
   tutorial: g('term', '教程', 'Tutorial',
     '三四分钟的练习局：不花钱，不记成绩。',
     'A three-or-four-minute practice run: free, and nothing is recorded.', '初'),
+  // ── m8:items ── (only genuinely new terms; PLAN §4.I M3)
+  gild: g('term', '点金', 'Gild',
+    '带着点石成金时，每家店能点一次：多付些月华，不用同款就把一件兵器升一品。',
+    'With Iron into Gold, once a shop: pay a little more moonlight to raise a weapon a tier without a copy.'),
+  // ── m8:hidden ──
 };
 
 /** Every word the mirror shows, keyed by stat, status, class ('cls:…') or term. */

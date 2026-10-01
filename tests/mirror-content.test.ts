@@ -20,6 +20,10 @@ import { bossState, forcePhase } from '../src/views/mirror/engine/content/bosses
 import { contentDev } from '../src/views/mirror/engine/content/dev';
 import { AFFIX_IMPLS } from '../src/views/mirror/engine/content/elites';
 import { addAffix } from '../src/views/mirror/engine/content/bridge';
+import { mirrorTally } from '../src/views/mirror/engine/content/mirrorself';
+import { HIDDEN_MIRROR } from '../src/views/mirror/engine/content/hidden';
+import { COMPANION_REG } from '../src/views/mirror/ids';
+import { isHidden } from '../src/views/mirror/types';
 
 const SILENT: MirrorAudio = { prime: async () => {}, sfx: () => {}, pickup: () => {}, music: () => {}, dispose: () => {} };
 
@@ -129,7 +133,7 @@ describe('engine-content: the 13 镜技', () => {
     const zone = calls.filter((c) => c.fn === 'zone').map((c) => c.args[0] as ZoneSpec).find((z) => z.slow);
     expect(zone?.life).toBe(5); expect(zone?.slow).toBe(40); expect(zone?.r).toBe(180);
     step(eng, 30);
-    expect(calls.some((c) => c.fn === 'status' && c.args[1] === 'vuln' && c.args[3] === 20)).toBe(true);
+    expect(calls.some((c) => c.fn === 'status' && c.args[1] === 'vuln' && c.args[3] === 25)).toBe(true); // m8 BALANCE: amp 20 → 25
     eng.dispose();
   });
 
@@ -140,7 +144,7 @@ describe('engine-content: the 13 镜技', () => {
     const calls = spy(eng);
     eng.skill();
     expect(calls.some((c) => c.fn === 'status' && c.args[1] === 'root' && c.args[2] === 2)).toBe(true);
-    expect(calls.some((c) => c.fn === 'status' && c.args[1] === 'vuln' && c.args[2] === 4 && c.args[3] === 25)).toBe(true);
+    expect(calls.some((c) => c.fn === 'status' && c.args[1] === 'vuln' && c.args[2] === 4 && c.args[3] === 30)).toBe(true); // m8 BALANCE: amp 25 → 30
     expect(calls.some((c) => c.fn === 'attract' && c.args[2] === 400)).toBe(true);
     // kill a netted body: two shares of 月华
     const D = eng.world.D;
@@ -438,9 +442,11 @@ describe('engine-content: the nine bosses', () => {
     const st = bossState(W, h)!;
     expect(st.eaten).toBeGreaterThanOrEqual(40);
     expect(W.enemy(h).r).toBeGreaterThan(BOSSES.goldtoad.r);
-    const d0 = W.D.count;
+    // m8 (ART): the refund comes as 满月 / 月华珠 / 月华 pieces, so count the worth on the floor, not the pieces
+    const worthOf = () => { let s = 0; for (let i = 0; i < W.D.n; i++) if (W.D.alive[i]) s += W.D.worth[i]; return s; };
+    const w0 = worthOf();
     W.kill(h, true);
-    expect(W.D.count - d0).toBeGreaterThanOrEqual(Math.floor(st.eaten * 1.5) - 1);
+    expect(worthOf() - w0).toBeGreaterThanOrEqual(st.eaten * 1.5 - 1);
     f.eng.dispose();
   });
 
@@ -620,6 +626,22 @@ describe('engine-content: the nine bosses', () => {
     }
   });
 
+  // m8:hidden (H7): every companion, the hidden three included, has a mirrored 镜技 (hidden.md §3.10, §4.10, §5.10)
+  it('镜主 casts a mirrored 镜技 for every companion (all 16) within 10 s, and none falls through', () => {
+    for (const c of COMPANION_REG) {
+      const { run, setup } = at(50, { map: 'lake', char: c.id }, { weapons: [] });
+      const { eng, log } = make(run);
+      eng.start(run, setup); eng.world.godmode = true;
+      step(eng, 60 * 10);
+      const tl = mirrorTally(eng.world);
+      expect(tl.casts, c.id).toBeGreaterThanOrEqual(1);
+      expect(tl.misses, c.id).toBe(0);
+      if (isHidden(c.id)) { expect(HIDDEN_MIRROR[c.id], c.id).toBeTruthy(); step(eng, 60 * 12); }
+      expect(errs(log), c.id).toEqual([]);
+      eng.dispose();
+    }
+  }, 60_000);
+
   it('the busiest phases stay cheap to simulate (≤ 4 ms a step in node, with the wave\'s adds)', () => {
     const worst: Record<string, number> = {};
     for (const b of BOSS_REG) {
@@ -722,7 +744,7 @@ describe('engine-content: QA fixes', () => {
     }
     expect(res[1].peak).toBeLessThanOrEqual(res[1].cap + 30);
     expect(res[1].kids).toBeLessThan(Math.max(10, res[0].kids * 3));
-  });
+  }, 30_000);
 
   it('闲游 stretches every telegraph by 1.3, and content strikes wait for the ink to fill', async () => {
     const hitsVsTeles = (eng: MirrorEngine, src: string) => {

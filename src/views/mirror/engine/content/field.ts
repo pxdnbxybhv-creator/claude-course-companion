@@ -4,13 +4,14 @@
 import type { HazardId, MutatorId, PassiveId, TermModId } from '../../ids';
 import { TERM_MOD_REG } from '../../ids';
 import type { Behaviour, GameEvent, WorldApi } from '../../types';
-import { HAZARDS, MUTATORS, TERM_MODS, WEAPONS } from '../../data';
+import { HAZARDS, MUTATORS, PASSIVES, TERM_MODS, WEAPONS } from '../../data';
 import { strengthOf } from '../../logic/formulas';
 import {
   addCrate, core, copyShot, dotsOf, isChild, markChild, dropMoon, drunkNow, freshCoreShots, lightNow, livesLeft, moveZone, mods, nudgePlayer,
   pullPlayer, pushPlayer, restoreHp, scaleShot, sky, waveLen, waveTime, zonePos,
 } from './bridge';
 import { FOREVER, TAU, b, hurtPlayer, openPoint, poolFactor, rimR, shared } from './util';
+import { HIDDEN_PASSIVE_IMPLS } from './hidden';
 
 const change = (w: WorldApi) => w.run.char === 'change';
 /** The first periodic event of a hazard comes at 40% of its period, then every period. */
@@ -227,9 +228,13 @@ const yuanzhe: Behaviour<null> = {
     if (n.until >= w.t && n.cost > 0) dropMoon(w, ev.x, ev.y, n.cost);
   },
 };
-/** 九命: a word from the cat each time a life is spent. */
+/** 九命: a word from the cat each time a life is spent. m8 猫步 (balance.md §1.3): after each dodge, +攻速 for a while. */
 const jiuming: Behaviour<{ lives: number }> = {
   start(w) { return { lives: livesLeft(w) }; },
+  on(w, _s, ev) {
+    const p = PASSIVES.jiuming.p;
+    if (ev.type === 'dodge' && p.dodgeAspd > 0) w.buff('maobu', { aspd: p.dodgeAspd }, p.dodgeDur);
+  },
   tick(w, s) {
     const n = livesLeft(w);
     if (n < s.lives) {
@@ -239,17 +244,31 @@ const jiuming: Behaviour<{ lives: number }> = {
     s.lives = n;
   },
 };
-/** 斗酒百篇: the first time 醉 fills in a wave, 醉仙. */
-const baipian: Behaviour<{ full: boolean }> = {
-  start() { return { full: false }; },
+/**
+ * 斗酒百篇: the first time 醉 fills in a wave, 醉仙. m8 酒入豪肠 (balance.md §12.3 #2, PLAN D8): each crit heals
+ * p.critHeal, at most p.critHealCap a second. It listens to the `crit` event (a crit is never a `hit` with crit set).
+ */
+const baipian: Behaviour<{ full: boolean; win: number; got: number }> = {
+  start() { return { full: false, win: -1, got: 0 }; },
   tick(w, s) {
     const d = drunkNow(w);
     if (d >= 100 && !s.full) { s.full = true; w.title(b('醉仙', 'Drunken Immortal'), 'edge'); }
     else if (d < 80) s.full = false;
   },
+  on(w, s, ev) {
+    if (ev.type !== 'crit') return;
+    const p = PASSIVES.baipian.p;
+    if (!(p.critHeal > 0)) return;
+    if (w.t - s.win >= 1) { s.win = w.t; s.got = 0; }
+    if (s.got + p.critHeal > p.critHealCap) return;
+    s.got += p.critHeal;
+    w.heal(p.critHeal);
+  },
 };
 export const PASSIVE_IMPLS: Partial<Record<PassiveId, Behaviour>> = {
   yinqing: yinqing as Behaviour, yuanzhe: yuanzhe as Behaviour, jiuming: jiuming as Behaviour, baipian: baipian as Behaviour,
+  // m8:hidden · the hidden three's passives (engine/content/hidden.ts, HIDDEN)
+  ...HIDDEN_PASSIVE_IMPLS,
 };
 
 // ═════════════════════════════════════════════ 镜蚀 (runtime)

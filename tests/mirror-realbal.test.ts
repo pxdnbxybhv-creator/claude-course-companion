@@ -2,11 +2,16 @@
 // balance sweep on demand: MIRROR_REALBAL=1 [SEEDS=3 MAXW=31 MAP=lake LEVEL=average CHARS=guan DIFF=1 ZONES=1
 // OUT=file.jsonl] npx vitest run tests/mirror-realbal.test.ts. The sweep prints a summary a bot level; it
 // asserts nothing about depth.
-import { appendFileSync } from 'node:fs';
+// The owner's tuning file (sandbox.md §7.3): TUNING=mirror-tuning-….json applies the file's usable changes (in the
+// tuning layer, restored after) before playing; COMPARE=1 plays each level twice, today's numbers then the file's;
+// GOD=30 plays godmode below wave 30 (the owner's 「从 30 重开始对比」).
+import { appendFileSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { COMPANION_REG, type MapId } from '../src/views/mirror/ids';
 import type { CharacterId, DiffIndex } from '../src/views/mirror/types';
 import { playReal, summarizeReal, type BotLevel, type RealRun } from '../src/views/mirror/sim/realbal';
+import { endTuning, tuningActive } from '../src/views/mirror/logic';
+import { applyTuningText } from '../src/views/mirror/ui/sand/io';
 
 describe('镜衡 on the real engine', () => {
   it('plays a short run headless, deterministically, without errors', () => {
@@ -27,18 +32,31 @@ describe('镜衡 on the real engine', () => {
     const diff = +(env.DIFF ?? 1) as DiffIndex;
     const levels = (env.BEGIN === '1' ? 'beginner' : env.LEVEL ?? 'beginner,average,skilled').split(',') as BotLevel[];
     const chars = env.CHARS ? (env.CHARS.split(',') as CharacterId[]) : COMPANION_REG.map((c) => c.id as CharacterId);
+    const godTo = env.GOD ? +env.GOD : undefined;
+    const modes: ('today' | 'tuned')[] = !env.TUNING ? ['today'] : env.COMPARE === '1' ? ['today', 'tuned'] : ['tuned'];
     const all: RealRun[] = [];
-    for (const level of levels) {
-      const runs: RealRun[] = [];
-      const s0 = +(env.SEED0 ?? 1);
-      for (const c of chars) for (let s = s0; s < s0 + seeds; s++) {
-        const r = playReal({ seed: s * 7919 + c.length, char: c, map, maxWave, level, diff, zones: env.ZONES === '1' });
-        runs.push(r);
-        if (env.OUT) appendFileSync(env.OUT, JSON.stringify({ ...r, trace: r.trace.slice(-3), level, diff }) + '\n');
+    for (const mode of modes) {
+      if (mode === 'tuned') {
+        const t = applyTuningText(readFileSync(env.TUNING!, 'utf8'));
+        console.log(`TUNING ${env.TUNING}: ${t.applied} applied · not found ${t.missing.length} ${t.missing.join(' ')} · default moved ${t.stale.length} ${t.stale.join(' ')}`);
       }
-      console.log(level, JSON.stringify(summarizeReal(runs)));
-      all.push(...runs);
+      try {
+        for (const level of levels) {
+          const runs: RealRun[] = [];
+          const s0 = +(env.SEED0 ?? 1);
+          for (const c of chars) for (let s = s0; s < s0 + seeds; s++) {
+            const r = playReal({ seed: s * 7919 + c.length, char: c, map, maxWave, level, diff, zones: env.ZONES === '1', godTo });
+            runs.push(r);
+            if (env.OUT) appendFileSync(env.OUT, JSON.stringify({ ...r, trace: r.trace.slice(-3), level, diff, ...(env.TUNING ? { tuning: mode } : {}) }) + '\n');
+          }
+          console.log(env.TUNING ? `${mode} ${level}` : level, JSON.stringify(summarizeReal(runs)));
+          all.push(...runs);
+        }
+      } finally {
+        if (mode === 'tuned' && tuningActive()) endTuning();
+      }
     }
+    expect(tuningActive()).toBe(false);
     expect(all.every((r) => r.errors === 0)).toBe(true);
   }, 7_200_000);
 });

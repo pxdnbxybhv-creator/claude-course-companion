@@ -5,6 +5,7 @@
 // only real money (铜钱) is round with a square hole and golden.
 import { PIGMENTS } from '../../../ink/types';
 import type { MapId } from '../ids';
+import { HIDDEN_LOOK } from './hidden';
 
 export const INK = PIGMENTS.ink;
 export const PAPER = '#f1e9d8';
@@ -82,6 +83,8 @@ export const CHAR_LOOK: Record<string, CharLook> = {
   poet: { skin: '#f2d0b0', robe: '#f6ecda', trim: '#8e2b3a', hair: INK, accent: '#8e2b3a' },
   guan: { skin: '#bb4632', robe: '#2f7552', trim: '#cda146', hair: INK, accent: '#c0412f' },
   change: { skin: '#f9e3d2', robe: '#fbf0e2', trim: '#d2a95a', hair: INK, accent: '#e8eef2' },
+  // m8:hidden (paint/hidden.ts, HIDDEN)
+  ...HIDDEN_LOOK,
 };
 
 /** '#rrggbb' → [r, g, b]. */

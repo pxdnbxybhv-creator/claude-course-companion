@@ -7,6 +7,8 @@
 //   elites.ts     the 6 named elites, the 6 镜印 affixes, 貔貅 and 镜中花
 //   bosses.ts     the phase-script runner and the pattern library (9 bosses, 双生 by pairing)
 //   mirrorself.ts 镜主, the Mirror Self
+//   hidden.ts     m8: the hidden three's 镜技, passives, 镜主 skills and world hooks (HIDDEN)
+//   items.ts      m8: item Behaviours and the item world hooks (ITEMS)
 //   bridge.ts     the engine internals content needs beyond WorldApi (CHANGE REQUESTS)
 //   util.ts       geometry, damage scaling, per-wave state, coroutines
 //   dev.ts        window.__mirrorContent (dev builds)
@@ -16,6 +18,7 @@ import { HAZARD_IMPLS, MUTATOR_IMPLS, PASSIVE_IMPLS, TERM_IMPLS } from './field'
 import { AFFIX_IMPLS, ELITE_IMPLS, TREASURE_IMPLS } from './elites';
 import { BOSS_IMPLS, PATTERN_IMPLS } from './bosses';
 import { MIRROR_SELF } from './mirrorself';
+import { ITEM_BEHAVIOURS } from './items';
 import { installContentDev } from './dev';
 
 export const CONTENT: ContentRegistry = {
@@ -29,6 +32,8 @@ export const CONTENT: ContentRegistry = {
   affixes: AFFIX_IMPLS,
   mutators: MUTATOR_IMPLS,
   terms: TERM_IMPLS,
+  // m8:items · item Behaviours (engine/content/items.ts, ITEMS)
+  items: ITEM_BEHAVIOURS,
 };
 
 installContentDev();

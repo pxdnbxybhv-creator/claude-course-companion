@@ -155,29 +155,29 @@ describe('stats', () => {
       expect(s.stones).toBe(c.id === 'player' ? 8 : 6);
     }
     const g = computeStats(newRun(opts({ char: 'gardener' })));
-    expect([g.regen, g.harvest, g.aspd]).toEqual([3, 8, -15]);
+    expect([g.regen, g.harvest, g.aspd]).toEqual([3, 8, -10]); // m8: 春种 costs 10% 攻速 (was 15)
     const f = computeStats(newRun(opts({ char: 'fisher' })));
-    expect([f.luck, f.pickup, f.dmg]).toEqual([15, 40, -5]);
+    expect([f.luck, f.pickup, f.dmg]).toEqual([15, 40, 5]); // m8 老渔: +1% 伤害 per 3 福缘 (the −5 is gone)
   });
   it('applies sets, items, 劫数, converts, 心镜 and the cat / Chang’e gain rules', () => {
     const r = newRun(opts({ char: 'scholar' }));
     const two = computeStats({ ...r, weapons: [{ id: 'qingfeng', t: 1 }, { id: 'qingfeng', t: 1 }] });
     expect(two.crit).toBe(5);
     const six = computeStats({ ...r, weapons: Array.from({ length: 6 }, () => ({ id: 'yanyue' as const, t: 1 as const })) });
-    expect([six.melee, six.armor, six.area, six.hp]).toEqual([9, 4 + 6, 15, 34 + 10]); // 重器 6-set (⚖5): 近战 9, 护甲 6, 气血 10
+    expect([six.melee, six.armor, six.area, six.hp]).toEqual([9, 4 + 6, 15, 36 + 10]); // 重器 6-set (⚖5): 近战 9, 护甲 6, 气血 10
     const cursed = computeStats({ ...r, items: { cuthair: 2 } });
     expect(cursed.curse).toBe(2);
-    expect(cursed.dmg).toBe(20 + 4);
-    expect(cursed.hp).toBe(34 - 4);
+    expect(cursed.dmg).toBe(8 + 2); // m8 劫律: 断发 +4 each, 劫 +1 伤害 a point
+    expect(cursed.hp).toBe(36 - 6);
     const armoured = computeStats({ ...r, items: { ironbone: 1, needle: 1, guardmirror: 10 } });
     expect(armoured.armor).toBe(4 + 8 + 20);
     expect(armoured.dmg).toBe(40); // 铁骨 + 定海神针 share a +40% cap
     const fast = computeStats({ ...r, items: { chasewind: 1, sandals: 6 } });
     expect(fast.dmg).toBeCloseTo(10);
     const heart = computeStats({ ...r, heart: { heartHp: 2, heartLuck: 1 } });
-    expect([heart.hp, heart.luck]).toEqual([38, 4]);
+    expect([heart.hp, heart.luck]).toEqual([40, 4]);
     const cat = computeStats({ ...newRun(opts({ char: 'cat' })), items: { songzi: 2 } });
-    expect(cat.hp).toBe(26 + 4);
+    expect(cat.hp).toBeCloseTo(26 + 8 * 0.7); // m8: 大橘's 气血 gains count 70% (was 50%)
     const change = computeStats({ ...newRun(opts({ char: 'change' })), items: { guardmirror: 2 } });
     expect(change.armor).toBe(3 + 3);
     const guan = computeStats({ ...newRun(opts({ char: 'guan' })), wave: 40 });

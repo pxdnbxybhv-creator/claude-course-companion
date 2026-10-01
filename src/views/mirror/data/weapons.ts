@@ -61,7 +61,8 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     crit: 5, critX: 1.5, knock: 0, price: 24, speed: 600, p: { pull: 150, hookGold: 0.25, hooks: [1, 1, 2, 3] }, verse: b('太公钓鱼，愿者上钩', 'Jiang Taigong fishes; the willing bite'),
   },
   qingping: {
-    id: 'qingping', classes: ['flying'], kind: 'launch', dmg: [9, 15, 24, 38], cd: 1.2, range: 460, scale: { ranged: 1 },
+    // m8 (balance.md §1.3): 侠客's kit was the weakest in the game
+    id: 'qingping', classes: ['flying'], kind: 'launch', dmg: [11, 18, 29, 46], cd: 1.2, range: 460, scale: { ranged: 1 },
     crit: 10, critX: 2.0, knock: 20, price: 30, speed: 800, p: { pierce: 1, ret: [0.5, 0.5, 0.5, 0.75], splitT4: 3 }, verse: b('青萍结绿，长剑出匣', 'Qingping and Jielü, long swords from the case'),
   },
   casket: {
@@ -79,8 +80,9 @@ export const WEAPONS: Readonly<Record<WeaponId, WeaponDef>> = {
     verse: b('七星北斗，剑指天枢', 'Seven stars of the Dipper; the sword points at Dubhe'),
   },
   thunder: {
-    id: 'thunder', classes: ['talisman'], kind: 'chain', dmg: [16, 26, 42, 66], cd: 1.3, range: 450, scale: { elem: 1 },
-    crit: 5, critX: 1.5, knock: 0, price: 32, p: { jumps: [2, 2, 3, 6], fall: 0.85, stunT4: 0.15, stunDur: 0.5 },
+    // m8 (balance.md §1.2, the owner: 道童 too strong): tier I 16 → 13 damage and 2 → 1 jump, reach 450 → 420; the opening only
+    id: 'thunder', classes: ['talisman'], kind: 'chain', dmg: [13, 26, 42, 66], cd: 1.3, range: 420, scale: { elem: 1 },
+    crit: 5, critX: 1.5, knock: 0, price: 32, p: { jumps: [1, 2, 3, 6], fall: 0.85, stunT4: 0.15, stunDur: 0.5 },
     verse: b('五雷轰顶', 'Five thunders overhead'),
   },
   fire: {

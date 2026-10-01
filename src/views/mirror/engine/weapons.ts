@@ -6,7 +6,7 @@ import type { WeaponId } from '../ids';
 import type { Stats, Tier, WClass, WeaponDef, WeaponKind } from '../types';
 import { F, PASSIVES, WEAPONS } from '../data';
 import {
-  charMult, clamp, cooldown, critChance, critMult, dmgMult, dottingX, luckMult, perTier, procCoef, rawDamage, stonesOf, summonCapOf,
+  charMult, clamp, cooldown, critChance, critMult, critOverflowOf, dmgMult, dottingX, luckMult, perTier, procCoef, rawDamage, stonesOf, summonCapOf,
   tierCd, weaponRange, CLAMP_SPEED_MAX,
 } from '../logic/formulas';
 import { emptyStats } from '../logic/formulas';
@@ -23,6 +23,8 @@ const tintOf = (s: WeaponSlot): number => tintOfWeapon(s.id, s.fc);
 
 export interface WeaponSlot {
   i: number;
+  /** m8 诗成 (balance.md §1.3): 暴击 past 100 counts this many times into the crit multiplier (诗仙 2, else 1). */
+  over: number;
   id: WeaponId;
   t: Tier;
   def: WeaponDef;
@@ -61,7 +63,7 @@ export function initWeapons(W: World): void {
     const t4c = ow.t === 4 ? def.p.critT4 : undefined;
     const critX = def.critX > 0 ? def.critX : def.classes.includes('ink') ? dottingX(W.run) : 0;
     const s: WeaponSlot = {
-      i, id: ow.id, t: ow.t, def, kind: def.kind, cls: def.classes, cd: 0.25 + i * 0.07, n: 0,
+      i, over: critOverflowOf(W.run), id: ow.id, t: ow.t, def, kind: def.kind, cls: def.classes, cd: 0.25 + i * 0.07, n: 0,
       charM: charMult(W.run, def), crit: def.crit + (typeof t4c === 'number' ? t4c : 0), critX, proc: procCoef(def.cd),
       stats: emptyStats(),
       music: def.classes.includes('music'), talisman: def.classes.includes('talisman'), heavy: def.classes.includes('heavy'),
@@ -71,7 +73,6 @@ export function initWeapons(W: World): void {
     };
     return s;
   });
-  heavyCount = 0;
   W.blades = 0;
   W.canjian = 0;
   W.wanjianT = 0;
@@ -83,7 +84,17 @@ export function initWeapons(W: World): void {
   const fam = W.mods.familiar;
   if (fam) for (let k = 0; k < fam.n; k++) spawnFamiliarItem(W, k);
 }
-let heavyCount = 0;
+/** m8 后发先至: set around a primed slot's attack (fireKind reads it as a sure crit); the kinds never primed. */
+let forceCrit = false;
+const NO_PRIME: ReadonlySet<WeaponKind> = new Set<WeaponKind>(['paint', 'turret', 'mine', 'familiar']);
+/** m8 (I1): the echo a slot gets: every echo whose class it has, the percentages added, the shortest delay (null: none). */
+const ECHO = { delay: 0, pct: 0 };
+function echoOf(W: World, s: WeaponSlot): { delay: number; pct: number } | null {
+  let hit = false;
+  ECHO.delay = Infinity; ECHO.pct = 0;
+  for (const e of W.mods.echo) if (s.cls.includes(e.cls)) { hit = true; ECHO.pct += e.pct; ECHO.delay = Math.min(ECHO.delay, e.delay); }
+  return hit ? ECHO : null;
+}
 
 // ─────────────────────────────────────────────────────────────── damage numbers for a slot
 
@@ -103,7 +114,7 @@ function dmgOf(W: World, s: WeaponSlot, st: Stats): number {
   return raw * mult;
 }
 function critPOf(s: WeaponSlot, st: Stats): number { return s.critX > 0 ? critChance(s.crit, st) : 0; }
-function critMOf(s: WeaponSlot, st: Stats): number { return s.critX > 0 ? critMult(s.critX, s.crit, st) : 1; }
+function critMOf(s: WeaponSlot, st: Stats): number { return s.critX > 0 ? critMult(s.critX, s.crit, st, s.over) : 1; }
 function areaOf(W: World, s: WeaponSlot, st: Stats): number {
   let a = st.area;
   if (s.music) {
@@ -132,7 +143,7 @@ export function fireWeapons(W: World, dt: number): void {
   for (const s of W.slots) {
     if (s.stackT > 0) { s.stackT -= dt; if (s.stackT <= 0) s.stack = 0; }
     if (s.queue > 0) { s.queueT -= dt; if (s.queueT <= 0) fireQueued(W, s); }
-    if (s.echoT > 0) { s.echoT -= dt; if (s.echoT <= 0) fireKind(W, s, s.echoDir, W.mods.echo ? W.mods.echo.pct / 100 : 0.5, true); }
+    if (s.echoT > 0) { s.echoT -= dt; if (s.echoT <= 0) { const ec = echoOf(W, s); fireKind(W, s, s.echoDir, ec ? ec.pct / 100 : 0.5, true); } }
     if (s.flareT > 0) s.flareT -= dt;
     s.cd -= dt;
     if (s.cd > 0) continue;
@@ -147,9 +158,15 @@ export function fireWeapons(W: World, dt: number): void {
     let dir = NO_DIR;
     if (manual && (s.kind === 'projectile' || s.kind === 'beam' || s.kind === 'launch' || s.kind === 'boomerang' || s.kind === 'burst')) dir = aimDir(W);
     let xm = 1;
-    if (W.mods.every && s.cls.includes(W.mods.every.cls)) { heavyCount++; if (heavyCount % W.mods.every.n === 0) xm *= W.mods.every.x; }
+    // m8 (I1): each 「every n-th」 rule keeps its own count (拖刀诀 …)
+    for (let q = 0; q < W.mods.every.length; q++) { const ev = W.mods.every[q]; if (s.cls.includes(ev.cls)) { ev.c++; if (ev.c % ev.n === 0) xm *= ev.x; } }
     s.resetCd = false;
+    // m8 后发先至 (P9): a primed slot's next attack is a sure crit, × x (墨宝 and 棋子 are never primed)
+    const primed = W.primeMask !== 0 && W.primeT > W.t && (W.primeMask & (1 << s.i)) !== 0 && s.critX > 0 && !NO_PRIME.has(s.kind);
+    if (primed) { xm *= W.mods.prime?.x ?? 1; forceCrit = true; }
     const fired = fireKind(W, s, dir, xm, false);
+    forceCrit = false;
+    if (primed && fired) W.primeMask &= ~(1 << s.i);
     if (!fired) { s.cd = 0.1; continue; }
     // 醉拳 IV: a crit resets the cooldown. As in the balance sim (aps ÷ max(0.5, 1 − crit)), the
     // attack rate at most doubles: up to 50% crit a reset is immediate, above it the reset leaves
@@ -158,7 +175,7 @@ export function fireWeapons(W: World, dt: number): void {
     else s.cd = cdv;
     s.resetCd = false;
     s.n++;
-    if (s.music && W.mods.echo) { s.echoT = W.mods.echo.delay; s.echoDir = W.lastDir; }
+    if (W.mods.echo.length) { const ec = echoOf(W, s); if (ec) { s.echoT = ec.delay; s.echoDir = W.lastDir; } }
     // 十面埋伏: every 4th 乐器/符箓 attack fires every other 乐器 and 符箓 weapon at 40%
     const amb = W.mods.special.ambush;
     if (amb && (s.music || s.talisman)) {
@@ -205,7 +222,7 @@ function fireKind(W: World, s: WeaponSlot, dir: number, xm: number, extra: boole
   const px = W.px, py = W.py;
   const range = rangeOf(W, s, st);
   const d = dmgOf(W, s, st) * xm;
-  const cp = critPOf(s, st), cm = critMOf(s, st);
+  const cp = forceCrit ? 1 : critPOf(s, st), cm = critMOf(s, st);
   const knock = s.def.knock;
   const p = s.def.p;
   const t = s.t;
@@ -1280,6 +1297,15 @@ function placeStone(W: World, s: WeaponSlot, x: number, y: number): void {
   ST.x[i] = q.x; ST.y[i] = q.y; ST.arm[i] = F.stone.arm; ST.slot[i] = s.i; ST.order[i] = ++W.stoneOrder; ST.fuse[i] = 0;
   ST.white[i] = W.stoneOrder & 1;
   ST.life[i] = W.run.char === 'player' ? 1e9 : 14;
+  // m8 厚积薄发: when it was placed
+  if (i < W.stoneBorn.length) W.stoneBorn[i] = W.t;
+}
+/** m8 厚积薄发 (P15): × (1 + min(max, pct × whole `per`s stone i has waited) / 100); 1 without the item. */
+export function houjiX(W: World, i: number): number {
+  const h = W.mods.special.houji;
+  if (!h || i >= W.stoneBorn.length) return 1;
+  const per = h.per ?? 1, waited = Math.max(0, W.t - W.stoneBorn[i]);
+  return 1 + Math.min(h.max ?? 0, (h.pct ?? 0) * Math.floor(waited / per + 1e-9)) / 100;
 }
 
 export function tickStones(W: World, dt: number): void {
@@ -1325,7 +1351,7 @@ function blast(W: World, i: number, x: number): void {
   if (!ST.alive[i]) return;
   const slot = ST.slot[i];
   const s = slot >= 0 && slot < W.slots.length ? W.slots[slot] : null;
-  const sx = ST.x[i], sy = ST.y[i];
+  const sx = ST.x[i], sy = ST.y[i], age = houjiX(W, i);
   ST.release(i);
   if (!s) return;
   const st = sheet(W, s);
@@ -1336,7 +1362,7 @@ function blast(W: World, i: number, x: number): void {
     const n = W.hash.gather(sx, sy, r + 60 + 64, buf);
     for (let k = 0; k < n; k++) { const e = buf[k]; if (W.targetable(e)) W.pull(E.handle(e), sx, sy, (s.def.p.pullT4 as number) ?? 60); }
   }
-  areaStrike(W, sx, sy, r, dmgOf(W, s, st) * x, slot, SRCI.weapon, HF.blast, s.def.knock, critPOf(s, st), critMOf(s, st));
+  areaStrike(W, sx, sy, r, dmgOf(W, s, st) * x * age, slot, SRCI.weapon, HF.blast, s.def.knock, critPOf(s, st), critMOf(s, st));
   // ink on the board: a double ring, flung chips, a scorch; a white heart for the stone (no camera shake:
   // the player's blows show on the bodies)
   const V = vfxOf(W);
@@ -1386,14 +1412,15 @@ function capture(W: World, r: number, need: number, x: number): boolean {
   }
   if (best < 0) return false;
   const ex = E.x[best], ey = E.y[best];
-  // the stones that closed the ring flash white
+  // the stones that closed the ring flash white (m8 厚积薄发: the capture reads the oldest of them)
+  let age = 1;
   for (let m = 0; m < ST.n; m++) {
     if (!ST.alive[m] || ST.arm[m] > 0) continue;
     const dx = ST.x[m] - ex, dy = ST.y[m] - ey;
-    if (dx * dx + dy * dy <= r2) W.fx('stoneWhite', ST.x[m], ST.y[m], { r: 14, life: 0.3 });
+    if (dx * dx + dy * dy <= r2) { W.fx('stoneWhite', ST.x[m], ST.y[m], { r: 14, life: 0.3 }); age = Math.max(age, houjiX(W, m)); }
   }
   const st = sheet(W, s);
-  W.strike(best, dmgOf(W, s, st) * x, 0, 1, 0, ex, ey, s.i, SRCI.weapon, HF.noArmor);
+  W.strike(best, dmgOf(W, s, st) * x * age, 0, 1, 0, ex, ey, s.i, SRCI.weapon, HF.noArmor);
   W.fx('stoneWhite', ex, ey, { r: 26, life: 0.35 });
   vfxOf(W).shock(ex, ey, r * 0.6, VT.moon, { flags: VF.thin | VF.double, debris: 0, life: 0.3 });
   W.title({ zh: '提子', en: 'Capture' }, 'edge');

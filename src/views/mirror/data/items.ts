@@ -27,7 +27,8 @@ export const ITEMS: Readonly<Record<ItemId, ItemDef>> = {
   tigertally: { id: 'tigertally', tier: 2, price: 45, max: 0, tags: [], stats: { dmg: 8 }, verse: b('虎符调兵', 'The tiger tally moves armies') },
   amulet: { id: 'amulet', tier: 2, price: 40, max: 0, tags: ['moon'], stats: { dodge: 6 }, verse: b('平安符', 'A charm for safe keeping') },
   balm: { id: 'balm', tier: 2, price: 40, max: 0, tags: ['sword', 'fist', 'heavy'], stats: { steal: 3 }, verse: b('金疮药到病除', 'Wound balm, and the hurt is gone') },
-  elixir: { id: 'elixir', tier: 3, price: 80, max: 0, tags: [], stats: { hp: 12, dmg: 6, armor: 2, regen: 1 }, verse: b('九转金丹', 'The ninefold golden elixir') },
+  // m8 (balance.md §7): at most 12 (it was the uncapped late HP race; 12 copies = +144 气血)
+  elixir: { id: 'elixir', tier: 3, price: 80, max: 12, tags: [], stats: { hp: 12, dmg: 6, armor: 2, regen: 1 }, verse: b('九转金丹', 'The ninefold golden elixir') },
   // ─────────────────────────────── 9.2 conditional
   drumroll: {
     id: 'drumroll', tier: 1, price: 22, max: 1, tags: [], fx: [{ hook: 'cond', do: 'stats', stats: { aspd: 40 }, when: { k: 'waveTime', below: 8 } }], verse: b('一鼓作气，再而衰', 'One drumbeat for courage; the second fades'),
@@ -156,21 +157,22 @@ export const ITEMS: Readonly<Record<ItemId, ItemDef>> = {
     id: 'cushion', tier: 1, price: 22, max: 3, tags: [], fx: [{ hook: 'cond', do: 'stats', stats: { regen: 50 }, pct: true, when: { k: 'still', s: 1 } }], verse: b('一蒲团，一炷香', 'One cushion, one stick of incense'),
   },
   // ─────────────────────────────── 9.7 劫
-  cuthair: { id: 'cuthair', tier: 1, price: 10, max: 0, tags: [], stats: { dmg: 10, hp: -2 }, curse: 1, verse: b('断发明志', 'Cutting the hair to show resolve') },
+  // m8 劫律 (balance.md §4.2): every 劫 item gives you less than it gives the monsters (4 + 4 a 劫 point)
+  cuthair: { id: 'cuthair', tier: 1, price: 12, max: 5, tags: [], stats: { dmg: 4, hp: -3 }, curse: 1, verse: b('断发明志', 'Cutting the hair to show resolve') },
   burnboats: {
-    id: 'burnboats', tier: 3, price: 55, max: 1, tags: [], stats: { dmg: 15, aspd: 15 }, curse: 1, fx: [{ hook: 'shop', do: 'noReroll' }], verse: b('破釜沉舟', 'Break the pots, sink the boats'),
+    id: 'burnboats', tier: 3, price: 55, max: 1, tags: [], stats: { dmg: 8 }, curse: 2, fx: [{ hook: 'shop', do: 'noReroll' }, { hook: 'shop', do: 'tierFloor', t: 2 }], verse: b('破釜沉舟', 'Break the pots, sink the boats'),
   },
   yanwang: {
     id: 'yanwang', tier: 3, price: 60, max: 1, tags: [], curse: 2, fx: [{ hook: 'onLethal', do: 'survive', per: 'wave', hpPct: 0 }], verse: b('阎王叫你三更死', 'When Yama calls at the third watch'),
   },
   delusion: {
-    id: 'delusion', tier: 2, price: 20, max: 1, tags: [], curse: 2, fx: [{ hook: 'cond', do: 'world', budgetPct: 20, moonPct: 10 }], verse: b('妄念纷飞', 'Deluded thoughts scatter'),
+    id: 'delusion', tier: 2, price: 20, max: 1, tags: [], curse: 2, fx: [{ hook: 'cond', do: 'world', budgetPct: 20, moonPct: -15 }], verse: b('妄念纷飞', 'Deluded thoughts scatter'),
   },
   innerdemon: {
-    id: 'innerdemon', tier: 2, price: 30, max: 1, tags: [], stats: { dmg: 20 }, curse: 2, fx: [{ hook: 'onWaveStart', do: 'demon', pct: 40 }], verse: b('心魔难除', 'The inner demon is hard to slay'),
+    id: 'innerdemon', tier: 2, price: 30, max: 1, tags: [], stats: { dmg: 6 }, curse: 3, fx: [{ hook: 'onWaveStart', do: 'demon', pct: 40, crate: 10 }], verse: b('心魔难除', 'The inner demon is hard to slay'),
   },
   crackedmirror: {
-    id: 'crackedmirror', tier: 3, price: 55, max: 1, tags: [], curse: 3, fx: [{ hook: 'shop', do: 'slot', n: 1 }, { hook: 'shop', do: 'odds', t3: 5, t4: 5 }], verse: b('破镜难圆', 'A broken mirror is hard to mend'),
+    id: 'crackedmirror', tier: 3, price: 55, max: 1, tags: [], curse: 2, fx: [{ hook: 'shop', do: 'slot', n: 1 }, { hook: 'shop', do: 'odds', t3: 5, t4: 5 }], verse: b('破镜难圆', 'A broken mirror is hard to mend'),
   },
   // ─────────────────────────────── 9.8 神品
   wanjian: {
@@ -212,4 +214,33 @@ export const ITEMS: Readonly<Record<ItemId, ItemDef>> = {
   longyuan: {
     id: 'longyuan', tier: 4, price: 0, max: 0, tags: [], relic: 'melee', stats: { hp: 100, armor: 20, speed: 20 }, reachPct: 20, verse: b('龙渊出鞘，寒光三尺', 'Longyuan leaves its sheath: three feet of cold light'),
   },
+  // ─────────────────────────────── m8:items · the 26 new items (items.md §R.5). Lane 0 stubs: tier, price, max, tags,
+  // from and verse are final; ITEMS fills stats / fx / curse and removes `wip` item by item (a wip item is offered nowhere).
+  huadi: { id: 'huadi', tier: 4, price: 92, max: 1, tags: ['go', 'ink', 'talisman'], from: 8, stats: { aspd: 100 }, fx: [{ hook: 'cond', do: 'moveCap', x: 0.5 }], verse: b('画地为牢，势不可入', 'A circle drawn on the ground: a prison none would enter') },
+  zhancao: { id: 'zhancao', tier: 2, price: 48, max: 1, tags: ['sword'], stats: {}, fx: [{ hook: 'onHit', do: 'execute', cls: 'sword', below: 0.3, x: 2, bigX: 1.5 }], verse: b('斩草不除根，春风吹又生', 'Cut the grass and leave the root, and the spring wind brings it back') },
+  taishan: { id: 'taishan', tier: 2, price: 44, max: 1, tags: ['heavy'], stats: {}, fx: [{ hook: 'cond', do: 'stats', stats: { dmg: 20 }, cls: 'heavy' }, { hook: 'onHit', do: 'pin', cls: 'heavy', dur: 0.6 }], verse: b('会当凌绝顶，一览众山小', 'I will stand on the summit and see every hill below') },
+  yiqi: { id: 'yiqi', tier: 2, price: 42, max: 1, tags: ['fist'], stats: {}, fx: [{ hook: 'onHit', do: 'buff', cls: 'fist', stats: { aspd: 3 }, dur: 1.5, stack: 10 }], verse: b('一气呵成，不见斧凿', 'All in one breath, without a chisel mark') },
+  jianxue: { id: 'jianxue', tier: 2, price: 44, max: 1, tags: ['hidden'], stats: {}, fx: [{ hook: 'onHit', do: 'status', cls: 'hidden', kind: 'bleed', dur: 3, ofHit: 20, cap: 5 }], verse: b('见血封喉，其树名箭毒', 'It seals the throat at the sight of blood: the arrow-poison tree') },
+  baibu: { id: 'baibu', tier: 3, price: 58, max: 1, tags: ['bow'], stats: {}, fx: [{ hook: 'onHit', do: 'far', cls: 'bow', per: 100, pct: 10, max: 50 }], verse: b('去柳叶者百步而射之，百发百中', 'From a hundred paces he shot at a willow leaf, a hundred hits in a hundred') },
+  chuge: { id: 'chuge', tier: 2, price: 46, max: 1, tags: ['music'], stats: {}, fx: [{ hook: 'onHit', do: 'status', cls: 'music', kind: 'vuln', dur: 2, v: 12, bossV: 6 }], verse: b('夜闻汉军四面皆楚歌', 'At night, from every side of the Han camp, the songs of Chu') },
+  liaoyuan: { id: 'liaoyuan', tier: 2, price: 42, max: 1, tags: ['talisman'], stats: {}, fx: [{ hook: 'onKill', do: 'spread', kind: 'burn', n: 2, r: 120, dur: 3, perSec: 20 }], verse: b('若火之燎于原，不可向迩', 'Like fire across the plain: none can come near') },
+  jibai: { id: 'jibai', tier: 2, price: 44, max: 1, tags: ['ink'], stats: { summonCap: -2 }, fx: [{ hook: 'cond', do: 'stats', stats: { dmg: 60 }, cls: 'ink' }], verse: b('常计白以当黑，奇趣乃出', 'Always count the white as black, and the wonder appears') },
+  houji: { id: 'houji', tier: 2, price: 44, max: 1, tags: ['go'], stats: {}, fx: [{ hook: 'cond', do: 'special', key: 'houji', p: { per: 1, pct: 15, max: 75 } }], verse: b('博观而约取，厚积而薄发', 'Read widely, take sparingly; store deep, release late') },
+  zuiwo: { id: 'zuiwo', tier: 3, price: 56, max: 1, tags: ['wine'], stats: {}, fx: [{ hook: 'onHurt', do: 'guard', from: 'drunk', per: 10, pct: 3, max: 30 }], verse: b('醉卧沙场君莫笑，古来征战几人回', 'Laugh not if I lie drunk on the field: how many came home from war?') },
+  chulei: { id: 'chulei', tier: 3, price: 56, max: 1, tags: [], stats: {}, fx: [{ hook: 'cond', do: 'setPlus', n: 1 }], verse: b('引而伸之，触类而长之', 'Draw it out and extend it: touch one kind and it grows') },
+  pengyue: { id: 'pengyue', tier: 3, price: 60, max: 1, tags: ['moon', 'fortune'], stats: { pickup: -70 }, fx: [{ hook: 'cond', do: 'convert', from: 'moonNear', r: 150, per: 5, k: 3, to: ['dmg'], max: 60 }], verse: b('譬如北辰，居其所而众星共之', 'Like the Pole Star: it keeps its place and all the stars turn toward it') },
+  rulian: { id: 'rulian', tier: 2, price: 40, max: 1, tags: ['moon', 'fortune'], stats: { pickup: 30 }, fx: [{ hook: 'onPickup', do: 'stream', base: 6, scale: { ranged: 0.3, elem: 0.3 }, perWorth: 20, maxX: 6 }], verse: b('年年今夜，月华如练，长是人千里', 'Every year, this night, the moonlight lies like silk, and you are a thousand li away') },
+  sanjin: { id: 'sanjin', tier: 2, price: 40, max: 1, tags: ['fortune'], stats: { dmg: 25 }, fx: [{ hook: 'onHurt', do: 'scatter', pct: 8, max: 60 }], verse: b('天生我材必有用，千金散尽还复来', 'Heaven made my talent for a use; scatter a thousand in gold and it comes back') },
+  huobi: { id: 'huobi', tier: 2, price: 40, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'rerollOff', pct: 5, max: 25 }], verse: b('货比三家不吃亏', 'Compare three shops and you never lose') },
+  qihuo: { id: 'qihuo', tier: 3, price: 50, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'noWeapons' }, { hook: 'shop', do: 'slot', n: 1 }], verse: b('此奇货可居', 'These are rare goods, worth hoarding') },
+  dianshi: { id: 'dianshi', tier: 3, price: 58, max: 1, tags: ['fortune'], stats: {}, fx: [{ hook: 'shop', do: 'upgrade', x: 1.5, n: 1 }], verse: b('还丹一粒，点铁成金', 'One grain of elixir, and iron turns to gold') },
+  zhenjiu: { id: 'zhenjiu', tier: 2, price: 32, max: 1, tags: [], stats: { dmg: 20, heal: -30 }, curse: 2, fx: [{ hook: 'onWaveStart', do: 'hpPct', v: 70 }], verse: b('止渴于鸩毒，未入肠胃，已绝咽喉', 'Quench thirst with poison: before it reaches the belly, the throat is closed') },
+  mouhu: { id: 'mouhu', tier: 2, price: 34, max: 1, tags: [], stats: {}, curse: 2, fx: [{ hook: 'cond', do: 'world', eliteAffix: 1, eliteMoonPct: 100 }], verse: b('欲为千金之裘，而与狐谋其皮', 'Wanting a coat worth a thousand, he asked the foxes for their fur') },
+  lianhuan: { id: 'lianhuan', tier: 4, price: 88, max: 1, tags: ['talisman', 'go'], from: 8, stats: {}, fx: [{ hook: 'onKill', do: 'blast', pct: 25, r: 90, bossPct: 2, bossPerSec: 1, perSec: 15 }], verse: b('将多兵众，不可以敌，使其自累，以杀其势', 'Too many to fight: make them weigh each other down, and their strength is broken') },
+  xianzhi: { id: 'xianzhi', tier: 3, price: 56, max: 1, tags: ['moon', 'fist'], stats: {}, fx: [{ hook: 'onDodge', do: 'prime', dur: 1.5, x: 1.5, cd: 2 }], verse: b('后之发，先之至，此用兵之要术也', 'Set out after, arrive before: this is the heart of the art of war') },
+  jingru: { id: 'jingru', tier: 1, price: 20, max: 1, tags: ['heavy', 'go', 'ink'], stats: {}, fx: [{ hook: 'cond', do: 'stats', stats: { dmg: 12 }, when: { k: 'still', s: 1 } }, { hook: 'cond', do: 'stats', stats: { dmg: 20 }, when: { k: 'still', s: 3 } }], verse: b('始如处女，敌人开户', 'First be still as a maiden, and the enemy opens his door') },
+  dongru: { id: 'dongru', tier: 1, price: 20, max: 1, tags: ['fist', 'hidden', 'bow'], stats: {}, fx: [{ hook: 'onGo', do: 'buff', after: 1, stats: { aspd: 30, dodge: 10 }, dur: 2 }], verse: b('后如脱兔，敌不及拒', 'Then be swift as a hare, and he cannot keep you out') },
+  daoge: { id: 'daoge', tier: 2, price: 44, max: 1, tags: ['ink'], stats: {}, fx: [{ hook: 'onHit', do: 'status', kind: 'convert', p: 2, dur: 6, luck: true, cap: 8 }], verse: b('前徒倒戈，攻于后以北', 'The front ranks turned their spears and struck their own rear') },
+  duanbing: { id: 'duanbing', tier: 2, price: 46, max: 1, tags: ['sword', 'heavy', 'fist'], stats: {}, fx: [{ hook: 'cond', do: 'convert', from: 'near', r: 150, per: 1, k: 1, to: ['armor'], max: 6 }, { hook: 'cond', do: 'convert', from: 'near', r: 150, per: 1, k: 3, to: ['dmg'], max: 18 }], verse: b('车错毂兮短兵接', 'Chariot hubs clash, and short blades meet') },
+  // ─────────────────────────────── end m8:items
 };

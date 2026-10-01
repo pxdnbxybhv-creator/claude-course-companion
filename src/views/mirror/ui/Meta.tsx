@@ -4,13 +4,14 @@
 import { useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { mirror, storageOk } from '../../../app/mirror';
-import { unlocked } from '../../../app/play';
 import { Toggle } from '../../../ui/kit';
 import { COMPANION_REG, DIFF_REG, HEART_REG, MAP_REG, RECORD_REG, RIM_REG, TITLE_REG, type HeartFaceId, type RecordId } from '../ids';
-import type { CharacterId, TitleId } from '../types';
+import { isHidden, type CharacterId, type TitleId } from '../types';
 import { COMPANIONS, HEART, MASTERY } from '../data';
 import { heartCost, masteryLevel } from '../logic';
-import { heartBuy, heartPick, setPlain, setRim, setTitle } from '../logic/session';
+import { heartBuy, heartPick, heartView, masteryView, openOf, setPlain, setRim, setTitle } from '../logic/session';
+import { NEVER_LENT } from '../logic/lend';
+import { CodeRibbon } from './sand/overlay';
 import { Portrait, Seal } from './icons';
 import { SettingsRows } from './Pause';
 import { fmtInt, fmtMinutes, HEART_TEXT, nameOf } from './text';
@@ -32,7 +33,8 @@ export function RecordsPage() {
     .map(([k, b]) => ({ k, b: b! }))
     .sort((a, b) => b.b.wave - a.b.wave)
     .slice(0, 24);
-  const chars = COMPANION_REG.map((c) => c.id);
+  // m8 (U1): the hidden three have no seal rows until HIDDEN H5
+  const chars = COMPANION_REG.filter((c) => !isHidden(c.id)).map((c) => c.id);
   return (
     <section class="mj-meta" aria-label={t('镜碑', 'Records')}>
       <h1 class="brush mj-page-title">{t('镜碑', 'Records')}</h1>
@@ -107,12 +109,16 @@ export function HeartMirror() {
   const pairs = [1, 2, 3, 4, 5, 6, 7, 8];
   const face = sel ? HEART_REG.find((f) => f.id === sel)! : null;
   const rank = (id: HeartFaceId) => m.heart.ranks[id] ?? 0;
+  // m8: while the code lends (「按满阶」), the next run's ranks; the earned ones stay as they are
+  const hv = heartView(m);
+  const shown = (id: HeartFaceId) => hv.ranks[id] ?? 0;
   const cost = sel ? heartCost(m, sel) : null;
   const active = (id: HeartFaceId) => { const f = HEART_REG.find((x) => x.id === id)!; return (m.heart.pick[f.pair] ?? 'A') === f.side; };
   return (
     <section class="mj-meta" aria-label={t('心镜', 'Heart mirror')}>
       <h1 class="brush mj-page-title">{t('心镜', 'Heart mirror')}</h1>
       <p class="mj-small">{t(`镜屑 ${fmtInt(m.dust)} · 每对只一面生效，入镜之间可换。`, `Shards ${fmtInt(m.dust)} · one face of each pair is in force; switch between runs.`)}</p>
+      <CodeRibbon page="heart" />
       <div class={'mj-heart' + (m.heart.plain ? ' is-plain' : '')}>
         {pairs.map((p, i) => {
           const [a, b] = HEART_REG.filter((f) => f.pair === p);
@@ -125,10 +131,10 @@ export function HeartMirror() {
                   class={'mj-petal' + (active(f.id) ? ' is-on' : '') + (sel === f.id ? ' is-sel' : '')}
                   onClick={() => setSel(f.id)}
                   aria-pressed={sel === f.id}
-                  aria-label={`${t(f.zh, f.en)} · ${rank(f.id)}/${HEART[f.id].costs.length}${active(f.id) ? t('（生效）', ' (in force)') : ''}`}
+                  aria-label={`${t(f.zh, f.en)} · ${shown(f.id)}/${HEART[f.id].costs.length}${shown(f.id) > rank(f.id) ? t('（测试码代填）', ' (lent by the test code)') : ''}${active(f.id) ? t('（生效）', ' (in force)') : ''}`}
                 >
                   <span class="brush">{f.zh.slice(0, 1)}</span>
-                  <i class="mj-petal-ranks">{HEART[f.id].costs.map((_, k) => <b class={k < rank(f.id) ? 'is-on' : ''} />)}</i>
+                  <i class="mj-petal-ranks">{HEART[f.id].costs.map((_, k) => <b class={k < rank(f.id) ? 'is-on' : k < shown(f.id) ? 'is-lent' : ''} />)}</i>
                 </button>
               ))}
             </div>
@@ -140,11 +146,16 @@ export function HeartMirror() {
         <div class="card mj-heart-detail">
           <b class="brush">{t(face.zh, face.en)}</b> <span class="muted">{t(`第 ${face.pair} 对 · ${face.side} 面`, `pair ${face.pair} · face ${face.side}`)}</span>
           <p class="mj-small">{t(HEART_TEXT[face.id][0], HEART_TEXT[face.id][1])}</p>
-          <p class="mj-small num">{t(`阶 ${rank(face.id)}/${HEART[face.id].costs.length}`, `rank ${rank(face.id)}/${HEART[face.id].costs.length}`)}</p>
+          <p class="mj-small num">
+            {shown(face.id) > rank(face.id)
+              ? t(`阶 ${shown(face.id)}/${HEART[face.id].costs.length}（测试码代填；自有 ${rank(face.id)} 阶）`, `Rank ${shown(face.id)}/${HEART[face.id].costs.length} (lent by the test code; yours: ${rank(face.id)})`)
+              : t(`阶 ${rank(face.id)}/${HEART[face.id].costs.length}`, `rank ${rank(face.id)}/${HEART[face.id].costs.length}`)}
+          </p>
+          {hv.lent && NEVER_LENT.includes(face.id) && <p class="mj-small mj-lend-num">{t('测试码不代填这一面。', "The test code doesn't lend this face.")}</p>}
           <div class="mj-row-actions">
             <button type="button" class="btn btn-small" disabled={active(face.id)} onClick={() => heartPick(face.pair, face.side)}>{active(face.id) ? t('已用此面', 'In force') : t('改用此面', 'Use this face')}</button>
             <button type="button" class="btn btn-small btn-primary" disabled={cost === null || m.dust < cost} onClick={() => heartBuy(face.id)}>
-              {cost === null ? t('已满', 'Full') : t(`升一阶 · ${cost} 镜屑`, `Rank up · ${cost} shards`)}
+              {cost === null ? t('已满', 'Full') : hv.lent ? t(`升一阶（自有）· ${cost} 镜屑`, `Rank up (yours) · ${cost} shards`) : t(`升一阶 · ${cost} 镜屑`, `Rank up · ${cost} shards`)}
             </button>
           </div>
         </div>
@@ -170,27 +181,37 @@ export function MasteryPage() {
   const [focus, setFocus] = useState<CharacterId>(m.lobby.char);
   const xp = m.mastery[focus] ?? 0;
   const lvl = masteryLevel(xp);
+  // m8: what the next run takes (10 while the code lends), beside the earned level
+  const mv = masteryView(m, focus);
+  const open = openOf(m).chars;
   const next = MASTERY[lvl] ?? null;
   const prev = lvl > 0 ? MASTERY[lvl - 1] : 0;
-  const open = unlocked.value;
   return (
     <section class="mj-meta" aria-label={t('心得', 'Mastery')}>
       <h1 class="brush mj-page-title">{t('心得', 'Mastery')}</h1>
+      <CodeRibbon page="mastery" />
       <div class="mj-mastery-grid" role="listbox" aria-label={t('同伴', 'Companions')}>
-        {COMPANION_REG.map((c) => (
-          <button type="button" role="option" aria-selected={focus === c.id} class={'mj-select-tile' + (focus === c.id ? ' is-focus' : '')} onClick={() => setFocus(c.id)}>
-            <Portrait id={c.id} size={44} locked={!open.includes(c.id)} />
-            <span class="num">{masteryLevel(m.mastery[c.id] ?? 0)}</span>
-          </button>
-        ))}
+        {/* m8: a hidden companion shows once it is open (earned at 40重, or the code) */}
+        {COMPANION_REG.filter((c) => !isHidden(c.id) || open.includes(c.id)).map((c) => {
+          const v = masteryView(m, c.id);
+          return (
+            <button type="button" role="option" aria-selected={focus === c.id} class={'mj-select-tile' + (focus === c.id ? ' is-focus' : '')} onClick={() => setFocus(c.id)}>
+              <Portrait id={c.id} size={44} locked={!open.includes(c.id)} />
+              <span class={'num' + (v.lent ? ' mj-lend-num' : '')}>{v.level}</span>
+            </button>
+          );
+        })}
       </div>
       <div class="card">
-        <b class="brush">{nameOf(focus, t)}</b> <span class="muted">{t(`心得 ${lvl} 级 · ${xp} 点`, `mastery ${lvl} · ${xp} xp`)}</span>
+        <b class="brush">{nameOf(focus, t)}</b>{' '}
+        {mv.lent
+          ? <span class="muted"><span class="mj-lend-num">{t(`心得 ${mv.level} 级（测试码）`, `Mastery ${mv.level} (test code)`)}</span>{t(` · 自有 ${lvl} 级 · ${xp} 点`, ` · yours ${lvl} · ${xp} xp`)}</span>
+          : <span class="muted">{t(`心得 ${lvl} 级 · ${xp} 点`, `mastery ${lvl} · ${xp} xp`)}</span>}
         <i class="mj-bar"><b style={{ width: `${next ? ((xp - prev) / (next - prev)) * 100 : 100}%` }} /></i>
         <p class="muted mj-small">{next ? t(`距 ${lvl + 1} 级尚差 ${next - xp} 点（每照：已过重数 + 首领×5 + 照破 20）`, `${next - xp} to level ${lvl + 1} (per run: waves + 5 a boss + 20 for a clear)`) : t('心得已满。', 'Mastery complete.')}</p>
         {COMPANIONS[focus].alt !== 'more' && <p class="mj-small">{t(`三级：可以 ${nameOf(COMPANIONS[focus].alt as string, t)} 起手`, `Level 3: start with ${nameOf(COMPANIONS[focus].alt as string, t)}`)}</p>}
         <ol class="mj-rewards">
-          {REWARDS.map(([zh, en], i) => <li class={i < lvl ? 'is-got' : ''}><span class="num">{i + 1}</span> {t(zh, en)}</li>)}
+          {REWARDS.map(([zh, en], i) => <li class={i < lvl ? 'is-got' : i < mv.level ? 'is-got mj-lend-num' : ''}><span class="num">{i + 1}</span> {t(zh, en)}</li>)}
         </ol>
       </div>
     </section>

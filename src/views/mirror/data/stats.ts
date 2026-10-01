@@ -45,10 +45,11 @@ export const F = {
   /** i-frames after a hit (round 5: 0.35 → 0.5, every companion). */
   iframes: 0.5,
   contactCd: 0.35,
-  /** ⚖ 劫数: enemies +1% HP and damage per point, you +2% 伤害, 月华 +3%. */
-  curseEnemy: 0.01,
-  curseDmg: 2,
-  curseMoon: 0.03,
+  /** ⚖ 劫数 (m8 劫律, balance.md §4.1): per point enemies +2% HP and +2% damage, you +1 伤害 and +2% 月华, so a
+   *  point always gives the monsters more than you (kill speed ×(1+(D+1)/100)/(1+D/100)/1.02 < 1 for every D ≥ 0). */
+  curseEnemy: 0.02,
+  curseDmg: 1,
+  curseMoon: 0.02,
   /** 关公: no hit over 20% of max HP. */
   guanHitCap: 0.2,
   // §4.5
@@ -122,16 +123,23 @@ export const F = {
   schoolK: 4,
   schoolCap: 4,
   /** [fromWave, 凡, 灵, 仙, 神]: weapon tiers in the shop and the item in a 镜奁. */
-  shopOdds: [[1, 90, 10, 0, 0], [4, 70, 25, 5, 0], [8, 55, 32, 11, 2], [13, 42, 36, 18, 4], [20, 30, 38, 25, 7], [30, 22, 38, 30, 10]] as const,
+  /** m8 (balance.md §2, the owner: 「高品质物品刷新率太低」): 凡 down in every band. */
+  shopOdds: [[1, 85, 15, 0, 0], [4, 62, 30, 8, 0], [8, 46, 36, 15, 3], [13, 34, 38, 22, 6], [20, 24, 38, 29, 9], [30, 16, 36, 34, 14]] as const,
   /** [fromWave, 凡, 灵, 仙, 神]: item (道具) tiers in the shop — ⚖5: more 仙 and 神 (the owner: 「紫，红品质道具降价且多刷」). */
-  itemOdds: [[1, 90, 10, 0, 0], [4, 62, 28, 10, 0], [8, 44, 34, 18, 4], [13, 30, 36, 26, 8], [20, 20, 34, 34, 12], [30, 14, 32, 38, 16]] as const,
-  /** ⚖ price = round(base × tierMult × (1 + 0.18(w−1))). */
+  /** m8 (balance.md §2): 凡 80/55/36/24/15/10 at waves 1/4/8/13/20/30. */
+  itemOdds: [[1, 80, 20, 0, 0], [4, 55, 33, 12, 0], [8, 36, 36, 22, 6], [13, 24, 36, 30, 10], [20, 15, 33, 37, 15], [30, 10, 30, 40, 20]] as const,
+  /** ⚖ item price = round(base × (1 + 0.18(w−1))). */
   priceSlope: 0.18,
-  tierMult: [1, 2, 3.8, 6.5] as PerTier,
+  /** m8 (balance.md §3, the owner: 「武器类用品涨价过于快速」): weapon price = round(base × tierMult × (1 + 0.15(w−1))). */
+  weaponSlope: 0.15,
+  /** Weapon tier price multipliers I..IV (m8: 1 / 2 / 3.8 / 6.5 → 1 / 1.8 / 3.2 / 5.2). */
+  tierMult: [1, 1.8, 3.2, 5.2] as PerTier,
   /** ⚖ reroll k = ⌈w/2⌉ + 1 + k·⌈0.5w⌉. */
   rerollSlope: 0.5,
   sellFrac: 0.25,
   pawnFrac: 0.6,
+  /** The most a sale ever returns (当票 + 善贾 stacked), below 货比三家's cheapest buy (QA: no buy-low, sell-high loop). */
+  sellFracMax: 0.7,
   weaponSlots: 6,
   legendFrom: 8,
   crateMelt: 0.5,
@@ -144,6 +152,45 @@ export const F = {
   cardsScholar: 5,
   cardsSolo: 3,
   treasure: { pixiuFrom: 3, pixiuChance: 1 / 6, flowerFrom: 5, flowerChance: 0.003 },
+  // ── m8:items ── (new constants only, append-only; PLAN §5)
+  /** 千金散尽 (items.md §R.4 ⑥): spilled 月华 lands pickupR + near … far from you and can't be taken for `hold` s. */
+  itemScatter: { near: 60, far: 160, hold: 1.5 },
+  /** 月华如练 (items.md §2.14): a streaming pearl strikes foes within r (+ their radius), each once (a ring of `ring`). */
+  itemStream: { r: 12, ring: 16 },
+  /** 与虎谋皮 (items.md §2.20): the 镜印 an elite carries at most once eliteAffix adds to them. */
+  eliteAffixMax: 3,
+  // ── m8:art ──
+  /** 月华 tiers (m8, PLAN D20): a haul is split greedily into 满月 [0] and 月华珠 [1] pieces, then 月华 of 1
+   *  (engine/moon.ts splitMoon). Totals and XP are unchanged; 蓄月 pays per whole point (D21). */
+  moonTiers: [25, 5] as readonly [number, number],
+  // ── m8:hidden ──
+  /** The hidden companions' engine numbers that are not a skill's or passive's p (hidden.md §2.5, §2.7, §3.4). */
+  hidden: {
+    /** A press is credited back to the pointer / key event's own time, at most this much before the step (s). */
+    lagMax: 0.1,
+    /** The ring at the figure: radius = hitbox + ringPad (u); its opacity while idle. */
+    ringPad: 10, ringIdle: 0.3,
+    /** 越女: a caught shot flies back at reflectSpeed × its speed (at least reflectMin u/s) for reflectLife s, radius reflectR. */
+    reflectSpeed: 1.2, reflectMin: 360, reflectLife: 1.2, reflectR: 10,
+    /** 越女 夺: the dash takes cutDur s. */
+    cutDur: 0.18,
+    /** Haptic ticks (ms, when 震动 is on): 越女's catch and 精, 后羿's draw entering the notch. */
+    hapticCatch: 8, hapticPerfect: 20, hapticNotch: 10,
+    /** The 镜主's mirrored 镜技 for the hidden three (hidden.md §3.10, §4.10, §5.10); damage is × the 镜主's blow. */
+    mirror: {
+      /** 越女: a thin circle warns `warn` s before a guard ring of radius r that lasts dur s; your shots touching it are
+       *  caught and it throws `shots` slow shots back (speed u/s, spread° apart, life s, radius shotR, × shotX each);
+       *  after `dashAfter` guards that caught something, a dash along len × w u telegraphed tele s, × dashX on contact. */
+      yuenv: { warn: 0.3, dur: 0.4, r: 80, shots: 3, speed: 200, spread: 14, life: 3.5, shotR: 10, shotX: 1, dashAfter: 2, len: 320, w: 60, tele: 0.6, dashDur: 0.22, dashX: 2 },
+      /** 山鬼: a vine telegraphed tele s along a w u line binds you for life s; beyond far u from it you are slow (0..1)
+       *  slower; at the end, if you are more than snap u farther than at the bind, you are yanked to pullTo u from it
+       *  and stunned stun s. */
+      shangui: { tele: 0.6, w: 26, life: 4, far: 300, slow: 0.3, snap: 150, pullTo: 60, stun: 0.5, tint: '#9fb86a' },
+      /** 后羿: a len × w line telegraph of tele s that tracks you for track s, then locks; × x on the line. Every other
+       *  shot glows gold from sweet0 to sweet1 s (the moment to step off). */
+      houyi: { tele: 1.2, track: 0.6, len: 900, w: 44, x: 2, sweet0: 0.9, sweet1: 1.1 },
+    },
+  },
 } as const;
 
 /** Level-up card values per stat, 凡 / 灵 / 仙 / 神 (GDD §6). */

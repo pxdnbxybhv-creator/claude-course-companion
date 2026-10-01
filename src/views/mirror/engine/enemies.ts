@@ -7,8 +7,9 @@ import type { TeleShape } from '../types';
 import { BOSSES, F, MONSTERS, TREASURES } from '../data';
 import { clamp } from '../logic/formulas';
 import { BLEED_MAX, BURN_MAX, EKind } from './pools';
-import { DK, HF, ROLE, SRCI, STI, TAG_BIT, TAU, TC, ZC, angDiff, segDist2 } from './consts';
+import { HF, ROLE, SRCI, STI, TAG_BIT, TAU, TC, ZC, angDiff, segDist2 } from './consts';
 import type { World } from './world';
+import { isMoonKind } from './moon';
 
 /** Enemy states. */
 export const ST = { bloom: 0, move: 1, tell: 2, act: 3, rest: 4, under: 5, air: 6, dying: 7 } as const;
@@ -862,7 +863,8 @@ function thiefRole(W: World, i: number, dt: number, tx: number, ty: number, dist
   if ((W.t * 10 | 0) % 3 === i % 3) {
     const R = p.eatR ?? 150, R2 = R * R;
     for (let d = 0; d < D.n; d++) {
-      if (!D.alive[d] || (D.kind[d] !== DK.moonDrop && D.kind[d] !== DK.moonThick)) continue;
+      // m8 (ART CR): every moon pearl (月华 / 月华珠 / 满月); never your own scattered 月华 (千金散尽)
+      if (!D.alive[d] || !isMoonKind(D.kind[d]) || D.own[d]) continue;
       const dx = D.x[d] - E.x[i], dy = D.y[d] - E.y[i];
       if (dx * dx + dy * dy > R2) continue;
       E.eaten[i] += D.worth[d];

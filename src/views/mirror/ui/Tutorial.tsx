@@ -23,7 +23,7 @@ import { mergeLeft, swordSlot, type TutorSession } from '../tutor/session';
 import { Seal } from './icons';
 import { calmNow } from './prefs';
 import { STICK_R } from './text';
-import { markTip, primerDue, tipDue, tipsOn, tutorOf } from './tips';
+import { hiddenCoachDue, markTip, primerDue, tipDue, tipsOn, tutorOf } from './tips';
 import './tutorial.css';
 
 // ───────────────────────────────────────────── what the overlay draws
@@ -258,6 +258,9 @@ export class TipsBrain extends Base implements CoachBrain {
         if (this.bubble) { this.bubble = null; this.changed(); }
         if (ev.s === 'wave') { this.waveT = 0; this.since = 99; this.lowHp = false; }
         const run = this.o.run();
+        // m8:hidden · the first run with a hidden companion: its two coach lines as the wave starts (ui/tips.ts)
+        const hc = ev.s === 'wave' ? hiddenCoachDue(mirror.value, run.char) : null;
+        if (hc) { markTip(hc.id); for (const l of hc.lines) this.pushWhisper({ text: say(l), dur: 6 }); }
         if (ev.s === 'crate' && this.due('crateOpen')) {
           let melt = 0;
           try { const id = crateItem(run, this.o.unlocks); melt = meltValue(run, id); this.crateId = id; } catch { /* none */ }

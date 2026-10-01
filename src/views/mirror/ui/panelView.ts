@@ -5,12 +5,13 @@
 import { named, type ItemId, type WeaponId } from '../ids';
 import type { CharacterId, OwnedWeapon, RunSave, StatId, Stats, Tier, WClass } from '../types';
 import { RUN_VER } from '../types';
-import { BASE_STATS, CLAMP, COMPANIONS, ITEMS, SETS, STAT_IDS, WEAPONS, WCLASSES } from '../data';
+import { BASE_STATS, CLAMP, COMPANIONS, F, ITEMS, SETS, STAT_IDS, WEAPONS, WCLASSES } from '../data';
 import { clsKey, STAT_FMT, STAT_GROUPS, termLine as termLineOf, termName, type StatGroup } from '../data/glossary';
 import {
   armorReduction, classCounts, computeStats, cooldown, dodgeCapOf, mainScale, maxHp, regenPerSec, setTiers, tierCd, weaponHit, weaponSlotsOf,
 } from '../logic';
-import { perTier, summonCapOf } from '../logic/formulas';
+import { moveSpeedOf, perTier, summonCapOf } from '../logic/formulas';
+import { moveCapOf, setPlusOf } from '../logic/items';
 import { describeWeapon, FLAG_TEXT, setSteps } from './describe';
 import type { T } from './text';
 
@@ -107,6 +108,18 @@ export function levelPreview(run: RunSave, stat: StatId, v: number, t: T = tZh):
 export function armourWords(r: number, t: T = tZh): string {
   return r >= 0 ? t(`少受 ${r}%`, `${r}% less damage`) : t(`多受 ${-r}%`, `${-r}% more damage`);
 }
+/** m8 画地为牢: 「最快每秒 140（画地为牢）」 when a walking cap holds you below your own pace; null otherwise. */
+export function speedCapSub(run: RunSave, s: Stats, t: T): string | null {
+  const capX = moveCapOf(run);
+  if (!Number.isFinite(capX) || moveSpeedOf(s, capX) >= moveSpeedOf(s)) return null;
+  const v = num(capX * F.baseSpeed);
+  let who = '';
+  for (const id in run.items) {
+    if ((run.items[id as ItemId] ?? 0) <= 0) continue;
+    if (ITEMS[id as ItemId]?.fx?.some((e) => e.hook === 'cond' && e.do === 'moveCap' && e.x === capX)) { who = nameOf(id, t); break; }
+  }
+  return t(`最快每秒 ${v}（${who}）`, `At most ${v} a second (${who})`);
+}
 function speedValue(speed: number, t: T): { value: string; word: string | null; sub: string; capped: boolean } {
   const v = Math.max(CLAMP.speedMin, Math.min(CLAMP.speedMax, speed));
   const capped = speed > CLAMP.speedMax || speed < CLAMP.speedMin;
@@ -184,7 +197,8 @@ export interface WeaponRowView {
   delta: DeltaChip | null;
 }
 export interface SetRowView {
-  cls: WClass; name: string; count: number; tier: -1 | 0 | 1 | 2;
+  /** `count`: the pieces you hold; `plus`: the extra pieces 触类旁通 counts (the pips and 「再 n 把」 read both). */
+  cls: WClass; name: string; count: number; plus: number; tier: -1 | 0 | 1 | 2;
   active: string | null;
   /** 「再 2 把（凑满 4 把）：暴击率 +10%」, or null at 6. */
   next: string | null;
@@ -323,7 +337,7 @@ export function panelView(run: RunSave, base?: PanelBase | null, t: T = tZh): Pa
       tone: 'plain', delta: bs && b ? bodyChip('dodge', dodgeShown - Math.max(0, Math.min(bs.dodge, b.cap)), '%') : null, gloss: statGloss('dodge', t),
     },
     {
-      id: 'speed', label: statLabel('speed', t), word: null, value: spd.value, sub: spd.sub,
+      id: 'speed', label: statLabel('speed', t), word: null, value: spd.value, sub: speedCapSub(run, s, t) ?? spd.sub,
       tone: s.speed < 0 ? 'down' : 'plain',
       delta: bs ? bodyChip('speed', clampSpeed(s.speed) - clampSpeed(bs.speed), '%') : null, gloss: statGloss('speed', t),
     },
@@ -402,15 +416,18 @@ export function panelView(run: RunSave, base?: PanelBase | null, t: T = tZh): Pa
   const cnt = classCounts(run);
   const tiers = setTiers(run);
   const dugu = (run.items.dugu ?? 0) > 0 && run.weapons.length === 1;
+  // m8 触类旁通: every class you hold counts setPlusOf more pieces toward its set (setTiers already does)
+  const plus = setPlusOf(run);
   const sets: SetRowView[] = WCLASSES.filter((c) => (cnt[c] ?? 0) > 0)
     .map((c) => {
       const count = cnt[c] ?? 0;
       const tier = (tiers[c] ?? -1) as -1 | 0 | 1 | 2;
       const need = tier >= 2 ? 0 : ([2, 4, 6] as const)[tier + 1];
+      const more = need - count - plus;
       return {
-        cls: c, name: termName(clsKey(c), t), count, tier,
+        cls: c, name: termName(clsKey(c), t), count, plus, tier,
         active: tier >= 0 ? setStepText(c, tier as 0 | 1 | 2, t) : null,
-        next: tier >= 2 ? null : t(`再 ${need - count} 把（凑满 ${need} 把）：${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`, `${need - count} more (for ${need}): ${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`),
+        next: tier >= 2 ? null : t(`再 ${more} 把（凑满 ${need} 把）：${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`, `${more} more (for ${need}): ${setStepText(c, (tier + 1) as 0 | 1 | 2, t)}`),
         dugu,
       };
     })

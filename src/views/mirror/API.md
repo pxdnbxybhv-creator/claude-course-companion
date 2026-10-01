@@ -61,6 +61,19 @@ To change `ids.ts`, `types.ts` or this file after the contracts step, send a cha
 | art | `paint/*`, `audio/*`, the `/src/audio/music-themes.ts` additions and the `MusicTheme` line in `/src/views/walk/map.ts`, `/src/lab/scenes/mirror-*.ts`; `tests/mirror-paint*.test.ts` |
 | ui | `ui/*`, `MirrorView.tsx`, `index.ts`, `/src/app/router.ts`, `/src/app/App.tsx`, the tabbar-hide css, `/src/views/quests/helpers.ts` (the 幻镜 ledger row), `/scripts/build_fonts.py` (`MIRROR_DIR`), `/scripts/brush_chars.txt`; `tests/mirror-ui*.test.ts` |
 
+**Round 8 (m8) lanes** (build plan §5). Phase 2 merged their contract into §2.7, §3.1, §4.1, §5.1 and §6.1; the regions below still say who changes what in Phase 3:
+
+| Lane | Files and regions |
+|---|---|
+| 0 · seams | `types.ts` (then CR only; each lane may add its own types in its `m8:<lane>` block), every new `ids.ts` row, `/src/app/mirror.ts` `CHAR_IDS`, the World seams block, §9's frame |
+| B · balance | `data/stats.ts` F outside the m8 blocks, `data/weapons.ts`, the 13 and the 77 outside the m8 blocks, `say.ts` outside the m8 blocks, `STARTER_ITEMS` / `DEED_REG` / `lockOf`, `logic/formulas.ts`, `logic/shop.ts` `rollSlot` / `rollSlots` / fallbacks, `logic/meta.ts` deeds, `logic/economy.ts`, `tutor/*`, `engine/content/skills.ts` (the 13), `engine/content/field.ts`, the Demon branch of `killDrops`, `sim/bot.ts` |
+| I · items | the `m8:items` blocks (`data/items.ts`, `say.ts` `ITEM_SAY`, F, glossary, pools, bridge, World, css), `data/glossary.ts`, `ui/describe.ts`, `ui/panelView.ts`, `ui/Shop.tsx`, `paint/items.ts`, `logic/items.ts`, the rest of `logic/shop.ts`, `logic/spawn.ts`, `engine/effects.ts`, `engine/weapons.ts`, `engine/enemies.ts`, `engine/content/items.ts`, `sim/itemvalues.ts`; in world.ts `strike` / `strikeIn`, `statusSlot`, `killIn`, `killDrops` (not the Demon branch), `onDodge`, `recomputeStats`, `begin`'s item block |
+| H · hidden | the `m8:hidden` blocks, `logic/hidden.ts`, `sim/realbal.ts`, `engine/content/hidden.ts`, `engine/content/mirrorself.ts`, `engine/verbs.ts`, `engine/rings.ts` (new), `engine/threats.ts`, world.ts `castSkill` / `tickSkill` / `shotHitsPlayer`, `engine/index.ts` `skillPress` / `skillRelease`, `paint/hidden.ts`, `ui/Select.tsx`, `ui/Hud.tsx`, `ui/Results.tsx`, `ui/Codex.tsx` char pages, `ui/icons.tsx`, `ui/tips.ts`, the key region of `ui/Run.tsx` |
+| A · art | `paint/*` except `paint/items.ts` and `paint/hidden.ts`, `paint/brushwork.ts` (new), `engine/render.ts` (the hook call site stays), `engine/feel.ts`, world.ts drops (`dropMoon`, `dropOne`, `tickDrops`, `pickup`, `collectMoon`, inside the own-piece seams), `audio/*`, the `m8:art` blocks, `DROP_REG` text |
+| S · sandbox | `logic/session.ts`, `logic/lend.ts`, `logic/tuning.ts` (new), `logic/run.ts`, `logic/save.ts`, `sim/sandstart.ts` (new), `engine/index.ts` (not `skillPress` / `skillRelease`), `engine/dev.ts`, `ui/sand/*` (new), `ui/Run.tsx` (not the key region), `ui/Lobby.tsx`, `ui/Meta.tsx`, `ui/Panel.tsx`, `MirrorView.tsx`, `scripts/mirror-tuning.mjs` |
+
+- **Anchors** (`m8:<lane>`): `types.ts` (end), `data/stats.ts` F, `data/glossary.ts` (term ids and terms), `engine/pools.ts`, `engine/content/bridge.ts`, the end of the World class, `ui/mirror.css`.
+
 ---
 
 ## 1. Conventions
@@ -284,6 +297,43 @@ reviveFailed(): void              // payRevive said 'ok' but engine.revive() ret
 
 `app/mirror.ts sanitizeMirror` keeps `settings.view` only when it is `'near' | 'mid' | 'far'` (missing = 中).
 
+### 2.7 Round 8 (m8): balance, the shop, ask B, the hidden unlock, the code and tuning
+
+Pure logic added in round 8 (build plan §3–§4). Every number is data (`F`, a def's `stats` / `fx` / `p`), so the 模拟场 lists and exports it.
+
+**Seams.**
+
+- **Ids.** `HIDDEN_CHARS = ['yuenv', 'shangui', 'houyi']`, `HiddenId`, `CharacterId = AppCharacterId | HiddenId`, `isHidden(id)` (types.ts). `CHARACTER[…]` (the app's table) is never read for a hidden id; `appOpen(id)` (logic/session.ts) is false for one. `src/app/mirror.ts` `CHAR_IDS` holds all 16.
+- **Logic.** `shopFloor(run)`, `noWeapons(run)`, `setPlusOf(run)`, `moveCapOf(run)` (logic/items.ts); `moveSpeedOf(stats, capX = Infinity)` reads `CLAMP` live and is the one walking-speed formula (the player, 镜主, 貔貅); `applySheet(s, run.sand)` before `clampSheet`; `curseOf` adds `run.sand?.curse`; `condHolds` knows `moving`; `convertSource` knows `luck` and `dodge`; `setTiers` counts `setPlusOf`; `CompanionDef.dodgeMult` after the converts; `endWave` subtracts `WaveResult.lost` once (never below 0); `settleMeta` reports `chars`; the 莲湖 rim counts the 13; `BotOpts.immortal`.
+
+**Balance.**
+
+- **Numbers** (balance.md §1–§7 as amended by its §12.3 and the build plan; orchestrator O1: 忘尘镜 and 龙渊剑 unchanged). `F.itemOdds` / `F.shopOdds` (凡 down every band), `F.tierMult` [1, 1.8, 3.2, 5.2], `F.weaponSlope` 0.15 (items keep `F.priceSlope` 0.18), 劫 `F.curseDmg` 1 · `F.curseMoon` 0.02 · `F.curseEnemy` 0.02, 金丹 `max` 12, 断发 +4 / −3 max 5, 心魔 +6 (劫 3, a 10 % casket: the QA 劫 pass), 妄念 月华 −15 % (was +10 %: the extra 20 % of enemies already paid more than its 劫 cost), 镜裂 劫 2, 破釜沉舟 `{ dmg: 8 }` 劫 2. The 13 companions: 琴师 and 道童 trimmed (`MELEE_PEN` is shared and never edited: 琴师's 乐器 +12 is her own wmult row), the weak five's rules, the middle six's numbers.
+- **The floor** (`{ hook: 'shop', do: 'tierFloor', t }`, read by `shopFloor(run)`). `shopOdds(w, luck, extra, floor = 1)` / `itemOdds(…)`: tiers below the floor are zeroed and the rest scaled to 100; luck multiplies, and 镜裂's +5/+5 is added to, the tiers above the floor, and the floor tier takes the rest. `rollSlot` passes it for items and new weapons; weapon copies for 合铸 are exempt; the class lean's fallback starts at the floor and the last resorts are `itemPool(…, max(1, floor))` then 人参 (松子 without a floor). 镜奁, 镜心, cards, 行囊 and boons never read it. `noWeapons(run)` skips both weapon branches.
+- **Prices.** `weaponPrice` = round(base × `F.tierMult[t]` × (1 + `F.weaponSlope`·(w − 1)) × mods); `sellPrice` follows it.
+- **诗成.** `critMult(critX, weaponCrit, stats, overflow = 1)`; `critOverflowOf(run)` is `PASSIVES.baipian.p.overflow` for 诗仙, 1 for anyone else (logic `weaponHit`, the engine's weapon slot and `World.hitSlot`'s skill packets all pass it).
+- **Ask B.** `STARTER_ITEMS` = every item; `lockOf(id)` names a deed only for the 9 deed weapons, `deedOf(id)` names any item's or weapon's deed. `settleMeta` pays an item deed's 镜屑 once, when it first reaches its goal: `deedDust(id)` = `PAY.deedDust[tier − 1]` (灵 20 = 心魔's, 仙 30, 神 60), `deedDustOf(before, after)`; never retroactive. The Codex item page shows the deed, its progress and 「成就 · 镜屑 +n」 (`DEED_REWARD_SAY`); `RunReport.deeds` names the item deeds a run paid for (present only when non-empty) and Results shows one line each, 「<deed> · 成就 · 镜屑 +n」. The tutorial keeps the old 55 items (`tutor/run.ts TUTOR_ITEMS`).
+- **Bot** (`sim/bot.ts value()`): 劫's enemy damage divides the effective HP (`1 + F.curseEnemy·劫`); `BOT_M8.rerollLoss` while `noReroll`; `BOT_M8.floorPer × min(floorCap, commonStackers(run))` under a floor; plus `botItemValue(run, id) × n` for held items.
+- **Tests.** `tests/mirror-m8-balance.test.ts`; `tests/mirror-m8-sweep.test.ts` is QA's sweep (gated `MIRROR_SWEEP=1`; `PART=A|B|F` write jsonl rows, `PART=H` the hidden three's verbs (expert / novice, tallies, 山鬼's snaps; PLAN A-H1–A-H5), `PART=TAB FILES=…` prints the §8.1 and hidden tables; `CURSE=w:n`, `NO_BB=1`, `LEVER=TABLE.path=v` (F, ITEMS, PASSIVES, SKILLS, WEAPONS, COMPANIONS, BOT_M8) and `TUNING=` probes).
+
+**Items.**
+
+- **Shop (`logic/shop.ts`, `logic/items.ts`).** `ShopState.rolls` counts this shop's rerolls (free ones too); `rerollOffPct(run)` is 货比三家's discount, applied in `slotPrice` (every slot); `sellPrice`'s fraction is capped at `F.sellFracMax` 0.7 (under that discount's cheapest buy, so buying and selling a weapon never profits). `itemPool` skips an item with `rerollOff` while `noReroll(run)`. 点石成金: `upgradeRule(run)`, `upgradePrice(run, slot)` (null at 神 or without the rule; `u.x` of the copy price this shop shows, 货比三家 included), `upgradesLeft(run)`, `upgrade(run, slot)` (uses `ShopState.upgrades`); the Shop's weapon tab shows 「点金 · price」.
+- **Bot values (`sim/itemvalues.ts`).** `ITEM_BOT_VALUE` (full-fit value in `value()` units, all 26) and `botItemValue(run, id)` (× the share of weapons of the item's class; 画地为牢 is `HUADI_SHORT_PENALTY` on kits whose mean reach ≤ `HUADI_SHORT_REACH`, 短兵相接 is worth its value only there; 醉卧沙场 only with the 醉 meter; 后发先至 × dodge / 60). BALANCE's `value()` adds `botItemValue × count` for held items.
+
+**Hidden companions.**
+
+- **Unlock (`logic/hidden.ts`).** `HIDDEN_BY_MAP` (lake 越女 · forest 山鬼 · palace 后羿), `HIDDEN_WAVE` 40, `HIDDEN_MIN_DIFF` 0 (any 镜境, 闲游 included: the owner's words, orchestrator O2). `deepestOn(meta, map, minDiff?)` reads `meta.bests` keys `char|map|diff|heat(|p)`; `hiddenOpen(meta)` lists the earned ones in `HIDDEN_CHARS` order (retroactive; no save field; the daily writes no bests, the tutorial and the sandbox never settle). `hiddenTease(meta)` (any map's deepest ≥ `HIDDEN_TEASE_WAVE` 30: the sealed tiles may show) and `hiddenMap(id)`.
+
+**The code and the 模拟场.**
+
+- **The code's overlays (S1; chars.md §3.4, §4.3; PLAN D18).** `logic/session.ts` is the only reader of `codeActive`.
+  - `openOf(m).chars`: every companion (the 13 and the hidden three) while the code is on; otherwise `unlocked` (app ids) plus `hiddenOpen(m)`. `enter` and `lobbyVisit` fall back to 书生 for a companion that is not in it; 今日镜 stays on `unlocked` (`dailySpec`). No `char:*` flag or app-wide state is written.
+  - `lendOn` (a signal, default on, never saved), `setLendOn(v)`, `lent()` = the code on and 「按满阶」. While `lent()`, `enter` passes `heartFor(m, true)` (every picked face at its last rank; 回魂 keeps its earned rank, `NEVER_LENT`) and `masteryFor(m, char, true)` (10) to `newRun`, and records `run.lent = lentOf(m, char, plain)` (the ranks and levels above the earned ones). `meta.heart`, `meta.mastery` and `dust` are never written.
+  - **Pay is unchanged.** `waveSetup` rolls the 铜钱 plan on `unlentRun(run)` with `luck − lentLuck(run)`: lent 福缘 changes neither the coin rolls nor how often 貔貅 (a 铜钱 carrier, luck-scaled in `wavePlan`) is planned for the coins.
+  - Views: `heartView(m)` → `{ ranks, own, lent, code }`, `masteryView(m, char)` → `{ level, own, xp, lent }`, `charTag(m, id)` → `'code'` for a hidden companion open only through the code. The UI pieces are in `ui/sand/overlay.tsx` (`CodeRibbon`, `LendSeal`, `charTagText`): the 心镜 and 心得 pages show the ribbon and the 「按满阶 / 按自有」 chips, lent pips hollow, 「阶 5/5（测试码代填；自有 N 阶）」 and 「心得 10 级（测试码）· 自有 N 级」; the lobby glass shows the lent level with a small 「测」 seal.
+- **The tuning layer (S2, `logic/tuning.ts`, sandbox.md §5).** `TUNABLE` lists 24 tables (not `PAY` or `REVIVE`). `leaves()` walks them at runtime (about 3,200 numbers and booleans), each with its `aliases` (shared objects such as `MELEE_PEN` and the 心镜 cost arrays), `ro` (structural), `badge` (`live`, `spawn`, `wave`, `shop`, `run`, `none`) and `int`. `beginTuning()` snapshots; `setValue(path, v | null)` writes in place (clamped where the engine needs it; StatId keys may be added to and removed from StatMods maps); `changes()` lists only differences; `endTuning()` restores in reverse order, deep-compares with `Object.is` and falls back to a full restore; `dataHash({ except? })` fingerprints the pristine tables. `sandOf(run, rows)` / `withSheet(run, rows)` turn the 本局 rows into `RunSave.sand` (a 劫数 row becomes `sand.curse`, so the enemies scale too). `enter` and `startWave` restore the tables first if tuning is somehow still on.
+
 ---
 
 ## 3. Engine (`engine/index.ts` exports `createEngine: CreateEngine`)
@@ -372,6 +422,39 @@ engine.setSettings({ view: 'near' | 'mid' | 'far' }); // the view size, live (�
   - Simulation ≤ 4 ms and draw ≤ 6 ms on a mid phone.
 - **Item effects.** The engine interprets every in-wave `Effect` (types.ts §2) with one switch on `do`, and `special` with one switch on `key`.
 
+### 3.1 Round 8 (m8): the seams, item ops, the verbs, 月华 tiers and held weapons
+
+Engine-core additions in round 8. No tunable literal lives in `engine/`: each number is read from `F` or a def.
+
+**Seams.**
+
+- **World** (engine/world.ts, the m8 seams block): `guardHook`, `hurtScalers[]`, `afterHurt[]`, `teleOwner`, `cdX`, `onStream`, `playerHooks[]`, `ownLost`, `moveCap`, `press(at)`, `release(dir, at)`; `hurtFrom(…, shot = -1)`; `dropOne(kind, x, y, worth, coin, { own, hold, noFuse })`; `result().lost`; `begin` resets them all, then calls `registerItemHooks(this)` and `registerHiddenHooks(this)`, and starts one `CONTENT.items` Behaviour per held item after the passive. The 劫 月华 bonus reads `F.curseMoon`; the 伤害 floor reads `CLAMP.dmgMin`.
+- **Engine.** `skillPress(at?)`, `skillRelease(dir, at?)`, `setTimeScale(x)` (reset by `start`).
+- **Order in `hurtFrom`:** invuln / untargetable / leap → **guard** → i-frames → dodge → blocks → 关公's aura → **hurtScalers** → armour → shield → damage → (not a DoT) feel, event, thorns, **afterHurt** → lethal.
+
+**Items.**
+
+- **Mods are lists (I1, `engine/effects.ts`).** `conv: LiveConv[]` (every live convert: `moonHeld`, `summons`, `near` = foes within `r`, `moonNear` = unpulled moon-kind worth within pickupR + `r`; the World fills `near` / `moonNear` in `itemConvReadings` each step), `shards[]`, `echo[]` (a slot sums the echoes of its classes), `every[]` (each with its own count), `charm` merged (largest `x` / `dmgPct`, bursts added), `returnHeal` = the larger `v` with the caps added (剑归 + 洗剑池), `evBuffs[]` (onDodge buffs included). Two items with the same op both apply.
+- **Class conds** read `cls`, `when` and `pct` together (`classExtras`), so 满弓's `{ cls: 'bow', when: { k: 'still', s } }` works as data.
+- **Every op has a reader (I11).** `apply` ends in `assertNever`; `OP_READERS: Record<EffectOp, files[]>` names where each op is read and `UNREAD_OPS` lists the ones with no reader yet (empty now: all 26 items are live, none is `wip`). `tests/mirror-m8-items.test.ts` checks both, and that no `wip` item is left.
+- **Event buffs (I2).** `{ hook: 'onHit' | 'onCrit' | 'onKill' | 'onDodge' | 'onHurt' | 'onGo', do: 'buff', stats, dur, stack?, cls?, moveX?, after?, key? }`. Keyed `key ?? '<item>#<fx index>'`; each trigger adds a stack up to `stack` and refreshes `dur`, and all stacks end together. `cls` filters hits and crits to that class's weapon hits (weapon hits without `noProc` only). `moveX` multiplies walking after the 画地为牢 cap. `onHurt` rides `afterHurt`; `onGo` fires in `tickPlayer` when you start moving after standing still for at least `after` s. World: `itemBuffs(hook, slot, still?)`, `itemBuff(b)`.
+- **The new ops' readers.** In `strikeIn`: `execute` and `far` multiply beside vulnerability (weapon hits of their class), `pin` roots instead of pushing, `status` (`bleed` with `ofHit`, `vuln` with `bossV`, `convert` with `p` × proc × 福缘 and its own `cap`) and on-hit buffs. In `killIn`: `blast` (queued, raw, at most `perSec` in any 1 s window, a boss ≤ `bossPct` % a burst and ≤ `bossPerSec` bursts a second) and `spread` (the victim's strongest burn to the `n` nearest within `r`, at most `perSec` in any 1 s). In `onDodge`: `prime` (World `primeT` / `primeMask`; `weapons.ts fireWeapons` makes the next attack of each primed slot a sure crit × `x`; 墨宝 and 棋子 never). `statusSlot('bleed', …, v > 0)` uses `v` as that stack's damage a second, and a refresh at the cap keeps the larger. `W.itemTally` counts bursts, boss bursts, spreads, turns, primes, 月华 scattered and stream hits per wave.
+- **Batch c / d readers.** `guard` (醉卧沙场) is a `hurtScaler`: × (1 − min(max, pct × ⌊醉 / per⌋) / 100), DoTs too. `scatter` (千金散尽) rides `afterHurt` → `World.itemScatter()`: pct % of the 月华 in hand (≤ max) leaves it as own pearls (`splitMoon`) at pickupR + `F.itemScatter.near…far`, held `F.itemScatter.hold` s, never fused; taken back they only return, left lying they are `result().lost` (endWave subtracts it once, never below 0). `stream` (月华如练) sets `onStream` → `World.itemStream(i)`: a flying pearl strikes each foe within `F.itemStream.r` once (it remembers each foe it struck, at most `F.itemStream.ring` = 16 a piece, never evicting) for (base + Σ scale·stat) × 伤害 × min(maxX, 1 + worth × perWorth / 100), crits, no procs. `hpPct` (饮鸩止渴): `registerItemHooks` sets hp = round(hpMax × lowest v / 100) at the wave start. `world` (与虎谋皮): `eliteAffixOf(run)` adds 镜印 in `wavePlan` (≤ `F.eliteAffixMax`); `killDrops`' Elite branch adds `mods.eliteCrates` 镜奁 (与虎谋皮 itself gives none since QA's 劫 check) and × (1 + `mods.eliteMoonPct` / 100) 月华. `special houji` (厚积薄发): `World.stoneBorn[slot]` is set by `placeStone`; `houjiX(W, i)` multiplies a stone's blast (and a capture reads its oldest ring stone). 静如处子, 动如脱兔, 短兵相接 and 计白当黑 are data only (`still` conds, an `onGo` buff, two `near` converts, an ink class cond and 墨宝上限 −2).
+- **诗成 in weapons.** `WeaponSlot.over = critOverflowOf(run)`; `critMOf` passes it to `critMult`. `World.hitSlot`'s skill packets multiply the crit points over 100 by `critOverflowOf(this.run)` the same way.
+
+**Hidden companions.**
+
+- **Verbs (`engine/verbs.ts`).** `SkillDef.input` 'tap' (the 13, unchanged: a press casts, a release does nothing), 'guard' (the press opens the guard at its own event time; with full 剑意 it waits for the release, which is 夺), 'hold' (the press draws, the release looses after `held` s), 'recast' (the bind and the snap act on the release; a press while the run lives goes to `SkillRun.recast`, routed by `World.castSkill`). **A release's `dir`: `null` = cancelled, a zero vector = auto (no drag), else aimed.** `engine.skillPress(at?)` / `skillRelease(dir, at?)` (a release while paused or between waves is passed on as a cancel): `at` on the event clock (`performance.now()/1000`, a pointer's `e.timeStamp/1000`); `worldAt` credits back at most `F.hidden.lagMax`. `engine.skill(t)` stays a press + release in one call (a 'hold' skill looses at once: the tap shot), for the bot and the tutorial.
+- **World (`m8:hidden` block; `castSkill`, `tickSkill`; one line in `pushHud`).** `castSkill(at, dir, t?)` records `castT` (the press's world time) and `castAimed`; `cdNext` (≥ 0) replaces the run's cooldown when it ends (× `cdX`). `hidBlades` (越女's 剑意; it carries into the same run's next wave, and a retry or a new run starts at 0). WorldApi's optional members are implemented: `ring(key, v01, o)` (drawn while asked this step), `guard(dur, onCatch)` (attacker as a handle; `shot` = the ES slot or −1), `expose(pct, dur)` (露, a `hurtScalers` factor `exposeX()`), `underTele()` (the striking telegraph's owner handle, or −1; `TeleSpec.owner` gives a `World.tele` an owner, and the boss, elite and 镜主 patterns pass theirs), `tether(h, sag01, tint?)`. `hiddenHud(h)` fills `skillHeld`, `skillRecast` and `ring` (undefined for 'tap' skills). `registerHiddenHooks` resets all this each wave (剑意 aside); only a 'guard' skill sets `guardHook` and the 露 scaler, and only the hidden three get the figure-layer hook (`engine/rings.ts`: the ring, the vines, the 破绽 ✕, 后羿's aim line; it never replaces the figure).
+
+**Art and 月华.**
+
+- **月华 tiers (PLAN D20–D22, art.md §5).** `engine/moon.ts` (pure): `splitMoon(worth, out?)` splits a haul greedily into 满月 (`F.moonTiers[0]` = 25), 月华珠 (`F.moonTiers[1]` = 5) and 月华 of 1; a fractional remainder rides on the last piece, so an ordinary 1–3 kill drops exactly as before. `moonKindOf(worth)`, `isMoonKind(k)` (the three pearls), `isMoonWorth(k)` (+ 金月华, 金鲤), `moonDraws(k, worth)`.
+  - `World.dropMoon` uses the split. Fusion past `F.thickAbove` keeps pearls (a fused piece wears 月华珠 from 5, 满月 from 25). `World.collectMoon(worth, draws = 1, big = 0)`: 蓄月 pays one per whole point of a pearl (`draws`), so the income is unchanged; a 月华珠 or 满月 always chimes, an octave up (`audio.pickup(degree + 5)`; the audio primes 15 pickup voices), and a 满月 adds `bell` at gain 0.5.
+  - Paint (`paint/things.ts`): the three pearls have 2 frames (v1 twinkles) and no halo; `pearlMap(map)` bakes the bleed deeper on 天宫 (0.75); `paint/index.ts` calls it before a `drop:moon*` bake.
+  - Render (`engine/render.ts`): the pearls take no glow from the budget. `moonBob(t, i, calm, pulled)` and `moonFrame(t, i, calm)` give the float (±1.8 u) and the twinkle frame (12 % of the time); both are off under 减少动态 (`moonIdle` wraps the two). Pearls streaming in are drawn after the enemies (`drawStream`), with a tail of 1.4 × 0.9 at alpha 0.85. The pickup ping is a 30 u ring and 3 motes; `engine/feel.ts` `PICK_GLINT` [1.25, 1] adds a second white glint.
+- **Held weapons.** `engine/render.ts` `HELD = { size: 0.8, alpha: 1, orbitX: 30, orbitY: 22 }`; `kindScale('wpn:')` 0.85. Every held weapon is drawn behind the figure (`drawHeld`; QA measured the near half drawn in front covering 35–57 % of the figure with 4–6 weapons); the lanes' `playerHooks` still run just before the figure. `WPN_SPECS` (27, `paint/gear.ts`) are redrawn with two-steel blades, 1.1 u contours, gold guards, tassels and a baked class-colour glow; the shop, codex and results icons share them.
+
 ---
 
 ### 3.x The tutorial's controller (`engine/tutor.ts`) and `World.attach`
@@ -426,6 +509,28 @@ results 画卷 ─▶ 再入镜 (−20 or 今日免费) · 回镜前 · 存画 (
   - `plan(run,'boss')` in the shops of waves 9, 19, 29, 39 …
   - `plan(run,'endless')` in the wave-30 shop, behind a small 研墨 bar.
 
+### 4.1 Round 8 (m8): the new screens, the hidden companions and the 模拟场
+
+UI additions in round 8. Every visible string is a {zh, en} pair, numbers through slots.
+
+**Items.**
+
+- **UI.** `panelView`'s speed tile says 「最快每秒 140（画地为牢）」 under a walking cap (`speedCapSub`); set rows carry `plus` (触类旁通), and the pips and 「再 n 把」 count it. The 点金 button reads the new glossary term `gild`. The 26 icons are painted in `paint/items.ts`.
+
+**Hidden companions.**
+
+- **UI.** `ui/Hud.tsx`: `skillInput(id)`, `cursorDir(engine, sx, sy)`, `skillGlyphNow(hud, own)`; the 技 button presses on pointerdown for the hidden three and releases with the drag (`null` when dragged back), repeats the draw / vine ring on its rim and shows 「夺」 / 「断」. `ui/Run.tsx` keys: Q / Space down = press, up = release (aimed at the cursor with 手瞄), Esc while held = cancel; the right mouse button on the arena is the same verb aimed at the cursor for every companion (released off the arena = cancel; the context menu is off there). `ui/Select.tsx` reads `openOf(m).chars` and shows 「测试码开启」 for a hidden companion opened by the code.
+  - Part 2 (H5). `ui/hiddenText.ts` (pure, tested): `HIDDEN_SAY` (flavour, verb seal, reveal verse, title), `HIDDEN_UI` (「？」, the hint 「在{@map}打过第 {wave} 重，哪个镜境都算。」 per O2, 「还没现身」, 「去见见」 …), `hiddenLine(say, id, t, n?)`, `companionTiles(m, t, only?)` (the 13; a hidden companion once open, or sealed once `hiddenTease`) and `sealedView(m, id, t)`. Select draws sealed 「？」 tiles (veiled bust, no name) and the sealed pane (hint, flavour, verb seal, deepest on that map, the disabled 「还没现身」); Codex shows the hidden pages from the tease on (sealed: silhouette + hint); Results shows one reveal card per `report.chars` id (ripple, ink → colour, typed verse, title, 后羿's moon line when 嫦娥 is open; 「去见见」 opens the companion sheet on it and `setLobby`). Coach lines: `ui/tips.ts` `HIDDEN_COACH` / `hiddenCoachDue(m, char)`, whispered twice at the first wave of the first run with each (TipsBrain, `ui/Tutorial.tsx`). `ui/icons.tsx` `Portrait` tries `HIDDEN_BUSTS` first and takes `veiled`. The HUD 月华 pulse (art §5.4) is in Hud.tsx.
+
+**The code and the 模拟场.**
+
+- **The start run and the session (S3).** `sim/sandstart.ts` `sandStart(meta, opts)` builds the run at the end of wave N − 1 (1–70, default 30): the bot's build (`simulateRun`, `immortal`, deterministic per seed), bare hands, a copy of the paused run, or the last sandbox build; 心镜 满阶 / 自有 / 素镜, 心得 满 / 自有, the pool all or mine. `ui/sand/session.ts` `createSandSession(setup)` is a `RunSession` with `sandbox: true` that lives in memory (the tutorial's pattern): no coins (the plan is `[]`, the sleeve is dropped), no meta writes, no revive (no `payRevive`, so the engine gets no `downed` hook), `replay()` for 重打此重, `adopt(run)` (the 敌人 tab's boss fight restarts the engine on the boss's wave: the session follows it, so that wave's win or death is counted; `contentDev.boss()` resolves false and starts nothing if the wave ended or you fell while it baked), the wave log and the death card's top sources (from a `hurtFrom` tally installed by `attach`), the enemy knobs (`knobPlan`; HP, damage and speed also live on the engine's plan) and live sheet edits (`liveSheet`: the engine's sheet moves by the difference, as a 镜宝 grant does). `openSand()` / `leaveSand()` begin and end the tuning.
+- **The 模拟场 on screen (S4).** The lobby shows 「试 · 模拟场」 only while the code is on (`codeOn()`); MirrorView's `'sand'` scene loads the sandbox chunk (`ui/sand/Sand.tsx` + `session.ts`), calls `openSand()`, and leaves through one path (`leaveSand()`, also on unmount and when the code is revoked, with a toast); the edits are kept as the draft on leaving, on unmount, on `pagehide` and when the page hides. RunView takes `sess` (a `SandSession`) and `sand` (`SAND_UI`: `Dock`, `Death`, `Pause`; types in `ui/sand/ui.ts`): no coach or first-time tips, no `rememberPlayed` / `rememberPanelBase` / `saveMetaNow`, its own pause sheet (回场前) and death card (重打此重 · 回场前 · 看记录; a bare 倒下了 card if no death was recorded), no revive, its own sheets (导入, 复制) hold the wave with a quiet 'sheet' hold instead of the pause sheet, the boss and endless rosters baked up front, the 工具 switches re-applied after every start, 「直接开打」 starting the wave at once.
+- **The dock's tools (S4, part 2).** 本局: the 26 stats (加减 / 设为, live), 「写进同伴底子」 (`sess.bake(id)`: the row becomes `COMPANIONS.<c>.hp/armor/speed/dodge` or `.extra.<stat>` in the tables, so it exports as a real value; 劫数 stays a run row because enemies read items' curse only), weapons (grouped by class, search, tier, 合铸), all items, 月华 (live), 等级, 蓄月 / 收成 / 经验 / 醉 / 大橘的命. 敌人: the four knobs, monsters × n, an elite with 0–2 镜印, treasures, 清场, any boss (双生, 镜主, a phase, 倒悬), the live boss list, 转阶段, 狂暴计时, hazards, 镜蚀 ×0.5/1/2, 节气. 工具: 无敌, 技能冷却 ×, 快慢 (`setTimeScale`), 伤害数字 (`SandTools.nums`: the engine only, never the setting), 回满, 重开此重, 算作过关, 测 DPS (`sess.measure()`, a `MEASURE_SEC` window of game time; `SandMeasure` by weapon, in the log and the export's `measure`), 跳到第 N 重, 现在开店, 刷新免费, 商店品质 / 道具品质 (open 数值表 on that search), 月华. A phone sheet holds the wave unless 「边看边调」 (40 %); its grip raises it to 92 %. Keys: T, G, R, [ ], / (search).
+- **数值表 (S5).** Browse 24 groups → entities → rows, or search names, ids, paths and labels (the owner's words too: `SYNONYMS`, `searchTerms`); per-tier and odds arrays are one row of boxes (凡 灵 仙 神; 起始重数 + 4); badges, 共用 · N 处, 源里是算式, the read-only lock, 「合计 N，不是 100 · 补在凡上」; a key with no word (`rawKeys`) shows the entity's own text (`describeWeapon` / `describeItem` / `describeSkill` / `describePassive`). Labels: `ui/sand/labels.ts` (`FIELD`, `PARAM`, `F_LABEL` (every F key), `CLAMP_LABEL`, DIFFS rows by 镜境 name, `leafLabel`); lanes add pairs by CR. The search and the 全部/改过的 chips stay at the top (sticky); the file bar and the money note sit under the results. Read-only: the structural fields plus money (`DIFFS[*].pay`, `MAPS.*.pay`, `F.endless.coinX`, `HEART.*.costs`); literal-typed fields round into their type (item/weapon `tier` 1–4, `COMPANIONS.*.slots` 5–6, `DIFFS[*].unlock.diff` 0–5).
+- **The file (S6).** `ui/sand/io.ts`: `buildExport` (only differences, with default, file, label, aliases and `source`), `fileName`, `checkImport` (usable · missing · stale · `ro` (不能改) · `bad` (a wrong type; `null` only for a stat in a StatMods map)) / `applyImport`, `saveTuning` (hostSave → copy sheet → share → download), the draft under `banmu.mirror.sand.v1` (the only storage key the sandbox writes). `scripts/mirror-tuning.mjs print | check | apply [--write] | computed [--write]` takes a returned file back into `data/`; `ui/sand/computed.json` lists the leaves the source writes as a formula.
+- **The way back (S6, part 2).** `applyTuningText(text)` (begin tuning + the file's usable changes; the caller ends it) and `verifyTuning(text)` (each change holds, and `dataHash({ except, live: true })` equals the file's `build.rest`). `TUNING=file.json npx vitest run tests/mirror-tuning-verify.test.ts` after `apply --write`; `MIRROR_REALBAL=1 TUNING=file.json [COMPARE=1] [GOD=30] … tests/mirror-realbal.test.ts` plays the owner's numbers (COMPARE: today's first, rows tagged `tuning`).
+
 ---
 
 ## 5. Engine ↔ content (`engine/content/index.ts` exports `CONTENT: ContentRegistry`)
@@ -461,6 +566,26 @@ A missing entry is a no-op, so the core runs before content is finished.
   - Content implements only their runtime behaviour: 墨潮, 回光, 碎镜, 暗月, 反照, affixes, hazards and the like.
 - **Effects.** Content draws the player's light through `vfxW(w)` from `engine/vfx.ts` (`shock`, `ring`, `slash`, `lance`, `streak`, `bolt`, `beam`, `bloom`, `motes`, `stain`, `impact`; every strike through `w` already lands its impact), never with gameplay numbers. The enemy's side keeps `w.fx(...)`: its telegraphs stay vermilion and its rings are drawn in ink. Every 镜技 has a cast and a landing signature, and a boss's death breaks in gold (`bosses.ts` `bossDownFx`).
 - **What content may keep.** The `WorldApi` object and the views it returns are reused, so never keep them across calls. Keep handles (numbers) and your own state object.
+
+### 5.1 Round 8 (m8): new rules, item Behaviours, the hidden kits and their 镜主
+
+Content added in round 8. Numbers live in `SKILLS[id].p`, `PASSIVES[id].p`, item `fx` or `F`.
+
+**Balance.**
+
+- **Content.** 剑幕: `yijian`'s `end` buffs `jianmu` { armor: p.guard } for p.guardDur. 捣药: each pound's packet carries `status: vuln` (p.vuln, p.vulnDur). 猫步: the `jiuming` Behaviour buffs `maobu` { aspd: p.dodgeAspd } for p.dodgeDur on each `dodge`. 酒入豪肠: the `baipian` Behaviour heals p.critHeal on each `crit` event, at most p.critHealCap in any 1 s window. 剑归, 药力 and 老渔 are data (`returnHeal`, `convert` from `regen` and `luck`). 心魔's shadow drops a 镜奁 with its fx's `crate` % chance (`mods.demonCrate`, rolled on the engine rng in killSlot's Demon branch). 心魔 is 劫 3 with a 10 % casket since QA found the sure casket a net gain against its 劫 (A10 pairs, seeds 11–16: mean W −0.40, clear-20 71 → 70).
+
+**Items.**
+
+- **Item Behaviours (I9).** `CONTENT.items` (`engine/content/items.ts ITEM_BEHAVIOURS`) start after the passive with `arg` = the count held and hear every combat event. `registerItemHooks(w)` runs each wave: it resets the item ops (`w.itemBegin()`) and registers what the held items need on the seams.
+
+**Hidden companions.**
+
+- **Content (`engine/content/hidden.ts`).** `kitHit(w, cls?)` (hidden.md §2.6), `loose(w, def, held, dir, own)` (射日's arrow, also 满弓's free sun arrow; `inSunArrow(w)` is true while a free one strikes, so a sweep tallies it apart), `hiddenTally(w)` (guards, catches, perfect, whiffs, reflects, breaks, seizes · binds, snaps, taut, refunds, withered · looses, sweet, slips, suns, cancels, sunArrows), `isMarked(w, h)` (破绽). Every number is `SKILLS[id].p`, `PASSIVES[id].p` or `F.hidden` (lagMax, ringPad, ringIdle, reflectSpeed, reflectMin, reflectLife, reflectR, cutDur).
+  - 越女: a caught blow sets i-frames `iframe` (the guard sits before i-frames, so the window still catches a chain); the fourth blow in one guard clears them once and lands (its own i-frames then cover the rest of a volley). A shot flies back as a player `flySword` shot (×reflectX its damage, pierce 1); a telegraph's owner is 破招 (+2 剑意); a body gets the counter-cut, stun and 破绽. 精 (within `perfect` of the press): ×perfX, cooldown `cdPerfect`; a catch: `cdCatch`; a whiff: 露 and the full cooldown. 内实精神: +100 暴击 for `critHits` weapon hits within `critWin` after a catch; a crit on a marked foe adds `markCritDmg` 暴击倍数 as a second, quiet strike.
+  - 山鬼: binds the n nearest within r (a drag: the cone `coneDeg` that way, out to `reach`); the leash pulls a non-boss back to rest + leash; −drag % speed per stretched vine (≤ dragMax); the snap's m is slackX under `slack`, else m0 + min(stretch, cap) / per, taut (≥ `taut`) a sure crit with `stunTaut`; non-bosses land `pullTo` in front of her with 惑 (`PASSIVES.youhuang.p.vuln` for `vulnDur`). Cooldown from the bind; every foe dead first → at most `refund`.
+  - 后羿: moves at `move` while drawing; the string slips by itself past `slip` (×slipX, cooldown + slipCd); a cancel costs nothing.
+- **镜主 (H7).** `HIDDEN_MIRROR` (engine/content/hidden.ts), numbers in `F.hidden.mirror`: 越女 a warned guard ring (the 镜主 is untouchable for `dur`; your shots inside are caught and come back as `shots` slow shots; after `dashAfter` catching guards, a telegraphed dash cut), 山鬼 a vine that slows you beyond `far` and yanks + roots you if you ended more than `snap` farther than at the bind, 后羿 a line telegraph that tracks, locks and looses (its sweet window glows gold every other shot). `mirrorTally(w)` (mirrorself.ts) counts casts and cases missing (tests: all 16 cast, none miss).
 
 ---
 
@@ -504,6 +629,29 @@ The look of each is the `look` line in `ids.ts`.
   - 月华 is moon-white and drawn on top.
   - Only the three cash drops are round with a square hole.
 
+### 6.1 Round 8 (m8): the redraw
+
+The round 8 redraw (art.md, hidden.md §3.2 / §4.2 / §5.2). Effects are unchanged.
+
+**Hidden companions.**
+
+- **Paint (H6, `paint/hidden.ts`).** `HIDDEN_SPECS` on ART's brushwork (≤ 50 ops, ≤ 3 washes): 越女 and 后羿 have a fifth frame, their pose (`POSE_FRAME` 'yuenv-guard' / 'houyi-draw' = 4, frames of their own `char:` id; no new atlas ids); 山鬼 rides a leopard on a wider box. `hiddenBustOps(id, veiled?)`, `paintHiddenBust(g, w, h, id, veiled?)` (the app portrait's round fan; veiled = ink at 40 % with a 1.5 px rim in `HIDDEN_RIM[map]`, never a palette colour), `HIDDEN_BUSTS`. `engine/rings.ts` blits the pose frame in place of the figure while 越女's guard window is open or 后羿's draw is held (not while hurt, leaping or risen).
+
+**Art and 月华.**
+
+- **`paint/brushwork.ts` (frozen; additive changes only).** The shared brushwork every redrawn figure and monster paints on (art.md §3 R1–R11). It imports no runtime value from `palette.ts` or `figures.ts`.
+  - `body2(b, L: CharLook, v, o?: Body2Opt): Body2`: the standing figure (pool, 5.2 u feet, the robe with a shade wash, a lit wash and folds, the broken 焦墨 contour, an optional R7 `over` mass, the sash, the front sleeve with a hand, the collar, a head of r 8.4 with its contour). Options: `robeW` (10), `hem` (13), `head` (8.4), `robe`, `over`, `sash` (default `L.trim`, `null` for none), `contour`, `collar`, `noSleeve`, `noHand`, `pool`. It returns `{ hx, hy, hr, lean, top, hem, rw, handX, handY }`.
+  - `face2(b, hx, hy, hr, v, kind = 'dot' | 'fierce' | 'lady' | 'smile' | 'old', blush = 0.35)`: eyes of r 1.35 with a glint, a mouth and a blush; shut on frame 3.
+  - `hair2(b, hx, hy, hr, color, bun = true)`: the hair cap, an optional bun and a moonlit 飞白 sheen.
+  - `sheen(b, cx, cy, rx, ry, a0?, a1?, w = 1.8)`: a monster's moonlit dry-brush edge.
+  - `eyes2(b, x, y, gap, r, look = 0.3, white?)`: ringed eyes (ink ring, white, pupil, glint).
+  - Also `shadeOf`, `litOf`, `mixHex`, `pool2`, `hurtInk2`, `hat2`, `SHEEN`.
+  - Conventions: 4 frames (0 idle, 1 and 2 walk, 3 hurt), the box `[-22, -34, 24, 20]`, facing right, hitbox centre (0, 0); at most 3 washes and 50 ops a frame.
+- **Companions.** `paint/figures.ts` paints the 13 on `brushwork.ts`. Each pale one has a mid-value mass (R7). The contrast guard is `tests/mirror-paint-contrast.test.ts`: it runs only with `MIRROR_PIXELS=1` and headless Chromium, and needs ≥ 40 % strong-contrast pixels on the 月湖 paper for all 16.
+- **Monsters, elites and treasures (A3).** `paint/monsters.ts` paints the 44 on `brushwork.ts` (`sheen`, `eyes2`) and local helpers: `bleed(b, pts, c, grow, tone)` (R4's wet wash, the mass's outline grown ≈ 2.2 u; defaults in `BLEED`), `eye1`, `glowEye` (an accent eye over a 0.28-alpha bloom), `spark` (a treasure's glint) and the elite `seal` (1.3×). Frame counts are unchanged (3; 墨蝌 2). Every crisp mark carries its bb and every frame keeps to ≤ 3 washes (`mirror-paint` checks both). The bleeds stay inside each sprite's old box where they can, so the canvases barely grow (the 月湖 roster's are ×1.03 the old area).
+- **Bosses (A4).** `paint/bosses.ts`: every phase look `boss:<id>:<p>` has `n: 2`, two idle frames with a real breath (`render.ts` already alternates a boss's `v` at 2 Hz). 水中月's eight reflections (`MOON_SPEC`) keep one frame. Scale and feather lines are 1.4 u, eyes have a ring and a glint (`eyeB`), axes are in two steels, 金蟾王 holds a coin, and 水中月 has an indigo bleed round its moon.
+  - Memory: `big(r, paint, halo, box, tight)` takes a tighter box for phases 0–2 (phase 3 keeps the box its vermilion ring needs), and `paint/index.ts` bakes a boss's frame 1 without its own hit-flash twin: it shares frame 0's (`sharesFlash`; not 镜主, whose two frames are walk steps). A boss fight's atlas stays within a few per cent of the one-frame bosses.
+
 ---
 
 ## 7. Audio (`audio/sfx.ts` exports `createMirrorAudio: CreateMirrorAudio`)
@@ -534,3 +682,17 @@ The look of each is the `look` line in `ids.ts`.
   - the 镜境 names;
   - 凡灵仙神;
   - 照破印, 誓印, 心印, 月印, 今日免费, 入镜, 续镜, 弃镜, 暂离, 镜碎, 照破, 第重破, 镜心, 镜奁, 镜市, 升级 and 技.
+  - Round 8: the hidden three's skill glyph 萝, titles and seals (夺, 破招, 绷紧, 藤枯, 弦松, 化, 镜中来客, 接 缠 弓, 越女 山鬼 后羿), and the code's 「测」 seal with the lobby's 「试 · 模拟场」.
+
+---
+
+## 9. Round 8 (m8)
+
+Round 8 (the owner's asks A, B and C: balance, the shop, 劫, 破釜沉舟's floor, every item open, 26 new items, the hidden 越女 · 山鬼 · 后羿, the redraw and 月华 tiers, the test code's overlays and the 模拟场) is merged into the sections above:
+
+- **Logic:** §2.7 (numbers, the floor, prices, 诗成, ask B and the deed line, the bot, the shop's new rules, the hidden unlock, the code's overlays, the tuning layer).
+- **Engine:** §3.1 (the World seams and `hurtFrom` order, the item ops and their readers, the verbs, 月华 tiers, held weapons).
+- **Screens:** §4.1 (item UI, the hidden companions' tiles, pages, reveal and coach lines, the 模拟场 and its file).
+- **Content:** §5.1 (the companions' new rules, item Behaviours, the hidden kits, their 镜主).
+- **Paint:** §6.1 (brushwork, companions, monsters, bosses, the hidden figures and busts).
+- **Ownership and anchors:** §0 (the lanes table and the `m8:<lane>` anchors).

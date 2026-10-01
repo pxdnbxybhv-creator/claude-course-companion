@@ -68,7 +68,8 @@ class MirrorSound implements MirrorAudio, FeelAudio {
       try { this.bufs.set(name, mix.buffer(renderVoice(name, sr))); } catch (e) { console.warn('[mirror audio] voice', name, e); }
       if (performance.now() - t0 > 12) { await new Promise((r) => setTimeout(r, 0)); t0 = performance.now(); }
     }
-    for (let d = 0; d < 10; d++) {
+    // two octaves for the combo, and (m8) a third octave's five for a 月华珠 / 满月 an octave up (degree + 5)
+    for (let d = 0; d < 15; d++) {
       try { this.picks.push(mix.buffer([renderPickup(sr, d)])); } catch { /* skip */ }
     }
     for (const name of FEEL_NAMES) {
@@ -114,7 +115,8 @@ class MirrorSound implements MirrorAudio, FeelAudio {
     if (!mix || !this.picks.length || this.disposed) return;
     const now = mix.ctx.currentTime;
     if (!this.limiter.allow('pickup', SFX_MIX.pickup.cap, true, now)) return;
-    // 宫商角徵羽 climbing, wrapping back down after two octaves
+    // 宫商角徵羽 climbing, wrapping back down after two octaves (the world passes the degree: combo % 10, + 5
+    // for a big piece an octave up)
     const d = Math.max(0, combo | 0) % this.picks.length;
     try { mix.play(this.picks[d], now + 0.005, { gain: SFX_MIX.pickup.gain, send: SFX_MIX.pickup.send, rate: 1 + (Math.random() - 0.5) * 0.01 }); } catch { /* closed */ }
   }

@@ -7,7 +7,7 @@ import { F, ITEMS, MAPS, HAZARDS, WEAPONS } from '../data';
 import {
   classCounts, computeStats, effectsOf, itemOdds, itemPrice, rerollCost, sellPrice, shopOdds, shopSlotsOf, weaponPrice, weaponSlotsOf,
 } from './formulas';
-import { addItem, itemMaxed, itemPool, noReroll, weaponPool } from './items';
+import { addItem, itemMaxed, itemPool, noReroll, noWeapons, rerollOffPct, shopFloor, upgradeRule, weaponPool } from './items';
 import { rngFor, rollTier, type Rng } from './rng';
 import { wavePlan } from './spawn';
 
@@ -49,10 +49,13 @@ function pickWeighted<T>(rng: Rng, xs: readonly T[], wt: (x: T) => number): T {
 }
 
 function rollSlot(run: RunSave, unlocks: Unlocks, w: number, rng: Rng, stats: Stats, shown: readonly (ShopSlot | null)[]): ShopSlot {
-  const odds = shopOdds(w, stats.luck, extraOdds(run));
+  // m8 破釜沉舟 (PLAN D2): the floor holds for items and new weapons; weapon copies for 合铸 are exempt
+  const floor = shopFloor(run);
+  const odds = shopOdds(w, stats.luck, extraOdds(run), floor);
   const full = run.weapons.length >= weaponSlotsOf(run);
   const have = schoolPieces(run, shown);
-  if (rng() < (full ? F.fullWeaponRoll : F.weaponRoll)) {
+  // m8 奇货可居 (C11): noWeapons(run) skips both weapon branches (new weapons and the full-bar copies)
+  if (!noWeapons(run) && rng() < (full ? F.fullWeaponRoll : F.weaponRoll)) {
     const lean = rng();
     const mergeable = run.weapons.filter((x) => x.t < 4);
     if (mergeable.length && (full || lean < F.copyLean)) {
@@ -66,7 +69,7 @@ function rollSlot(run: RunSave, unlocks: Unlocks, w: number, rng: Rng, stats: St
       return { kind: 'weapon', id, t, locked: false };
     }
   }
-  const t = rollTier(rng, itemOdds(w, stats.luck, extraOdds(run)));
+  const t = rollTier(rng, itemOdds(w, stats.luck, extraOdds(run), floor));
   const unique = (id: ItemId) => !(ITEMS[id].max === 1 && shown.some((s) => s?.kind === 'item' && s.id === id));
   let pool: ItemId[] = [];
   const cls = (Object.keys(have) as WClass[]).filter((c) => (have[c] ?? 0) >= F.classLeanFrom);
@@ -74,14 +77,16 @@ function rollSlot(run: RunSave, unlocks: Unlocks, w: number, rng: Rng, stats: St
   if (cls.length && leanRoll < F.classLean) {
     const c = pickWeighted(rng, cls, (x) => have[x] ?? 0);
     pool = itemPool(run, unlocks, t, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id));
+    // the lean's fallback starts at the floor (m8: under 破釜 no 凡 leaks through it)
     if (!pool.length && t <= 2) {
-      for (const tt of [1, 2] as Tier[]) pool.push(...itemPool(run, unlocks, tt, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id)));
+      for (const tt of [1, 2] as Tier[]) if (tt >= floor) pool.push(...itemPool(run, unlocks, tt, w).filter((id) => ITEMS[id].tags.includes(c) && unique(id)));
     }
   }
   if (!pool.length) pool = itemPool(run, unlocks, t, w).filter(unique);
   if (!pool.length && t === 4) pool = itemPool(run, unlocks, 3, w).filter(unique);
-  if (!pool.length) pool = itemPool(run, unlocks, 1, w).filter(unique);
-  if (!pool.length) pool = ['songzi'];
+  // the last resorts: max(1, floor) (under the floor a non-maxed 灵 stat item such as 人参, never 松子)
+  if (!pool.length) pool = itemPool(run, unlocks, Math.max(1, floor) as Tier, w).filter(unique);
+  if (!pool.length) pool = [floor >= 2 ? 'ginseng' : 'songzi'];
   return { kind: 'item', id: pool[Math.floor(rng() * pool.length)], locked: false };
 }
 
@@ -117,7 +122,10 @@ export function openShop(run: RunSave, unlocks: Unlocks): RunSave {
 
 function slotPrice(run: RunSave, s: ShopSlot): number {
   const w = shopW(run);
-  return s.kind === 'weapon' ? weaponPrice(s.id, s.t, w, run) : itemPrice(s.id, w, run);
+  const p = s.kind === 'weapon' ? weaponPrice(s.id, s.t, w, run) : itemPrice(s.id, w, run);
+  // m8 货比三家 (P16): each reroll in this shop takes its % off every price here
+  const off = rerollOffPct(run);
+  return off > 0 ? Math.max(1, Math.round(p * (1 - off / 100))) : p;
 }
 function mergeIndex(run: RunSave, id: WeaponId, t: Tier): number {
   return t >= 4 ? -1 : run.weapons.findIndex((x) => x.id === id && x.t === t);
@@ -184,7 +192,32 @@ export function reroll(run: RunSave, unlocks: Unlocks): RunSave | null {
     k++;
   }
   const slots = rollSlots(run, unlocks, shop.slots, shop.slots.length, rollKey(k, free), shop.wave);
-  return { ...run, moon, shop: { ...shop, k, free, slots } };
+  // m8 (P16): rerolls done in this shop, free ones too (货比三家 reads it; a new shop starts at 0)
+  return { ...run, moon, shop: { ...shop, k, free, slots, rolls: (shop.rolls ?? 0) + 1 } };
+}
+
+// ── m8 点石成金 (items.md §2.18, P16): once a shop, pay x × a copy's price to raise a weapon a tier without the copy
+/** What 点金 costs for the weapon in `slot` now (null: not possible at all — no rule held, no weapon, or 神品). */
+export function upgradePrice(run: RunSave, slot: number): number | null {
+  const u = upgradeRule(run), wp = run.weapons[slot];
+  if (!u || !wp || wp.t >= 4) return null;
+  // u.x of the copy's price as this shop shows it (货比三家's discount included)
+  const off = rerollOffPct(run);
+  const p = weaponPrice(wp.id, wp.t, shopW(run), run) * u.x;
+  return Math.max(1, Math.round(off > 0 ? p * (1 - off / 100) : p));
+}
+/** 点金 left in this shop (0 without the rule). */
+export function upgradesLeft(run: RunSave): number {
+  const u = upgradeRule(run);
+  return u && run.shop ? Math.max(0, u.n - (run.shop.upgrades ?? 0)) : 0;
+}
+/** Raise the weapon in `slot` one tier for upgradePrice (exactly as a merge would). null if not possible. */
+export function upgrade(run: RunSave, slot: number): RunSave | null {
+  const price = upgradePrice(run, slot);
+  if (price === null || !run.shop || upgradesLeft(run) <= 0 || run.moon < price) return null;
+  const weapons = run.weapons.slice();
+  weapons[slot] = { id: weapons[slot].id, t: (weapons[slot].t + 1) as Tier };
+  return { ...run, moon: run.moon - price, weapons, shop: { ...run.shop, upgrades: (run.shop.upgrades ?? 0) + 1 }, lastBuy: weapons[slot].id };
 }
 /** Lock or unlock slot i (free; not under 破釜沉舟). */
 export function toggleLock(run: RunSave, i: number): RunSave {

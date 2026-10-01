@@ -4,13 +4,13 @@
 // and who gets offered the tutorial.
 import { describe, expect, it } from 'vitest';
 import type { RunSave, WaveResult } from '../src/views/mirror/types';
-import { STARTER_ITEMS, STARTER_WEAPONS, type ItemId, type WeaponId } from '../src/views/mirror/ids';
+import { STARTER_WEAPONS, type ItemId, type WeaponId } from '../src/views/mirror/ids';
 import { F, PAY, SKILLS, WEAPONS } from '../src/views/mirror/data';
 import { termOf } from '../src/views/mirror/data/glossary';
 import {
   buy, endWave, freeRerolls, gross, itemPrice, merge, openShop, pickCard, rerollCards, reroll, resolveCrate, sell, shopView, toggleLock, weaponPrice,
 } from '../src/views/mirror/logic';
-import { TUTOR_SEED, TUTOR_SHOP1, tutorPlan, tutorRun, tutorScript, tutorSetup, tutorShop1, tutorUnlocks } from '../src/views/mirror/tutor/run';
+import { TUTOR_ITEMS, TUTOR_SEED, TUTOR_SHOP1, tutorPlan, tutorRun, tutorScript, tutorSetup, tutorShop1, tutorUnlocks } from '../src/views/mirror/tutor/run';
 import { classify } from '../src/views/mirror/tutor/classify';
 import { createTutorSession, mergeLeft, shortfall, swordSlot } from '../src/views/mirror/tutor/session';
 import {
@@ -71,7 +71,7 @@ describe('the fixed run', () => {
     expect(r1.shop?.slots.map((x) => x?.id)).toEqual(['qingfeng', 'songzi', 'sandals', 'bell']);
     for (const x of TUTOR_SHOP1) {
       if (x.kind === 'weapon') expect(STARTER_WEAPONS).toContain(x.id as WeaponId);
-      else expect(STARTER_ITEMS).toContain(x.id as ItemId);
+      else expect(TUTOR_ITEMS).toContain(x.id as ItemId); // m8: the tutorial's pinned 55 (ask B opened the rest)
     }
     expect(openShop(r1, tutorUnlocks())).toBe(r1);
     const v = shopView(r1);

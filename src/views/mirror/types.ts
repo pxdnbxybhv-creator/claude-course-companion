@@ -1,10 +1,11 @@
 // 水月幻镜 · the core types every module codes against (GDD §24.2, refined so the data tables fit).
 // Type-only imports of ids.ts: the eager store (src/app/mirror.ts) may import this file without
-// pulling the registry into the main bundle. The only runtime values here are the version numbers.
+// pulling the registry into the main bundle. The only runtime values here are the version numbers and
+// the hidden companions' ids (HIDDEN_CHARS, m8).
 //
 // Sections: 1 basics · 2 data definitions · 3 run state · 4 meta store · 5 engine ↔ UI ·
 //           6 engine ↔ content (WorldApi, registries) · 7 painter · 8 audio · 9 logic results.
-import type { CharacterId } from '../../data/characters';
+import type { CharacterId as AppCharacterId } from '../../data/characters';
 import type { DateKey } from '../../core/types';
 import type {
   AffixId, AltSkillId, ArchetypeId, BossId, DeedId, DiffId, DropKind, EliteId, EndlessBossId, FixedTitleId, FxName,
@@ -12,7 +13,16 @@ import type {
   TermModId, TreasureId, VowId, WeaponId,
 } from './ids';
 
-export type { CharacterId, DateKey };
+export type { AppCharacterId, DateKey };
+
+/** Mirror-only companions (m8): never app companions, never a char:* flag; opened by 40重 on their map
+ *  (logic/hidden.ts). `CHARACTER[…]` (the app's table) must never be read for one of these. */
+export const HIDDEN_CHARS = ['yuenv', 'shangui', 'houyi'] as const;
+export type HiddenId = (typeof HIDDEN_CHARS)[number];
+/** Every mirror companion: the app's 13 plus the hidden three. */
+export type CharacterId = AppCharacterId | HiddenId;
+/** True for the hidden three (a companion the app's tables don't know). */
+export const isHidden = (id: string): id is HiddenId => (HIDDEN_CHARS as readonly string[]).includes(id);
 
 /** Bump with a migration in logic/save.ts (GDD §23: a run that can't migrate settles as 镜碎). */
 export const RUN_VER = 2;
@@ -98,7 +108,9 @@ export interface SetTier { stats: StatMods; flags?: readonly string[] }
 
 export type Hook =
   | 'cond' | 'onWaveStart' | 'onWaveEnd' | 'onTick' | 'onHit' | 'onCrit' | 'onKill' | 'onDodge' | 'onHurt' | 'onLethal'
-  | 'onPickup' | 'shop' | 'summon' | 'sword';
+  | 'onPickup' | 'shop' | 'summon' | 'sword'
+  // m8: you start moving after standing still (动如脱兔)
+  | 'onGo';
 
 /** Predicates for conditional stat blocks. */
 export type Cond =
@@ -106,10 +118,12 @@ export type Cond =
   | { k: 'hpBelow'; v: number }       // HP below this fraction of max (背水一战)
   | { k: 'still'; s: number }         // standing still for ≥ s (以逸待劳 0.5, 蒲团 1)
   | { k: 'swordsAir'; n: number }     // ≥ n swords in the air (剑心通明)
-  | { k: 'soloWeapon' };              // exactly one weapon held (独孤九剑)
+  | { k: 'soloWeapon' }               // exactly one weapon held (独孤九剑)
+  | { k: 'moving'; s: number };       // m8: holds while you have stood still for less than s (后羿 满弓)
 
-/** Sources for `convert`: per point of speed %, armour, 回气, 月华 held, distinct classes, living 墨宝, 劫数. */
-export type ConvertFrom = 'speed' | 'armor' | 'regen' | 'moonHeld' | 'classes' | 'summons' | 'curse';
+/** Sources for `convert`: per point of speed %, armour, 回气, 月华 held, distinct classes, living 墨宝, 劫数;
+ *  m8: 福缘 and 闪避 (static, between waves), foes within `r` and unpulled 月华 worth within pickupR + `r` (live). */
+export type ConvertFrom = 'speed' | 'armor' | 'regen' | 'moonHeld' | 'classes' | 'summons' | 'curse' | 'luck' | 'dodge' | 'near' | 'moonNear';
 
 /**
  * Who interprets what: logic (computeStats, endWave, shop) handles `cond`/stats and `convert` whose
@@ -119,21 +133,21 @@ export type ConvertFrom = 'speed' | 'armor' | 'regen' | 'moonHeld' | 'classes' |
  */
 export type Effect =
   | { hook: 'cond'; do: 'stats'; stats: StatMods; when?: Cond; cls?: WClass; pct?: boolean }
-  | { hook: 'cond'; do: 'convert'; from: ConvertFrom; per: number; to: readonly StatId[]; k?: number; max: number; pool?: string }
+  | { hook: 'cond'; do: 'convert'; from: ConvertFrom; per: number; to: readonly StatId[]; k?: number; max: number; pool?: string; r?: number }
   | { hook: 'cond'; do: 'cap'; stat: 'dodge'; v: number }
   | { hook: 'cond'; do: 'immune'; to: 'knock' }
-  | { hook: 'cond'; do: 'world'; budgetPct?: number; moonPct?: number }
+  | { hook: 'cond'; do: 'world'; budgetPct?: number; moonPct?: number; eliteAffix?: number; eliteCrates?: number; eliteMoonPct?: number }
   | { hook: 'onWaveEnd'; do: 'grow'; stat: StatId; v: number }
   | { hook: 'onWaveEnd'; do: 'interest'; per?: number; pct?: number; max: number }
   | { hook: 'onKill'; do: 'drop'; kind: DropKind; p: number; luck?: boolean }
   | { hook: 'onHit' | 'onCrit'; do: 'heal'; v: number; p?: number; capPerSec?: number }
   | { hook: 'onCrit'; do: 'drunk'; v: number }
   | { hook: 'onDodge'; do: 'shards'; n: number; base: number; scale: StatMods }
-  | { hook: 'onDodge'; do: 'buff'; stats: StatMods; dur: number }
+  | { hook: 'onDodge' | 'onHit' | 'onKill' | 'onCrit' | 'onHurt' | 'onGo'; do: 'buff'; stats: StatMods; dur: number; stack?: number; cls?: WClass; moveX?: number; after?: number; key?: string }
   | { hook: 'onHurt'; do: 'thorns'; base: number; scale: StatMods; dealtPct?: number; meleeOnly?: boolean }
   | { hook: 'onWaveStart'; do: 'block'; n: number }
   | { hook: 'onWaveStart'; do: 'familiar'; summon: SummonKind; base: number; scale: StatMods; cd: number; fetch?: number }
-  | { hook: 'onWaveStart'; do: 'demon'; pct: number }
+  | { hook: 'onWaveStart'; do: 'demon'; pct: number; /** % chance that beating the shadow drops a 镜奁 (absent: always). */ crate?: number }
   | { hook: 'onLethal'; do: 'survive'; per: 'wave' | 'run'; hpPct: number; clearShots?: boolean }
   | { hook: 'onTick'; do: 'sprout'; summon: SummonKind; every: number; life: number; base: number; scale: StatMods; cd: number; range: number }
   | { hook: 'onHit'; do: 'burnMod'; stacks: number; dur: number }
@@ -152,7 +166,25 @@ export type Effect =
   | { hook: 'summon'; do: 'burst'; base: number; scale: StatMods; r: number; slow: number; dur: number }
   | { hook: 'sword'; do: 'trail'; pierce: number; pct: number }
   | { hook: 'sword'; do: 'returnHeal'; v: number; capPerSec: number }
-  | { hook: Hook; do: 'special'; key: ItemId; p?: Readonly<Record<string, number>> };
+  | { hook: Hook; do: 'special'; key: ItemId; p?: Readonly<Record<string, number>> }
+  // ── m8 ops (items.md §R.5, hooks.md; ITEMS implements the readers)
+  | { hook: 'cond'; do: 'moveCap'; x: number }
+  | { hook: 'cond'; do: 'setPlus'; n: number }
+  | { hook: 'shop'; do: 'tierFloor'; t: Tier }
+  | { hook: 'shop'; do: 'noWeapons' }
+  | { hook: 'shop'; do: 'rerollOff'; pct: number; max: number }
+  | { hook: 'shop'; do: 'upgrade'; x: number; n: number }
+  | { hook: 'onHit'; do: 'status'; cls?: WClass; kind: StatusKind | 'convert'; dur: number; v?: number; bossV?: number; ofHit?: number; p?: number; luck?: boolean; cap?: number }
+  | { hook: 'onHit'; do: 'execute'; cls: WClass; below: number; x: number; bigX: number }
+  | { hook: 'onHit'; do: 'far'; cls: WClass; per: number; pct: number; max: number }
+  | { hook: 'onHit'; do: 'pin'; cls: WClass; dur: number }
+  | { hook: 'onKill'; do: 'blast'; pct: number; r: number; bossPct: number; bossPerSec: number; perSec: number }
+  | { hook: 'onKill'; do: 'spread'; kind: StatusKind; n: number; r: number; dur: number; perSec: number }
+  | { hook: 'onDodge'; do: 'prime'; dur: number; x: number; cd: number }
+  | { hook: 'onHurt'; do: 'guard'; from: 'drunk'; per: number; pct: number; max: number }
+  | { hook: 'onHurt'; do: 'scatter'; pct: number; max: number }
+  | { hook: 'onPickup'; do: 'stream'; base: number; scale: StatMods; perWorth: number; maxX: number }
+  | { hook: 'onWaveStart'; do: 'hpPct'; v: number };
 export type EffectOp = Effect['do'];
 
 export interface ItemDef {
@@ -178,6 +210,8 @@ export interface ItemDef {
   inkCrit?: number;
   /** Its words live in data/say.ts (ITEM_SAY; stats-only items are generated); ui/describe.ts renders them. */
   verse?: Bilingual;
+  /** m8: a stub still being built: offered nowhere (itemPool, boons) until its lane removes the flag. */
+  wip?: true;
 }
 
 export type MonsterRole =
@@ -318,6 +352,8 @@ export interface CompanionDef {
   /** A quip for the shop / select sheet (「暗器？关某不屑。」). */
   quip?: Bilingual;
   verse?: Bilingual;
+  /** m8: 闪避 counts × this, applied after the converts (越女 0.5). Absent = 1. */
+  dodgeMult?: number;
 }
 
 export type SkillAim = 'cluster' | 'feet' | 'around' | 'move' | 'arc' | 'strongest' | 'self' | 'land';
@@ -330,6 +366,9 @@ export interface SkillDef {
   cd: number;
   /** Every number of the skill text (data/say.ts SKILL_SAY slots): base, k, r, dur, slow, root, amp, n, cap, iframe, len … */
   p: Readonly<Record<string, number>>;
+  /** m8: how the 技 button drives it (hidden.md §2.5): 'tap' (default, the 13), 'hold' (press, release),
+   *  'recast' (a second press goes to SkillRun.recast), 'guard' (the press time matters). */
+  input?: 'tap' | 'hold' | 'recast' | 'guard';
 }
 export interface PassiveDef {
   id: PassiveId;
@@ -438,6 +477,10 @@ export interface ShopState {
   free: number;
   /** null = bought. The shop RNG is seeded from (seed, wave, k), so a reload shows the same slots. */
   slots: (ShopSlot | null)[];
+  /** m8: rerolls done in this shop, free ones included (货比三家). Absent = 0 (validateRun keeps it only when present). */
+  rolls?: number;
+  /** m8: 点石成金 upgrades used in this shop. Absent = 0 (validateRun keeps it only when present). */
+  upgrades?: number;
 }
 
 export type HeartSource = 'boss' | 'flower';
@@ -548,6 +591,19 @@ export interface RunSave {
    * a closed tab never dodges a death (API.md §3 破镜重圆).
    */
   downAt?: number;
+  /** m8 模拟场 only: sheet edits and extra 劫数 (logic/tuning.ts). validateRun drops it: a real save never carries it. */
+  sand?: SandRun;
+  /** m8: what the test code lent this run above the earned values (chars.md §4.3): 心镜 ranks and 心得 levels. */
+  lent?: { heart: Partial<Record<HeartFaceId, number>>; mastery: number };
+}
+
+/** m8 模拟场 (sandbox.md §5.4): the run-level what-ifs. computeStats applies `sheet` before clampSheet;
+ *  curseOf adds `curse`. Absent on every real run. */
+export interface SandRun {
+  /** Exact sheet edits: add ±v, or set to v (after gain factors, before clampSheet). */
+  sheet: readonly { id: StatId; mode: 'add' | 'set'; v: number }[];
+  /** Extra 劫数 that also scales enemies. */
+  curse: number;
 }
 
 /** What the account has open (logic/meta unlocksOf); stable for the life of a run. */
@@ -655,7 +711,9 @@ export interface MirrorSettings {
   view?: 'near' | 'mid' | 'far';
 }
 /** The tutorial's first-time tips (ui/tips.ts): one line each, shown once per account. */
-export type TutorTipId = 'boss' | 'crate' | 'crateOpen' | 'elite' | 'curse' | 'lowHp' | 'cards' | 'shop' | 'relic';
+export type TutorTipId = 'boss' | 'crate' | 'crateOpen' | 'elite' | 'curse' | 'lowHp' | 'cards' | 'shop' | 'relic'
+  // m8: the first run with each hidden companion (hidden.md §2.4)
+  | 'hidYuenv' | 'hidShangui' | 'hidHouyi';
 /**
  * The tutorial 「初入镜中」 (ui/Tutorial.tsx): `offered` once the sheet, ribbon or tutorial was seen,
  * `done` once it was played to its end card; `tips` the first-time tips already shown. They unlock
@@ -748,6 +806,12 @@ export interface HudState {
   /** Darkness is down (暗月, 天狗食月): the HUD turns to light words (.mj-dark). */
   dark: boolean;
   fps: number;
+  /** m8: a 'hold' skill is being held (后羿's draw). */
+  skillHeld?: boolean;
+  /** m8: the next press goes to SkillRun.recast (山鬼's snap). */
+  skillRecast?: boolean;
+  /** m8: the ring at the figure (WorldApi.ring): key, 0..1 and its marks. */
+  ring?: { key: string; v: number; marks?: readonly number[]; pips?: number; of?: number; tone?: 'lake' | 'vine' | 'sun'; flash?: boolean } | null;
 }
 
 /** What a won wave hands back; logic/run endWave(run, result) folds it into the run. */
@@ -776,6 +840,8 @@ export interface WaveResult {
   /** 镜宝 earned this wave, one per boss body felled (engine: relicFor at the kill). Absent in older results. */
   relics?: readonly ItemId[];
   ms: number;
+  /** m8: 月华 of your own that you scattered and did not take back (千金散尽): endWave subtracts it once. */
+  lost?: number;
 }
 /** 镜碎 during a wave. `partial` counts for deeds, tallies and records; its sleeve is lost (「袖中铜钱，随镜沉池」). */
 export interface DeathResult {
@@ -871,6 +937,12 @@ export interface Engine {
   revive(): boolean;
   /** The other answer to `downed`: the normal death (hooks.death → phase 'dead'). A no-op unless 'down'. */
   giveUp(): void;
+  /** m8 (hidden.md §2.5): the 技 button's press and release for 'hold' / 'recast' / 'guard' skills; `at` is the
+   *  event time in s (performance.now() / 1000), dir null = cancel. For a 'tap' skill press = skill(). */
+  skillPress?(at?: number): void;
+  skillRelease?(dir: Vec | null, at?: number): void;
+  /** m8 模拟场: the world runs x times as fast (1 = normal; reset to 1 by start()). */
+  setTimeScale?(x: number): void;
 }
 export interface EngineDeps {
   painter: Painter;
@@ -961,6 +1033,8 @@ export interface TeleSpec {
   dur: number;
   /** Fires when full (the strike). */
   then?: (w: WorldApi) => void;
+  /** m8: the striking enemy's handle, so 越女's guard can break it (破招); −1 / absent for an ownerless strike. */
+  owner?: number;
 }
 export interface SpawnOpts {
   bloom?: boolean;
@@ -1112,6 +1186,18 @@ export interface WorldApi {
   after(sec: number, fn: (w: WorldApi) => void): number;
   every(sec: number, fn: (w: WorldApi) => void): number;
   cancel(timer: number): void;
+
+  // m8 (hidden.md; optional: HIDDEN fills them in engine/verbs.ts and engine/rings.ts)
+  /** Open a guard window on the player: blows reaching hurtFrom inside it go to `catch` (return true = caught). */
+  guard?(dur: number, onCatch: (w: WorldApi, attacker: number, shot: number, src: string, melee: boolean) => boolean): void;
+  /** The ring at the figure (HudState.ring), set each step it is wanted. */
+  ring?(key: string, v01: number, o?: { marks?: readonly number[]; pips?: number; of?: number; tone?: 'lake' | 'vine' | 'sun'; flash?: boolean }): void;
+  /** 露: the player takes +pct % damage for dur s. */
+  expose?(pct: number, dur: number): void;
+  /** The owner (an enemy handle) of the telegraph striking now, or −1 (破招). */
+  underTele?(): number;
+  /** A vine from the player to an enemy (山鬼), drawn with sag 0..1. */
+  tether?(h: number, sag01: number, tint?: string): void;
 }
 
 /** Content lifecycle: start at the wave start (or spawn), tick per 60 Hz step, events, end at the wave end. */
@@ -1142,6 +1228,10 @@ export interface SkillRun {
   tick(w: WorldApi, dt: number): boolean;
   on?(w: WorldApi, ev: GameEvent): void;
   end?(w: WorldApi): void;
+  /** m8 'recast' skills: a press while this run lives (山鬼's snap). */
+  recast?(w: WorldApi, at: number, dir: Vec | null): void;
+  /** m8 'hold' skills: the button was released after `held` s (dir null = cancel). */
+  release?(w: WorldApi, held: number, dir: Vec | null): void;
 }
 export interface SkillImpl {
   /** The auto-target, or null for your feet / facing. */
@@ -1166,6 +1256,8 @@ export interface ContentRegistry {
   /** start(w, x) receives the strength (0.5, 1, 2). */
   mutators: Readonly<Partial<Record<MutatorId, Behaviour>>>;
   terms: Readonly<Partial<Record<TermModId, Behaviour>>>;
+  /** m8: one Behaviour per held item that needs one (engine/content/items.ts); started with arg = count. */
+  items?: Readonly<Partial<Record<ItemId, Behaviour>>>;
 }
 
 // ═════════════════════════════════════════════════════════════ 7 · painter (paint/*: createPainter)
@@ -1338,6 +1430,10 @@ export interface RunReport {
   seals: readonly SealKey[];
   titles: readonly TitleId[];
   slip: number | null;
+  /** m8: hidden companions this run opened (hiddenOpen after − before; hidden.md §2.2). */
+  chars?: readonly HiddenId[];
+  /** m8 ask B (PLAN D27): item deeds this run finished for the first time, each paying its 镜屑 once (logic/meta.ts deedDust). */
+  deeds?: readonly DeedId[];
 }
 /** 今日镜 for a date (seed hashString('mirror:' + day)). */
 export interface DailySpec {
@@ -1351,3 +1447,11 @@ export interface DailySpec {
   /** 候签 index = term·3 + pentad. */
   slip: number;
 }
+
+// ═════════════════════════════════════════════════════════════ m8 · lane blocks (PLAN §3.1 T4)
+// Each lane may add types it alone uses inside its own block; changes to anything above go by CR.
+// ── m8:balance ──
+// ── m8:items ──
+// ── m8:hidden ──
+// ── m8:art ──
+// ── m8:sandbox ──

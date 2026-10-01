@@ -1,7 +1,15 @@
 // 水月幻镜 · the UI's pure helpers (src/views/mirror/ui/text.ts): words for every stat and term, the
 // results scroll's pay lines, the stick / keys / 技 drag maths, the codex's 187 pages and their
 // pictures, and the day arithmetic behind 「镜中人已候 N 日」.
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { play, emptyPlay, redeemCode, revokeCode, _acceptCodeForTests } from '../src/app/play';
+import { mirror, defaultMeta } from '../src/app/mirror';
+import { companionTiles, sealedView } from '../src/views/mirror/ui/hiddenText';
+import { COMPANION_REG } from '../src/views/mirror/ids';
+import { COMPANION_SAY } from '../src/views/mirror/data/say';
+import { HIDDEN_CHARS, isHidden, type HiddenId, type MirrorMeta } from '../src/views/mirror/types';
+import { allUnlocked, newRun, settleMeta } from '../src/views/mirror/logic';
+import type { T } from '../src/views/mirror/ui/text';
 import {
   CODEX_TABS, CODEX_TOTAL, codexKeys, daysBetween, fmtClock, fmtStat, fmtStatValue, keysVector, lockHint, nameOf, pageAtlas, pageId,
   payLines, payTable, rateMark, rateWord, skillDrag, STAT_NAMES, stickVector, STICK_R, TERM_TEXT, tFor, CLASS_NAMES, bossName,
@@ -120,8 +128,8 @@ describe('mirror ui · input maths', () => {
 });
 
 describe('mirror ui · codex', () => {
-  it('holds 187 pages in seven tabs, plus the 候签 album', () => {
-    expect(CODEX_TOTAL).toBe(187); // 185 + the two 镜宝 (忘尘镜, 龙渊剑)
+  it('holds 216 pages in seven tabs, plus the 候签 album', () => {
+    expect(CODEX_TOTAL).toBe(216); // 185 + the two 镜宝 (忘尘镜, 龙渊剑); m8: + the 26 new items and the 3 hidden companions
     expect(CODEX_TABS.map((x) => x.id)).toContain('slip');
     const all = CODEX_TABS.flatMap((x) => codexKeys(x.id));
     expect(new Set(all).size).toBe(all.length);
@@ -138,9 +146,9 @@ describe('mirror ui · codex', () => {
       }
     }
   });
-  it('locked gear has a deed hint; starters have none', () => {
+  it('locked gear has a deed hint; starters have none (m8 ask B: no item is locked)', () => {
     for (const w of WEAPON_REG) expect(lockHint(w.id, zh) === null).toBe(STARTER_WEAPONS.includes(w.id));
-    for (const i of ITEM_REG) expect(lockHint(i.id, en) === null).toBe(STARTER_ITEMS.includes(i.id));
+    for (const i of ITEM_REG) { expect(STARTER_ITEMS).toContain(i.id); expect(lockHint(i.id, en)).toBeNull(); }
     expect(lockHint('longquan', zh)?.goal).toBe(500);
   });
 });
@@ -217,5 +225,63 @@ describe('mirror ui · 「镜中人已候 N 日」', () => {
     expect(waitedSince(null, '2026-09-01')).toBe('2026-09-01');
     expect(waitedSince('junk', '2026-09-01')).toBe('2026-09-01');
     expect(daysBetween(waitedSince('2026-09-01', '2026-09-27'), '2026-09-27')).toBe(0);
+  });
+});
+
+// ── m8:hidden (H5): the sealed 「？」 tiles, the code's tag, the 莲湖 rim (hidden.md §2.3) ──
+describe('mirror ui · the hidden companions on the companion sheet', () => {
+  const DAY = '2026-09-27';
+  const zh: T = (z) => z, en: T = (_z, e) => e;
+  const bestsAt = (k: string, wave: number) => ({ [k]: { wave, heat: 0, at: DAY } }) as unknown as MirrorMeta['bests'];
+  const hiddenTiles = (m: MirrorMeta) => companionTiles(m, zh).filter((x) => isHidden(x.id));
+  beforeEach(() => { play.value = emptyPlay(); mirror.value = defaultMeta(DAY); });
+  afterEach(() => { revokeCode(); });
+
+  it('before any map\'s wave 30 the sheet shows the 13 only, and nothing hints', () => {
+    const m = { ...defaultMeta(DAY), bests: bestsAt('scholar|lake|2|0', 29) };
+    expect(hiddenTiles(m)).toEqual([]);
+    expect(companionTiles(m, zh).length).toBe(13);
+  });
+
+  it('from wave 30 on any map (闲游 too): three sealed tiles, 「？」, the hint and no name or gist', () => {
+    const m = { ...defaultMeta(DAY), bests: bestsAt('scholar|forest|0|0', 30) };
+    const tiles = hiddenTiles(m);
+    expect(tiles.map((x) => x.id)).toEqual([...HIDDEN_CHARS]);
+    for (const x of tiles) {
+      expect(x).toMatchObject({ sealed: true, open: false, name: '？', label: '镜中来客，还没现身', tag: '' });
+      const v = sealedView(m, x.id as HiddenId, zh);
+      const c = COMPANION_REG.find((r) => r.id === x.id)!;
+      const all = Object.values(v).join('|');
+      expect(all).not.toContain(c.zh);
+      expect(all).not.toContain(COMPANION_SAY[x.id].zh);
+      expect(v.button).toBe('还没现身');
+    }
+    expect(sealedView(m, 'yuenv', zh).hint).toBe('在月湖打过第 40 重，哪个镜境都算。');
+    expect(sealedView(m, 'shangui', zh).deepest).toBe('你在墨林最远：第 30 重');
+    expect(sealedView(m, 'houyi', en).hint).toBe('Clear wave 40 on Moon Palace, on any difficulty.');
+    expect(sealedView(m, 'yuenv', zh).seal).toBe('接');
+  });
+
+  it('earned (40 on its map): the real name, no tag; the other two stay sealed', () => {
+    const m = { ...defaultMeta(DAY), bests: bestsAt('guan|palace|0|0', 40) };
+    const tiles = hiddenTiles(m);
+    expect(tiles.find((x) => x.id === 'houyi')).toMatchObject({ open: true, sealed: false, name: '后羿', tag: '' });
+    expect(tiles.filter((x) => x.sealed).map((x) => x.id)).toEqual(['yuenv', 'shangui']);
+  });
+
+  it('with the test code: the names and 「测试码开启」, nothing sealed', () => {
+    _acceptCodeForTests('TESTING');
+    expect(redeemCode('TESTING')).toBe('ok');
+    const tiles = hiddenTiles(mirror.value);
+    expect(tiles.map((x) => [x.name, x.tag, x.sealed])).toEqual([['越女', '测试码开启', false], ['山鬼', '测试码开启', false], ['后羿', '测试码开启', false]]);
+    expect(companionTiles(mirror.value, en).find((x) => x.id === 'yuenv')!.tag).toBe('Opened by test code');
+  });
+
+  it('the 莲湖 rim counts the 13 pages only', () => {
+    const codex: Record<string, number> = {};
+    for (const c of COMPANION_REG) if (!isHidden(c.id)) codex[`char:${c.id}`] = 2;
+    const meta = { ...defaultMeta(DAY), codex } as MirrorMeta;
+    const run = { ...newRun({ seed: 7, char: 'scholar', map: 'lake', diff: 1, vows: {}, daily: false, plain: false, heart: {}, ticket: 20, free: false, runIndex: 1, rate: 1, startedDay: DAY, term: null, mutator: null, boon: null, unlocks: allUnlocked(), mastery: 0 }), wave: 3 };
+    expect(settleMeta(meta, run, 'death', DAY).meta.rims).toContain('lianhu');
   });
 });

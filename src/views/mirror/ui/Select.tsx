@@ -6,12 +6,15 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useT } from '../../../app/i18n';
 import { mirror } from '../../../app/mirror';
-import { unlocked } from '../../../app/play';
-import { CHARACTER, type CharacterId } from '../../../data/characters';
+import { CHARACTER } from '../../../data/characters';
+import { isHidden, type CharacterId, type HiddenId } from '../types';
+import { charTag, masteryView, openOf } from '../logic/session';
+import { HIDDEN_UI, companionTiles, sealedView } from './hiddenText';
+import { charTagText } from './sand/overlay';
 import { QUEST } from '../../../data/quests';
 import { LETTER } from '../../../data/letters';
 import { Sheet } from '../../../ui/kit';
-import { ARCHETYPE_REG, COMPANION_REG, DIFF_REG } from '../ids';
+import { ARCHETYPE_REG, DIFF_REG } from '../ids';
 import { COMPANIONS, PASSIVES } from '../data';
 import { termLine, termName } from '../data/glossary';
 import { masteryLevel } from '../logic';
@@ -22,7 +25,8 @@ import { nameOf, type T } from './text';
 
 /** How a locked companion is earned in the main game (入画). */
 export function howToEarn(id: CharacterId, t: T): string {
-  const def = CHARACTER[id];
+  // m8: a hidden companion is not the app's: CHARACTER is never read for one
+  const def = isHidden(id) ? undefined : CHARACTER[id];
   if (!def) return '';
   if (def.unlock === 'gift') {
     const l = def.letter ? LETTER[def.letter] : undefined;
@@ -43,8 +47,11 @@ export function CompanionSheet(props: {
   const [focus, setFocus] = useState<CharacterId>(props.current);
   const [info, setInfo] = useState<'mastery' | 'seals' | string | null>(null);
   const strip = useRef<HTMLDivElement>(null);
-  const open = unlocked.value;
-  const list = props.only ? COMPANION_REG.filter((c) => props.only!.includes(c.id)) : COMPANION_REG;
+  // m8 (cr/S-hidden #1): who is open is openOf(m).chars (earned, the app's roster, or the code). A hidden companion
+  // shows on the grid once open, or as a sealed 「？」 tile once any map's deepest reaches 30 (hidden.md §2.3)
+  const open = openOf(mirror.value).chars;
+  const list = companionTiles(mirror.value, t, props.only);
+  const sealed = (id: CharacterId) => isHidden(id) && !open.includes(id);
   const f = list.some((c) => c.id === focus) ? focus : list[0].id;
   // the focused portrait scrolls into the middle of the phone strip
   useEffect(() => {
@@ -55,9 +62,12 @@ export function CompanionSheet(props: {
   }, [f, props.open]);
   if (!props.open) return null;
   const has = open.includes(f);
+  const tag = charTagText(charTag(mirror.value, f), t);
   const c = COMPANIONS[f];
   const m = mirror.value;
-  const lvl = masteryLevel(m.mastery[f] ?? 0);
+  // m8 (ask C): the 心得 the next run takes; while the code lends it, 10 with the own level beside it (as on the 心得 page)
+  const mv = masteryView(m, f);
+  const lvl = mv.lent ? mv.level : masteryLevel(m.mastery[f] ?? 0);
   const bestWave = Object.entries(m.bests).filter(([k]) => k.startsWith(f + '|')).reduce((a, [, b]) => Math.max(a, b?.wave ?? 0), 0);
   const gist = companionGist(f, t) || describePassive(c.passive, t).gist;
   const toggle = (k: string) => setInfo(info === k ? null : k);
@@ -67,7 +77,20 @@ export function CompanionSheet(props: {
       <div class="mj-select">
         <div class="mj-select-grid" role="listbox" aria-label={t('同伴', 'Companions')} ref={strip}>
           {list.map((x) => {
-            const ok = open.includes(x.id);
+            const ok = x.open;
+            if (x.sealed) return (
+              <button
+                type="button"
+                role="option"
+                aria-selected={x.id === f}
+                class={'mj-select-tile is-locked is-sealed' + (x.id === f ? ' is-focus' : '')}
+                onClick={() => setFocus(x.id)}
+                aria-label={x.label}
+              >
+                <Portrait id={x.id} size={56} veiled />
+                <span class="mj-select-name">{x.name}</span>
+              </button>
+            );
             return (
               <button
                 type="button"
@@ -76,21 +99,24 @@ export function CompanionSheet(props: {
                 class={'mj-select-tile' + (x.id === f ? ' is-focus' : '') + (ok ? '' : ' is-locked') + (x.id === props.current ? ' is-current' : '')}
                 onClick={() => setFocus(x.id)}
                 onDblClick={() => ok && props.onPick(x.id)}
-                aria-label={ok ? t(x.zh, x.en) : t(`${x.zh}，还没结伴`, `${x.en}, locked`)}
+                aria-label={x.label}
               >
                 <Portrait id={x.id} size={56} locked={!ok} />
-                <span class="mj-select-name">{t(x.zh, x.en)}</span>
+                <span class="mj-select-name">{x.name}</span>
               </button>
             );
           })}
         </div>
-        <div class="mj-select-detail">
+        {sealed(f) ? <SealedPane id={f as HiddenId} t={t} /> : <div class="mj-select-detail">
           <div class="mj-select-head">
             <Portrait id={f} size={84} locked={!has} />
             <div>
               <h3 class="brush">{nameOf(f, t)}</h3>
+              {tag && <p class="mj-select-meta"><span class="mj-tag">{tag}</span></p>}
               <p class="mj-select-meta">
-                <span>{t(`${termName('mastery', t)} ${lvl} 级`, `${termName('mastery', t)} ${lvl}`)}</span>
+                {mv.lent
+                  ? <span><span class="mj-lend-num">{t(`${termName('mastery', t)} ${lvl} 级（测试码）`, `${termName('mastery', t)} ${lvl} (test code)`)}</span>{t(` · 自有 ${mv.own} 级`, ` · yours ${mv.own}`)}</span>
+                  : <span>{t(`${termName('mastery', t)} ${lvl} 级`, `${termName('mastery', t)} ${lvl}`)}</span>}
                 <button type="button" class="mj-cp-info" aria-expanded={info === 'mastery'} aria-controls="mj-sel-info" aria-label={t('心得是什么', 'What mastery is')} onClick={() => toggle('mastery')}><span aria-hidden="true">ⓘ</span></button>
                 {bestWave > 0 && <span class="muted">{t(` · 最远到第 ${bestWave} 重`, ` · deepest wave ${bestWave}`)}</span>}
               </p>
@@ -141,11 +167,11 @@ export function CompanionSheet(props: {
             <p id="mj-sel-lean" class="mj-cp-gloss" hidden={!c.leans.some((a) => a === info)}>{c.leans.includes(info as never) ? archLine(info as never, t) : ''}</p>
           </div>
           {c.quip && <p class="mj-quip">{t(c.quip.zh, c.quip.en)}</p>}
-        </div>
+        </div>}
         <div class="mj-select-foot">
           <button type="button" class="btn btn-primary mj-wide" disabled={!has} onClick={() => props.onPick(f)}>
             {!has
-              ? t('还没结伴', 'Not yet a companion')
+              ? (sealed(f) ? t(HIDDEN_UI.notYet.zh, HIDDEN_UI.notYet.en) : t('还没结伴', 'Not yet a companion'))
               : props.enters
                 ? t(`以${nameOf(f, (z) => z)}入镜`, `Enter as ${nameOf(f, (_z, e) => e)}`)
                 : t(`选定${nameOf(f, (z) => z)}`, `Choose ${nameOf(f, (_z, e) => e)}`)}
@@ -153,5 +179,24 @@ export function CompanionSheet(props: {
         </div>
       </div>
     </Sheet>
+  );
+}
+
+/** A sealed hidden companion's pane (hidden.md §2.3): no gist, kit, weapon or leans until it is earned. */
+function SealedPane(props: { id: HiddenId; t: T }) {
+  const v = sealedView(mirror.value, props.id, props.t);
+  return (
+    <div class="mj-select-detail mj-hid-pane">
+      <div class="mj-select-head">
+        <Portrait id={props.id} size={84} veiled />
+        <div>
+          <h3 class="brush">{v.head}</h3>
+          <p class="mj-select-meta"><Seal text={v.seal} size={28} style="zhu" label={v.sealWord} /></p>
+        </div>
+      </div>
+      <p class="mj-howto"><span class="mj-tag">{v.button}</span>{v.hint}</p>
+      <p class="mj-hid-flavour">{v.flavour}</p>
+      <p class="mj-select-line muted">{v.deepest}</p>
+    </div>
   );
 }

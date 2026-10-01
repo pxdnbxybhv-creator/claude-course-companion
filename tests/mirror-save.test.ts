@@ -108,6 +108,17 @@ describe('validateRun and migrateRun', () => {
     expect(fixed.coins).toBe(20);
     expect(fixed.diff).toBe(5);
   });
+  // m8:hidden: a run with a hidden companion (山鬼's 猫爪 start) saves and loads like any other (hidden.md §7)
+  it('a run saved with 山鬼 (or 越女, 后羿) loads', () => {
+    for (const char of ['shangui', 'yuenv', 'houyi'] as const) {
+      const r = endWave(beginWave(run({ char })), {
+        wave: 1, moon: 10, xp: 10, field: 0, storeLeft: 0, levels: 0, crates: 0, hearts: [], sleeve: [], lives: 0, once: [], drunk: 0,
+        stats: { kills: 3 }, killsBy: {}, byWeapon: {}, bosses: [], ms: 100,
+      });
+      expect(r.char).toBe(char);
+      expect(validateRun(JSON.parse(JSON.stringify(r))), char).toEqual(r);
+    }
+  });
   it('migrates only its own version', () => {
     const r = run();
     expect(migrateRun(r)).toBe(r);
@@ -166,7 +177,10 @@ describe('settlement into meta', () => {
     const { meta, report } = settleMeta(m0(), r, 'death', DAY);
     expect(deedProgress(meta, 'inkKills').done).toBe(true);
     expect(deedProgress(meta, 'inkFour').done).toBe(true);
-    expect(report.unlocks).toEqual(expect.arrayContaining(['inkstone', 'dotting', 'inkpool']));
+    // m8 ask B: item deeds open nothing (every item is open) and pay 镜屑 once: 画龙点睛 and 墨池 are 仙, 30 each
+    expect(report.unlocks).toEqual(['inkstone']);
+    const done = settleMeta({ ...m0(), deeds: { inkSix: 6, inkKills: 1000 } }, r, 'death', DAY);
+    expect(report.dust - done.report.dust).toBe(30 + 30);
     expect(unlocksOf(meta).weapons.has('inkstone')).toBe(true);
     expect(unlocksOf(m0()).weapons.size).toBe(STARTER_WEAPONS.length);
     expect(unlocksOf(m0()).items.size).toBe(STARTER_ITEMS.length);
@@ -176,7 +190,7 @@ describe('settlement into meta', () => {
     expect(meta.bests['painter|lake|1|0']).toEqual({ wave: 12, heat: 0, at: DAY });
     expect(meta.records.bigHit).toBe(88);
     expect(meta.mapsOpen).toBe(2); // beat the wave-10 boss on 月湖
-    expect(report.dust).toBe(Math.round((12 + 5 + 10) * 1));
+    expect(report.dust).toBe(Math.round((12 + 5 + 10) * 1) + 30 + 30); // m8: + the two 仙 item deeds' 镜屑
     expect(meta.tally['play:painter']).toBe(1);
     // a sum deed adds up across runs; a max deed keeps the best
     const again = settleMeta(meta, run({}, { wave: 3, runStats: { killsSword: 300 } }), 'death', DAY).meta;
@@ -237,7 +251,7 @@ describe('settlement into meta', () => {
     const ink = [{ id: 'brush', t: 1 }, { id: 'inkstone', t: 1 }, { id: 'crane', t: 1 }, { id: 'brush', t: 2 }] as RunSave['weapons'];
     const g = settleMeta(m0(), run({ char: 'gardener' }, { wave: 12, weapons: ink, runStats: { peakInkWeapons: 4 } }), 'death', DAY);
     expect(g.meta.deeds.painterClear).toBe(1);
-    expect(g.report.unlocks).toContain('inkdragon');
+    expect(g.report.unlocks).not.toContain('inkdragon'); // m8 ask B: 墨龙图 is open from the start; the deed pays 镜屑 60
     const three = settleMeta(m0(), run({ char: 'gardener' }, { wave: 31, runStats: { peakInkWeapons: 3 } }), 'death', DAY);
     expect(three.meta.deeds.painterClear ?? 0).toBe(0); // 照破, but not as 画师 and only 3 墨宝
     expect(settleMeta(m0(), run({ char: 'painter' }, { wave: 30 }), 'death', DAY).meta.deeds.painterClear).toBe(1);

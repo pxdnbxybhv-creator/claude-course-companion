@@ -14,10 +14,15 @@ import { todayKey } from '../../../core/date';
 import { Sheet, toast } from '../../../ui/kit';
 import { CoinIcon, fmtCoins } from '../../../ui/coins';
 import { pentadText } from '../../../data/terms';
-import { DIFF_REG, MAP_REG, RECORD_REG, WEAPON_REG, type WeaponId } from '../ids';
-import type { RunReport } from '../types';
+import { DEED_REG, DIFF_REG, MAP_REG, RECORD_REG, WEAPON_REG, type WeaponId } from '../ids';
+import type { HiddenId, RunReport } from '../types';
+import { openOf, setLobby } from '../logic/session';
+import { HIDDEN_SAY, HIDDEN_UI } from './hiddenText';
+import { CompanionSheet } from './Select';
 import { MASTERY } from '../data';
-import { entryQuote, fmtBig } from '../logic';
+import { deedDust, entryQuote, fmtBig } from '../logic';
+import { DEED_REWARD_SAY } from '../data/say';
+import { fill } from './describe';
 import { Icon, Portrait, Seal } from './icons';
 import { BuildRow } from './Shop';
 import { CharacterPanel } from './Panel';
@@ -36,6 +41,8 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
   const lng = lang.value === 'en' ? 'en' : 'zh';
   const snapUrl = useMemo(() => { try { return props.snap?.toDataURL('image/png') ?? null; } catch { return null; } }, [props.snap]);
   const [preview, setPreview] = useState<string | null>(null);
+  // m8:hidden · 「去见见」 opens the companion sheet on the new tile
+  const [meet, setMeet] = useState<HiddenId | null>(null);
   const q = entryQuote(mirror.value, coins.value, play.value.counters['mirror:paid'] ?? 0, todayKey());
   const rs = run.runStats;
   const weapons = (Object.keys(run.byWeapon) as WeaponId[])
@@ -145,8 +152,14 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
               </div>
             </section>
           )}
-          {(report.records.length > 0 || report.firsts.length > 0 || report.seals.length > 0 || report.titles.length > 0 || report.slip !== null) && (
+          {(report.chars?.length ?? 0) > 0 && (
+            <section class="mj-hid-reveals" aria-label={t(HIDDEN_UI.reveals.zh, HIDDEN_UI.reveals.en)}>
+              {report.chars!.map((id) => <HiddenReveal id={id} t={t} onMeet={() => setMeet(id)} />)}
+            </section>
+          )}
+          {(report.records.length > 0 || report.firsts.length > 0 || report.seals.length > 0 || report.titles.length > 0 || report.slip !== null || (report.deeds?.length ?? 0) > 0) && (
             <section class="mj-res-extra">
+              {report.deeds?.map((id) => <DeedPaid id={id} t={t} />)}
               {report.records.map((r) => <p class="mj-res-record">{t('新纪录', 'New record')} · {t(RECORD_REG.find((x) => x.id === r)!.zh, RECORD_REG.find((x) => x.id === r)!.en)}</p>)}
               {report.firsts.map((f) => (
                 <p>{f.startsWith('boss:') ? t(`初破 ${nameOf(f.slice(5), t)} · +10 文`, `First ${nameOf(f.slice(5), t)} · +10`) : t(`初次照破 ${nameOf(f.slice(6).split('|')[0], t)} · ${DIFF_REG[Number(f.split('|')[1])]?.zh ?? ''} · +20 文`, `First clear of ${nameOf(f.slice(6).split('|')[0], t)} on ${DIFF_REG[Number(f.split('|')[1])]?.en ?? ''} · +20`)}</p>
@@ -177,11 +190,35 @@ export function Results(props: { report: RunReport; snap: HTMLCanvasElement | nu
         <button type="button" class="btn" onClick={props.onLobby}>{t('回镜前', 'Back to the mirror')}</button>
         <button type="button" class="btn btn-ghost" onClick={() => void saveImage()}>{t('存画', 'Save the scroll')}</button>
       </div>
+      {meet && <CompanionSheet open current={meet} onClose={() => setMeet(null)} onPick={(id) => { setLobby({ char: id }); setMeet(null); }} />}
       <Sheet open={preview !== null} onClose={() => { if (preview) URL.revokeObjectURL(preview); setPreview(null); }} title={t('画卷', 'The scroll')}>
         {preview && <img class="mj-res-preview" src={preview} alt={t('画卷', 'The scroll')} />}
         {preview && <p class="muted mj-small">{t('长按（或右键）图片即可保存', 'Long-press (or right-click) the picture to save it')}</p>}
       </Sheet>
     </article>
+  );
+}
+
+/**
+ * m8:hidden · the reveal page of a companion this run opened (hidden.md §2.4): the glass ripples, the figure
+ * steps out of its ink outline and fills with colour, the verse types, then the title; 减少动态: the finished card.
+ */
+function HiddenReveal(props: { id: HiddenId; t: (zh: string, en: string) => string; onMeet: () => void }) {
+  const { id, t } = props;
+  const s = HIDDEN_SAY[id];
+  const verse = t(s.verse.zh, s.verse.en);
+  const moon = id === 'houyi' && openOf(mirror.value).chars.includes('change');
+  return (
+    <div class="mj-hid-card" role="group" aria-label={t(s.title.zh, s.title.en)}>
+      <div class="mj-hid-fig" aria-hidden="true">
+        <Portrait id={id} size={120} class="is-colour" />
+        <Portrait id={id} size={120} veiled class="is-ink" />
+      </div>
+      <p class="mj-hid-verse" style={{ '--n': [...verse].length } as Record<string, number>}>{verse}</p>
+      <h2 class="brush mj-hid-title">{t(s.title.zh, s.title.en)}</h2>
+      {moon && <p class="mj-hid-moon muted">{t(HIDDEN_UI.moon.zh, HIDDEN_UI.moon.en)}</p>}
+      <button type="button" class="btn btn-primary" onClick={props.onMeet}>{t(HIDDEN_UI.meet.zh, HIDDEN_UI.meet.en)}</button>
+    </div>
   );
 }
 
@@ -274,4 +311,14 @@ async function drawScroll(r: RunReport, snap: HTMLCanvasElement | null, lng: 'zh
   g.fillStyle = '#b93a2b';
   g.fillText(zh ? '水月幻镜 · 半亩' : 'The Mirror of Water and Moon · Half-Acre', W / 2, 1350);
   return new Promise((k) => c.toBlob((b) => k(b), 'image/png'));
+}
+
+/** m8 ask B (PLAN D27): one line per item deed this run finished, 「心魔 · 成就 · 镜屑 +20」. */
+function DeedPaid(props: { id: NonNullable<RunReport['deeds']>[number]; t: ReturnType<typeof useT> }) {
+  const { id, t } = props;
+  const d = DEED_REG.find((x) => x.id === id);
+  if (!d) return null;
+  const n = deedDust(id);
+  const say = (l: 'zh' | 'en') => fill(DEED_REWARD_SAY[l], (p) => (p === 'n' ? n : undefined), l);
+  return <p class="mj-res-deed">{t(d.zh, d.en)} · {t(say('zh'), say('en'))}</p>;
 }

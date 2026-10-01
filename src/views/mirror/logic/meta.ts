@@ -9,6 +9,7 @@ import {
 import type {
   CharacterId, CodexKey, CodexStage, DailySpec, DateKey, EndCause, MirrorMeta, RunReport, RunSave, SealKey, TitleId, Unlocks,
 } from '../types';
+import { isHidden } from '../types';
 import { DIFFS, HEART, ITEMS, MAPS, MASTERY, PAY } from '../data';
 import { hashString, makeRng } from '../../../core/rng';
 import { addDays, fromKey } from '../../../core/date';
@@ -17,6 +18,7 @@ import { computeStats } from './formulas';
 import { MS_AT_30 } from './run';
 import { dailyFor, newFirsts } from './economy';
 import { pickDistinct } from './rng';
+import { hiddenOpen } from './hidden';
 
 // ───────────────────────────────────────────── unlocks and deeds
 /** Weapons and items open to this account: the starters plus every finished deed's unlock. */
@@ -29,6 +31,21 @@ export function unlocksOf(meta: Pick<MirrorMeta, 'deeds'>): Unlocks {
     else items.add(d.unlocks as ItemId);
   }
   return { weapons, items };
+}
+/**
+ * m8 ask B (PLAN D27): an item deed no longer opens its item (every item is open); the first time it reaches its
+ * goal it pays 镜屑 by the item's tier (PAY.deedDust: 灵 20 = 心魔's, 仙 30, 神 60). Weapon deeds still unlock.
+ */
+export function deedDust(id: DeedId): number {
+  const d = DEED_REG.find((x) => x.id === id)!;
+  const it = ITEMS[d.unlocks as ItemId];
+  return WEAPON_REG.some((w) => w.id === d.unlocks) || !it ? 0 : PAY.deedDust[it.tier - 1];
+}
+/** 镜屑 owed for the item deeds that go from unfinished (before) to finished (after). */
+export function deedDustOf(before: MirrorMeta['deeds'], after: MirrorMeta['deeds']): number {
+  let n = 0;
+  for (const d of DEED_REG) if ((before[d.id] ?? 0) < d.goal && (after[d.id] ?? 0) >= d.goal) n += deedDust(d.id);
+  return n;
 }
 export function deedProgress(meta: Pick<MirrorMeta, 'deeds'>, id: DeedId): { value: number; goal: number; done: boolean } {
   const d = DEED_REG.find((x) => x.id === id)!;
@@ -83,7 +100,7 @@ export function dailySpec(day: DateKey, meta: Pick<MirrorMeta, 'mapsOpen' | 'dee
   const order = COMPANION_REG.map((c) => c.id).filter((id) => unlocked.includes(id));
   const chars = pickDistinct(rng, order.length ? order : ['scholar' as CharacterId], 3);
   const u = unlocksOf(meta);
-  const boons = ITEM_REG.map((i) => i.id).filter((id) => ITEMS[id].tier === 2 && !ITEMS[id].curse && u.items.has(id));
+  const boons = ITEM_REG.map((i) => i.id).filter((id) => ITEMS[id].tier === 2 && !ITEMS[id].curse && !ITEMS[id].wip && u.items.has(id));
   const boon = boons[Math.floor(rng() * boons.length)];
   const mutator = MUTATOR_REG[Math.floor(rng() * MUTATOR_REG.length)].id;
   const tc = termContext(fromKey(day));
@@ -105,7 +122,8 @@ const CHAPTERS: readonly { rim: RimId; keys: () => CodexKey[] }[] = [
   { rim: 'huaniao', keys: () => ITEM_REG.map((m) => `item:${m.id}` as CodexKey) },
   { rim: 'bagua', keys: () => WEAPON_REG.map((m) => `wpn:${m.id}` as CodexKey) },
   { rim: 'panchi', keys: () => BOSS_REG.map((m) => `boss:${m.id}` as CodexKey) },
-  { rim: 'lianhu', keys: () => COMPANION_REG.map((m) => `char:${m.id}` as CodexKey) },
+  // m8: the 13 only (a hidden companion never costs anyone the rim they were close to)
+  { rim: 'lianhu', keys: () => COMPANION_REG.filter((m) => !isHidden(m.id)).map((m) => `char:${m.id}` as CodexKey) },
   { rim: 'yuegong', keys: () => [...ELITE_REG.map((m) => `elite:${m.id}` as CodexKey), ...TREASURE_REG.map((m) => `trs:${m.id}` as CodexKey)] },
 ];
 
@@ -147,6 +165,8 @@ export function settleMeta(meta: MirrorMeta, run: RunSave, cause: EndCause, toda
     const prev = deeds[d.id] ?? 0;
     deeds[d.id] = Math.min(d.goal, d.mode === 'sum' ? prev + v : Math.max(prev, v));
   }
+  const deedPay = deedDustOf(meta.deeds, deeds);
+  const deedsPaid = DEED_REG.filter((d) => (meta.deeds[d.id] ?? 0) < d.goal && (deeds[d.id] ?? 0) >= d.goal && deedDust(d.id) > 0).map((d) => d.id);
   const after = unlocksOf({ deeds });
   const unlocks: (WeaponId | ItemId)[] = [
     ...[...after.weapons].filter((w) => !before.weapons.has(w)), ...[...after.items].filter((i) => !before.items.has(i)),
@@ -218,6 +238,8 @@ export function settleMeta(meta: MirrorMeta, run: RunSave, cause: EndCause, toda
   // 镜屑
   const firstBoss = newFirsts(meta, run).filter((k) => k.startsWith('boss:')).length;
   let dust = Math.round((W + 5 * bosses + 10 * firstBoss) * (1 + run.heat / 10) * (run.plain ? 1.2 : 1) * (run.diff === 0 ? 0.5 : 1));
+  // m8 ask B: an item deed finished for the first time pays its 镜屑 once (never scaled, never retroactive)
+  dust += deedPay;
   // 今日镜
   let daily = dailyFor(meta, today);
   const slips = { ...meta.slips };
@@ -254,10 +276,14 @@ export function settleMeta(meta: MirrorMeta, run: RunSave, cause: EndCause, toda
     ...meta, deeds, codex, tally, bests, records, seals, titles, dust: meta.dust + dust, slips, daily, mapsOpen, diffMax, rims,
     mastery: { ...meta.mastery, [run.char]: mAfter }, rim: meta.rim ?? rims[0] ?? null,
   };
+  // m8: hidden companions this run opened (hidden.md §2.2); the field is present only when one was
+  const hidBefore = hiddenOpen(meta), chars = hiddenOpen({ bests }).filter((id) => !hidBefore.includes(id));
   const report: Omit<RunReport, 'pay'> = {
     run, cause, W, zhaopo, dust,
     mastery: { char: run.char, before: mBefore, after: mAfter, level: lvlAfter, levelUp: lvlAfter > lvlBefore },
     unlocks, records: newRecords, firsts: newFirsts(meta, run), seals: newSeals, titles: newTitles, slip,
+    ...(chars.length ? { chars } : {}),
+    ...(deedsPaid.length ? { deeds: deedsPaid } : {}),
   };
   return { meta: next, report };
 }

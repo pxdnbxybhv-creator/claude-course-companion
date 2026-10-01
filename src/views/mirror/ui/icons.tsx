@@ -5,7 +5,8 @@ import { useEffect, useRef } from 'preact/hooks';
 import { paintPortrait } from '../../walk/characters/portrait';
 import { makeSeal, sealReady } from '../../../ink/seal';
 import { createPainter } from '../paint';
-import type { AtlasId, Painter } from '../types';
+import { HIDDEN_BUSTS } from '../paint/hidden';
+import type { AtlasId, HiddenId, Painter } from '../types';
 
 let shared: Painter | null = null;
 /** One painter for DOM icons, shared by every screen (its icon cache survives runs). */
@@ -61,16 +62,24 @@ export function Icon(props: { id: string; px: number; class?: string; painter?: 
   );
 }
 
-/** A companion's round-fan portrait (a pale 「未」 silhouette when locked). */
-export function Portrait(props: { id: string; size: number; locked?: boolean; class?: string }) {
+/**
+ * A companion's round-fan portrait (a pale 「未」 silhouette when locked). m8: a hidden companion's own bust
+ * (paint/hidden.ts HIDDEN_BUSTS) is tried first; `veiled` paints it as the sealed ink silhouette (hidden.md §2.3).
+ */
+export function Portrait(props: { id: string; size: number; locked?: boolean; veiled?: boolean; class?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
     const d = Math.min(2, window.devicePixelRatio || 1);
     c.width = c.height = Math.round(props.size * d);
+    const hidden = HIDDEN_BUSTS[props.id as HiddenId];
+    if (hidden) {
+      const g = c.getContext('2d');
+      return schedulePaint(() => { if (g) hidden(g, c.width, c.height, !!props.veiled || !!props.locked); }, true);
+    }
     return schedulePaint(() => paintPortrait(c, props.id, !!props.locked, { seal: !!props.locked }), true);
-  }, [props.id, props.size, props.locked]);
+  }, [props.id, props.size, props.locked, props.veiled]);
   return <canvas ref={ref} class={'mj-portrait ' + (props.class ?? '')} style={{ width: props.size + 'px', height: props.size + 'px' }} aria-hidden="true" />;
 }
 

@@ -28,6 +28,45 @@ function coin(b: B, r: number, squash: number, glint: boolean, label?: string, x
 }
 
 const d = (r: number, paint: (b: B, v: number) => void, n = 1, halo: Spec['halo'] = 'dark'): Spec => ({ box: [-r, -r, r, r], n, halo, paint });
+
+// ───────────────────────────── m8 · 月华 as 烘云托月 (art.md §5.1, PLAN A1)
+/** The indigo bleed's peak alpha by map: 天宫's cold-blue wash is the weakest ground for it (art §5.1). */
+const PEARL_BLEED: Readonly<Record<string, number>> = { lake: 0.62, forest: 0.62, palace: 0.75 };
+let pearlBleed = 0.62;
+/** The painter bakes the pearls for its map (paint/index.ts calls this before a drop:moon* bake). */
+export function pearlMap(map: string): void { pearlBleed = PEARL_BLEED[map] ?? 0.62; }
+/** A moon-white pearl made by the wash around it: a radial indigo bleed (dense at the pearl, gone by rg), a
+ *  thin indigo rim, a crescent's shade (lower right), a glint (upper left); v1 adds a four-point star glint
+ *  (the twinkle frame). One flat mark with its bb. */
+function pearl(b: B, r: number, rg: number, v: number) {
+  const a0 = pearlBleed;
+  b.flat((g) => {
+    const gr = g.createRadialGradient(0, 0, r * 0.7, 0, 0, rg);
+    gr.addColorStop(0, `rgba(58,84,140,${a0})`);
+    gr.addColorStop(0.5, `rgba(96,128,186,${(a0 * 0.66).toFixed(3)})`);
+    gr.addColorStop(1, 'rgba(150,182,228,0)');
+    g.fillStyle = gr; g.beginPath(); g.arc(0, 0, rg, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#f7f9ff'; g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#c3d2ea'; g.beginPath(); g.arc(0, 0, r, -0.25, Math.PI * 0.95); g.arc(-r * 0.32, -r * 0.3, r, Math.PI * 0.8, -0.4, true); g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(40,56,100,0.9)'; g.lineWidth = Math.max(0.6, r * 0.14); g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.stroke();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.arc(-r * 0.32, -r * 0.36, r * 0.3, 0, Math.PI * 2); g.fill();
+    if (v === 1) {
+      // the glint's arms stay inside the mark's box (QA: 月华 / 月华珠's twinkle was cut flat at the sprite edge)
+      const c = r * 0.55, L = Math.min(r * 2.1, rg - c - 0.5);
+      for (const [dx, dy] of [[1, 0], [0, 1]]) { g.beginPath(); g.moveTo(c - dx * L, -c - dy * L); g.lineTo(c + dy * r * 0.2, -c + dx * r * 0.2); g.lineTo(c + dx * L, -c + dy * L); g.lineTo(c - dy * r * 0.2, -c - dx * r * 0.2); g.closePath(); g.fill(); }
+    }
+  }, [-rg, -rg, rg, rg]);
+}
+/** 满月's ring of 8 moon motes (turned half a step on v1, so the twinkle frame also turns it). */
+function motes(b: B, R: number, v: number) {
+  b.flat((g) => {
+    for (let i = 0; i < 8; i++) {
+      const a = ((i + (v ? 0.5 : 0)) / 8) * Math.PI * 2, x = Math.cos(a) * R, y = Math.sin(a) * R * 0.92, m = i % 2 ? 1.1 : 1.6;
+      g.fillStyle = 'rgba(40,56,100,0.55)'; g.beginPath(); g.arc(x, y, m + 0.6, 0, Math.PI * 2); g.fill();
+      g.fillStyle = '#f7f9ff'; g.beginPath(); g.arc(x, y, m, 0, Math.PI * 2); g.fill();
+    }
+  }, [-R - 2.3, -R - 2.3, R + 2.3, R + 2.3]);
+}
 /** A spec painted k× larger: every point, stroke width and crisp mark scaled (as paint/index.ts does for 镜主). */
 function larger(sp: Spec, k: number): Spec {
   return {
@@ -45,8 +84,9 @@ function larger(sp: Spec, k: number): Spec {
 }
 
 export const DROP_SPECS: Record<DropKind, Spec> = {
-  moonDrop: d(6, (b) => { b.fill(MOON, [[-4, 0], [-1, -5], [4, -1], [1, 5]], 0.97, 0.3); b.line([[-4, 0], [-1, -5], [4, -1], [1, 5], [-4, 0]], 0.4, 0.5, '#6f8ea6'); b.disc(-0.6, -1.8, 0.9, '#ffffff'); b.line([[-1, -5], [1, 5]], 0.3, 0.35, SILVER); }),
-  moonThick: d(9, (b) => { b.disc(0, 0, 7.4, '#c9d3dc'); b.disc(0, 0, 6.4, MOON); b.disc(-2, -2.2, 1.8, '#ffffff'); b.ring(0, 0, 6.8, 0.5, '#6f8ea6', 0.7); }),
+  // m8: 月华 (1), 月华珠 (5) and 满月 (25) are pearls in an indigo bleed (烘云托月), 2 frames (v1 twinkles)
+  moonDrop: d(12, (b, v) => pearl(b, 5.2, 11.5, v), 2, 'none'),
+  moonThick: d(14.5, (b, v) => { pearl(b, 6.6, 14, v); b.ring(0, 0, 8.6, 0.9, '#7f9cc8', 0.7); }, 2, 'none'),
   goldShard: d(6, (b) => { b.fill('#e9c46a', [[-4, 0], [-1, -5.4], [4, -1], [1, 5]], 0.97, 0.3); b.line([[-4, 0], [-1, -5.4], [4, -1], [1, 5], [-4, 0]], 0.4, 0.6, '#8a5a12'); b.disc(-0.6, -2, 0.9, '#fff6d0'); }),
   carpGold: d(10, (b, v) => { const f = v ? -0.35 : 0.35; b.fill('#e3a83a', rot([[-8, 0], [-2, -4], [5, -3], [8, 0], [5, 3], [-2, 4]], f), 0.95, 0.3); b.fill('#e3a83a', rot([[-7, 0], [-11, -4], [-10, 0], [-11, 4]], f), 0.9, 0.3); b.disc(Math.cos(f) * 5, Math.sin(f) * 5 - 0.8, 0.8, '#111'); b.line(rot([[-3, -2], [-3, 2]], f), 0.3, 0.6, '#8a5a12'); }, 2),
   crateBox: d(11, (b) => { b.fill('#6a1f1c', [[-9, -5], [9, -5], [9, 7], [-9, 7]], 0.97, 0.3); b.fill('#8e2b2b', [[-10, -9], [10, -9], [9, -5], [-9, -5]], 0.97, 0.3); b.line([[-9, -5], [9, -5]], 0.6, 0.8, GOLD); b.fill(GOLD, [[-2, -6], [2, -6], [2, -1], [-2, -1]], 0.97, 0.2); b.disc(0, 2.5, 2.4, '#e9e4d4'); }, 1, 'paper'),
@@ -63,6 +103,8 @@ export const DROP_SPECS: Record<DropKind, Spec> = {
   // 镜宝 fly-ins: the relic's own item icon, half again as large (it hangs over the fallen boss, then flies to you)
   relicMirror: larger(ITEM_SPECS.wangchen, 1.5),
   relicSword: larger(ITEM_SPECS.longyuan, 1.5),
+  // m8:art · 满月 (worth 25): the largest pearl, a second ring and 8 moon motes turning round it
+  moonFull: d(23, (b, v) => { pearl(b, 9, 22, v); b.ring(0, 0, 11.4, 1.1, '#7f9cc8', 0.75); motes(b, 15.5, v); }, 2, 'none'),
 };
 
 // ───────────────────────────────────────────── effects

@@ -6,6 +6,9 @@
 import { describe, expect, it } from 'vitest';
 import { allAtlasIds, createPainter, specOf, abbrev } from '../src/views/mirror/paint';
 import { B, extentOf } from '../src/views/mirror/paint/kit';
+import { HIDDEN_BUSTS, HIDDEN_LOOK, POSE_FRAME, hiddenBustOps } from '../src/views/mirror/paint/hidden';
+import { HIDDEN_CHARS } from '../src/views/mirror/types';
+import { PIGMENTS } from '../src/ink/types';
 import { fmtBig } from '../src/views/mirror/logic/formulas';
 import { Limiter } from '../src/views/mirror/audio/limiter';
 import { BOSS_REG, DROP_REG, ELITE_REG, FX_REG, ITEM_REG, MONSTER_REG, PROJ_REG, SUMMON_REG, TREASURE_REG, WEAPON_REG, COMPANION_REG } from '../src/views/mirror/ids';
@@ -73,6 +76,77 @@ describe('atlas coverage', () => {
     expect(specOf('drop:cashCoin')!.spec.n).toBe(4);
     expect(specOf('boss:mirrorself:2', 'cat')!.ghost).toBe(true);
     expect(specOf('mon:nope')).toBeNull();
+    // m8: the 月华 pearls twinkle (a second frame)
+    for (const id of ['drop:moonDrop', 'drop:moonThick', 'drop:moonFull']) expect(specOf(id)!.spec.n, id).toBe(2);
+    // m8 (A4): every boss phase breathes in two idle frames; 水中月's eight reflections keep one
+    for (const bo of BOSS_REG) for (let p = 0; p < 4; p++) {
+      const { spec } = specOf(`boss:${bo.id}:${p}`)!;
+      expect(spec.n, `${bo.id}:${p}`).toBe(2);
+      // the second idle frame really moves (a breath, not a copy)
+      const pts = (v: number) => { const b = new B(7); spec.paint(b, v); return JSON.stringify(b.ops.map((op) => (op.k === 'stroke' ? op.s.pts : op.bb ?? null))); };
+      expect(pts(1), `${bo.id}:${p} v1`).not.toBe(pts(0));
+    }
+    expect(specOf('boss:moonwater:1:m3')!.spec.n).toBe(1);
+  });
+
+  it('m8 redraw: every crisp mark of a companion, monster, elite, boss, weapon or 月华 pearl carries its bb; companions keep to ≤ 50 ops, every body to ≤ 3 washes a frame', () => {
+    const out: string[] = [];
+    const body = (x: string) => x.startsWith('char:') || x.startsWith('mon:') || x.startsWith('elite:') || x.startsWith('boss:');
+    for (const id of ids.filter((x) => body(x) || x.startsWith('wpn:') || x.startsWith('drop:moon'))) {
+      const { spec } = specOf(id, 'guan')!;
+      for (let v = 0; v < (spec.n ?? 1); v++) {
+        const b = new B(7);
+        spec.paint(b, v);
+        if (b.ops.some((op) => op.k === 'fn' && !op.bb)) out.push(`${id} v${v} flat without bb`);
+        if (body(id)) {
+          const washes = b.ops.filter((op) => op.k === 'stroke' && op.s.kind === 'wash').length;
+          if ((id.startsWith('char:') && b.ops.length > 50) || washes > 3) out.push(`${id} v${v} ${b.ops.length} ops, ${washes} washes`);
+        }
+      }
+    }
+    expect(out).toEqual([]);
+  });
+});
+
+// ── m8:hidden (H6): the three figures, their poses and their busts (hidden.md §3.2, §4.2, §5.2, §2.3) ──
+describe('the hidden companions\' paint', () => {
+  it('pose frames: 越女\'s guard and 后羿\'s draw are a fifth frame of their own atlas id (山鬼 keeps 4)', () => {
+    expect(POSE_FRAME).toEqual({ 'yuenv-guard': 4, 'houyi-draw': 4 });
+    expect(specOf('char:yuenv')!.spec.n).toBe(5);
+    expect(specOf('char:houyi')!.spec.n).toBe(5);
+    expect(specOf('char:shangui')!.spec.n).toBe(4);
+    const ops = (id: string, v: number) => { const b = new B(7); specOf(id)!.spec.paint(b, v); return JSON.stringify(b.ops.map((op) => (op.k === 'stroke' ? op.s.pts : op.bb ?? null))); };
+    for (const [name, v] of Object.entries(POSE_FRAME)) {
+      const id = `char:${name.split('-')[0]}`;
+      expect(ops(id, v), name).not.toBe(ops(id, 0));
+    }
+  });
+
+  it('the busts stay inside the fan\'s 100 × 120 drawing space', () => {
+    for (const id of HIDDEN_CHARS) {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const op of hiddenBustOps(id)) {
+        if (op.k === 'fn') { if (!op.bb) throw new Error(`${id} flat without bb`); x0 = Math.min(x0, op.bb[0]); y0 = Math.min(y0, op.bb[1]); x1 = Math.max(x1, op.bb[2]); y1 = Math.max(y1, op.bb[3]); continue; }
+        for (const q of op.s.pts) { expect(Number.isFinite(q.x) && Number.isFinite(q.y), id).toBe(true); x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y); x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y); }
+      }
+      expect(x0, id).toBeGreaterThanOrEqual(-4); expect(y0, id).toBeGreaterThanOrEqual(-4);
+      expect(x1, id).toBeLessThanOrEqual(110); expect(y1, id).toBeLessThanOrEqual(128);
+      expect(HIDDEN_BUSTS[id], id).toBeTruthy();
+    }
+  });
+
+  it('`veiled` paints the silhouette in ink only: no palette colour, no crisp marks', () => {
+    const ink = PIGMENTS.ink;
+    for (const id of HIDDEN_CHARS) {
+      const v = hiddenBustOps(id, true);
+      expect(v.length, id).toBeGreaterThan(10);
+      for (const op of v) {
+        expect(op.k, id).toBe('stroke');
+        if (op.k === 'stroke') expect(op.s.color, id).toBe(ink);
+      }
+      const look = Object.values(HIDDEN_LOOK[id]).filter((c) => c !== ink);
+      expect(v.some((op) => op.k === 'stroke' && look.includes(op.s.color ?? '')), id).toBe(false);
+    }
   });
 });
 
@@ -248,6 +322,7 @@ describe('the mirror sound effects', () => {
     expect(gongHz(0)).toBeCloseTo(349.23, 1);
     expect(gongHz(5)).toBeCloseTo(698.46, 1);
     expect(gongHz(1) / gongHz(0)).toBeCloseTo(Math.pow(2, 2 / 12), 4);
-    for (let d = 0; d < 10; d++) expect(renderPickup(sr, d).length).toBeGreaterThan(100);
+    // two octaves for the combo and (m8) five more for a 月华珠 / 满月 an octave up
+    for (let d = 0; d < 15; d++) expect(renderPickup(sr, d).length).toBeGreaterThan(100);
   });
 });

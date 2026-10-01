@@ -47,10 +47,10 @@ rod 1 | 伤害 11 · 1 秒一竿 | 受远程、福缘加成 | 甩竿钩住 1 个
 rod 2 | 伤害 18 · 0.95 秒一竿 | 受远程、福缘加成 | 甩竿钩住 1 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。 | 合到神品：一竿钩 3 个敌人。
 rod 3 | 伤害 28 · 0.9 秒一竿 | 受远程、福缘加成 | 甩竿钩住 2 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。 | 合到神品：一竿钩 3 个敌人。
 rod 4 | 伤害 44 · 0.85 秒一竿 | 受远程、福缘加成 | 甩竿钩住 3 个敌人往回拉；钩死的敌人有 25% 几率多掉 1 点月华。
-qingping 1 | 伤害 9 · 1.2 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
-qingping 2 | 伤害 15 · 1.14 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
-qingping 3 | 伤害 24 · 1.08 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
-qingping 4 | 伤害 38 · 1.02 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（75% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 1 | 伤害 11 · 1.2 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 2 | 伤害 18 · 1.14 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 3 | 伤害 29 · 1.08 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（50% 伤害）。 | 合到神品：飞剑第一次暴击时，一把分成 3 把。
+qingping 4 | 伤害 46 · 1.02 秒一次 | 受远程加成 | 放出一把飞剑，最多刺中 2 个敌人，还会飞回来再打一次（75% 伤害）。 | 神品：飞剑第一次暴击时，一把分成 3 把。
 casket 1 | 伤害 6 · 0.5 秒碰一次 | 受远程、近战加成 | 2 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 合到神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
 casket 2 | 伤害 10 · 0.48 秒碰一次 | 受远程、近战加成 | 2 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 合到神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
 casket 3 | 伤害 16 · 0.45 秒碰一次 | 受远程、近战加成 | 3 把剑绕着你转，碰到敌人就砍；飞剑数越多，剑越多。 | 合到神品：每 4 秒剑圈猛地张大到一大圈，撑 1 秒。
@@ -63,7 +63,7 @@ seven 1 | 伤害 7 · 2.2 秒一轮 | 受远程加成 | 从天上落下 3 把剑
 seven 2 | 伤害 12 · 2.09 秒一轮 | 受远程加成 | 从天上落下 3 把剑，各砸一小圈；飞剑数越多，落得越多。 | 合到神品：最后一把剑晕住敌人 0.5 秒。
 seven 3 | 伤害 19 · 1.98 秒一轮 | 受远程加成 | 从天上落下 4 把剑，各砸一小圈；飞剑数越多，落得越多。 | 合到神品：最后一把剑晕住敌人 0.5 秒。
 seven 4 | 伤害 30 · 1.87 秒一轮 | 受远程加成 | 从天上落下 7 把剑，各砸一小圈；飞剑数越多，落得越多。 | 神品：最后一把剑晕住敌人 0.5 秒。
-thunder 1 | 伤害 16 · 1.3 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 2 个敌人身上，每跳一次伤害少 15%。 | 合到神品：每次打中有 15% 几率晕住敌人 0.5 秒。
+thunder 1 | 伤害 13 · 1.3 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 1 个敌人身上，每跳一次伤害少 15%。 | 合到神品：每次打中有 15% 几率晕住敌人 0.5 秒。
 thunder 2 | 伤害 26 · 1.23 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 2 个敌人身上，每跳一次伤害少 15%。 | 合到神品：每次打中有 15% 几率晕住敌人 0.5 秒。
 thunder 3 | 伤害 42 · 1.17 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 3 个敌人身上，每跳一次伤害少 15%。 | 合到神品：每次打中有 15% 几率晕住敌人 0.5 秒。
 thunder 4 | 伤害 66 · 1.11 秒一道 | 受法术加成 | 雷劈中一个敌人，再跳到旁边 6 个敌人身上，每跳一次伤害少 15%。 | 神品：每次打中有 15% 几率晕住敌人 0.5 秒。
@@ -166,12 +166,12 @@ moonsoul | 每闪避一次，射出 3 枚会追人的月魄（受法术加成）
 osmanthus | 闪避上限 +10%；闪避后 2 秒内伤害 +30%。
 lingbo | 走动时留下脚印，每 0.5 秒伤到踩着的敌人；移速越高越痛。
 cushion | 站着不动 1 秒后，回血 +50%（带几个就加几份）。
-cuthair | 伤害 +10%，气血 −2。劫数 +1。
-burnboats | 伤害 +15%，攻速 +15%。从此不能再刷新，也不能锁货。劫数 +1。
+cuthair | 伤害 +4%，气血 −3。劫数 +1。
+burnboats | 伤害 +8%。不能再刷新、锁货；商店只出灵品、仙品、神品的道具和兵器。劫数 +2。
 yanwang | 每重一次：挨了致命一击不倒，剩 1 点血。劫数 +2。
-delusion | 每重多来 20% 的敌人；月华 +10%。劫数 +2。
-innerdemon | 伤害 +20%。每重来个心魔（你 40% 的血和伤害），打倒掉一个镜奁。劫数 +2。
-crackedmirror | 商店多 1 个货位；仙品几率 +5%，神品几率 +5%。劫数 +3。
+delusion | 每重多来 20% 的敌人；每只掉的月华 −15%。劫数 +2。
+innerdemon | 伤害 +6%。每重来个心魔（你 40% 的血和伤害）。劫数 +3。
+crackedmirror | 商店多 1 个货位；仙品几率 +5%，神品几率 +5%。劫数 +2。
 wanjian | 飞剑数 +2。有 8 把以上飞剑时，每 8 秒全部扑进怪堆一次（60% 伤害）。
 inkdragon | 总有一只墨宝变成墨龙：伤害 5 倍，会飞，能穿过敌人。墨龙没了，12 秒后再变一只。
 dugu | 只带 1 把兵器时：套装按 6 把算，伤害变成 3 倍，攻速 +60%。
@@ -184,19 +184,48 @@ jiangjinjiu | 醉意上限变成 200；醉意到 100 以上每下都暴击；醉
 watermoon | 每件兵器出手时，还会朝身后打出一次镜像（50% 伤害）。护甲 −4。
 wangchen | 伤害 +50%，暴击率 +50%，攻速 +20%，移速 +20%
 longyuan | 气血 +100，护甲 +20，移速 +20%。所有兵器攻击距离 +20%。
-yizi | 在敌人最多的地方写个大「镇」字，砸出 30 点伤害（按你兵器加成里最高的一项算）。字在地上留 5 秒，里面的敌人慢 40%，多受 20% 伤害。
-manyuan | 脚下种一片花圃，开 12 秒（最多 2 片）：花瓣每 0.8 秒打圃里 4 个敌人（受造物、回血加成），敌人慢 25%；你站在里面每秒回 1.5 点血。
-yiwang | 往敌人扎堆处撒网，把网里的敌人拖到中间定住 2 秒（精英 1 秒）；之后 4 秒它们多受 25% 伤害，打倒掉 2 倍月华。附近的月华也会飞过来。
-guangling | 弹琴 6 秒：每 0.5 秒一拍，震伤身边的敌人（受法术加成）并让它们慢 40%；小怪每秒有 15% 几率被迷惑 6 秒（福缘越高越容易）。
-yijian | 往前冲一段，冲的时候 0.35 秒打不着你，所有飞剑跟着一路砍过去（150% 伤害）。之后 3 秒绕身的剑转得飞快。冲刺中打倒敌人，冷却少 1 秒。
+huadi | 攻速 +100%。你走路最快只有常人的 50%，移速再高也不会更快。
+zhancao | 剑类兵器打中气血低于 30% 的敌人时伤害 ×2（精英和首领 ×1.5）。
+taishan | 重器伤害 +20%；重器不再击退敌人，改为定住它 0.6 秒（精英减半，首领不会）。
+yiqi | 拳类兵器每打中一下，攻速 +3%，最多叠 10 层；1.5 秒没打中就散了。
+jianxue | 暗器打中时敌人流血：每层每秒掉这一下伤害的 20%，持续 3 秒，最多 5 层。
+baibu | 弓弩伤害随距离变高：敌人离你每远 100，伤害 +10%（最多 +50%）。
+chuge | 乐器打中的敌人易伤：2 秒内受到的所有伤害 +12%（首领 +6%）。
+liaoyuan | 燃烧的敌人倒下时，火会跳到身边最近的 2 个敌人身上（烧 3 秒）。
+jibai | 墨类兵器和墨宝伤害 +60%。墨宝上限 −2。
+houji | 棋子在地上每多待 1 秒，炸开时伤害 +15%（最多 +75%）。
+zuiwo | 醉意每 10 点，受到的伤害 −3%（最多 −30%）。
+chulei | 你带着的每个流派凑套装时都多算 1 件兵器。
+pengyue | 身边地上每有 5 点月华，伤害 +3%（最多 +60%）。拾取范围 −70%。
+rulian | 拾取范围 +30%。飞向你的月华会割伤一路上的敌人，越大颗越痛。
+sanjin | 伤害 +25%。挨打时手里 8% 的月华（最多 60）撒在远处，这重没捡回就没了。
+huobi | 在一家店里每刷新一次（免费的也算），这家店的东西都便宜 5%（最多便宜 25%）。
+qihuo | 商店多 1 个货位，但从此不再出兵器（新的、同款的都没有）。
+dianshi | 每家店 1 次：付同款兵器现价的 150%，不用同款就把一件兵器升一品（神品除外）。
+zhenjiu | 伤害 +20%。每重开始时只有 70% 的气血。治疗效果 −30%。劫数 +2。
+mouhu | 精英多 1 个镜印；打倒精英月华 +100%。劫数 +2。
+lianhuan | 打倒的敌人会炸开，炸伤身边的敌人（它最大气血的 25%）；炸死的也会接着炸。
+xianzhi | 闪避后 1.5 秒内，每件兵器下一击必定暴击，伤害再 +50%（每 2 秒一次）。
+jingru | 站着不动 1 秒，伤害 +12%；站满 3 秒，再 +20%；一走动就没了。
+dongru | 站定 1 秒以上再起步：2 秒内攻速 +30%，闪避 +10%。
+daoge | 兵器打中有 2% 几率让普通敌人倒戈，替你打 6 秒；时间到它就倒下。
+duanbing | 身边每有一个敌人，护甲 +1、伤害 +3%（最多 +6 和 +18%）。
+yizi | 在敌人最多的地方写个大「镇」字，砸出 30 点伤害（按你兵器加成里最高的一项算）。字在地上留 5 秒，里面的敌人慢 40%，多受 25% 伤害。
+manyuan | 脚下种一片花圃，开 12 秒（最多 2 片）：花瓣每 0.8 秒打圃里 4 个敌人（受造物、回血加成），敌人慢 30%；你站在里面每秒回 1.5 点血。
+yiwang | 往敌人扎堆处撒网，把网里的敌人拖到中间定住 2 秒（精英 1 秒）；之后 4 秒它们多受 30% 伤害，打倒掉 2 倍月华。附近的月华也会飞过来。
+guangling | 弹琴 6 秒：每 0.5 秒一拍，震伤身边的敌人（受法术加成）并让它们慢 40%；小怪每秒有 10% 几率被迷惑 6 秒（福缘越高越容易）。
+yijian | 往前冲一段，冲的时候 0.35 秒打不着你，所有飞剑跟着一路砍过去（200% 伤害）。之后 3 秒绕身的剑转得飞快。冲刺中打倒敌人，冷却少 1 秒。
 jiji | 钉下一道符，化成旋涡 5 秒把敌人吸进来（精英只吸 50%，首领不吸）；每 0.5 秒落雷劈 2 个敌人（受法术加成），还会点着它们。
 dianhua | 画轴向前一扫：最多 5 个小怪变成你的墨友，帮你打 10 秒（受造物加成）；精英和首领改为挨一记重的（60 点，受造物加成）。
-wei | 八颗棋子在身边围成一圈，1 秒后收拢：圈里最多 30 个小怪直接被吃掉；精英和首领掉 8% 当前气血，晕住 1 秒。
-pudie | 扑向附近最强的敌人，在空中的 0.4 秒谁也打不到你。落地打 25 点伤害（受近战加成），晕住身边敌人 0.5 秒。落地打倒敌人，扑蝶马上能再用。
+wei | 八颗棋子在身边围成一圈，1 秒后收拢：圈里最多 30 个小怪直接被吃掉；精英和首领掉 12% 当前气血，晕住 1 秒。
+pudie | 扑向附近最强的敌人，在空中的 0.4 秒谁也打不到你。落地打 35 点伤害（受近战加成），晕住身边敌人 0.5 秒。落地打倒敌人，扑蝶马上能再用。
 daoyao | 站定 1.2 秒，这时少受 50% 伤害，连捣 3 下震伤身边的敌人（受回血、气血加成）；然后吃药回 15% 气血，6 秒里伤害 +20%。
-yaoyue | 一口喝到醉意 100：6 秒里暴击率 +30%，每次暴击射出一个追人的诗字（受远程加成，再跳 2 个敌人）；之后宿醉 2 秒，移速 −30%。
+yaoyue | 一口喝到醉意 100：6 秒里暴击率 +40%，每次暴击射出一个追人的诗字（受远程加成，再跳 2 个敌人）；之后宿醉 2 秒，移速 −30%。
 tuodao | 假装往后退一步（这时 0.3 秒打不着你），回身一刀扫一整圈：受你最强的重器和近战加成，把敌人打飞，晕住 1 秒。
 qinghui | 飞上天 2.5 秒，打不着你；落地砸出月光池（40 点伤害，受法术加成），留 6 秒：池里敌人伤害 −30%、慢 20%，你回血 +5。月亮随即变满。
+houqi | 按下守 0.25 秒，最多接 3 招：近身的反斩并击晕，飞来的原路打回（3 倍），首领的蓄力一击被破招。落空会露出破绽，受伤 +25%。
+nvluo | 缠住身边 5 个敌人（拖动就缠那一边的），藤留 6 秒。再按一次扯断：松藤只有 30% 的力，绷紧的必暴击、晕 1.2 秒；敌人被拽到身前，多受伤。
+sheri | 按住拉弓（走得慢），松手射出穿透整条线的大箭，拉得越满越痛。0.9–1.1 秒松手是正中：翻倍，打到首领或精英炸成 9 道日光。过 1.4 秒弦会松。
 tishi | 沿着你走的路写下 7 个字，变成墙留 4 秒：敌人碰到会受伤（受远程加成），还慢 30%。
 cuihua | 场上的花和竹子一起开：每一株给你回 2 点血，并定住附近的敌人 1.5 秒。
 dudiao | 站着不动蓄力（最多 2 秒），然后把附近最强的敌人钩到面前：50 点伤害（受远程加成），蓄满时伤害翻倍。
@@ -210,19 +239,25 @@ dengyue | 一跳 0.8 秒谁也打不着你，落地打 20 点伤害（受远程�
 doujiu | 醉意 +50，6 秒里攻速 +40%；每次暴击迸出诗字，打附近 3 个敌人（暴击伤害的 30%）。
 chitu | 骑上赤兔马 5 秒：移速 +60%，不怕减速、定住和击退；撞到的敌人每 0.3 秒受一次伤（受近战、护甲加成）。
 benyue | 飘在空中 3 秒谁也碰不到你，月光每秒打 6 个敌人（受法术加成）。
-bolan | 升级时有 5 张卡可挑（别人 4 张）；每次商店第一次刷新免费；经验 +10%；开局从 3 把兵器里自己挑一把。 | -
-chunzhong | 收成 +8，而且收成每重涨 8%（别人是 5%）。 | 攻速 −15%
-yuanzhe | 福缘 +15，拾取范围 +40%；打倒的敌人有 5% 几率变成金鲤，多给 5 点月华（福缘越高越容易）。 | 伤害 −5%
-zhiyin | 乐器跟着拍子出手（最多等 0.25 秒），伤害 +20%，范围 +15%。 | 主要受近战加成的兵器，伤害 −25%
-jianyi | 飞剑数 +1；飞剑类兵器暴击率 +10%。 | 主要受近战加成的兵器，伤害 −25%
+lunjian | 按住站桩最多 1.5 秒（移速 50%），只接飞来的，最多 6 个，每个变成一把飞剑；松手一齐射出（受近战加成）。什么都没接住会露出破绽。
+chibao | 赤豹扑向 300 内最强的敌人，守住那里 8 秒，每 0.6 秒咬一口（受近战加成），还把敌人引过去。再按一次叫它跑回来，一路把藤扯断。
+lianzhu | 按住每 0.6 秒上一支箭，最多 3 支；松手扇形射出。最后一支刚上好 0.15 秒内松手，几支箭排成一条直线，每支 变成 1.6 倍。
+bolan | 升级时有 5 张卡可挑（别人 4 张）；每次商店第一次刷新免费；经验 +20%；开局从 3 把兵器里自己挑一把。 | -
+chunzhong | 收成 +8，而且收成每重涨 8%（别人是 5%）。 | 攻速 −10%
+yuanzhe | 福缘 +15，拾取 +40%；每 3 点福缘伤害 +1%（最多 +30%）；打倒的敌人有 5% 几率变金鲤，多给 5 点月华。 | -
+zhiyin | 乐器跟着拍子出手（最多等 0.15 秒），伤害 +12%，范围 +10%。 | 主要受近战加成的兵器，伤害 −25%
+jianyi | 飞剑数 +2；飞剑类兵器暴击率 +10%、攻速 +15%；每把飞剑飞回身边回 1 点气血，每秒最多 3 点。 | 主要受近战加成的兵器，伤害 −25%
 tongzi | 你给敌人的减速、燃烧这类效果多持续 50%；个子更小（身体半径 11，别人 14），更难被打中。 | 主要受近战加成的兵器，伤害 −25%
 chengzhu | 墨宝上限 +2；墨宝多留 50% 的时间，伤害 +35%。 | 墨宝以外的兵器，伤害 −25%
-luozi | 棋子上限 +2，棋子一直留到这一重结束；每次商店多 1 次免费刷新；商店里能先看到下一重的精英和险地。 | 攻速 −10%
-jiuming | 一局有 8 次（每重最多一次）：挨了致命一击不倒，剩 1 点血，1.5 秒打不着。 | 加的气血只算 50%；不能用重器、弓弩
-yaoxiang | 血回满以后，再回的血变成护盾（最多到气血上限的 25%，每秒少 2%）；治疗效果 +15%。 | 射程 −15%
-baipian | 不带酒类兵器也有醉意条，醉意涨得快一倍。 | 自动瞄准会左右晃 10°
+luozi | 棋子上限 +2，棋子一直留到这一重结束；每次商店多 1 次免费刷新；商店里能先看到下一重的精英和险地。 | -
+jiuming | 一局有 8 次（每重最多一次）：挨了致命一击不倒，剩 1 点血，1.5 秒打不着。闪避之后 2 秒内攻速 +30%。 | 加的气血只算 70%；不能用重器、弓弩
+yaoxiang | 血回满以后，再回的血变成护盾（最多到气血上限的 25%，每秒少 2%）；治疗效果 +15%；每 1 点回血伤害 +1%（最多 +30%）。 | -
+baipian | 醉意涨得快一倍，不带酒也有醉意条。暴击率超过 100% 的部分每点变 2% 暴击倍数；每次暴击回 1 点气血，每秒最多 8 点。 | 自动瞄准会左右晃 10°
 yibo | 一下最多掉气血上限的 20%；每打完 3 重近战 +1（最多 +10）；身边一圈里的敌人伤害 −10%。 | 只有 5 个兵器位；商店不卖暗器
 yinqing | 月相 16 秒转一圈：满月时伤害 +30%，新月时伤害 −15%、闪避 +15%；地上的险地只伤她一半，也拖不慢她。 | 加的护甲只算 75%
+jingshen | 闪避只算 50%；每 2 点闪避变 1 点近战。接住一招后，2 秒内兵器前 3 下必暴击；对有破绽的敌人暴击倍数 +30%。 | 闪避只算一半。
+youhuang | 身边 150 以内每有一个敌人，伤害 +2%（最多 +20%）。被女萝扯过的敌人 3 秒内多受 20% 伤害。 | 身子轻：护甲低。
+mangong | 站定 0.35 秒后，弓类伤害 +25%、穿透 +1；走动时弓类攻速 −10%。弓每暴击 9 次，自动补一箭射日。 | 走动时弓射得慢。
 ## en
 qingfeng 1 | 14 damage · every 0.8 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
 qingfeng 2 | 22 damage · every 0.76 s | scales with Melee | Thrusts straight ahead, hitting up to 2 enemies in a line. | At Divine: +20% crit chance.
@@ -272,10 +307,10 @@ rod 1 | 11 damage · every 1 s | scales with Ranged and Luck | Hooks 1 enemy and
 rod 2 | 18 damage · every 0.95 s | scales with Ranged and Luck | Hooks 1 enemy and reels it in; kills have a 25% chance to drop 1 extra moonlight. | At Divine: Hooks 3 enemies at once.
 rod 3 | 28 damage · every 0.9 s | scales with Ranged and Luck | Hooks 2 enemies and reels them in; kills have a 25% chance to drop 1 extra moonlight. | At Divine: Hooks 3 enemies at once.
 rod 4 | 44 damage · every 0.85 s | scales with Ranged and Luck | Hooks 3 enemies and reels them in; kills have a 25% chance to drop 1 extra moonlight.
-qingping 1 | 9 damage · every 1.2 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
-qingping 2 | 15 damage · every 1.14 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
-qingping 3 | 24 damage · every 1.08 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
-qingping 4 | 38 damage · every 1.02 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (75% damage). | Divine: A sword splits into 3 on its first crit.
+qingping 1 | 11 damage · every 1.2 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
+qingping 2 | 18 damage · every 1.14 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
+qingping 3 | 29 damage · every 1.08 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (50% damage). | At Divine: A sword splits into 3 on its first crit.
+qingping 4 | 46 damage · every 1.02 s | scales with Ranged | Launches a flying sword that hits up to 2 enemies, then flies back to hit again (75% damage). | Divine: A sword splits into 3 on its first crit.
 casket 1 | 6 damage · every 0.5 s | scales with Ranged and Melee | 2 swords circle you and cut whatever they touch; Extra swords add more. | At Divine: Every 4 s the ring flares out to a large area for 1 s.
 casket 2 | 10 damage · every 0.48 s | scales with Ranged and Melee | 2 swords circle you and cut whatever they touch; Extra swords add more. | At Divine: Every 4 s the ring flares out to a large area for 1 s.
 casket 3 | 16 damage · every 0.45 s | scales with Ranged and Melee | 3 swords circle you and cut whatever they touch; Extra swords add more. | At Divine: Every 4 s the ring flares out to a large area for 1 s.
@@ -288,7 +323,7 @@ seven 1 | 7 damage · every 2.2 s | scales with Ranged | Drops 3 swords from the
 seven 2 | 12 damage · every 2.09 s | scales with Ranged | Drops 3 swords from the sky, each hitting a small area; Extra swords add more. | At Divine: The last sword stuns for 0.5 s.
 seven 3 | 19 damage · every 1.98 s | scales with Ranged | Drops 4 swords from the sky, each hitting a small area; Extra swords add more. | At Divine: The last sword stuns for 0.5 s.
 seven 4 | 30 damage · every 1.87 s | scales with Ranged | Drops 7 swords from the sky, each hitting a small area; Extra swords add more. | Divine: The last sword stuns for 0.5 s.
-thunder 1 | 16 damage · every 1.3 s | scales with Elemental | Lightning strikes an enemy, then jumps to 2 more nearby, losing 15% each jump. | At Divine: Each hit has a 15% chance to stun for 0.5 s.
+thunder 1 | 13 damage · every 1.3 s | scales with Elemental | Lightning strikes an enemy, then jumps to 1 more nearby, losing 15% each jump. | At Divine: Each hit has a 15% chance to stun for 0.5 s.
 thunder 2 | 26 damage · every 1.23 s | scales with Elemental | Lightning strikes an enemy, then jumps to 2 more nearby, losing 15% each jump. | At Divine: Each hit has a 15% chance to stun for 0.5 s.
 thunder 3 | 42 damage · every 1.17 s | scales with Elemental | Lightning strikes an enemy, then jumps to 3 more nearby, losing 15% each jump. | At Divine: Each hit has a 15% chance to stun for 0.5 s.
 thunder 4 | 66 damage · every 1.11 s | scales with Elemental | Lightning strikes an enemy, then jumps to 6 more nearby, losing 15% each jump. | Divine: Each hit has a 15% chance to stun for 0.5 s.
@@ -391,12 +426,12 @@ moonsoul | Each dodge fires 3 homing moon shards (scales with Elemental).
 osmanthus | Dodge cap +10%; +30% Damage for 2 s after a dodge.
 lingbo | Moving leaves footprints that hurt enemies on them every 0.5 s; the faster you move, the harder.
 cushion | After standing still for 1 s: +50% HP Regen (each copy adds more).
-cuthair | +10% Damage, −2 HP. Curse +1.
-burnboats | +15% Damage, +15% Attack speed. No more rerolls or locks after this. Curse +1.
+cuthair | +4% Damage, −3 HP. Curse +1.
+burnboats | +8% Damage. No more rerolls or locks; the shop only offers Spirit, Immortal and Divine items and weapons. Curse +2.
 yanwang | Once a wave, a lethal hit leaves you at 1 HP. Curse +2.
-delusion | 20% more enemies each wave; +10% moonlight. Curse +2.
-innerdemon | +20% Damage. Each wave your inner demon appears (40% of your HP and damage); beating it drops a casket. Curse +2.
-crackedmirror | +1 shop slot; Immortal odds +5%, Divine odds +5%. Curse +3.
+delusion | 20% more enemies each wave; −15% moonlight from each. Curse +2.
+innerdemon | +6% Damage. Each wave your inner demon appears (40% of your HP and damage). Curse +3.
+crackedmirror | +1 shop slot; Immortal odds +5%, Divine odds +5%. Curse +2.
 wanjian | +2 Extra swords. With 8+ swords, every 8 s they all dive through the thickest crowd (60% damage).
 inkdragon | One ink summon is always an ink dragon: 5× damage, flies and passes through enemies. If it's gone, another turns in 12 s.
 dugu | With exactly 1 weapon: its set counts as 6, it deals 3× damage and gets +60% Attack speed.
@@ -409,19 +444,48 @@ jiangjinjiu | Drunk cap becomes 200; at 100+ Drunk every hit crits; Drunk drains
 watermoon | Every weapon also attacks behind you as a mirror image (50% damage). −4 Armour.
 wangchen | +50% Damage, +50% Crit chance, +20% Attack speed, +20% Move speed
 longyuan | +100 HP, +20 Armour, +20% Move speed. +20% reach on every weapon.
-yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest of Melee, Ranged, Elemental and Craft). It stays 5 s: enemies inside are 40% slower and take 20% more damage.
-manyuan | Plants a flowerbed at your feet for 12 s (max 2): every 0.8 s petals hit 4 enemies inside (scales with Craft and HP Regen), enemies are 25% slower, and you heal 1.5 HP a second inside.
-yiwang | Throws a net where enemies crowd: they're dragged to the middle and held 2 s (elites 1 s). For 4 s they take 25% more damage and drop 2× moonlight. Loose moonlight nearby flies to you.
-guangling | Plays for 6 s: every 0.5 s a beat hits enemies around you (scales with Elemental) and slows them 40%; each second small enemies have a 15% chance to switch sides for 6 s (more with Luck).
-yijian | Dashes forward, untouchable for 0.35 s, with every sword slashing along the path (150% damage). Then orbiting swords spin fast for 3 s. A kill during the dash takes 1 s off the cooldown.
+huadi | +100% Attack speed. You walk at most 50% of the normal pace, however high your Move speed.
+zhancao | Sword weapons deal ×2 to enemies below 30% HP (×1.5 to elites and bosses).
+taishan | +20% Heavy damage; Heavy weapons pin enemies for 0.6 s instead of knocking them back (half on elites, never bosses).
+yiqi | Each Fist hit: +3% Attack speed, stacking 10 times; it fades after 1.5 s without a Fist hit.
+jianxue | Hidden weapon hits cause Bleed: each stack deals 20% of that hit every second for 3 s (max 5 stacks).
+baibu | Bow damage grows with distance: +10% for every 100 between you and the target (max +50%).
+chuge | Music hits make the target Vulnerable: +12% damage taken from everything for 2 s (+6% for bosses).
+liaoyuan | When a burning enemy dies, its fire jumps to the 2 nearest enemies (3 s).
+jibai | Ink weapons and ink summons deal +60% damage. −2 Ink summon limit.
+houji | A stone's blast gains +15% for every 1 s it waited on the board (max +75%).
+zuiwo | −3% damage taken for every 10 Drunk (max −30%).
+chulei | Each weapon class you carry counts 1 extra piece toward its set.
+pengyue | +3% Damage for every 5 moonlight on the ground near you (max +60%). −70% Pickup range.
+rulian | +30% Pickup range. Moonlight flying to you cuts every enemy in its way; bigger pieces cut deeper.
+sanjin | +25% Damage. When hit, 8% of the moonlight in hand (max 60) scatters away; what you don't take back this wave is lost.
+huobi | Each reroll in a shop (free ones too) takes 5% off every price there (max 25% off).
+qihuo | +1 shop slot, but the shop never offers weapons again (no new ones, no copies).
+dianshi | 1 use per shop: pay 150% of a copy's price to raise a weapon a tier without the copy (not Divine).
+zhenjiu | +20% Damage. Every wave starts at 70% HP. −30% Healing. Curse +2.
+mouhu | Elites carry 1 more mirror mark; each one you beat gives +100% moonlight. Curse +2.
+lianhuan | Enemies you kill burst, hurting those nearby for 25% of the victim's max HP; burst kills burst too.
+xianzhi | For 1.5 s after a dodge, each weapon's next attack is a sure crit with +50% damage (at most once every 2 s).
+jingru | Stand still for 1 s: +12% Damage; for 3 s: another +20%. Moving ends it.
+dongru | Start moving after standing still for 1 s or more: +30% Attack speed and +10% Dodge for 2 s.
+daoge | Weapon hits have a 2% chance to turn an ordinary enemy to your side for 6 s; then it falls.
+duanbing | Each enemy close to you: +1 Armour and +3% Damage (max +6 and +18%).
+yizi | Writes a giant 'Hold' glyph where enemies crowd: 30 damage (scales with your highest of Melee, Ranged, Elemental and Craft). It stays 5 s: enemies inside are 40% slower and take 25% more damage.
+manyuan | Plants a flowerbed at your feet for 12 s (max 2): every 0.8 s petals hit 4 enemies inside (scales with Craft and HP Regen), enemies are 30% slower, and you heal 1.5 HP a second inside.
+yiwang | Throws a net where enemies crowd: they're dragged to the middle and held 2 s (elites 1 s). For 4 s they take 30% more damage and drop 2× moonlight. Loose moonlight nearby flies to you.
+guangling | Plays for 6 s: every 0.5 s a beat hits enemies around you (scales with Elemental) and slows them 40%; each second small enemies have a 10% chance to switch sides for 6 s (more with Luck).
+yijian | Dashes forward, untouchable for 0.35 s, with every sword slashing along the path (200% damage). Then orbiting swords spin fast for 3 s. A kill during the dash takes 1 s off the cooldown.
 jiji | Pins a talisman that becomes a vortex for 5 s, pulling enemies in (elites 50%, not bosses); every 0.5 s lightning strikes 2 enemies (scales with Elemental) and sets them alight.
 dianhua | Sweeps a scroll ahead: up to 5 small enemies become your ink allies for 10 s (scales with Craft); elites and bosses take a heavy hit instead (60 damage, scales with Craft).
-wei | Eight stones ring you and close in over 1 s: up to 30 small enemies inside are captured; elites and bosses lose 8% of their current HP and are stunned 1 s.
-pudie | Pounces on the strongest enemy nearby, untouchable for 0.4 s in the air. Landing deals 25 damage (scales with Melee) and stuns enemies around you 0.5 s. A kill on landing resets the cooldown.
+wei | Eight stones ring you and close in over 1 s: up to 30 small enemies inside are captured; elites and bosses lose 12% of their current HP and are stunned 1 s.
+pudie | Pounces on the strongest enemy nearby, untouchable for 0.4 s in the air. Landing deals 35 damage (scales with Melee) and stuns enemies around you 0.5 s. A kill on landing resets the cooldown.
 daoyao | Stands still for 1.2 s taking 50% less damage and pounds 3 times, hurting enemies around you (scales with HP Regen and HP); then drinks: heals 15% of max HP and +20% Damage for 6 s.
-yaoyue | Drinks to 100 Drunk: for 6 s +30% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to 2 more; then 2 s of hangover at −30% Move speed.
+yaoyue | Drinks to 100 Drunk: for 6 s +40% crit chance, and every crit fires a seeking verse glyph (scales with Ranged) that jumps to 2 more; then 2 s of hangover at −30% Move speed.
 tuodao | Feigns a retreat (untouchable for 0.3 s), then spins a full-circle sweep that scales with your best Heavy weapon and Melee, knocking enemies away and stunning them 1 s.
 qinghui | Rises for 2.5 s where nothing can touch you, then lands in a moon pool (40 damage, scales with Elemental) that lasts 6 s: enemies inside deal 30% less and are 20% slower; you get +5 HP Regen. The moon turns full.
+houqi | Guard for 0.25 s and catch up to 3 blows: a body gets a stunning counter-cut, a shot flies back at 3×, a boss's charged strike is broken. A guard that catches nothing leaves you open: +25% damage taken.
+nvluo | Binds the 5 nearest foes (drag to bind the ones that way) for 6 s. Press again to snap: a slack vine hits for 30%, a taut one always crits and stuns 1.2 s; foes are yanked in front of you and take more damage.
+sheri | Hold to draw, let go to loose an arrow through a whole line; the fuller the draw, the harder. Let go at 0.9–1.1 s for a Bullseye: twice, bursting into 9 suns on a boss or elite. Past 1.4 s the string slips.
 tishi | Brushes 7 glyphs of verse along your path; they stand as walls for 4 s, hurting enemies that touch them (scales with Ranged) and slowing them 30%.
 cuihua | Every flower and bamboo you've grown blooms at once: each heals you 2 HP and roots enemies near it for 1.5 s.
 dudiao | Hold still to charge (up to 2 s), then hook the strongest enemy nearby to you: 50 damage (scales with Ranged), twice as hard at full charge.
@@ -435,16 +499,22 @@ dengyue | A 0.8 s hop where nothing can touch you; landing deals 20 damage (scal
 doujiu | +50 Drunk and +40% Attack speed for 6 s; each crit bursts into verse that hits 3 nearby enemies for 30% of the crit.
 chitu | Ride Red Hare for 5 s: +60% Move speed, immune to slow, root and knockback; enemies you run through take damage every 0.3 s (scales with Melee and Armour).
 benyue | Float for 3 s where nothing can touch you while moonbeams strike 6 enemies a second (scales with Elemental).
-bolan | 5 cards to choose from at each level-up (others get 4); the first reroll in every shop is free; +10% XP; picks his starting weapon from 3. | -
-chunzhong | +8 Harvest, and Harvest grows 8% a wave (others 5%). | −15% Attack speed
-yuanzhe | +15 Luck, +40% pickup range; kills have a 5% chance to become a golden carp worth 5 moonlight (more with Luck). | −5% damage
-zhiyin | Music weapons fire on the beat (waiting at most 0.25 s): +20% damage, +15% area. | Weapons that mainly scale with Melee deal 25% less damage
-jianyi | +1 Extra sword; flying-sword weapons +10% crit chance. | Weapons that mainly scale with Melee deal 25% less damage
+lunjian | Hold a stance for up to 1.5 s (50% move speed), catching only shots, up to 6; each becomes a flying sword, all loosed when you let go (scales with Melee). Catch nothing and you are left open.
+chibao | The leopard pounces on the strongest foe within 300 and holds the spot for 8 s, biting every 0.6 s (scales with Melee) and drawing foes to it. Press again to call it back, snapping every vine on the way.
+lianzhu | Hold to nock an arrow every 0.6 s, up to 3; let go to loose them in a fan. Let go within 0.15 s of the last nock and they fly as one line, each 1.6 times.
+bolan | 5 cards to choose from at each level-up (others get 4); the first reroll in every shop is free; +20% XP; picks his starting weapon from 3. | -
+chunzhong | +8 Harvest, and Harvest grows 8% a wave (others 5%). | −10% Attack speed
+yuanzhe | +15 Luck, +40% pickup range; +1% Damage for every 3 Luck (up to +30%); kills have a 5% chance to become a golden carp worth 5 moonlight (more with Luck). | -
+zhiyin | Music weapons fire on the beat (waiting at most 0.15 s): +12% damage, +10% area. | Weapons that mainly scale with Melee deal 25% less damage
+jianyi | +2 Extra swords; flying-sword weapons +10% crit chance and +15% Attack speed; each sword that comes back heals 1 HP, at most 3 a second. | Weapons that mainly scale with Melee deal 25% less damage
 tongzi | Slows, burns and other effects you inflict last 50% longer; your body is smaller (radius 11, others 14), so you're harder to hit. | Weapons that mainly scale with Melee deal 25% less damage
 chengzhu | +2 ink summon limit; ink summons last 50% longer and deal +35%. | Non-ink weapons deal 25% less damage
-luozi | +2 stone limit, and stones last until the wave ends; +1 free reroll every shop; the shop shows the next wave's elites and hazards. | −10% Attack speed
-jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP and untouchable for 1.5 s. | HP gains count 50%; no Heavy or Bow weapons
-yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing. | −15% range
-baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. | Auto-aim sways 10°
+luozi | +2 stone limit, and stones last until the wave ends; +1 free reroll every shop; the shop shows the next wave's elites and hazards. | -
+jiuming | 8 times a run (at most once a wave), a lethal hit leaves you at 1 HP and untouchable for 1.5 s. For 2 s after a dodge: +30% Attack speed. | HP gains count 70%; no Heavy or Bow weapons
+yaoxiang | Healing past full HP becomes a shield (up to 25% of max HP, fading 2% a second); +15% healing; +1% Damage for each 1 HP Regen (up to +30%). | -
+baipian | You have the Drunk meter even without a wine weapon, and it rises twice as fast. Each point of Crit chance over 100% becomes 2% Crit multiplier; each crit heals 1 HP, at most 8 a second. | Auto-aim sways 10°
 yibo | No hit takes more than 20% of max HP; +1 Melee every 3 waves cleared (max +10); enemies in a medium area around you deal 10% less. | Only 5 weapon slots; no Hidden weapons in his shop
 yinqing | A 16 s moon cycle: full moon +30% Damage; new moon −15% Damage and +15% Dodge. Ground hazards hurt her half as much and never slow her. | Armour gains count 75%
+jingshen | Dodge counts 50%; every 2 Dodge becomes 1 Melee. After a catch, your next 3 weapon hits within 2 s crit; +30% Crit damage on marked foes. | Dodge counts half.
+youhuang | +2% Damage for each foe within 150 (max +20%). Foes you snap take 20% more damage for 3 s. | Light: low Armour.
+mangong | After standing still 0.35 s: +25% Bow damage and +1 Pierce; moving: −10% Bow attack speed. Every 9 Bow crits, a free sun arrow. | Bows fire slower while he moves.

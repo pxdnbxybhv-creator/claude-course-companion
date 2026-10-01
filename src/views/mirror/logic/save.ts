@@ -64,6 +64,10 @@ export function validateRun(raw: unknown): RunSave | null {
     let shop: ShopState | null = null;
     if (isObj(r.shop) && Array.isArray(r.shop.slots)) {
       shop = { wave: nat(r.shop.wave, 1e6), k: nat(r.shop.k, 1e6), free: nat(r.shop.free, 99), slots: r.shop.slots.slice(0, 6).map(slot) };
+      // m8: rerolls (free ones too) and 点石成金 upgrades in this shop; copied only when present (readers take
+      // an absent count as 0), so a save without them round-trips unchanged
+      if (r.shop.rolls !== undefined) shop.rolls = nat(r.shop.rolls, 1e6);
+      if (r.shop.upgrades !== undefined) shop.upgrades = nat(r.shop.upgrades, 99);
     }
     const vows = counts<keyof RunSave['vows'] & string>(r.vows, new Set(VOWS.keys()), 3);
     for (const k in vows) vows[k as keyof typeof vows] = Math.min(vows[k as keyof typeof vows] ?? 0, VOWS.get(k) ?? 1);
@@ -94,6 +98,8 @@ export function validateRun(raw: unknown): RunSave | null {
     if (r.revived === true) run.revived = true;
     if (r.tutorial === true) run.tutorial = true;
     if (typeof r.downAt === 'number' && Number.isFinite(r.downAt) && r.downAt >= 1) run.downAt = nat(r.downAt, 9999);
+    // m8: what the test code lent (shape-checked like `heart`); `sand` (模拟场) is never copied: a real save can't carry it
+    if (isObj(r.lent)) run.lent = { heart: counts(r.lent.heart, FACES, 9), mastery: nat(r.lent.mastery, 99) };
     return run;
   } catch {
     return null;

@@ -22,15 +22,18 @@ describe('shop odds and prices', () => {
       expect(o.reduce((a, b) => a + b, 0)).toBeCloseTo(100);
       for (const x of o) expect(x).toBeGreaterThanOrEqual(0);
     }
-    expect(shopOdds(1, 0)).toEqual([90, 10, 0, 0]);
-    expect(shopOdds(20, 0)).toEqual([30, 38, 25, 7]);
+    // m8 (balance.md §2): 凡 down in every band
+    expect(shopOdds(1, 0)).toEqual([85, 15, 0, 0]);
+    expect(shopOdds(20, 0)).toEqual([24, 38, 29, 9]);
     const lucky = shopOdds(20, 100);
     expect(lucky[0]).toBe(0);
-    expect(lucky[1] / lucky[2]).toBeCloseTo(38 / 25);
+    expect(lucky[1] / lucky[2]).toBeCloseTo(38 / 29);
   });
-  it('prices follow round(base × tier × (1 + 0.18(w−1)))', () => {
+  it('prices follow round(base × (1 + 0.18(w−1))) for items and round(base × tier × (1 + 0.15(w−1))) for weapons', () => {
     expect([1, 10, 20, 30].map((w) => itemPrice('whetstone', w))).toEqual([16, 42, 71, 100]);
-    expect([1, 2, 3, 4].map((t) => weaponPrice('qingfeng', t as 1, 1))).toEqual([22, 44, 84, 143]);
+    // m8 (balance.md §3): tier ×1 / 1.8 / 3.2 / 5.2
+    expect([1, 2, 3, 4].map((t) => weaponPrice('qingfeng', t as 1, 1))).toEqual([22, 40, 70, 114]);
+    expect([1, 10, 20, 30].map((w) => weaponPrice('qingfeng', 1, w))).toEqual([22, 52, 85, 118]);
     const r = run({}, { items: { miser: 1 }, vows: { qianlin: 2 } });
     expect(itemPrice('whetstone', 1, r)).toBe(Math.round(16 * 1.16 * 1.08));
   });
@@ -158,13 +161,14 @@ describe('the shop', () => {
 describe('shop · 紫红 items (⚖5)', () => {
   const u = allUnlocked();
   it('item odds by band, with the same luck and 镜裂 rules', () => {
-    expect(itemOdds(1, 0)).toEqual([90, 10, 0, 0]);
-    expect(itemOdds(4, 0)).toEqual([62, 28, 10, 0]);
-    expect(itemOdds(20, 0)).toEqual([20, 34, 34, 12]);
-    expect(itemOdds(30, 0, true)).toEqual([4, 32, 43, 21]);
+    // m8 (balance.md §2)
+    expect(itemOdds(1, 0)).toEqual([80, 20, 0, 0]);
+    expect(itemOdds(4, 0)).toEqual([55, 33, 12, 0]);
+    expect(itemOdds(20, 0)).toEqual([15, 33, 37, 15]);
+    expect(itemOdds(30, 0, true)).toEqual([0, 30, 45, 25]);
     for (const w of [1, 8, 13, 20, 30, 45]) for (const luck of [-80, 0, 150]) expect(itemOdds(w, luck).reduce((a, b) => a + b, 0)).toBeCloseTo(100);
-    // weapons keep the old table
-    expect(shopOdds(20, 0)).toEqual([30, 38, 25, 7]);
+    // weapons have their own table
+    expect(shopOdds(20, 0)).toEqual([24, 38, 29, 9]);
   });
   it('purple and red items are cheaper: 金丹 80, 仙 ×0.7, 神 ×0.6', () => {
     expect(ITEMS.elixir.price).toBe(80);
