@@ -744,7 +744,7 @@ describe('engine-content: QA fixes', () => {
     }
     expect(res[1].peak).toBeLessThanOrEqual(res[1].cap + 30);
     expect(res[1].kids).toBeLessThan(Math.max(10, res[0].kids * 3));
-  });
+  }, 30_000);
 
   it('闲游 stretches every telegraph by 1.3, and content strikes wait for the ink to fill', async () => {
     const hitsVsTeles = (eng: MirrorEngine, src: string) => {

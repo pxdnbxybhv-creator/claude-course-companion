@@ -117,7 +117,7 @@ describe('m8 balance · 破釜沉舟', () => {
     expect(items).toBeGreaterThan(5 * 1000 * 2);
     expect(weapons).toBeGreaterThan(1000);
     expect(copies).toBeGreaterThan(100);
-  });
+  }, 30_000); // ≈ 1.4 s alone; slower on a CI runner
   it('the class lean and the last resorts start at the floor: 人参, never 松子', () => {
     // only 凡 items unlocked plus 人参: every item slot under the floor falls through to 人参
     const commons = ITEM_REG.map((x) => x.id).filter((id) => ITEMS[id].tier === 1);

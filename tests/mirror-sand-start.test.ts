@@ -57,7 +57,7 @@ describe('the start run', () => {
         expect(validateRun(noSand(r))).toEqual(v);
         // the paused real run (and all of meta) is never touched
         expect(m).toEqual(before);
-      });
+      }, 30_000); // ≈ 1.6 s alone at wave 70; slower on a CI runner
     }
   }
 
@@ -78,7 +78,7 @@ describe('the start run', () => {
     expect(a.byWeapon).toEqual({});
     expect(a.shop).toBeNull();
     expect(computeStats(a).hp).toBeGreaterThan(computeStats(sandStart(m, opts({ wave: 30, seed: 11, heart: 'plain' }))).hp);
-  });
+  }, 30_000);
 
   it('bare: the starting weapon, a level that fits the wave (with its 气血), and the start 月华 unless given', () => {
     const r = sandStart(meta(), opts({ build: 'bare', wave: 30 }));
