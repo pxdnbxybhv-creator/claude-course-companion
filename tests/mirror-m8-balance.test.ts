@@ -85,8 +85,8 @@ describe('m8 balance · shop odds (A11)', () => {
 // ═════════════════════════════════════════════ 破釜沉舟 (balance.md §5, PLAN D1–D3)
 
 describe('m8 balance · 破釜沉舟', () => {
-  it('carries +8 伤害, 劫 2, no reroll and the tier floor 2', () => {
-    expect(ITEMS.burnboats.stats).toEqual({ dmg: 8 });
+  it('carries +18 伤害, 劫 2, no reroll and the tier floor 2', () => {
+    expect(ITEMS.burnboats.stats).toEqual({ dmg: 18 });
     expect(ITEMS.burnboats.curse).toBe(2);
     expect(ITEMS.burnboats.price).toBe(55);
     expect(ITEMS.burnboats.fx).toEqual([{ hook: 'shop', do: 'noReroll' }, { hook: 'shop', do: 'tierFloor', t: 2 }]);
@@ -145,7 +145,9 @@ describe('m8 balance · 破釜沉舟', () => {
 
 // ═════════════════════════════════════════════ 劫 (balance.md §4, PLAN D4–D6)
 
-describe('m8 balance · 劫律: a point always gives the monsters more than you', () => {
+// The owner's rule: each 劫 item gives you a little more than it gives the monsters (in paired runs to 31, a small
+// gain in mean waves), so 劫 pays but does not inflate the numbers. A bare point is still a cost; the item pays for it.
+describe('m8 balance · 劫律: a 劫 item gives you a little more than the monsters; a bare point is a cost', () => {
   it('the constants are +1 伤害 / 2% 月华 for you, 2% HP and damage for them', () => {
     expect([F.curseDmg, F.curseMoon, F.curseEnemy]).toEqual([1, 0.02, 0.02]);
   });
@@ -158,14 +160,16 @@ describe('m8 balance · 劫律: a point always gives the monsters more than you'
       expect(dmgX(21, r1) / dmgX(21, r0)).toBeGreaterThan(1);
     }
   });
-  it('the 劫 items: 断发 +4 / −3 max 5, 心魔 +6 劫 3, 镜裂 劫 2, 妄念 月华 −15%; 阎王帖 unchanged', () => {
-    expect(ITEMS.cuthair).toMatchObject({ stats: { dmg: 4, hp: -3 }, max: 5, price: 12, curse: 1 });
-    expect(ITEMS.innerdemon).toMatchObject({ stats: { dmg: 6 }, curse: 3 });
-    expect(ITEMS.crackedmirror.curse).toBe(2);
-    expect([ITEMS.yanwang.curse, ITEMS.delusion.curse]).toEqual([2, 2]);
-    // QA's 劫 pass: the extra enemies' drops made 妄念 a net gain at +10 %
-    expect(ITEMS.delusion.fx?.[0]).toMatchObject({ budgetPct: 20, moonPct: -15 });
-    expect(curseOf({ items: { cuthair: 5, burnboats: 1, innerdemon: 1, crackedmirror: 1, yanwang: 1, delusion: 1 } })).toBe(16);
+  it('the 劫 items: 断发 +5 max 5, 心魔 +6 劫 2 (50% 镜奁), 镜裂 +8 劫 1 (+10/+10), 阎王帖 劫 1, 妄念 月华 +10%', () => {
+    expect(ITEMS.cuthair).toMatchObject({ stats: { dmg: 5 }, max: 5, price: 12, curse: 1 });
+    expect(ITEMS.innerdemon).toMatchObject({ stats: { dmg: 6 }, curse: 2 });
+    expect(ITEMS.innerdemon.fx?.[0]).toMatchObject({ crate: 50 });
+    expect(ITEMS.crackedmirror).toMatchObject({ stats: { dmg: 8 }, curse: 1 });
+    expect(ITEMS.crackedmirror.fx?.[0]).toMatchObject({ n: 1 });
+    expect(ITEMS.crackedmirror.fx?.[1]).toMatchObject({ t3: 10, t4: 10 });
+    expect([ITEMS.yanwang.curse, ITEMS.delusion.curse]).toEqual([1, 2]);
+    expect(ITEMS.delusion.fx?.[0]).toMatchObject({ budgetPct: 20, moonPct: 10 });
+    expect(curseOf({ items: { cuthair: 5, burnboats: 1, innerdemon: 1, crackedmirror: 1, yanwang: 1, delusion: 1 } })).toBe(13);
   });
 });
 

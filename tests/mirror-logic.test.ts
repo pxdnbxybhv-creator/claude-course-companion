@@ -167,8 +167,8 @@ describe('stats', () => {
     expect([six.melee, six.armor, six.area, six.hp]).toEqual([9, 4 + 6, 15, 36 + 10]); // 重器 6-set (⚖5): 近战 9, 护甲 6, 气血 10
     const cursed = computeStats({ ...r, items: { cuthair: 2 } });
     expect(cursed.curse).toBe(2);
-    expect(cursed.dmg).toBe(8 + 2); // m8 劫律: 断发 +4 each, 劫 +1 伤害 a point
-    expect(cursed.hp).toBe(36 - 6);
+    expect(cursed.dmg).toBe(10 + 2); // m8 劫律: 断发 +5 each, 劫 +1 伤害 a point
+    expect(cursed.hp).toBe(36);
     const armoured = computeStats({ ...r, items: { ironbone: 1, needle: 1, guardmirror: 10 } });
     expect(armoured.armor).toBe(4 + 8 + 20);
     expect(armoured.dmg).toBe(40); // 铁骨 + 定海神针 share a +40% cap

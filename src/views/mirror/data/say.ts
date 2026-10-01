@@ -338,12 +338,12 @@ export const ITEM_SAY: Readonly<Record<string, ItemSay>> = {
     more: [b('合铸用的兵器副本不受此限', 'weapon copies for merging are exempt'), b('{@cinnabar}、{@whetstone}这类凡品从此买不到', 'Common stackers such as {@cinnabar} and {@whetstone} no longer appear')],
   },
   yanwang: { say: b('每重一次：挨了致命一击不倒，剩 {=1} 点血。', 'Once a wave, a lethal hit leaves you at {=1} HP.') },
-  delusion: { say: b('每重多来 {f0.budgetPct}% 的敌人；每只掉的月华 −{-f0.moonPct}%。', '{f0.budgetPct}% more enemies each wave; −{-f0.moonPct}% moonlight from each.') },
+  delusion: { say: b('每重多来 {f0.budgetPct}% 的敌人；每只掉的月华 +{f0.moonPct}%。', '{f0.budgetPct}% more enemies each wave; +{f0.moonPct}% moonlight from each.') },
   innerdemon: {
     say: b('每重来个心魔（你 {f0.pct}% 的血和伤害）。', 'Each wave your inner demon appears ({f0.pct}% of your HP and damage).'),
     more: [b('打倒它有 {f0.crate}% 的机会掉一个镜奁', 'beating it has a {f0.crate}% chance to drop a casket')],
   },
-  crackedmirror: { say: b('商店多 {f0.n} 个货位；仙品几率 +{f1.t3}%，神品几率 +{f1.t4}%。', '+{f0.n} shop {f0.n?slot|slots}; Immortal odds +{f1.t3}%, Divine odds +{f1.t4}%.') },
+  crackedmirror: { say: b('商店多 {f0.n} 个货位；仙品几率 +{f1.t3}%，神品 +{f1.t4}%。', '+{f0.n} shop {f0.n?slot|slots}; Immortal odds +{f1.t3}%, Divine odds +{f1.t4}%.') },
   wanjian: { say: b('有 {f0.p.min} 把以上飞剑时，每 {f0.p.every} 秒全部扑进怪堆一次（{f0.p.pct}% 伤害）。', 'With {f0.p.min}+ swords, every {f0.p.every} s they all dive through the thickest crowd ({f0.p.pct}% damage).') },
   inkdragon: {
     say: b('总有一只墨宝变成墨龙：伤害 {f0.p.x} 倍，会飞，能穿过敌人。墨龙没了，{f0.p.every} 秒后再变一只。', 'One ink summon is always an ink dragon: {f0.p.x}× damage, flies and passes through enemies. If it\'s gone, another turns in {f0.p.every} s.'),
